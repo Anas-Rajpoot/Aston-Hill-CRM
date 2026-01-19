@@ -1,0 +1,118 @@
+<?php
+
+namespace App\Http\Controllers\SuperAdmin;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Spatie\Permission\Models\Role;
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
+use App\Notifications\UserApprovalStatusNotification;
+use Spatie\Permission\PermissionRegistrar;
+
+
+class UserController extends Controller
+{
+    public function index()
+    {
+        $users = User::latest()->paginate(10);
+        return view('super-admin.users.index', compact('users'));
+    }
+
+    public function show(User $user)
+    {
+        $roles = Role::orderBy('name')->get();
+        return view('super-admin.users.show', compact('user', 'roles'));
+    }
+
+    public function review(User $user)
+    {
+        $roles = Role::orderBy('name')->get();
+        $userRoleIds = $user->roles()->pluck('id')->toArray();
+
+        return view('super-admin.users.review', compact('user', 'roles', 'userRoleIds'));
+    }
+    
+    public function approve(Request $request, User $user)
+    {
+        $validated = $request->validate([
+            'status' => 'required|in:approved,pending,rejected',
+            'roles' => 'nullable|array',
+            'roles.*' => 'exists:roles,id',
+
+            'rejection_reason' => 'nullable|string|max:255',
+        ]);
+        
+        if ($validated['status'] === 'approved') {
+            $request->validate([
+                'roles' => 'required|array|min:1',
+            ], [
+                'roles.required' => 'Please select at least one role when approving a user.',
+            ]);
+        }
+        // dd($user);
+        $oldStatus = $user->status;
+        $newStatus = $validated['status'];
+
+        $user->status = $newStatus;
+
+        if ($newStatus === 'approved') {
+            $user->approved_by = auth()->id();
+            $user->approved_at = now();
+
+            $user->rejected_by = null;
+            $user->rejected_at = null;
+            $user->rejection_reason = null;
+
+            // assign roles only when approved
+            $roleNames = Role::whereIn('id', $validated['roles'] ?? [])
+                ->pluck('name')
+                ->toArray();
+
+            $user->syncRoles($roleNames);
+
+        } elseif ($newStatus === 'rejected') {
+            $user->rejected_by = auth()->id();
+            $user->rejected_at = now();
+            $user->rejection_reason = $validated['rejection_reason'] ?? null;
+
+            // recommended: clear roles if rejected
+            $user->syncRoles([]);
+
+        } else { // pending
+            // recommended: clear roles while pending
+            $user->syncRoles([]);
+        }
+
+        $user->save();
+
+        // clear Spatie cache after role changes
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        // Notify user only if status changed (queued if notification implements ShouldQueue)
+        if ($oldStatus !== $newStatus) {
+            $user->notify(new UserApprovalStatusNotification($newStatus));
+        }
+
+        return redirect()
+            ->route('super-admin.users.index')
+            ->with('status', 'User status updated successfully.');
+    }
+
+    public function update(Request $request, User $user)
+    {
+        $user->update($request->except('password'));
+
+        if($request->password){
+            $user->update(['password'=>Hash::make($request->password)]);
+        }
+
+        return back();
+    }
+
+    public function destroy(User $user)
+    {
+        $user->delete();
+        return redirect()->route('users.index');
+    }
+}
