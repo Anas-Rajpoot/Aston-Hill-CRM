@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\SuperAdmin\UserController;
 use App\Http\Middleware\SuperAdminMiddleware;
 use App\Http\Controllers\Auth\TwoFactorController;
+use App\Http\Controllers\AccountController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -18,10 +19,12 @@ Route::get('super-admin/dashboard', function () {
     return view('dashboard');
 })->middleware(['auth', SuperAdminMiddleware::class])->name('super-admin.dashboard');
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'verified', 'approved', '2fa'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    Route::resource('accounts', AccountController::class)->middleware('crud_permission:accounts');
 });
 
 

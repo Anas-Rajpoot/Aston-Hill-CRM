@@ -20,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => PermissionMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
             'approved' => \App\Http\Middleware\CheckStatus::class,
+            'crud_permission' => \App\Http\Middleware\CrudPermission::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

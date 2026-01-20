@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             // RoleSeeder::class,
             SuperAdminSeeder::class,
             CountrySeeder::class,
+            PermissionSeeder::class,
         ]);
         // User::factory(10)->create();
 
