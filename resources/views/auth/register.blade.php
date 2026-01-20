@@ -92,51 +92,9 @@
     </form>
 </x-guest-layout>
 
-<!-- <script>
-    const countrySelect = document.getElementById('country');
-    const timezoneInput = document.getElementById('timezone');
-
-    let countryTimezones = {};
-
-    fetch('https://restcountries.com/v3.1/all?fields=name,cca2,timezones')
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Failed to fetch countries');
-            }
-            return response.json();
-        })
-        .then(countries => {
-            if (!Array.isArray(countries)) {
-                throw new Error('Invalid countries data');
-            }
-
-            countrySelect.innerHTML = '<option value="">Select country</option>';
-
-            countries
-                .sort((a, b) => a.name.common.localeCompare(b.name.common))
-                .forEach(country => {
-                    countryTimezones[country.cca2] = country.timezones?.[0] || '';
-
-                    const option = document.createElement('option');
-                    option.value = country.cca2;
-                    option.textContent = country.name.common;
-                    countrySelect.appendChild(option);
-                });
-        })
-        .catch(error => {
-            console.error(error);
-            alert('Unable to load countries');
-        });
-
-    countrySelect.addEventListener('change', function () {
-        timezoneInput.value = countryTimezones[this.value] || '';
-    });
-</script> -->
-
 <script>
     const countrySelect = document.getElementById('country');
     const timezoneInput = document.getElementById('timezone');
-    console.log(countrySelect);
 
     countrySelect.addEventListener('change', function () {
         const timezone = this.options[this.selectedIndex].dataset.timezone || '';

@@ -53,5 +53,4 @@ Route::get('/.well-known/{any}', function () {
     return response()->noContent();
 })->where('any', '.*');
 
-
 require __DIR__.'/auth.php';

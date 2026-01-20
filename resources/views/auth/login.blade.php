@@ -45,5 +45,6 @@
                 {{ __('Log in') }}
             </x-primary-button>
         </div>
+        <input type="hidden" name="redirect" value="{{ request('redirect') }}">
     </form>
 </x-guest-layout>

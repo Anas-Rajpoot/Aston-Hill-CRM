@@ -44,7 +44,9 @@ class NewUserApprovalNotification extends Notification implements ShouldQueue
             ->line('Email: ' . $this->user->email)
             ->action(
                 'Review User',
-                route('super-admin.users.review', $this->user->id)
+                route('login', [
+                    'redirect' => url()->signedRoute('super-admin.users.review', ['user' => $this->user->id])
+                ])
             );
     }
 

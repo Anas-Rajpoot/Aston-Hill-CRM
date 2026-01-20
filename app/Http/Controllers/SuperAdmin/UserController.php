@@ -50,7 +50,7 @@ class UserController extends Controller
                 'roles.required' => 'Please select at least one role when approving a user.',
             ]);
         }
-        // dd($user);
+        
         $oldStatus = $user->status;
         $newStatus = $validated['status'];
 

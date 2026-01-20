@@ -38,11 +38,22 @@ class AuthenticatedSessionController extends Controller
 
         $user = Auth::user();
         
-        if ($user->hasRole('superadmin')) {
-            $request->session()->put('2fa_passed', true);
-            return redirect('super-admin/dashboard');
+        if ($request->filled('redirect')) {
+            $target = $request->input('redirect');
+
+            // only allow your app URL
+            if (str_starts_with($target, config('app.url'))) {
+                $request->session()->put('url.intended', $target);
+            }
+            // $request->session()->put('url.intended', $request->input('redirect'));
         }
 
+        if ($user->hasRole('superadmin')) {
+            $request->session()->put('2fa_passed', true);
+
+            return redirect()->intended(route('dashboard'));// return redirect('dashboard');
+        }
+        
         if ($user->status !== 'approved') {
             Auth::logout();
 
@@ -63,7 +74,8 @@ class AuthenticatedSessionController extends Controller
 
         // Normal login
         $request->session()->put('2fa_passed', true);
-        return redirect()->route('dashboard');
+        return redirect()->intended(route('dashboard'));
+        // return redirect()->route('dashboard');
     }
 
     /**
