@@ -18,7 +18,7 @@ class SuperAdminSeeder extends Seeder
             [
                 'name' => 'Super Admin',
                 'password' => bcrypt('password'),
-                'status' => 'active'
+                'status' => 'approved'
             ]
         );
 

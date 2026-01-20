@@ -15,7 +15,7 @@ use DateTime;
 use DateTimeZone;
 use Illuminate\Support\Facades\Notification;
 use App\Notifications\NewUserApprovalNotification;
-
+use App\Models\Country;
 
 class RegisteredUserController extends Controller
 {
@@ -24,7 +24,11 @@ class RegisteredUserController extends Controller
      */
     public function create(): View
     {
-        return view('auth.register');
+        $countries = Country::where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'code', 'timezone']);
+    
+        return view('auth.register', compact('countries'));
     }
 
     /**

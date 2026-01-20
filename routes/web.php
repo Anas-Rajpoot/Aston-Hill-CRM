@@ -48,4 +48,10 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/2fa/verify', [TwoFactorController::class, 'verify'])->name('2fa.verify');
 });
 
+
+Route::get('/.well-known/{any}', function () {
+    return response()->noContent();
+})->where('any', '.*');
+
+
 require __DIR__.'/auth.php';

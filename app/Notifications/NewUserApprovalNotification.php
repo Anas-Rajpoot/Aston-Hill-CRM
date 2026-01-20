@@ -6,15 +6,18 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use App\Models\User;
 
 class NewUserApprovalNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
+    public User $user;
+
     /**
      * Create a new notification instance.
      */
-    public function __construct($user)
+    public function __construct(User $user)
     {
         $this->user = $user;
     }
@@ -41,7 +44,7 @@ class NewUserApprovalNotification extends Notification implements ShouldQueue
             ->line('Email: ' . $this->user->email)
             ->action(
                 'Review User',
-                route('admin.users.review', $this->user->id)
+                route('super-admin.users.review', $this->user->id)
             );
     }
 
@@ -56,7 +59,7 @@ class NewUserApprovalNotification extends Notification implements ShouldQueue
             'user_id' => $this->user->id,
             'name'    => $this->user->name,
             'email'   => $this->user->email,
-            'url'     => route('admin.users.review', $this->user->id),
+            'url'     => route('super-admin.users.review', $this->user->id),
             'message' => 'New user pending approval'
         ];
     }

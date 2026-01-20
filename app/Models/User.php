@@ -22,6 +22,7 @@ class User extends Authenticatable
         'name','email','password','phone','country',
         'timezone','cnic_number','status', 'approved_by',
         'approved_at','rejected_by','rejected_at','rejection_reason',
+        'two_factor_enabled'
     ];
 
     /**

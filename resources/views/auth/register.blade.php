@@ -29,7 +29,16 @@
             <!-- <x-text-input id="country" class="block mt-1 w-full" type="text" name="country" :value="old('country')" required autocomplete="country" /> -->
             <select id="country" name="country"
                 class="block mt-1 w-full border-gray-300 rounded-md shadow-sm">
-                <option value="">Loading countries...</option>
+                
+                <option value="" disabled selected>
+                    Select your country
+                </option>
+
+                @foreach ($countries as $country)
+                    <option value="{{ $country->code }}" data-timezone="{{ $country->timezone }}">
+                        {{ $country->name }}
+                    </option>
+                @endforeach
             </select>
             <x-input-error :messages="$errors->get('country')" class="mt-2" />
         </div>
@@ -83,7 +92,7 @@
     </form>
 </x-guest-layout>
 
-<script>
+<!-- <script>
     const countrySelect = document.getElementById('country');
     const timezoneInput = document.getElementById('timezone');
 
@@ -122,6 +131,15 @@
     countrySelect.addEventListener('change', function () {
         timezoneInput.value = countryTimezones[this.value] || '';
     });
+</script> -->
+
+<script>
+    const countrySelect = document.getElementById('country');
+    const timezoneInput = document.getElementById('timezone');
+    console.log(countrySelect);
+
+    countrySelect.addEventListener('change', function () {
+        const timezone = this.options[this.selectedIndex].dataset.timezone || '';
+        timezoneInput.value = timezone;
+    });
 </script>
-
-
