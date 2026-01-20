@@ -1,60 +1,105 @@
-<h2 class="text-xl font-semibold mb-4">User Approval</h2>
+@extends('layouts.app')
 
-<div class="mb-4">
-    <p><strong>Name:</strong> {{ $user->name }}</p>
-    <p><strong>Email:</strong> {{ $user->email }}</p>
-    <p><strong>Status:</strong> {{ $user->status }}</p>
-</div>
+@section('title', 'User Approval')
 
-@if ($errors->any())
-    <div class="mb-4 rounded-lg bg-red-50 border border-red-200 text-red-700 px-4 py-3">
-        <ul class="list-disc pl-5">
-            @foreach ($errors->all() as $err)
-                <li>{{ $err }}</li>
-            @endforeach
-        </ul>
-    </div>
-@endif
+@section('page-title', 'User Approval')
+@section('page-desc', 'Review user and update approval status and roles.')
 
-<form method="POST" action="{{ route('super-admin.users.approve', $user->id) }}">
-    @csrf
-    @method('PUT')
+@section('content')
+<div class="bg-white border rounded-2xl shadow-sm overflow-hidden">
 
-    <div class="mb-4">
-        <label class="block font-medium mb-1">Status</label>
-        <select id="status" name="status" class="border rounded-md px-3 py-2 w-full" required>
-            <option value="">Select</option>
-            <option value="approved">Approved</option>
-            <option value="pending">Pending</option>
-            <option value="rejected">Rejected</option>
-        </select>
-    </div>
-
-    <div id="rolesBox" class="mb-4 hidden">
-        <label class="block font-medium mb-2">Assign Roles (Only if Approved)</label>
-
-        <div class="border rounded-md p-3 grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-auto">
-            @foreach($roles as $role)
-                <label class="flex items-center gap-2 text-sm">
-                    <input type="checkbox" name="roles[]" value="{{ $role->id }}" class="rounded border-gray-300">
-                    <span>{{ $role->name }}</span>
-                </label>
-            @endforeach
+    <div class="px-6 py-5 border-b flex items-start justify-between gap-4">
+        <div>
+            <h2 class="text-lg font-semibold text-gray-900">User Approval</h2>
+            <p class="text-sm text-gray-500">Update status and assign roles when approved.</p>
         </div>
 
-        <p class="text-xs text-gray-500 mt-2">Select one or more roles.</p>
+        <a href="{{ route('super-admin.users.index') }}"
+           class="text-sm px-3 py-2 rounded-md border hover:bg-gray-50">
+            Back to Users
+        </a>
     </div>
 
-    <div id="rejectReasonBox" class="mb-4 hidden">
-        <label class="block font-medium mb-1">Rejection Reason (optional)</label>
-        <input type="text" name="rejection_reason" class="border rounded-md px-3 py-2 w-full"
-               placeholder="e.g. Missing documents">
+    <div class="px-6 py-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="p-4 rounded-xl bg-gray-50 border">
+            <div class="text-xs text-gray-500">Name</div>
+            <div class="font-medium text-gray-900">{{ $user->name }}</div>
+        </div>
+
+        <div class="p-4 rounded-xl bg-gray-50 border">
+            <div class="text-xs text-gray-500">Email</div>
+            <div class="font-medium text-gray-900 break-all">{{ $user->email }}</div>
+        </div>
+
+        <div class="p-4 rounded-xl bg-gray-50 border">
+            <div class="text-xs text-gray-500">Status</div>
+            <div class="font-medium text-gray-900">{{ ucfirst($user->status) }}</div>
+        </div>
     </div>
 
-    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md">
-        Submit
-    </button>
-</form>
+    @if ($errors->any())
+        <div class="mx-6 mb-4 rounded-xl bg-red-50 border border-red-200 text-red-700 px-4 py-3">
+            <ul class="list-disc pl-5 text-sm">
+                @foreach ($errors->all() as $err)
+                    <li>{{ $err }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
+    <form method="POST" action="{{ route('super-admin.users.approve', $user->id) }}" class="px-6 pb-6">
+        @csrf
+        @method('PUT')
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select id="status" name="status"
+                        class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
+                    <option value="">Select</option>
+                    <option value="approved">Approved</option>
+                    <option value="pending">Pending</option>
+                    <option value="rejected">Rejected</option>
+                </select>
+            </div>
+
+            <div id="rejectReasonBox" class="hidden">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Rejection Reason (optional)</label>
+                <input type="text" name="rejection_reason"
+                       class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                       placeholder="e.g. Missing documents">
+            </div>
+        </div>
+
+        <div id="rolesBox" class="mt-5 hidden">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Assign Roles (Only if Approved)</label>
+
+            <div class="border rounded-xl p-3 bg-gray-50 max-h-64 overflow-auto">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    @foreach($roles as $role)
+                        <label class="flex items-center gap-2 text-sm text-gray-800 bg-white border rounded-lg px-3 py-2">
+                            <input type="checkbox" name="roles[]" value="{{ $role->id }}"
+                                   class="rounded border-gray-300">
+                            <span>{{ $role->name }}</span>
+                        </label>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-6 flex items-center justify-end gap-3">
+            <a href="{{ route('super-admin.users.index') }}"
+               class="px-4 py-2 rounded-lg border text-sm hover:bg-gray-50">
+                Cancel
+            </a>
+
+            <button type="submit"
+                    class="px-5 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
+                Save Changes
+            </button>
+        </div>
+    </form>
+</div>
 
 <script>
     (function () {
@@ -69,6 +114,7 @@
         }
 
         status.addEventListener('change', toggle);
-        toggle(); // initial
+        toggle();
     })();
 </script>
+@endsection
