@@ -10,16 +10,32 @@
             Dashboard
         </a>
 
-        <a href="{{ route('super-admin.users.index') }}"
+        @role('superadmin')
+            <a href="{{ route('super-admin.users.index') }}"
+                class="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium
+                {{ request()->routeIs('super-admin.users.*')
+                    ? 'bg-indigo-50 text-indigo-700'
+                    : 'text-gray-700 hover:bg-gray-50' }}">
+                    👥 <span>Users</span>
+            </a>
+        @endrole
+
+        <a href="{{ route('roles.index') }}"
            class="block px-3 py-2 rounded-md text-sm font-medium
-           {{ request()->routeIs('super-admin.users.*') ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700 hover:bg-gray-50' }}">
-            Users
+           {{ request()->routeIs('roles.*') ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700 hover:bg-gray-50' }}">
+            Roles
         </a>
 
         <a href="{{ route('accounts.index') }}"
            class="block px-3 py-2 rounded-md text-sm font-medium
            {{ request()->routeIs('accounts.*') ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700 hover:bg-gray-50' }}">
             Account
+        </a>
+
+        <a href="{{ route('login-logs.index') }}"
+           class="block px-3 py-2 rounded-md text-sm font-medium
+           {{ request()->routeIs('login-logs.*') ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700 hover:bg-gray-50' }}">
+            Login Logs
         </a>
     </nav>
 

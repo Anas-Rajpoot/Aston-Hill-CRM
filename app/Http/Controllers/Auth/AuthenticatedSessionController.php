@@ -12,6 +12,7 @@ use App\Models\Otp;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Hash;
 use App\Services\SmsService;
+use App\Models\UserLoginLog;
 
 class AuthenticatedSessionController extends Controller
 {
@@ -35,6 +36,12 @@ class AuthenticatedSessionController extends Controller
         }
 
         $request->session()->regenerate();
+
+        UserLoginLog::where('user_id', auth()->id())
+                        ->whereNull('logout_at')
+                        ->latest('login_at')
+                        ->limit(1)
+                        ->update(['session_id' => $request->session()->getId()]);
 
         $user = Auth::user();
         

@@ -6,6 +6,8 @@ use App\Http\Controllers\SuperAdmin\UserController;
 use App\Http\Middleware\SuperAdminMiddleware;
 use App\Http\Controllers\Auth\TwoFactorController;
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\RoleController;
+use App\Http\Controllers\LoginLogController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -20,11 +22,25 @@ Route::get('super-admin/dashboard', function () {
 })->middleware(['auth', SuperAdminMiddleware::class])->name('super-admin.dashboard');
 
 Route::middleware(['auth', 'verified', 'approved', '2fa'])->group(function () {
+    
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     Route::resource('accounts', AccountController::class)->middleware('crud_permission:accounts');
+
+    Route::resource('roles', RoleController::class);
+
+    Route::get('login-logs', [LoginLogController::class, 'index'])->name('login-logs.index');
+        Route::get('login-logs/datatable', [LoginLogController::class, 'datatable'])->name('login-logs.datatable');
+
+        Route::get('login-logs/export/csv', [LoginLogController::class, 'exportCsv'])->name('login-logs.export.csv');
+
+        Route::get('login-logs/timeline/{user}', [LoginLogController::class, 'timeline'])->name('login-logs.timeline');
+
+        Route::post('login-logs/force-logout/log/{log}', [LoginLogController::class, 'forceLogoutLog'])->name('login-logs.force-logout-log');
+        Route::post('login-logs/force-logout/user/{user}', [LoginLogController::class, 'forceLogoutUser'])->name('login-logs.force-logout-user');
+
 });
 
 
