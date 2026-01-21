@@ -15,8 +15,27 @@ class UserController extends Controller
 {
     public function index()
     {
-        $users = User::latest()->paginate(10);
-        return view('super-admin.users.index', compact('users'));
+        $q = request('q');
+    $role = request('role');
+    $status = request('status');
+
+    $users = User::query()
+        ->when($q, fn($qq) => $qq->where(function($w) use ($q){
+            $w->where('name','like',"%$q%")->orWhere('email','like',"%$q%");
+        }))
+        ->when($status, fn($qq) => $qq->where('status', $status))
+        ->when($role, function($qq) use ($role){
+            $qq->whereHas('roles', fn($r)=>$r->where('name', $role));
+        })
+        ->latest()
+        ->paginate(10);
+
+        $roles = Role::orderBy('name')->get();
+
+        return view('super-admin.users.index', compact('users', 'roles'));
+
+        // $users = User::latest()->paginate(10);
+        // return view('super-admin.users.index', compact('users'));
     }
 
     public function show(User $user)

@@ -110,7 +110,7 @@
             { data: 'logout_at', name: 'logout_at' },
             { data: 'status_badge', orderable: false, searchable: false },
             { data: 'duration', orderable: false, searchable: false },
-            { data: 'ip', name: 'ip' },
+            { data: 'ip_address', name: 'ip' },
             { data: 'is_suspicious', name: 'is_suspicious' },
             { data: 'actions', orderable: false, searchable: false },
         ],

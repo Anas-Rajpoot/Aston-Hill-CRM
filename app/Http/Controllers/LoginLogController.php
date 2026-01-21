@@ -173,7 +173,7 @@ class LoginLogController extends Controller
                     optional($log->login_at)->toDateTimeString(),
                     optional($log->logout_at)->toDateTimeString(),
                     $log->active_seconds,
-                    $log->ip,
+                    $log->ip_address,
                     $log->country,
                     $log->is_suspicious ? 'YES' : 'NO',
                     $log->suspicious_reason,
