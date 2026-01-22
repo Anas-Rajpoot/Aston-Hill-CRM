@@ -6,8 +6,9 @@ use App\Http\Controllers\SuperAdmin\UserController;
 use App\Http\Middleware\SuperAdminMiddleware;
 use App\Http\Controllers\Auth\TwoFactorController;
 use App\Http\Controllers\AccountController;
-use App\Http\Controllers\RoleController;
+use App\Http\Controllers\SuperAdmin\RoleController;
 use App\Http\Controllers\LoginLogController;
+use App\Http\Controllers\SuperAdmin\PermissionController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -29,17 +30,26 @@ Route::middleware(['auth', 'verified', 'approved', '2fa'])->group(function () {
 
     Route::resource('accounts', AccountController::class)->middleware('crud_permission:accounts');
 
-    Route::resource('roles', RoleController::class);
-
     Route::get('login-logs', [LoginLogController::class, 'index'])->name('login-logs.index');
-        Route::get('login-logs/datatable', [LoginLogController::class, 'datatable'])->name('login-logs.datatable');
+    Route::get('login-logs/datatable', [LoginLogController::class, 'datatable'])->name('login-logs.datatable');
 
-        Route::get('login-logs/export/csv', [LoginLogController::class, 'exportCsv'])->name('login-logs.export.csv');
+    Route::get('login-logs/export/csv', [LoginLogController::class, 'exportCsv'])->name('login-logs.export.csv');
 
-        Route::get('login-logs/timeline/{user}', [LoginLogController::class, 'timeline'])->name('login-logs.timeline');
+    Route::get('login-logs/timeline/{user}', [LoginLogController::class, 'timeline'])->name('login-logs.timeline');
 
-        Route::post('login-logs/force-logout/log/{log}', [LoginLogController::class, 'forceLogoutLog'])->name('login-logs.force-logout-log');
-        Route::post('login-logs/force-logout/user/{user}', [LoginLogController::class, 'forceLogoutUser'])->name('login-logs.force-logout-user');
+    Route::post('login-logs/force-logout/log/{log}', [LoginLogController::class, 'forceLogoutLog'])->name('login-logs.force-logout-log');
+    Route::post('login-logs/force-logout/user/{user}', [LoginLogController::class, 'forceLogoutUser'])->name('login-logs.force-logout-user');
+
+    Route::get('/expenses/datatable', [\App\Http\Controllers\ExpenseController::class, 'datatable'])
+    ->name('expenses.datatable');
+
+    Route::get('/expenses/export/csv', [\App\Http\Controllers\ExpenseController::class, 'exportCsv'])
+        ->name('expenses.export.csv');
+
+    Route::get('/expenses/{expense}/export/csv', [\App\Http\Controllers\ExpenseController::class, 'exportSingleCsv'])
+        ->name('expenses.export.single');
+
+    Route::resource('expenses', \App\Http\Controllers\ExpenseController::class);
 
 });
 
@@ -55,6 +65,14 @@ Route::middleware(['auth','role:superadmin'])->prefix('super-admin')->name('supe
 
     // Route::post('/admin/users/{user}/approve', [UserController::class, 'update'])
     //     ->name('admin.users.update');
+
+    Route::resource('roles', RoleController::class);
+    Route::get('roles/{role}/permissions', [RoleController::class, 'editPermissions'])->name('roles.permissions.edit');
+    Route::put('roles/{role}/permissions', [RoleController::class, 'updatePermissions'])->name('roles.permissions.update');
+    Route::put('roles/{role}/permissions/module/{module}', [RoleController::class, 'updatePermissionsModule'])
+    ->name('roles.permissions.updateModule');
+
+    Route::resource('permissions', PermissionController::class);
 });
 
 // 2FA routes

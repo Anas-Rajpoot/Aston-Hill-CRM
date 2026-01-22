@@ -1,13 +1,28 @@
 @extends('layouts.app')
 
 @section('content')
+
 <div class="bg-white rounded-xl shadow p-6">
     <div class="flex items-center justify-between mb-4">
-        <h2 class="text-xl font-semibold">Roles</h2>
-        <a href="{{ route('roles.create') }}"
-           class="bg-indigo-600 text-white px-4 py-2 rounded-md">Add Role</a>
-    </div>
+        <div>
+            <h2 class="text-xl font-semibold">Roles</h2>
+            <x-breadcrumbs />
+        </div>
 
+        <div class="flex items-center gap-2">
+            @php
+                $trail = session('breadcrumbs_trail', []);
+                $backUrl = count($trail) > 1 ? ($trail[count($trail)-2]['url'] ?? url()->previous()) : url()->previous();
+            @endphp
+
+            <a href="{{ $backUrl }}"
+                class="text-sm text-gray-600 hover:text-indigo-600">
+                ← Back
+            </a>
+            <a href="{{ route('super-admin.roles.create') }}"
+            class="bg-indigo-600 text-white px-4 py-2 rounded-md">Add Role</a>
+        </div>
+    </div>
     @if(session('success'))
         <div class="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
             {{ session('success') }}
@@ -36,13 +51,18 @@
                         <td class="p-3">{{ $role->guard_name }}</td>
                         <td class="p-3">
                             <div class="flex justify-end gap-2">
+                                <a class="px-3 py-1 rounded bg-blue-100 text-blue-700"
+                                   href="{{ route('super-admin.roles.permissions.edit', $role) }}">
+                                   Permissions
+                                </a>
+
                                 <a class="px-3 py-1 rounded bg-gray-100"
-                                   href="{{ route('roles.show', $role) }}">View</a>
+                                   href="{{ route('super-admin.roles.show', $role) }}">View</a>
 
                                 <a class="px-3 py-1 rounded bg-indigo-100 text-indigo-700"
-                                   href="{{ route('roles.edit', $role) }}">Edit</a>
+                                   href="{{ route('super-admin.roles.edit', $role) }}">Edit</a>
 
-                                <form method="POST" action="{{ route('roles.destroy', $role) }}"
+                                <form method="POST" action="{{ route('super-admin.roles.destroy', $role) }}"
                                       onsubmit="return confirm('Delete this role?')">
                                     @csrf
                                     @method('DELETE')

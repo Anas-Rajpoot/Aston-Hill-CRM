@@ -10,6 +10,7 @@ use App\Exports\LoginLogsExport;
 use Illuminate\Support\Facades\DB;
 use App\Models\User;
 use Yajra\DataTables\Facades\DataTables;
+use App\Support\Format;
 
 
 class LoginLogController extends Controller
@@ -20,8 +21,6 @@ class LoginLogController extends Controller
         $roles = DB::table('roles')->select('id','name')->orderBy('name')->get();
 
         return view('login-logs.index', compact('users', 'roles'));
-
-        return view('login-logs.index');
     }
 
     public function datatable(Request $request)
@@ -57,6 +56,16 @@ class LoginLogController extends Controller
         }
 
         return DataTables::eloquent($query)
+
+            ->editColumn('login_at', function (UserLoginLog $log) {
+                $tz = Format::tzForLog($log);
+                return Format::dt($log->login_at, $tz);
+            })
+
+            ->editColumn('logout_at', function (UserLoginLog $log) {
+                $tz = Format::tzForLog($log);
+                return Format::dt($log->logout_at, $tz);
+            })
             ->addColumn('user', function (UserLoginLog $log) {
                 return $log->user
                     ? $log->user->name . ' (' . $log->user->email . ')'
@@ -129,8 +138,10 @@ class LoginLogController extends Controller
         return datatables()->of($query)
             ->addColumn('user', fn($r) => $r->user->name)
             ->addColumn('email', fn($r) => $r->user->email)
-            ->editColumn('login_at', fn($r) => $r->login_at?->format('Y-m-d H:i:s'))
-            ->editColumn('logout_at', fn($r) => $r->logout_at?->format('Y-m-d H:i:s') ?? '—')
+
+            ->editColumn('login_at', fn($r) => $r->login_at?->format('d-M-Y h:i A') ?? '—')
+            ->editColumn('logout_at', fn($r) => $r->logout_at?->format('d-M-Y h:i A') ?? '—')
+
             ->make(true);
     }
 
@@ -170,8 +181,8 @@ class LoginLogController extends Controller
                 fputcsv($file, [
                     optional($log->user)->name,
                     optional($log->user)->email,
-                    optional($log->login_at)->toDateTimeString(),
-                    optional($log->logout_at)->toDateTimeString(),
+                    Format::dt($log->login_at, $log->user?->timezone),
+                    Format::dt($log->logout_at, $log->user?->timezone),
                     $log->active_seconds,
                     $log->ip_address,
                     $log->country,

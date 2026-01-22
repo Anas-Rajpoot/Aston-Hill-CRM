@@ -17,9 +17,9 @@
             <div class="border rounded p-3">
                 <div class="flex items-center justify-between">
                     <div class="text-sm font-medium">
-                        Login: {{ $log->login_at?->format('Y-m-d H:i:s') }}
+                        Login: {{ $log->login_at?->format('d-M-Y h:i A') }}
                         <span class="text-gray-500">|</span>
-                        Logout: {{ $log->logout_at?->format('Y-m-d H:i:s') ?? '— (Online)' }}
+                        Logout: {{ $log->logout_at?->format('d-M-Y h:i A') ?? '— (Online)' }}
                     </div>
                     <div class="text-xs px-2 py-1 rounded {{ $log->logout_at ? 'bg-gray-200 text-gray-800' : 'bg-green-100 text-green-700' }}">
                         {{ $log->logout_at ? 'Offline' : 'Online' }}

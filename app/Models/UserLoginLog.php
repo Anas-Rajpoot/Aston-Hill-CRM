@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Carbon\Carbon;
 
 class UserLoginLog extends Model
 {
@@ -37,6 +38,7 @@ class UserLoginLog extends Model
     {
         if (!$this->login_at) return null;
         $end = $this->logout_at ?? now();
-        return max(0, $end->diffInSeconds($this->login_at));
+        return Carbon::parse($this->login_at)->diffInSeconds($end);
+        // return max(0, $end->diffInSeconds($this->login_at));
     }
 }

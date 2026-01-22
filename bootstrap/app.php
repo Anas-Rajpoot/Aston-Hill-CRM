@@ -22,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'approved' => \App\Http\Middleware\CheckStatus::class,
             'crud_permission' => \App\Http\Middleware\CrudPermission::class,
         ]);
+        $middleware->append(\App\Http\Middleware\BreadcrumbTrail::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

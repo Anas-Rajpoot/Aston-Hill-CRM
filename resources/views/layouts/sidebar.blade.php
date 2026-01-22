@@ -20,12 +20,25 @@
             </a>
         @endrole
 
-        <a href="{{ route('roles.index') }}"
-           class="block px-3 py-2 rounded-md text-sm font-medium
-           {{ request()->routeIs('roles.*') ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700 hover:bg-gray-50' }}">
-            Roles
-        </a>
+        @role('superadmin')
+            <a href="{{ route('super-admin.roles.index') }}"
+                class="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium
+                {{ request()->routeIs('super-admin.roles.*')
+                    ? 'bg-indigo-50 text-indigo-700'
+                    : 'text-gray-700 hover:bg-gray-50' }}">
+                     <span>Roles</span>
+            </a>
+        @endrole
 
+        @role('superadmin')
+            <a href="{{ route('super-admin.permissions.index') }}"
+                class="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium
+                {{ request()->routeIs('super-admin.permissions.*')
+                    ? 'bg-indigo-50 text-indigo-700'
+                    : 'text-gray-700 hover:bg-gray-50' }}">
+                    <span>Permissions</span>
+            </a>
+        @endrole
         <a href="{{ route('accounts.index') }}"
            class="block px-3 py-2 rounded-md text-sm font-medium
            {{ request()->routeIs('accounts.*') ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700 hover:bg-gray-50' }}">
