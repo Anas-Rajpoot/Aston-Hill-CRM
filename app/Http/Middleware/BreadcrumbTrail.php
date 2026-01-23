@@ -4,80 +4,93 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\Response;
 
 class BreadcrumbTrail
 {
-    /**
-     * Handle an incoming request.
-     *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
-     */
-
     public function handle(Request $request, Closure $next)
     {
-        if (
-            $request->isMethod('get') &&
-            !$request->ajax() &&
-            !$request->wantsJson()
-        ) {
-            $trail = session()->get('breadcrumbs_trail', []);
-
-            $current = [
-                'label' => $this->labelFromRequest($request),
-                'url'   => $request->fullUrl(),
-            ];
-
-            // Avoid duplicates (refresh / same page)
-            if (!empty($trail)) {
-                $last = end($trail);
-                if (($last['url'] ?? null) === $current['url']) {
-                    return $next($request);
-                }
-            }
-
-            // If user jumped from a totally different flow,
-            // keep trail short by limiting to last 6 items
-            $trail[] = $current;
-            $trail = array_slice($trail, -6);
-
-            session()->put('breadcrumbs_trail', $trail);
+        if (!$this->shouldTrack($request)) {
+            return $next($request);
         }
+
+        $tabId = $this->getTabId($request);
+        if (!$tabId) {
+            return $next($request); // if no tab id, skip tracking
+        }
+
+        $label = $this->labelFromRequest($request);
+        if ($label === '') {
+            return $next($request);
+        }
+
+        $url = (string) $request->fullUrl();
+
+        $sessionKey = "breadcrumbs_trail.$tabId";
+        $trail = session()->get($sessionKey, []);
+
+        $current = ['label' => $label, 'url' => $url];
+
+        // ✅ Reset on root pages (sidebar entry points)
+        if ($request->routeIs('dashboard', 'super-admin.roles.index', 'accounts.index', 'expenses.index')) {
+            session()->put($sessionKey, [$current]);
+            return $next($request);
+        }
+
+        // ✅ Remove duplicates by URL and label
+        $trail = array_values(array_filter($trail, fn($item) => ($item['url'] ?? null) !== $url));
+        $trail = array_values(array_filter($trail, fn($item) => ($item['label'] ?? null) !== $label));
+
+        $trail[] = $current;
+        $trail = array_slice($trail, -8);
+
+        session()->put($sessionKey, $trail);
 
         return $next($request);
     }
 
-    private function labelFromRequest(Request $request): string
+    private function getTabId(Request $request): ?string
     {
-        // Best: use route name -> nice title
-        $name = optional($request->route())->getName();
+        // 1) query param (best)
+        $tabId = $request->query('__tab');
 
-        if ($name) {
-            // convert route name to readable label
-            // e.g. super-admin.roles.permissions.edit => Roles / Permissions
-            $parts = explode('.', $name);
-
-            // remove common prefixes
-            $parts = array_values(array_filter($parts, fn($p) => !in_array($p, ['super-admin'])));
-
-            // last part often "index/create/edit/show"
-            $map = [
-                'index' => 'List',
-                'create' => 'Create',
-                'edit' => 'Edit',
-                'show' => 'View',
-                'permissions' => 'Permissions',
-            ];
-
-            $pretty = array_map(function ($p) use ($map) {
-                $p = $map[$p] ?? $p;
-                return ucfirst(str_replace('-', ' ', $p));
-            }, $parts);
-
-            return implode(' / ', $pretty);
+        // 2) cookie fallback (for refresh/direct access)
+        if (!$tabId) {
+            $tabId = $request->cookie('__tab');
         }
 
-        // fallback: URL path
-        return ucfirst(trim(str_replace('-', ' ', $request->path()), '/')) ?: 'Home';
+        if (!$tabId || strlen($tabId) > 80) return null;
+
+        return $tabId;
+    }
+
+
+    private function shouldTrack(Request $request): bool
+    {
+        if (!$request->isMethod('get')) return false;
+        if ($request->ajax() || $request->wantsJson()) return false;
+        if ($request->routeIs('login', 'register', 'password.*')) return false;
+        if (!$request->route()) return false;
+
+        $path = ltrim($request->path(), '/');
+        if (str_starts_with($path, '.well-known')) return false;
+        if (str_starts_with($path, 'build/') || str_starts_with($path, 'storage/') || str_starts_with($path, 'vendor/')) return false;
+
+        return true;
+    }
+
+    private function labelFromRequest(Request $request): string
+    {
+        $name = $request->route()?->getName();
+        if (!$name) return '';
+
+        $map = [
+            'dashboard' => 'Dashboard',
+            'super-admin.roles.index' => 'Roles',
+            'super-admin.roles.permissions.edit' => 'Roles / Permissions',
+            'expenses.index' => 'Expenses',
+            'expenses.create' => 'Expenses / Create',
+        ];
+
+        return $map[$name] ?? ucfirst(str_replace(['.', '-'], [' / ', ' '], $name));
     }
 }

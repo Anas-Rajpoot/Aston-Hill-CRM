@@ -9,6 +9,7 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\SuperAdmin\RoleController;
 use App\Http\Controllers\LoginLogController;
 use App\Http\Controllers\SuperAdmin\PermissionController;
+use App\Http\Controllers\ExpenseController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -16,13 +17,13 @@ Route::get('/', function () {
 
 Route::get('/dashboard', function () {
     return view('dashboard');
-})->middleware(['auth', 'verified', 'approved', '2fa'])->name('dashboard');
+})->middleware(['auth', 'verified', 'approved', '2fa_or_superadmin'])->name('dashboard');
 
 Route::get('super-admin/dashboard', function () {
     return view('dashboard');
 })->middleware(['auth', SuperAdminMiddleware::class])->name('super-admin.dashboard');
 
-Route::middleware(['auth', 'verified', 'approved', '2fa'])->group(function () {
+Route::middleware(['auth', 'verified', 'approved', '2fa_or_superadmin'])->group(function () {
     
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -40,16 +41,11 @@ Route::middleware(['auth', 'verified', 'approved', '2fa'])->group(function () {
     Route::post('login-logs/force-logout/log/{log}', [LoginLogController::class, 'forceLogoutLog'])->name('login-logs.force-logout-log');
     Route::post('login-logs/force-logout/user/{user}', [LoginLogController::class, 'forceLogoutUser'])->name('login-logs.force-logout-user');
 
-    Route::get('/expenses/datatable', [\App\Http\Controllers\ExpenseController::class, 'datatable'])
-    ->name('expenses.datatable');
+    Route::get('/expenses/datatable', [ExpenseController::class, 'datatable'])->name('expenses.datatable');
+    Route::get('/expenses/export/csv', [ExpenseController::class, 'exportCsv'])->name('expenses.export.csv');
+    Route::get('/expenses/{expense}/export/csv', [ExpenseController::class, 'exportSingleCsv'])->name('expenses.export.single');
 
-    Route::get('/expenses/export/csv', [\App\Http\Controllers\ExpenseController::class, 'exportCsv'])
-        ->name('expenses.export.csv');
-
-    Route::get('/expenses/{expense}/export/csv', [\App\Http\Controllers\ExpenseController::class, 'exportSingleCsv'])
-        ->name('expenses.export.single');
-
-    Route::resource('expenses', \App\Http\Controllers\ExpenseController::class);
+    Route::resource('expenses', ExpenseController::class);
 
 });
 

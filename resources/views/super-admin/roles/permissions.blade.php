@@ -2,6 +2,22 @@
 
 @section('content')
 <h2>Set Permissions for Role: {{ $role->name }}</h2>
+<x-breadcrumbs />
+
+<div class="flex items-center gap-2">
+    @php
+      $tabId = request()->query('__tab') ?? request()->cookie('__tab');
+      $trail = $tabId ? session("breadcrumbs_trail.$tabId", []) : [];
+      $backUrl = count($trail) > 1 ? ($trail[count($trail)-2]['url'] ?? url()->previous()) : url()->previous();
+    @endphp
+
+    <a href="{{ $backUrl }}"
+        class="text-sm text-gray-600 hover:text-indigo-600">
+        ← Back
+    </a>
+    <a href="{{ route('super-admin.roles.create') }}"
+    class="bg-indigo-600 text-white px-4 py-2 rounded-md">Add Role</a>
+</div>
 
 @if(session('success')) <p style="color:green">{{ session('success') }}</p> @endif
 @if(session('error')) <p style="color:red">{{ session('error') }}</p> @endif

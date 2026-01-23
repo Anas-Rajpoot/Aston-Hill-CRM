@@ -1,17 +1,18 @@
 @php
-  $trail = session('breadcrumbs_trail', []);
+  $tabId = request()->query('__tab') ?? request()->cookie('__tab');
+  $trail = $tabId ? session("breadcrumbs_trail.$tabId", []) : [];
 @endphp
 
-@if(count($trail) > 0)
-  <nav class="mb-4 text-sm text-gray-600">
-    <ol class="flex items-center flex-wrap gap-2">
+@if(count($trail))
+  <nav class="mb-3 text-sm text-gray-600">
+    <ol class="flex flex-wrap items-center gap-2">
       @foreach($trail as $item)
         @if(!$loop->first)
           <span class="text-gray-400">/</span>
         @endif
 
-        @if(!$loop->last)
-          <a href="{{ $item['url'] ?? '#' }}" class="text-indigo-600 hover:underline">
+        @if(!$loop->last && !empty($item['url']))
+          <a href="{{ $item['url'] }}" class="text-indigo-600 hover:underline">
             {{ $item['label'] ?? '...' }}
           </a>
         @else

@@ -14,7 +14,7 @@ class Expense extends Model
         'product_category',
         'product_description',
         'invoice_number',
-        'vat_rate',
+        'vat_amount',
         'amount_without_vat',
         'full_amount',
         'comment',
@@ -22,7 +22,7 @@ class Expense extends Model
 
     protected $casts = [
         'expense_date' => 'date',
-        'vat_rate' => 'decimal:2',
+        'vat_amount' => 'float',
         'amount_without_vat' => 'decimal:2',
         'full_amount' => 'decimal:2',
     ];
@@ -34,7 +34,7 @@ class Expense extends Model
 
     public function getVatAmountAttribute(): float
     {
-        $rate = (float)($this->vat_rate ?? 0);
+        $rate = (float)($this->vat_amount ?? 0);
         $net  = (float)($this->amount_without_vat ?? 0);
         return round($net * ($rate / 100), 2);
     }

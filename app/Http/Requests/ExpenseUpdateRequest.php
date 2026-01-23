@@ -18,7 +18,7 @@ class ExpenseUpdateRequest extends FormRequest
             'product_category' => ['required','string','max:190'],
             'product_description' => ['nullable','string'],
             'invoice_number' => ['nullable','string','max:190'],
-            'vat_rate' => ['nullable','numeric','min:0','max:100'],
+            'vat_amount' => ['nullable','numeric','min:0','max:100'],
             'amount_without_vat' => ['required','numeric','min:0'],
             'full_amount' => ['nullable','numeric','min:0'],
             'comment' => ['nullable','string'],

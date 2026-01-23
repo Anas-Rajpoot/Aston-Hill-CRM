@@ -15,14 +15,16 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            '2fa' => \App\Http\Middleware\EnsureTwoFactorVerified::class,
+            '2fa_or_superadmin' => \App\Http\Middleware\EnsureTwoFactorVerified::class,
             'role' => RoleMiddleware::class,
             'permission' => PermissionMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
             'approved' => \App\Http\Middleware\CheckStatus::class,
-            'crud_permission' => \App\Http\Middleware\CrudPermission::class,
+            'crud' => \App\Http\Middleware\CrudPermission::class,
         ]);
-        $middleware->append(\App\Http\Middleware\BreadcrumbTrail::class);
+        $middleware->web(append: [
+            \App\Http\Middleware\BreadcrumbTrail::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

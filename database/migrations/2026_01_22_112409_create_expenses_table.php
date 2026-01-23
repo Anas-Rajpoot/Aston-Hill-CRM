@@ -24,7 +24,7 @@ return new class extends Migration
             $table->text('comment')->nullable();
 
             // VAT as rate (e.g. 21.00)
-            $table->decimal('vat_rate', 5, 2)->nullable();
+            $table->decimal('vat_amount', 8, 2)->nullable();
 
             // amount without VAT (net)
             $table->decimal('amount_without_vat', 12, 2)->default(0);

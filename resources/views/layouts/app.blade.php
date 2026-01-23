@@ -46,3 +46,34 @@
         </div>
     </body>
 </html>
+
+<script>
+(function () {
+  // create per-tab id
+  if (!sessionStorage.getItem('tab_id')) {
+    sessionStorage.setItem('tab_id', (crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-' + Math.random())));
+  }
+
+  const tabId = sessionStorage.getItem('tab_id');
+
+  // store it in cookie too (for refresh/direct url fallback)
+  document.cookie = "__tab=" + encodeURIComponent(tabId) + "; path=/; samesite=lax";
+
+  // auto-append __tab to same-origin <a> links
+  document.addEventListener('click', function (e) {
+    const a = e.target.closest('a');
+    if (!a) return;
+
+    const href = a.getAttribute('href');
+    if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:') || href.startsWith('javascript:')) return;
+
+    const url = new URL(a.href, window.location.href);
+    if (url.origin !== window.location.origin) return;
+
+    if (!url.searchParams.has('__tab')) {
+      url.searchParams.set('__tab', tabId);
+      a.href = url.toString();
+    }
+  }, true);
+})();
+</script>

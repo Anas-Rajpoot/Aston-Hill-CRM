@@ -9,17 +9,21 @@ use App\Http\Requests\ExpenseUpdateRequest;
 use Illuminate\Support\Facades\DB;
 use Yajra\DataTables\Facades\DataTables;
 use App\Models\User;
+use Illuminate\Support\Carbon;
+use App\Support\Format;
 
 class ExpenseController extends Controller
 {
     public function __construct()
     {
         // Spatie Permission middleware
-        $this->middleware('permission:expenses.view')->only(['index','datatable','show']);
-        $this->middleware('permission:expenses.create')->only(['create','store']);
-        $this->middleware('permission:expenses.update')->only(['edit','update']);
-        $this->middleware('permission:expenses.delete')->only(['destroy']);
-        $this->middleware('permission:expenses.export')->only(['exportCsv','exportSingleCsv']);
+        // $this->middleware('crud:expense_tracker');
+        $this->middleware('permission:expense_tracker.view')->only(['index','datatable','show']);
+        
+        $this->middleware('permission:expense_tracker.create')->only(['create','store']);
+        $this->middleware('permission:expense_tracker.update')->only(['edit','update']);
+        $this->middleware('permission:expense_tracker.delete')->only(['destroy']);
+        $this->middleware('permission:expense_tracker.export')->only(['exportCsv','exportSingleCsv']);
     }
 
     /**
@@ -47,6 +51,11 @@ class ExpenseController extends Controller
             $query->where('user_id', $request->user()->id);
         }
 
+        // Restrict non-view_all users to own records
+        // if (!auth()->user()->can('expenses.view_all')) {
+        //     $query->where('user_id', auth()->id());
+        // }
+
         $query->filter([
             'user_id' => $request->user_id,
             'category' => $request->category,
@@ -60,14 +69,15 @@ class ExpenseController extends Controller
                 return $e->user ? ($e->user->name . ' (' . $e->user->email . ')') : '-';
             })
             ->editColumn('expense_date', function (Expense $e) {
-                // format: 14-Jan-2026
                 return optional($e->expense_date)->format('d-M-Y');
             })
-            ->addColumn('vat', function (Expense $e) {
-                $rate = $e->vat_rate;
-                if ($rate === null) return '—';
-                return number_format((float)$rate, 2) . '%';
-            })
+            ->editColumn('vat_amount', function (Expense $e) {
+                    if (!$e->vat_amount || $e->vat_amount == 0) {
+                        return '-';
+                    }
+
+                    return number_format((float)$e->vat_amount, 2) . '%';
+                })
             ->editColumn('amount_without_vat', fn(Expense $e) => number_format((float)$e->amount_without_vat, 2))
             ->editColumn('full_amount', fn(Expense $e) => number_format((float)$e->full_amount, 2))
             ->addColumn('actions', function (Expense $e) use ($request) {
@@ -119,14 +129,14 @@ class ExpenseController extends Controller
         // Auto-calc full_amount if missing
         if (empty($data['full_amount'])) {
             $net = (float)$data['amount_without_vat'];
-            $rate = (float)($data['vat_rate'] ?? 0);
+            $rate = (float)($data['vat_amount'] ?? 0);
             $data['full_amount'] = round($net + ($net * $rate / 100), 2);
         }
 
         $data['user_id'] = $request->user()->id;
-
-        Expense::create($data);
-
+        
+        $expense = Expense::create($data);
+        
         return redirect()->route('expenses.index')->with('success', 'Expense added');
     }
 
@@ -160,7 +170,7 @@ class ExpenseController extends Controller
 
         if (empty($data['full_amount'])) {
             $net = (float)$data['amount_without_vat'];
-            $rate = (float)($data['vat_rate'] ?? 0);
+            $rate = (float)($data['vat_amount'] ?? 0);
             $data['full_amount'] = round($net + ($net * $rate / 100), 2);
         }
 
@@ -243,7 +253,7 @@ class ExpenseController extends Controller
                         $e->product_category,
                         $e->product_description,
                         $e->invoice_number,
-                        $e->vat_rate !== null ? number_format((float)$e->vat_rate, 2) : '',
+                        $e->vat_amount !== null ? number_format((float)$e->vat_amount, 2) : '',
                         number_format((float)$e->amount_without_vat, 2),
                         number_format((float)$e->full_amount, 2),
                         $e->comment,
@@ -286,7 +296,7 @@ class ExpenseController extends Controller
                 $expense->product_category,
                 $expense->product_description,
                 $expense->invoice_number,
-                $expense->vat_rate !== null ? number_format((float)$expense->vat_rate, 2) : '',
+                $expense->vat_amount !== null ? number_format((float)$expense->vat_amount, 2) : '',
                 number_format((float)$expense->amount_without_vat, 2),
                 number_format((float)$expense->full_amount, 2),
                 $expense->comment,
@@ -300,10 +310,10 @@ class ExpenseController extends Controller
 
     private function authorizeOwnerOrSuperadmin(Expense $expense): void
     {
-        $u = request()->user();
-        if ($u->hasRole('superadmin')) return;
+        $user = request()->user();
+        if ($user->hasRole('superadmin')) return;
 
-        if ($expense->user_id !== $u->id) {
+        if ($expense->user_id !== $user->id) {
             abort(403);
         }
     }

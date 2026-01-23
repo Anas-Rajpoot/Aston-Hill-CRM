@@ -50,4 +50,10 @@ class Format
 
         return $tz ?: 'UTC';
     }
+
+    public static function money($value): string
+    {
+        $n = (float) $value;
+        return number_format($n, 2);
+    }
 }
