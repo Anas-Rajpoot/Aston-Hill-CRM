@@ -10,6 +10,7 @@ use App\Http\Controllers\SuperAdmin\RoleController;
 use App\Http\Controllers\LoginLogController;
 use App\Http\Controllers\SuperAdmin\PermissionController;
 use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\PersonalNoteController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -47,6 +48,13 @@ Route::middleware(['auth', 'verified', 'approved', '2fa_or_superadmin'])->group(
 
     Route::resource('expenses', ExpenseController::class);
 
+    Route::get('personal-notes/datatable', [PersonalNoteController::class, 'datatable'])
+    ->name('personal-notes.datatable');
+
+    Route::put('personal-notes/{personal_note}/toggle', [PersonalNoteController::class, 'toggle'])
+        ->name('personal-notes.toggle');
+
+    Route::resource('personal-notes', PersonalNoteController::class);
 });
 
 

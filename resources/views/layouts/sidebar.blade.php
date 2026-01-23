@@ -51,6 +51,11 @@
             Expenses
         </a>
 
+        <a href="{{ route('personal-notes.index') }}"
+            class="block px-3 py-2 rounded-md text-sm font-medium
+            {{ request()->routeIs('personal-notes.*') ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700 hover:bg-gray-50' }}">
+                Personal Notes
+        </a>
 
         <a href="{{ route('login-logs.index') }}"
            class="block px-3 py-2 rounded-md text-sm font-medium
