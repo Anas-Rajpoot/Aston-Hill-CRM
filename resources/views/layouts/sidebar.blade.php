@@ -57,6 +57,13 @@
                 Personal Notes
         </a>
 
+        <a href="{{ route('email-followups.index') }}"
+            class="block px-3 py-2 rounded-md text-sm font-medium
+            {{ request()->routeIs('email-followups.*') ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700 hover:bg-gray-50' }}">
+            Email Follow Up
+        </a>
+
+
         <a href="{{ route('login-logs.index') }}"
            class="block px-3 py-2 rounded-md text-sm font-medium
            {{ request()->routeIs('login-logs.*') ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700 hover:bg-gray-50' }}">

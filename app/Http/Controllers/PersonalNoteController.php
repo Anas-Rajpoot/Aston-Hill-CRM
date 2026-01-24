@@ -175,5 +175,5 @@ class PersonalNoteController extends Controller
         if ($note->user_id !== $user->id) {
             abort(403);
         }
-    }
+    } 
 }

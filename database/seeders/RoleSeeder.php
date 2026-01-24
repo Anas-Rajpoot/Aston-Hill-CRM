@@ -15,12 +15,12 @@ class RoleSeeder extends Seeder
     {
         $roles = [
             'superadmin',
-            'admin',
-            'sales_manager',
-            'sales_team_leader',
-            'sales_person',
-            'back_office',
-            'csr'
+            // 'admin',
+            // 'sales_manager',
+            // 'sales_team_leader',
+            // 'sales_person',
+            // 'back_office',
+            // 'csr'
         ];
 
         foreach ($roles as $role) {

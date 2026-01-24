@@ -11,6 +11,7 @@ use App\Http\Controllers\LoginLogController;
 use App\Http\Controllers\SuperAdmin\PermissionController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\PersonalNoteController;
+use App\Http\Controllers\EmailFollowUpController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -55,6 +56,14 @@ Route::middleware(['auth', 'verified', 'approved', '2fa_or_superadmin'])->group(
         ->name('personal-notes.toggle');
 
     Route::resource('personal-notes', PersonalNoteController::class);
+
+    Route::get('email-followups/datatable', [EmailFollowUpController::class, 'datatable'])
+    ->name('email-followups.datatable');
+
+    Route::get('email-followups/export/csv', [EmailFollowUpController::class, 'exportCsv'])
+        ->name('email-followups.export.csv');
+
+    Route::resource('email-followups', EmailFollowUpController::class);
 });
 
 
