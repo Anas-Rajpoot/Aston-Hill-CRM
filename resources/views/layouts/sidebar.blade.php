@@ -11,9 +11,9 @@
         </a>
 
         @role('superadmin')
-            <a href="{{ route('super-admin.users.index') }}"
+            <a href="{{ route('users.index') }}"
                 class="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium
-                {{ request()->routeIs('super-admin.users.*')
+                {{ request()->routeIs('users.*')
                     ? 'bg-indigo-50 text-indigo-700'
                     : 'text-gray-700 hover:bg-gray-50' }}">
                     👥 <span>Users</span>
@@ -39,6 +39,13 @@
                     <span>Permissions</span>
             </a>
         @endrole
+
+        <a href="{{ route('announcements.index') }}"
+            class="block px-3 py-2 rounded-md text-sm font-medium
+            {{ request()->routeIs('announcements.*') ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700 hover:bg-gray-50' }}">
+                Announcements
+        </a>
+
         <a href="{{ route('accounts.index') }}"
            class="block px-3 py-2 rounded-md text-sm font-medium
            {{ request()->routeIs('accounts.*') ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700 hover:bg-gray-50' }}">

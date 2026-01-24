@@ -2,7 +2,7 @@
 
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\SuperAdmin\UserController;
+use App\Http\Controllers\UserController;
 use App\Http\Middleware\SuperAdminMiddleware;
 use App\Http\Controllers\Auth\TwoFactorController;
 use App\Http\Controllers\AccountController;
@@ -12,6 +12,7 @@ use App\Http\Controllers\SuperAdmin\PermissionController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\PersonalNoteController;
 use App\Http\Controllers\EmailFollowUpController;
+use App\Http\Controllers\AnnouncementController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -64,11 +65,17 @@ Route::middleware(['auth', 'verified', 'approved', '2fa_or_superadmin'])->group(
         ->name('email-followups.export.csv');
 
     Route::resource('email-followups', EmailFollowUpController::class);
+
+    Route::resource('users', UserController::class);
+
+    Route::get('announcements/datatable', [AnnouncementController::class, 'datatable'])
+    ->name('announcements.datatable');
+
+    Route::resource('announcements', AnnouncementController::class);
 });
 
 
 Route::middleware(['auth','role:superadmin'])->prefix('super-admin')->name('super-admin.')->group(function () {
-    Route::resource('users', UserController::class);
 
     Route::put('users/{user}/approve', [UserController::class,'approve'])
         ->name('users.approve');

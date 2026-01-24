@@ -14,7 +14,7 @@
             <p class="text-sm text-gray-500">Update status and assign roles when approved.</p>
         </div>
 
-        <a href="{{ route('super-admin.users.index') }}"
+        <a href="{{ route('users.index') }}"
            class="text-sm px-3 py-2 rounded-md border hover:bg-gray-50">
             Back to Users
         </a>
@@ -88,7 +88,7 @@
         </div>
 
         <div class="mt-6 flex items-center justify-end gap-3">
-            <a href="{{ route('super-admin.users.index') }}"
+            <a href="{{ route('users.index') }}"
                class="px-4 py-2 rounded-lg border text-sm hover:bg-gray-50">
                 Cancel
             </a>

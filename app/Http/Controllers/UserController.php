@@ -1,8 +1,7 @@
 <?php
 
-namespace App\Http\Controllers\SuperAdmin;
+namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Spatie\Permission\Models\Role;
 use App\Models\User;
@@ -32,16 +31,22 @@ class UserController extends Controller
 
         $roles = Role::orderBy('name')->get();
 
-        return view('super-admin.users.index', compact('users', 'roles'));
+        return view('users.index', compact('users', 'roles'));
 
         // $users = User::latest()->paginate(10);
-        // return view('super-admin.users.index', compact('users'));
+        // return view('users.index', compact('users'));
     }
 
     public function show(User $user)
     {
         $roles = Role::orderBy('name')->get();
-        return view('super-admin.users.show', compact('user', 'roles'));
+        return view('users.show', compact('user', 'roles'));
+    }
+
+    public function edit(User $user)
+    {
+        $roles = Role::orderBy('name')->get();
+        return view('users.edit', compact('user', 'roles'));
     }
 
     public function review(User $user)
@@ -49,7 +54,7 @@ class UserController extends Controller
         $roles = Role::orderBy('name')->get();
         $userRoleIds = $user->roles()->pluck('id')->toArray();
 
-        return view('super-admin.users.review', compact('user', 'roles', 'userRoleIds'));
+        return view('users.review', compact('user', 'roles', 'userRoleIds'));
     }
     
     public function approve(Request $request, User $user)
@@ -114,19 +119,38 @@ class UserController extends Controller
         }
 
         return redirect()
-            ->route('super-admin.users.index')
+            ->route('users.index')
             ->with('status', 'User status updated successfully.');
     }
 
     public function update(Request $request, User $user)
     {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
+            'phone' => 'required|string|max:15',
+            'country' => 'required|string|max:100',
+            'cnic_number' => 'required|string|max:20',
+            'password' => 'nullable|confirmed|min:8',
+            'roles' => 'nullable|array',
+            'roles.*' => 'exists:roles,id',
+        ]);
+
         $user->update($request->except('password'));
 
-        if($request->password){
-            $user->update(['password'=>Hash::make($request->password)]);
+        if ($request->password) {
+            $user->password = Hash::make($request->password);
+            $user->save();
         }
 
-        return back();
+        // Update user roles
+        if ($request->has('roles')) {
+            $user->syncRoles($request->input('roles'));
+        }
+
+        return redirect()->route('users.index')->with('status', 'User updated successfully.');
+
+        // return back();
     }
 
     public function destroy(User $user)
