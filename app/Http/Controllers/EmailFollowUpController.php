@@ -101,7 +101,7 @@ class EmailFollowUpController extends Controller
         if (!$request->user()->can('emails_followup.create')) abort(403);
 
         $data = $request->validated();
-        $data['created_by'] = $request->user()->id; // ✅ auto add user
+        $data['created_by'] = $request->user()->id;
 
         EmailFollowUp::create($data);
 
@@ -220,7 +220,7 @@ class EmailFollowUpController extends Controller
 
     private function resolveDateRange(Request $request): array
     {
-        $preset = $request->input('preset'); // this_month, last_month, quarter, last_6_months, this_year, last_year
+        $preset = $request->input('preset');
         $from = $request->input('from');
         $to   = $request->input('to');
 

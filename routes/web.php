@@ -13,6 +13,7 @@ use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\PersonalNoteController;
 use App\Http\Controllers\EmailFollowUpController;
 use App\Http\Controllers\AnnouncementController;
+use App\Http\Controllers\NotificationController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -72,6 +73,23 @@ Route::middleware(['auth', 'verified', 'approved', '2fa_or_superadmin'])->group(
     ->name('announcements.datatable');
 
     Route::resource('announcements', AnnouncementController::class);
+
+    Route::get('/notifications', [NotificationController::class, 'index'])
+    ->name('notifications.index');
+
+    Route::get('/notifications/datatable', [NotificationController::class, 'datatable'])
+    ->name('notifications.datatable');
+
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])
+    ->name('notifications.read');
+
+    Route::post('/notifications/{id}/unread', [NotificationController::class, 'markUnread'])->name('notifications.unread');
+    
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.readAll');
+
+    Route::get('/notifications/poll', [NotificationController::class, 'poll'])
+    ->name('notifications.poll');
+
 });
 
 

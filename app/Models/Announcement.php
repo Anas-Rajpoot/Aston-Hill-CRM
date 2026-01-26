@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Notifications\Notifiable;
 
 class Announcement extends Model
 {
+    use Notifiable;
     protected $fillable = [
         'created_by',
         'title',

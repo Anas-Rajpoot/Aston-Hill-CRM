@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Yajra\DataTables\Facades\DataTables;
 use App\Models\Announcement;
+use App\Models\User;
+use App\Notifications\NewAnnouncementNotification;
 
 class AnnouncementController extends Controller
 {
@@ -121,7 +123,13 @@ class AnnouncementController extends Controller
             $payload['attachment_size'] = $file->getSize();
         }
 
-        Announcement::create($payload);
+        $announcement = Announcement::create($payload);
+
+        User::where('status', 'approved')->chunk(300, function ($users) use ($announcement) {
+            foreach ($users as $user) {
+                $user->notify(new NewAnnouncementNotification($announcement->id, $announcement->title));
+            }
+        });
 
         return redirect()->route('announcements.index')->with('success', 'Announcement created');
     }

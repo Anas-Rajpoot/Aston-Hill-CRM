@@ -46,6 +46,13 @@
                 Announcements
         </a>
 
+        <a href="{{ route('notifications.index') }}"
+            class="block px-3 py-2 rounded-md text-sm font-medium
+            {{ request()->routeIs('notifications.*') ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700 hover:bg-gray-50' }}">
+                Notifications
+        </a>
+
+
         <a href="{{ route('accounts.index') }}"
            class="block px-3 py-2 rounded-md text-sm font-medium
            {{ request()->routeIs('accounts.*') ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700 hover:bg-gray-50' }}">
