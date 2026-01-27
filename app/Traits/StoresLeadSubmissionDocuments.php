@@ -1,0 +1,36 @@
+<?php
+
+namespace App\Traits;
+
+use App\Models\LeadSubmission;
+use App\Models\LeadSubmissionDocument;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+
+trait StoresLeadSubmissionDocuments
+{
+    protected function storeLeadDocument(LeadSubmission $leadSubmission, string $docKey, UploadedFile $file): LeadSubmissionDocument
+    {
+        $dir = "leadSubmissions/{$leadSubmission->id}/{$docKey}";
+        $name = time() . '_' . preg_replace('/[^a-zA-Z0-9\.\-_]/', '_', $file->getClientOriginalName());
+
+        $path = $file->storeAs($dir, $name, 'public');
+
+        return LeadSubmissionDocument::create([
+            'lead_id' => $lead->id,
+            'doc_key' => $docKey,
+            'path' => $path,
+            'original_name' => $file->getClientOriginalName(),
+            'mime' => $file->getMimeType(),
+            'size' => $file->getSize(),
+        ]);
+    }
+
+    protected function deleteLeadDocument(LeadDocument $doc): void
+    {
+        if ($doc->path) {
+            Storage::disk('public')->delete($doc->path);
+        }
+        $doc->delete();
+    }
+}

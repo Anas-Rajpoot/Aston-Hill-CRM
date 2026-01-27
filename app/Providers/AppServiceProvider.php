@@ -6,6 +6,8 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 use App\Models\Account;
 use App\Policies\AccountPolicy;
+use App\Repositories\Contracts\LeadSubmissionRepositoryInterface;
+use App\Repositories\Eloquent\LeadSubmissionRepository;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -18,7 +20,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(LeadSubmissionRepositoryInterface::class, LeadSubmissionRepository::class);
     }
 
     /**

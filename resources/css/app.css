@@ -1,3 +1,10 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root{
+  --brand-primary: 34 197 94;
+  --brand-dark: 15 23 42;
+  --brand-bg: 248 250 252;
+  --brand-text: 15 23 42;
+}

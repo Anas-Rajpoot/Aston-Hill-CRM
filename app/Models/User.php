@@ -50,4 +50,10 @@ class User extends Authenticatable
             'two_factor_confirmed_at' => 'datetime',
         ];
     }
+
+    public function leadColumnPreference()
+    {
+        return $this->hasOne(\App\Models\LeadColumnPreference::class);
+    }
+
 }
