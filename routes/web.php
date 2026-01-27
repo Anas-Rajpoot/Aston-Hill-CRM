@@ -120,7 +120,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/2fa/disable', [TwoFactorController::class, 'disable'])->name('2fa.disable');
 
     Route::get('/2fa/verify', [TwoFactorController::class, 'verifyForm'])->name('2fa.verify.form');
-    Route::post('/2fa/verify', [TwoFactorController::class, 'verify'])->name('2fa.verify');
+    Route::post('/2fa/verify', [TwoFactorController::class, 'verify'])->name('2fa.verify')->middleware('throttle:5,1');
 });
 
 

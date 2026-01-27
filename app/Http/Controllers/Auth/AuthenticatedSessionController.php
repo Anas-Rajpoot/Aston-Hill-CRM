@@ -75,7 +75,7 @@ class AuthenticatedSessionController extends Controller
             $request->session()->forget('2fa_passed'); // ensure fresh verification
             return redirect()->route('2fa.verify.form');
         }
-
+        
         // If user does NOT have 2FA enabled, optionally send them to setup page:
         // return redirect()->route('2fa.setup');
 

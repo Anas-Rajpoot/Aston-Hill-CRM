@@ -1,7 +1,11 @@
-<x-app-layout>
-    <div class="max-w-md mx-auto mt-10 bg-white p-6 rounded-lg shadow">
-        <h2 class="text-xl font-semibold mb-2">Two-Factor Verification</h2>
-        <p class="text-sm text-gray-600 mb-4">Enter the 6-digit code from your Authenticator app.</p>
+<x-guest-layout>
+    <!-- <div class="max-w-md mx-auto mt-10 bg-white p-6 rounded-lg shadow"> -->
+        <div>
+            <h2 class="text-xl font-semibold mb-2">Two-Factor Verification</h2>
+            <p class="text-sm text-gray-600 mb-4">
+                Enter the 6-digit code from your Authenticator app.
+            </p>
+        </div>
 
         <form method="POST" action="{{ route('2fa.verify') }}">
             @csrf
@@ -18,5 +22,5 @@
                 Verify
             </button>
         </form>
-    </div>
-</x-app-layout>
+    <!-- </div> -->
+</x-guest-layout>

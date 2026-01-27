@@ -8,7 +8,7 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use App\Models\User;
 
-class NewUserApprovalNotification extends Notification implements ShouldQueue
+class NewUserApprovalNotification extends Notification
 {
     use Queueable;
 
@@ -58,11 +58,13 @@ class NewUserApprovalNotification extends Notification implements ShouldQueue
     public function toArray(object $notifiable): array
     {
         return [
+            'type' => 'user_approval',
+            'title' => 'New user pending approval',
             'user_id' => $this->user->id,
             'name'    => $this->user->name,
             'email'   => $this->user->email,
             'url'     => route('super-admin.users.review', $this->user->id),
-            'message' => 'New user pending approval'
+            'message' => $this->user->name . " registered and is waiting for approval."
         ];
     }
 }

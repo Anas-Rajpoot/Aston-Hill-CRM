@@ -51,7 +51,10 @@ class UserController extends Controller
 
     public function review(User $user)
     {
-        $roles = Role::orderBy('name')->get();
+        $roles = Role::whereNotIn('name', ['superadmin'])
+                    ->orderBy('name')
+                    ->get();
+                    
         $userRoleIds = $user->roles()->pluck('id')->toArray();
 
         return view('users.review', compact('user', 'roles', 'userRoleIds'));

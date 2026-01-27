@@ -10,15 +10,15 @@ class NotificationController extends Controller
 {
     public function __construct()
     {
-        $this->middleware('crud:notifications');
+        // $this->middleware('crud:notifications');
     }
 
     public function index(Request $request)
     {
         $user = $request->user();
 
-        $kind = $request->get('kind');     // announcement/email_followup/personal_note
-        $status = $request->get('status'); // unread/read
+        $kind = $request->get('kind');     
+        $status = $request->get('status');
 
         $q = $user->notifications()->latest();
 

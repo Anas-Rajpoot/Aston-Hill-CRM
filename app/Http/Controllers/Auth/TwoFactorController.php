@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use PragmaRX\Google2FA\Google2FA;
+use Illuminate\Support\Facades\Crypt;
 
 class TwoFactorController extends Controller
 {
@@ -20,7 +21,7 @@ class TwoFactorController extends Controller
         $google2fa = new Google2FA();
 
         if (!$user->two_factor_secret) {
-            $user->two_factor_secret = $google2fa->generateSecretKey();
+            $user->two_factor_secret = Crypt::encryptString($google2fa->generateSecretKey());
             $user->save();
         }
 
