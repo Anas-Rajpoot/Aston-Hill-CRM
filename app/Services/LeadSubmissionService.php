@@ -2,50 +2,67 @@
 
 namespace App\Services;
 
+use App\Models\LeadSubmission;
+use App\Models\ServiceType;
+use App\Repositories\Contracts\LeadSubmissionRepositoryInterface;
+use App\Support\LeadSubmissionSchema;
+use App\Traits\StoresLeadSubmissionDocuments;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+
 class LeadSubmissionService
 {
-    public function createStep1(array $data, User $user): Lead
+    use StoresLeadSubmissionDocuments;
+
+    public function __construct(private LeadSubmissionRepositoryInterface $repo) {}
+
+    public function createDraftFromStep1(array $data, int $userId): Lead
     {
-        return Lead::create(array_merge($data, [
-            'created_by' => $user->id,
-            'updated_by' => $user->id,
-            'step' => 1,
+        return $this->repo->createDraft([
+            ...$data,
+            'created_by' => $userId,
             'status' => 'draft',
-        ]));
+        ]);
     }
 
-    public function updateStep2(Lead $lead, array $data, User $user): Lead
+    public function saveStep2(LeadSubmission $leadSubmission, array $data): LeadSubmission
     {
-        $lead->update([
+        return $this->repo->updateLeadSubmission($leadSubmission, [
             'service_category_id' => $data['service_category_id'],
-            'updated_by' => $user->id,
-            'step' => max($lead->step, 2),
         ]);
-        return $lead;
     }
 
-    public function updateStep3(Lead $lead, array $data, User $user): Lead
+    public function saveStep3(LeadSubmission $leadSubmission, array $data): LeadSubmission
     {
-        $payload = $lead->payload ?? [];
-        $payload = array_merge($payload, $data['payload'] ?? []);
+        // data: service_type_id + dynamic meta[]
+        return DB::transaction(function () use ($leadSubmission, $data) {
+            $leadSubmission = $this->repo->updateLeadSubmission($leadSubmission, [
+                'service_type_id' => $data['service_type_id'],
+                'meta' => $data['meta'] ?? [],
+            ]);
 
-        $lead->update([
-            'service_type_id' => $data['service_type_id'],
-            'payload' => $payload,
-            'updated_by' => $user->id,
-            'step' => max($lead->step, 3),
-        ]);
-        return $lead;
+            return $leadSubmission;
+        });
     }
 
-    public function submit(Lead $lead, User $user): Lead
+    public function saveStep4Documents(Request $request, LeadSubmission $leadSubmission): void
     {
-        $lead->update([
-            'status' => 'submitted',
-            'submitted_at' => now(),
-            'updated_by' => $user->id,
-            'step' => 4,
-        ]);
-        return $lead;
+        $type = ServiceType::findOrFail($lead->service_type_id);
+        $docs = LeadSubmissionSchema::documents($type);
+
+        foreach ($docs as $doc) {
+            $key = $doc['key'] ?? null;
+            if (!$key) continue;
+
+            if ($request->hasFile("documents.$key")) {
+                $file = $request->file("documents.$key");
+                $this->storeLeadSubmissionDocument($lead, $key, $file);
+            }
+        }
+    }
+
+    public function submit(LeadSubmission $leadSubmission): LeadSubmission
+    {
+        return $this->repo->submit($leadSubmission);
     }
 }

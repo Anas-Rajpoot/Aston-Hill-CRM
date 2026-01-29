@@ -16,7 +16,8 @@ return new class extends Migration
             $table->foreignId('created_by')->constrained('users')->cascadeOnDelete();
             $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete();
             $table->unsignedTinyInteger('step')->default(1);
-            $table->string('status')->default('draft');
+            $table->enum('status', ['draft','submitted','approved','rejected'])
+                    ->default('draft');
             $table->string('account_number')->nullable();
             $table->string('company_name')->nullable();
             $table->string('authorized_signatory_name')->nullable();
@@ -37,6 +38,10 @@ return new class extends Migration
             $table->foreignId('service_type_id')->nullable()->constrained()->nullOnDelete();
             $table->json('payload')->nullable();
             $table->timestamp('submitted_at')->nullable();
+            $table->timestamp('approved_at')->nullable();
+            $table->timestamp('rejected_at')->nullable();
+            $table->foreignId('approved_by')->nullable();
+            $table->foreignId('rejected_by')->nullable();
             $table->index(['status','created_at']);
             $table->index(['service_category_id','service_type_id']);
             $table->text('remarks')->nullable();

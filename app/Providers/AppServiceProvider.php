@@ -6,6 +6,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 use App\Models\Account;
 use App\Policies\AccountPolicy;
+use App\Policies\LeadSubmissionPolicy;
 use App\Repositories\Contracts\LeadSubmissionRepositoryInterface;
 use App\Repositories\Eloquent\LeadSubmissionRepository;
 
@@ -13,6 +14,7 @@ class AppServiceProvider extends ServiceProvider
 {
     protected $policies = [
         Account::class => AccountPolicy::class,
+        LeadSubmissionPolicy::class,
     ];
 
     /**

@@ -11,13 +11,13 @@ trait StoresLeadSubmissionDocuments
 {
     protected function storeLeadDocument(LeadSubmission $leadSubmission, string $docKey, UploadedFile $file): LeadSubmissionDocument
     {
-        $dir = "leadSubmissions/{$leadSubmission->id}/{$docKey}";
+        $dir = "lead-submissions/{$leadSubmission->id}/{$docKey}";
         $name = time() . '_' . preg_replace('/[^a-zA-Z0-9\.\-_]/', '_', $file->getClientOriginalName());
 
         $path = $file->storeAs($dir, $name, 'public');
 
         return LeadSubmissionDocument::create([
-            'lead_id' => $lead->id,
+            'lead_submission_id' => $leadSubmission->id,
             'doc_key' => $docKey,
             'path' => $path,
             'original_name' => $file->getClientOriginalName(),
@@ -26,7 +26,7 @@ trait StoresLeadSubmissionDocuments
         ]);
     }
 
-    protected function deleteLeadDocument(LeadDocument $doc): void
+    protected function deleteLeadSubmissionDocument(LeadSubmissionDocument $doc): void
     {
         if ($doc->path) {
             Storage::disk('public')->delete($doc->path);

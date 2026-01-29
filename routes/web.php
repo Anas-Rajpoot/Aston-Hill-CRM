@@ -14,7 +14,9 @@ use App\Http\Controllers\PersonalNoteController;
 use App\Http\Controllers\EmailFollowUpController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\ColumnPreferenceController;
 use App\Http\Controllers\LeadSubmissionController;
+use App\Http\Controllers\DataTableController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -109,6 +111,14 @@ Route::middleware(['auth', 'verified', 'approved', '2fa_or_superadmin'])->group(
         Route::get('/create/step-4', [LeadSubmissionController::class, 'createStep4'])->name('create.step4');
         Route::post('/create/step-4', [LeadSubmissionController::class, 'storeStep4'])->name('store.step4');
 
+        Route::get('/service-types', [LeadSubmissionController::class, 'serviceTypesByCategory'])
+            ->name('serviceTypesByCategory');
+        Route::get('/type-schema/{type}', [LeadSubmissionController::class, 'typeSchema'])
+            ->name('typeSchema');
+
+        Route::post('/preferences/columns', [LeadSubmissionController::class, 'saveColumnPrefs'])
+            ->name('preferences.columns');
+
         // Resource CRUD
         Route::get('/{lead_submission}', [LeadSubmissionController::class, 'show'])->name('show');
         Route::get('/{lead_submission}/edit', [LeadSubmissionController::class, 'edit'])->name('edit');
@@ -116,10 +126,14 @@ Route::middleware(['auth', 'verified', 'approved', '2fa_or_superadmin'])->group(
         Route::delete('/{lead_submission}', [LeadSubmissionController::class, 'destroy'])->name('destroy');
 
         Route::get('/{lead_submission}/documents/{document}/download',
-            [LeadSubmissionController::class, 'downloadDocument']
-    )->name('documents.download');
-});
+                [LeadSubmissionController::class, 'downloadDocument']
+            )->name('documents.download');
 
+    });
+
+    Route::get('/modules/{module}/columns', [ColumnPreferenceController::class, 'show'])->name('columns.preference.show');
+    Route::post('/modules/{module}/columns', [ColumnPreferenceController::class, 'store'])->name('columns.preference.store');
+    Route::get('/datatable/{module}', [DataTableController::class, 'index'])->name('datatables.module.index');
 });
 
 

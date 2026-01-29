@@ -5,55 +5,63 @@ namespace App\Http\Controllers;
 use App\Models\LeadSubmission;
 use App\Models\ServiceCategory;
 use App\Models\ServiceType;
+use App\Models\UserColumnPreference;
 use App\Models\LeadSubmissionDocument;
+use App\Services\LeadSubmissionService;
+use App\Support\LeadSubmissionSchema;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\Rule;
 use Yajra\DataTables\Facades\DataTables;
+use App\Http\Resources\LeadSubmissionResource;
 
 class LeadSubmissionController extends Controller
 {
-    public function __construct()
+    public function __construct(private LeadSubmissionService $leadSubmissionService)
     {
-        $this->middleware('crud:lead_submission');
+        // Your CrudPermission middleware (module: leads)
+        // Must exist in Kernel alias as 'crud' OR your custom name.
+        $this->middleware('crud:lead-submissions');
     }
 
-    /**
-     * LIST PAGE
-     */
     public function index(Request $request)
     {
-        // Blade page only, datatable loads rows via ajax.
-        return view('lead-submissions.index');
+        $this->authorize('viewAny', LeadSubmission::class);
+
+        $preference = UserColumnPreference::where('user_id', $request->user()->id)
+            ->where('module', 'lead_submissions.index')
+            ->first();
+
+        $defaultCols = [
+            'created_at','lead_submission_id','company_name','account_number','request_type',
+            'category','type','status','created_by','email','phone'
+        ];
+
+        $visibleCols = $preference?->columns ?: $defaultCols;
+
+        $categories = ServiceCategory::orderBy('name')->get(['id','name']);
+
+        return LeadSubmissionResource::collection(
+            LeadSubmission::with(['creator','category','type'])
+                ->filter($request->all())
+                ->paginate(10)
+        );
+
+        // return view('lead-submission.index', compact('visibleCols','defaultCols','categories'));
     }
 
-    /**
-     * DATATABLE
-     */
+    /** DATATABLE ENDPOINT */
     public function datatable(Request $request)
     {
-        if (!$request->user()->can('lead_submission.list')) abort(403);
+        $q = LeadSubmission::query()->with(['creator:id,name,email','category:id,name','type:id,name']);
 
-        $q = LeadSubmission::query()
-            ->with(['creator:id,name,email', 'category:id,name', 'type:id,name'])
-            ->select('lead_submissions.*');
-
-        // Owner-only unless superadmin or permission lead-submission.view_all
-        if (!$request->user()->hasRole('superadmin') && !$request->user()->can('lead_submission.view_all')) {
+        // Your restriction logic belongs here:
+        if (!$request->user()->hasRole('superadmin') && !$request->user()->can('lead-submissions.view_all')) {
             $q->where('created_by', $request->user()->id);
         }
 
-        // Filters (basic + all common)
-        if ($request->filled('q')) {
-            $term = $request->q;
-            $q->where(function ($w) use ($term) {
-                $w->where('company_name', 'like', "%{$term}%")
-                  ->orWhere('account_number', 'like', "%{$term}%")
-                  ->orWhere('email', 'like', "%{$term}%")
-                  ->orWhere('contact_number', 'like', "%{$term}%")
-                  ->orWhere('status', 'like', "%{$term}%");
-            });
+        // Filters
+        if ($request->filled('status')) {
+            $q->where('status', $request->status);
         }
 
         if ($request->filled('service_category_id')) {
@@ -64,14 +72,6 @@ class LeadSubmissionController extends Controller
             $q->where('service_type_id', $request->service_type_id);
         }
 
-        if ($request->filled('status')) {
-            $q->where('status', $request->status);
-        }
-
-        if ($request->filled('created_by') && ($request->user()->can('lead_submission.view_all') || $request->user()->hasRole('superadmin'))) {
-            $q->where('created_by', $request->created_by);
-        }
-
         if ($request->filled('from')) {
             $q->whereDate('created_at', '>=', $request->from);
         }
@@ -80,539 +80,463 @@ class LeadSubmissionController extends Controller
             $q->whereDate('created_at', '<=', $request->to);
         }
 
+        if ($request->filled('q')) {
+            $term = $request->q;
+            $q->where(function ($w) use ($term) {
+                $w->where('company_name', 'like', "%{$term}%")
+                  ->orWhere('account_number', 'like', "%{$term}%")
+                  ->orWhere('email', 'like', "%{$term}%")
+                  ->orWhere('phone', 'like', "%{$term}%")
+                  ->orWhere('request_type', 'like', "%{$term}%");
+            });
+        }
+
         return DataTables::eloquent($q)
-            ->addColumn('created_by_name', function (LeadSubmission $l) {
-                return $l->creator ? ($l->creator->name.' ('.$l->creator->email.')') : '-';
-            })
-            ->addColumn('service_category_name', fn(LeadSubmission $l) => $l->category?->name ?? '-')
-            ->addColumn('service_type_name', fn(LeadSubmission $l) => $l->type?->name ?? '-')
-            ->editColumn('created_at', fn(LeadSubmission $l) => optional($l->created_at)->format('d-M-Y'))
-            ->addColumn('actions', function (LeadSubmission $l) use ($request) {
-                $u = $request->user();
+            ->addColumn('lead_submission_id', fn(LeadSubmission $l) => $l->id)
+            ->addColumn('category', fn(LeadSubmission $l) => $l->category?->name ?? '-')
+            ->addColumn('type', fn(LeadSubmission $l) => $l->type?->name ?? '-')
+            ->addColumn('created_by', fn(LeadSubmission $l) => $l->creator ? ($l->creator->name.' ('.$l->creator->email.')') : '-')
+            ->editColumn('created_at', fn(LeadSubmission $l) => optional($l->created_at)->format('d-M-Y h:i A'))
+            // ->addColumn('actions', function (LeadSubmission $l) use ($request) {
+            //     $user = $request->user();
+            //     $show = route('lead-submissions.show', $l);
+            //     $edit = route('lead-submissions.edit', $l);
+            //     $del  = route('lead-submissions.destroy', $l);
 
-                $btn = '<div class="flex gap-2 flex-wrap">';
-                $btn .= '<a class="px-3 py-1 rounded bg-gray-800 text-white text-xs" href="'.route('lead-submissions.show', $l).'">View</a>';
+            //     $btn = '<div class="flex gap-2 flex-wrap">';
+            //     $btn .= '<a class="px-3 py-1 rounded bg-gray-900 text-white text-xs" href="'.$show.'">View</a>';
 
-                if ($u->can('lead_submission.edit')) {
-                    $btn .= '<a class="px-3 py-1 rounded bg-indigo-600 text-white text-xs" href="'.route('lead-submissions.edit', $l).'">Edit</a>';
-                }
+            //     if ($user->can('lead-submissions.edit')) {
+            //         $btn .= '<a class="px-3 py-1 rounded bg-indigo-600 text-white text-xs" href="'.$edit.'">Edit</a>';
+            //     }
 
-                if ($u->can('lead_submission.delete')) {
-                    $btn .= '<form method="POST" action="'.route('lead-submissions.destroy', $l).'" onsubmit="return confirm(\'Delete this lead Submission?\')" style="display:inline">';
-                    $btn .= csrf_field().method_field('DELETE');
-                    $btn .= '<button class="px-3 py-1 rounded bg-red-600 text-white text-xs">Delete</button>';
-                    $btn .= '</form>';
-                }
+            //     if ($user->can('lead-submissions.delete')) {
+            //         $btn .= '<form method="POST" action="'.$del.'" onsubmit="return confirm(\'Delete this lead submission?\')" style="display:inline">';
+            //         $btn .= csrf_field().method_field('DELETE');
+            //         $btn .= '<button class="px-3 py-1 rounded bg-red-600 text-white text-xs">Delete</button>';
+            //         $btn .= '</form>';
+            //     }
 
-                $btn .= '</div>';
-                return $btn;
-            })
-            ->rawColumns(['actions'])
+            //     $btn .= '</div>';
+            //     return $btn;
+            // })
+            // ->rawColumns(['actions'])
             ->toJson();
     }
 
-    /**
-     * WIZARD - STEP 1 (Primary Info)
-     */
-    public function createStep1(Request $request)
+    /** SAVE COLUMN PREFS */
+    public function saveColumnPrefs(Request $request)
     {
-        $draft = $this->getDraft($request);
-        return view('lead-submissions.create-step1', compact('draft'));
+        $data = $request->validate([
+            'visible_columns' => ['required','array','min:1'],
+            'visible_columns.*' => ['string','max:80'],
+        ]);
+
+        UserColumnPreference::updateOrCreate(
+            ['user_id' => $request->user()->id, 'module' => 'lead_submissions.index'],
+            ['visible_columns' => $data['visible_columns']]
+        );
+
+        return response()->json(['ok' => true]);
     }
 
     public function storeStep1(Request $request)
     {
         $data = $request->validate([
-            'account_number' => ['required','string','max:100'],
             'company_name' => ['required','string','max:255'],
-
+            'account_number' => ['nullable','string','max:100'],
             'authorized_signatory_name' => ['nullable','string','max:255'],
-            'contact_number' => ['required','string','max:50'],
+            'contact_number_gsm' => ['nullable','string','max:50'],
             'alternate_contact_number' => ['nullable','string','max:50'],
-            'email' => ['required','email','max:255'],
-
-            'address' => ['required','string','max:500'],
-            'emirates' => ['required','string','max:100'],
+            'email' => ['nullable','email','max:255'],
+            'address' => ['nullable','string','max:500'],
+            'emirates' => ['nullable','string','max:150'],
             'location_coordinates' => ['nullable','string','max:100'],
+            'product' => ['nullable','string','max:150'],
+            'offer' => ['nullable','string','max:150'],
+            'mrc_aed' => ['nullable','string','max:50'],
+            'quantity' => ['nullable','integer','min:0'],
+            'remarks' => ['nullable','string','max:1000'],
 
-            'product' => ['required','string','max:255'],
-            'offer' => ['nullable','string','max:255'],
-            'mrc' => ['nullable','numeric','min:0'],
-            'quantity' => ['nullable','integer','min:1'],
-            'remarks' => ['nullable','string','max:2000'],
+            // If your figma has Request Type on step1:
+            'request_type' => ['nullable','string','max:120'],
         ]);
 
-        $this->putDraft($request, [
-            'step1' => $data,
-        ]);
+        $leadSubmission = $this->leadSubmissionService->createDraftFromStep1($data, $request->user()->id);
 
-        return redirect()->route('lead-submissions.create.step2');
+        return redirect()->route('lead-submissions.wizard.step2', $leadSubmission)->with('success', 'Step 1 saved.');
     }
 
-    /**
-     * WIZARD - STEP 2 (Service Category)
-     */
-    public function createStep2(Request $request)
+    /** STEP 2 */
+    public function createStep2(LeadSubmission $leadSubmission, Request $request)
     {
-        $draft = $this->getDraft($request);
-        $categories = ServiceCategory::orderBy('sort_order')->orderBy('name')->get(['id','name','slug']);
+        $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
 
-        return view('lead-submissions.create-step2', compact('draft','categories'));
+        $categories = ServiceCategory::orderBy('name')->get(['id','name']);
+        return view('lead-submission.wizard.step2', compact('leadSubmission','categories'));
     }
 
-    public function storeStep2(Request $request)
+    public function storeStep2(Request $request, LeadSubmission $leadSubmission)
     {
+        $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
+
         $data = $request->validate([
-            'service_category_id' => ['required', Rule::exists('service_categories','id')],
+            'service_category_id' => ['required','exists:service_categories,id'],
         ]);
 
-        $this->putDraft($request, [
-            'step2' => $data,
-            // reset dependent step when category changes
-            'step3' => null,
-            'step4' => null,
-        ]);
+        $this->leadSubmissionService->saveStep2($leadSubmission, $data);
 
-        return redirect()->route('lead-submissions.create.step3');
+        return redirect()->route('lead-submissions.wizard.step3', $leadSubmission)->with('success', 'Step 2 saved.');
     }
 
-    /**
-     * WIZARD - STEP 3 (Service Type + Dynamic Fields from schema)
-     */
-    public function createStep3(Request $request)
+    /** STEP 3 (dynamic fields from service_types.schema) */
+    public function createStep3(LeadSubmission $leadSubmission, Request $request)
     {
-        $draft = $this->getDraft($request);
-        $categoryId = data_get($draft, 'step2.service_category_id');
+        $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
 
-        if (!$categoryId) {
-            return redirect()->route('lead-submissions.create.step2')->with('error', 'Please select service category first.');
+        // types dropdown depends on selected category
+        $types = collect();
+        if ($leadSubmission->service_category_id) {
+            $types = ServiceType::where('service_category_id', $leadSubmission->service_category_id)
+                ->orderBy('name')
+                ->get(['id','name','schema']);
         }
 
-        $types = ServiceType::where('service_category_id', $categoryId)
-            ->orderBy('sort_order')->orderBy('name')
-            ->get(['id','name','schema','service_category_id']);
+        $selectedTypeId = (int) ($request->get('service_type_id') ?: $leadSubmission->service_type_id ?: 0);
+        $selectedType = $selectedTypeId ? $types->firstWhere('id', $selectedTypeId) : null;
 
-        // if type already selected, load schema
-        $selectedTypeId = data_get($draft, 'step3.service_type_id');
-        $selectedType = $selectedTypeId ? $types->firstWhere('id', (int)$selectedTypeId) : null;
-        $schema = $selectedType?->schema ?? null;
+        $fields = $selectedType ? LeadSubmissionSchema::fields($selectedType) : [];
 
-        return view('lead-submissions.create-step3', compact('draft','types','selectedType','schema'));
+        return view('lead-submission.wizard.step3', compact('leadSubmission','types','selectedType','fields'));
     }
 
-    public function storeStep3(Request $request)
+    public function storeStep3(Request $request, LeadSubmission $leadSubmission)
     {
-        $draft = $this->getDraft($request);
-        $categoryId = data_get($draft, 'step2.service_category_id');
-
-        if (!$categoryId) {
-            return redirect()->route('lead-sumissions.create.step2')->with('error', 'Please select service category first.');
-        }
+        $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
 
         $base = $request->validate([
-            'service_type_id' => ['required', Rule::exists('service_types','id')->where('service_category_id', $categoryId)],
+            'service_type_id' => ['required','exists:service_types,id'],
         ]);
 
-        $type = ServiceType::query()
-            ->where('id', $base['service_type_id'])
-            ->where('service_category_id', $categoryId)
-            ->firstOrFail();
+        $type = ServiceType::findOrFail($base['service_type_id']);
+        $fields = LeadSubmissionSchema::fields($type);
 
-        // Dynamic fields validation from schema
-        $schema = $type->schema ?? [];
-        $dynamicRules = $this->rulesFromSchema($schema);
+        // Dynamic validation rules
+        $rules = $this->buildDynamicRules($fields);
+        $validatedDynamic = $request->validate($rules);
 
-        $dynamicData = [];
-        if (!empty($dynamicRules)) {
-            $dynamicData = $request->validate($dynamicRules);
+        // Extract meta only for schema keys
+        $meta = [];
+        foreach ($fields as $f) {
+            $key = $f['key'] ?? null;
+            if (!$key) continue;
+
+            // checkbox can be absent => store 0
+            if (($f['type'] ?? '') === 'checkbox') {
+                $meta[$key] = $request->boolean("meta.$key");
+            } else {
+                $meta[$key] = data_get($validatedDynamic, "meta.$key");
+            }
         }
 
-        $this->putDraft($request, [
-            'step3' => [
-                'service_type_id' => (int)$base['service_type_id'],
-                'meta' => $dynamicData, // saved in leads.meta json later
-            ],
-            'step4' => null, // reset docs when type changes
+        $this->leadSubmissionService->saveStep3($leadSubmission, [
+            'service_type_id' => $type->id,
+            'meta' => $meta,
         ]);
 
-        return redirect()->route('lead-submissions.create.step4');
+        return redirect()->route('lead-submissions.wizard.step4', $leadSubmission)->with('success', 'Step 3 saved.');
     }
 
-    /**
-     * WIZARD - STEP 4 (Documents Upload based on schema)
-     */
-    public function createStep4(Request $request)
+    /** STEP 4 (documents from schema) */
+    public function createStep4(LeadSubmission $leadSubmission, Request $request)
     {
-        $draft = $this->getDraft($request);
+        $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
 
-        $categoryId = data_get($draft, 'step2.service_category_id');
-        $typeId = data_get($draft, 'step3.service_type_id');
+        $docDefs = [];
+        if ($leadSubmission->service_type_id) {
+            $type = ServiceType::find($leadSubmission->service_type_id);
+            $docDefs = $type ? LeadSubmissionSchema::documents($type) : [];
+        }
 
-        if (!$categoryId) return redirect()->route('lead-submissions.create.step2')->with('error', 'Please select service category first.');
-        if (!$typeId) return redirect()->route('lead-submissions.create.step3')->with('error', 'Please select service type first.');
+        $existingDocs = LeadSubmissionDocument::where('lead_submission_id', $leadSubmission->id)->get();
 
-        $type = ServiceType::where('id', $typeId)->firstOrFail();
-        $schema = $type->schema ?? [];
-
-        // expected documents list from schema
-        $docs = data_get($schema, 'documents', []); // each: {key,label,required,accept, max_mb}
-
-        return view('lead-submissions.create-step4', compact('draft','type','schema','docs'));
+        return view('lead-submission.wizard.step4', compact('leadSubmission','docDefs','existingDocs'));
     }
 
-    public function storeStep4(Request $request)
+    public function storeStep4(Request $request, LeadSubmission $leadSubmission)
     {
-        $draft = $this->getDraft($request);
+        $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
 
-        $categoryId = data_get($draft, 'step2.service_category_id');
-        $typeId = data_get($draft, 'step3.service_type_id');
+        $type = ServiceType::findOrFail($leadSubmission->service_type_id);
+        $docDefs = LeadSchema::documents($type);
 
-        if (!$categoryId) return redirect()->route('lead-submissions.create.step2')->with('error', 'Please select service category first.');
-        if (!$typeId) return redirect()->route('lead-submissions.create.step3')->with('error', 'Please select service type first.');
-
-        $type = ServiceType::where('id', $typeId)->firstOrFail();
-        $schema = $type->schema ?? [];
-        $docs = data_get($schema, 'documents', []);
-
-        // Build file validation rules dynamically
-        $fileRules = [];
-        foreach ($docs as $doc) {
+        // Validate uploads (optional per doc) + max size
+        $rules = [];
+        foreach ($docDefs as $doc) {
             $key = $doc['key'] ?? null;
             if (!$key) continue;
 
             $required = (bool)($doc['required'] ?? false);
-            $maxMb = (int)($doc['max_mb'] ?? 10);
 
-            // accept like "pdf,jpg,png" or mime list - keep simple:
-            $rule = [$required ? 'required' : 'nullable', 'file', 'max:'.($maxMb * 1024)];
-            $fileRules["docs.$key"] = $rule;
+            // file validation
+            $rules["documents.$key"] = [
+                $required ? 'required' : 'nullable',
+                'file',
+                'max:10240', // 10MB
+            ];
         }
+        $request->validate($rules);
 
-        $validated = [];
-        if (!empty($fileRules)) {
-            $validated = $request->validate($fileRules);
-        }
+        // Save documents in public/leads/{leadId}/...
+        $this->leadSubmissionService->saveStep4Documents($request, $leadSubmission);
 
-        // Save uploads temporarily in session (paths), then finalize on submit
-        $stored = [];
-        foreach ($docs as $doc) {
-            $key = $doc['key'] ?? null;
-            if (!$key) continue;
-
-            if ($request->hasFile("docs.$key")) {
-                $file = $request->file("docs.$key");
-                $path = $file->store("lead-submissions/tmp/".($request->user()->id), 'public');
-
-                $stored[$key] = [
-                    'path' => $path,
-                    'name' => $file->getClientOriginalName(),
-                    'mime' => $file->getMimeType(),
-                    'size' => $file->getSize(),
-                ];
-            }
-        }
-
-        $this->putDraft($request, [
-            'step4' => [
-                'docs' => $stored,
-            ],
-        ]);
-
-        // FINAL SUBMIT: create lead + move docs to final folder
-        return $this->finalizeLead($request);
-    }
-
-    /**
-     * CRUD - SHOW
-     */
-    public function show(Request $request, LeadSubmission $leadSubmission)
-    {
-        if (!$this->canViewLead($request, $leadSubmission)) abort(403);
-
-        $leadSubmission->load(['creator:id,name,email','category:id,name','type:id,name','documents']);
-
-        return view('lead-submissions.show', compact('leadSubmission'));
-    }
-
-    /**
-     * CRUD - EDIT
-     * (You can decide: edit single page OR edit through wizard - here is single page entry point)
-     */
-    public function edit(Request $request, LeadSubmission $leadSubmission)
-    {
-        if (!$this->canEditLeadSubmission($request, $leadSubmission)) abort(403);
-
-        $leadSubmission->load(['category:id,name','type:id,name','documents']);
-
-        $categories = ServiceCategory::orderBy('sort_order')->orderBy('name')->get(['id','name']);
-        $types = ServiceType::when($leadSubmission->service_category_id, fn($q)=>$q->where('service_category_id',$leadSubmission->service_category_id))
-            ->orderBy('sort_order')->orderBy('name')
-            ->get(['id','name','schema','service_category_id']);
-
-        $selectedType = $leadSubmission->type;
-        $schema = $selectedType?->schema ?? [];
-
-        return view('lead-submissions.edit', compact('leadSubmission','categories','types','schema'));
-    }
-
-    /**
-     * CRUD - UPDATE
-     */
-    public function update(Request $request, LeadSubmission $leadSubmission)
-    {
-        if (!$this->canEditLeadSubmission($request, $leadSubmission)) abort(403);
-
-        $data = $request->validate([
-            'account_number' => ['required','string','max:100'],
-            'company_name' => ['required','string','max:255'],
-
-            'authorized_signatory_name' => ['nullable','string','max:255'],
-            'contact_number' => ['required','string','max:50'],
-            'alternate_contact_number' => ['nullable','string','max:50'],
-            'email' => ['required','email','max:255'],
-
-            'address' => ['required','string','max:500'],
-            'emirates' => ['required','string','max:100'],
-            'location_coordinates' => ['nullable','string','max:100'],
-
-            'product' => ['required','string','max:255'],
-            'offer' => ['nullable','string','max:255'],
-            'mrc' => ['nullable','numeric','min:0'],
-            'quantity' => ['nullable','integer','min:1'],
-            'remarks' => ['nullable','string','max:2000'],
-
-            'service_category_id' => ['required', Rule::exists('service_categories','id')],
-            'service_type_id' => ['required', Rule::exists('service_types','id')->where('service_category_id', $request->service_category_id)],
-        ]);
-
-        $type = ServiceType::where('id', $data['service_type_id'])->firstOrFail();
-        $schema = $type->schema ?? [];
-        $dynamicRules = $this->rulesFromSchema($schema);
-        $meta = [];
-
-        if (!empty($dynamicRules)) {
-            $meta = $request->validate($dynamicRules);
-        }
-
-        DB::transaction(function () use ($leadSubmission, $data, $meta) {
-            $leadSubmission->fill([
-                'account_number' => $data['account_number'],
-                'company_name' => $data['company_name'],
-                'authorized_signatory_name' => $data['authorized_signatory_name'] ?? null,
-                'contact_number' => $data['contact_number'],
-                'alternate_contact_number' => $data['alternate_contact_number'] ?? null,
-                'email' => $data['email'],
-                'address' => $data['address'],
-                'emirates' => $data['emirates'],
-                'location_coordinates' => $data['location_coordinates'] ?? null,
-                'product' => $data['product'],
-                'offer' => $data['offer'] ?? null,
-                'mrc' => $data['mrc'] ?? null,
-                'quantity' => $data['quantity'] ?? null,
-                'remarks' => $data['remarks'] ?? null,
-                'service_category_id' => (int)$data['service_category_id'],
-                'service_type_id' => (int)$data['service_type_id'],
-                'meta' => $meta,
-            ]);
-
-            $leadSubmission->save();
-        });
-
-        return redirect()->route('lead-submission.show', $leadSubmission)->with('success', 'Lead updated');
-    }
-
-    /**
-     * CRUD - DELETE
-     */
-    public function destroy(Request $request, LeadSubmission $leadSubmission)
-    {
-        if (!$this->canDeleteLeadSubmission($request, $leadSubmission)) abort(403);
-
-        DB::transaction(function () use ($leadSubmission) {
-            // delete files
-            foreach ($leadSubmission->documents as $doc) {
-                if ($doc->path) Storage::disk('public')->delete($doc->path);
-            }
-
-            $leadSubmission->documents()->delete();
-            $leadSubmission->delete();
-        });
-
-        return redirect()->route('lead-submission.index')->with('success', 'Lead Submission deleted');
-    }
-
-    /**
-     * Download a lead document
-     */
-    public function downloadDocument(Request $request, Lead $leadSubmission, LeadSubmissionDocument $doc)
-    {
-        if (!$this->canViewLead($request, $lead)) abort(403);
-        if ($doc->lead_id !== $lead->id) abort(404);
-
-        return Storage::disk('public')->download($doc->path, $doc->original_name);
-    }
-
-    /**
-     * =========================
-     * Helpers
-     * =========================
-     */
-
-    private function finalizeLead(Request $request)
-    {
-        $draft = $this->getDraft($request);
-
-        $step1 = data_get($draft, 'step1');
-        $step2 = data_get($draft, 'step2');
-        $step3 = data_get($draft, 'step3');
-        $step4 = data_get($draft, 'step4');
-
-        if (!$step1 || !$step2 || !$step3) {
-            return redirect()->route('leads.create.step1')->with('error', 'Wizard data incomplete.');
-        }
-
-        $lead = DB::transaction(function () use ($request, $step1, $step2, $step3, $step4) {
-
-            $lead = LeadSubmission::create([
-                'created_by' => $request->user()->id,
-
-                // step 1
-                'account_number' => $step1['account_number'],
-                'company_name' => $step1['company_name'],
-                'authorized_signatory_name' => $step1['authorized_signatory_name'] ?? null,
-                'contact_number' => $step1['contact_number'],
-                'alternate_contact_number' => $step1['alternate_contact_number'] ?? null,
-                'email' => $step1['email'],
-                'address' => $step1['address'],
-                'emirates' => $step1['emirates'],
-                'location_coordinates' => $step1['location_coordinates'] ?? null,
-                'product' => $step1['product'],
-                'offer' => $step1['offer'] ?? null,
-                'mrc' => $step1['mrc'] ?? null,
-                'quantity' => $step1['quantity'] ?? null,
-                'remarks' => $step1['remarks'] ?? null,
-
-                // step 2/3
-                'service_category_id' => (int)$step2['service_category_id'],
-                'service_type_id' => (int)$step3['service_type_id'],
-                'meta' => $step3['meta'] ?? [],
-
-                'status' => 'submitted',
-                'submitted_at' => now(),
-            ]);
-
-            // move tmp docs to final folder
-            $docs = data_get($step4, 'docs', []);
-            foreach ($docs as $key => $info) {
-                $tmpPath = $info['path'] ?? null;
-                if (!$tmpPath) continue;
-
-                $finalPath = "leads/{$lead->id}/{$key}-".basename($tmpPath);
-
-                // move in same disk:
-                Storage::disk('public')->move($tmpPath, $finalPath);
-
-                LeadDocument::create([
-                    'lead_id' => $lead->id,
-                    'doc_key' => $key,
-                    'path' => $finalPath,
-                    'original_name' => $info['name'] ?? $key,
-                    'mime' => $info['mime'] ?? null,
-                    'size' => $info['size'] ?? null,
+        // If submit action: enforce required docs exist (in DB or in request)
+        if ($request->input('action') === 'submit') {
+            $missing = $this->missingRequiredDocs($leadSubmission, $docDefs);
+            if (!empty($missing)) {
+                return back()->withErrors([
+                    'documents' => 'Missing required documents: ' . implode(', ', $missing),
                 ]);
             }
 
-            return $lead;
-        });
+            $this->leadSubmissionService->submit($leadSubmission);
+            return redirect()->route('lead-submissions.show', $leadSubmission)->with('success', 'Lead Submission submitted successfully.');
+        }
 
-        $this->clearDraft($request);
-
-        return redirect()->route('leads.show', $lead)->with('success', 'Lead submitted successfully.');
+        return back()->with('success', 'Documents saved.');
     }
 
-    private function rulesFromSchema(array $schema): array
+    /** SHOW */
+    public function show(Request $request, LeadSubmission $leadSubmission)
     {
-        // Schema expected:
-        // fields: [{ key, label, type, required, rules }]
-        // Example rules: "string|max:255" or ["string","max:255"]
+        $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
+
+        $leadSubmission->load(['creator:id,name,email','category:id,name','type:id,name']);
+        $docs = LeadSubmissionDocument::where('lead_submission_id', $leadSubmission->id)->get();
+
+        $type = $leadSubmission->type;
+        $fields = $type ? LeadSubmissionSchema::fields($type) : [];
+
+        return view('lead-submission.show', compact('leadSubmission','docs','fields'));
+    }
+
+    /** EDIT (single page edit for primary + category + type + meta + upload new docs) */
+    public function edit(Request $request, LeadSubmission $leadSubmission)
+    {
+        $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
+
+        $categories = ServiceCategory::orderBy('name')->get(['id','name']);
+        $types = $leadSubmission->service_category_id
+            ? ServiceType::where('service_category_id', $leadSubmission->service_category_id)->orderBy('name')->get(['id','name','schema'])
+            : collect();
+
+        $selectedType = $leadSubmission->type;
+        $fields = $selectedType ? LeadSubmissionSchema::fields($selectedType) : [];
+        $docDefs = $selectedType ? LeadSubmissionSchema::documents($selectedType) : [];
+        $existingDocs = LeadSubmissionDocument::where('lead_submission_id', $leadSubmission->id)->get();
+
+        return view('lead-submission.edit', compact('leadSubmission','categories','types','selectedType','fields','docDefs','existingDocs'));
+    }
+
+    public function update(Request $request, LeadSubmission $leadSubmission)
+    {
+        $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
+
+        $base = $request->validate([
+            'company_name' => ['required','string','max:255'],
+            'account_number' => ['nullable','string','max:100'],
+            'email' => ['nullable','email','max:255'],
+            'contact_number_gsm' => ['nullable','string','max:50'],
+            'request_type' => ['nullable','string','max:120'],
+
+            'service_category_id' => ['required','exists:service_categories,id'],
+            'service_type_id' => ['required','exists:service_types,id'],
+        ]);
+
+        $type = ServiceType::findOrFail($base['service_type_id']);
+        $fields = LeadSubmissionSchema::fields($type);
+        $rules = $this->buildDynamicRules($fields);
+        $validatedDynamic = $request->validate($rules);
+
+        $meta = [];
+        foreach ($fields as $f) {
+            $key = $f['key'] ?? null;
+            if (!$key) continue;
+
+            if (($f['type'] ?? '') === 'checkbox') {
+                $meta[$key] = $request->boolean("meta.$key");
+            } else {
+                $meta[$key] = data_get($validatedDynamic, "meta.$key");
+            }
+        }
+
+        $lead->update([
+            ...$base,
+            'meta' => $meta,
+        ]);
+
+        // Optional: upload extra docs from edit
+        $docDefs = LeadSubmissionSchema::documents($type);
+        if (!empty($docDefs)) {
+            // Only validate provided files
+            $fileRules = [];
+            foreach ($docDefs as $doc) {
+                $key = $doc['key'] ?? null;
+                if (!$key) continue;
+                $fileRules["documents.$key"] = ['nullable','file','max:10240'];
+            }
+            $request->validate($fileRules);
+
+            $this->leadSubmissionService->saveStep4Documents($request, $leadSubmission);
+        }
+
+        return redirect()->route('lead-submissions.show', $leadSubmission)->with('success', 'Lead Submission updated successfully.');
+    }
+
+    /** DELETE */
+    public function destroy(Request $request, LeadSubmission $leadSubmission)
+    {
+        $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
+
+        // delete documents files
+        $docs = LeadSubmissionDocument::where('lead_submission_id', $leadSubmission->id)->get();
+        foreach ($docs as $d) {
+            if ($d->path) Storage::disk('public')->delete($d->path);
+            $d->delete();
+        }
+
+        // delete folder (optional)
+        Storage::disk('public')->deleteDirectory("lead-submissions/{$leadSubmission->id}");
+
+        $leadSubmission->delete();
+
+        return redirect()->route('lead-submissions.index')->with('success', 'Lead Submission deleted.');
+    }
+
+    /** AJAX: types by category */
+    public function serviceTypesByCategory(Request $request)
+    {
+        $request->validate([
+            'service_category_id' => ['required','exists:service_categories,id'],
+        ]);
+
+        $types = ServiceType::where('service_category_id', $request->service_category_id)
+            ->orderBy('name')
+            ->get(['id','name']);
+
+        return response()->json($types);
+    }
+
+    /** AJAX: schema by type */
+    public function typeSchema(ServiceType $type)
+    {
+        return response()->json([
+            'fields' => LeadSubmissionSchema::fields($type),
+            'documents' => LeadSubmissionSchema::documents($type),
+        ]);
+    }
+
+    /** ACCESS CONTROL: owner-only unless superadmin or leads.view_all */
+    private function authorizeLeadSubmissionAccess(Request $request, LeadSubmission $leadSubmission): void
+    {
+        $user = $request->user();
+
+        if ($user->hasRole('superadmin') || $user->can('lead_submissions.view_all')) {
+            return;
+        }
+
+        if ((int)$leadSubmission->created_by !== (int)$user->id) {
+            abort(403);
+        }
+    }
+
+    /** dynamic rules builder */
+    private function buildDynamicRules(array $fields): array
+    {
         $rules = [];
-        $fields = $schema['fields'] ?? [];
 
         foreach ($fields as $f) {
             $key = $f['key'] ?? null;
             if (!$key) continue;
 
+            $type = $f['type'] ?? 'text';
             $required = (bool)($f['required'] ?? false);
 
-            $base = $required ? ['required'] : ['nullable'];
+            $r = [];
+            $r[] = $required ? 'required' : 'nullable';
 
-            // if schema has explicit rules:
-            if (!empty($f['rules'])) {
-                $extra = is_array($f['rules']) ? $f['rules'] : explode('|', (string)$f['rules']);
-                $rules[$key] = array_merge($base, $extra);
-                continue;
+            // Basic type mapping
+            switch ($type) {
+                case 'number':
+                    $r[] = 'numeric';
+                    break;
+                case 'email':
+                    $r[] = 'email';
+                    break;
+                case 'date':
+                    $r[] = 'date';
+                    break;
+                case 'select':
+                    $r[] = 'string';
+                    break;
+                case 'textarea':
+                case 'text':
+                default:
+                    $r[] = 'string';
+                    break;
+                case 'checkbox':
+                    $r[] = 'boolean';
+                    break;
             }
 
-            // fallback by type
-            $type = $f['type'] ?? 'string';
-            if ($type === 'number') $rules[$key] = array_merge($base, ['numeric']);
-            elseif ($type === 'email') $rules[$key] = array_merge($base, ['email','max:255']);
-            elseif ($type === 'date') $rules[$key] = array_merge($base, ['date']);
-            else $rules[$key] = array_merge($base, ['string','max:255']);
+            if (!empty($f['max'])) {
+                $r[] = 'max:' . (int)$f['max'];
+            }
+
+            // If select has options, restrict values (optional)
+            if ($type === 'select' && !empty($f['options']) && is_array($f['options'])) {
+                $allowed = array_map('strval', $f['options']);
+                $r[] = 'in:' . implode(',', array_map(fn($v) => str_replace(',', '\,', $v), $allowed));
+            }
+
+            $rules["meta.$key"] = $r;
         }
 
         return $rules;
     }
 
-    private function canViewLead(Request $request, Lead $lead): bool
+    private function missingRequiredDocs(LeadSubmission $leadSubmission, array $docDefs): array
     {
-        if ($request->user()->hasRole('superadmin') || $request->user()->can('leads.view_all')) {
-            return $request->user()->can('leads.view');
-        }
+        $missing = [];
+        $existingKeys = LeadSubmissionDocument::where('lead_submission_id', $leadSubmission->id)->pluck('doc_key')->toArray();
 
-        return $request->user()->can('leads.view') && ((int)$lead->created_by === (int)$request->user()->id);
-    }
+        foreach ($docDefs as $doc) {
+            $key = $doc['key'] ?? null;
+            if (!$key) continue;
 
-    private function canEditLead(Request $request, Lead $lead): bool
-    {
-        if ($request->user()->hasRole('superadmin') || $request->user()->can('leads.view_all')) {
-            return $request->user()->can('leads.edit');
-        }
-
-        return $request->user()->can('leads.edit') && ((int)$lead->created_by === (int)$request->user()->id);
-    }
-
-    private function canDeleteLead(Request $request, Lead $lead): bool
-    {
-        if ($request->user()->hasRole('superadmin') || $request->user()->can('leads.view_all')) {
-            return $request->user()->can('leads.delete');
-        }
-
-        return $request->user()->can('leads.delete') && ((int)$lead->created_by === (int)$request->user()->id);
-    }
-
-    private function getDraft(Request $request): array
-    {
-        return (array) $request->session()->get('leads_wizard', []);
-    }
-
-    private function putDraft(Request $request, array $payload): void
-    {
-        $draft = $this->getDraft($request);
-
-        foreach ($payload as $k => $v) {
-            if ($v === null) {
-                unset($draft[$k]);
-            } else {
-                $draft[$k] = $v;
+            $required = (bool)($doc['required'] ?? false);
+            if ($required && !in_array($key, $existingKeys, true)) {
+                $missing[] = $doc['label'] ?? $key;
             }
         }
 
-        $request->session()->put('leads_wizard', $draft);
+        return $missing;
     }
 
-    private function clearDraft(Request $request): void
+    public function submit(LeadSubmission $leadSubmission)
     {
-        $request->session()->forget('leads_wizard');
+        $this->authorize('submit', $leadSubmission);
+
+        $leadSubmission->submit();
+
+        // Notification
+        Notification::send(
+            User::role('superadmin')->get(),
+            new LeadSubmittedNotification($leadSubmission)
+        );
+
+        return redirect()->route('lead-submissions.index')
+            ->with('success','Lead submission submitted successfully');
     }
+
 }

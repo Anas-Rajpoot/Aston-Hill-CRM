@@ -8,22 +8,49 @@ class LeadSubmission extends Model
 {
     protected $fillable = [
         'created_by','updated_by','step','status',
-        'account_number','company_name','authorized_signatory_name','contact_number_gsm','alternate_contact_number','email',
-        'address','emirate','location_coordinates',
-        'product','offer','mrc_aed','quantity',
-        'sales_agent_id','team_leader_id','manager_id',
-        'service_category_id','service_type_id',
-        'payload','submitted_at','remarks'
+        'account_number','company_name','authorized_signatory_name','contact_number_gsm',
+        'alternate_contact_number','email','address','emirate','location_coordinates',
+        'product','offer','mrc_aed','quantity','sales_agent_id','team_leader_id',
+        'manager_id','service_category_id','service_type_id','payload','submitted_at',
+        'remarks','approved_at','rejected_at','approved_by','rejected_by'
     ];
+
+    const STATUSES = ['draft','submitted','approved','rejected'];
 
     protected $casts = [
         'payload' => 'array',
         'submitted_at' => 'datetime',
     ];
 
+    public function submit()
+    {
+        $this->update([
+            'status' => 'submitted',
+            'submitted_at' => now(),
+        ]);
+    }
+
+    public function approve($userId)
+    {
+        $this->update([
+            'status' => 'approved',
+            'approved_by' => $userId,
+            'approved_at' => now(),
+        ]);
+    }
+
+    public function reject($userId)
+    {
+        $this->update([
+            'status' => 'rejected',
+            'rejected_by' => $userId,
+            'rejected_at' => now(),
+        ]);
+    }
+
     public function documents()
     { 
-        return $this->hasMany(LeadDocument::class); 
+        return $this->hasMany(LeadSubmissionDocument::class); 
     }
     public function category()
     { 

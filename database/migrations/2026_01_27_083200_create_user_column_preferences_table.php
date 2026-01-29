@@ -11,12 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('user_table_prefs', function (Blueprint $table) {
+        Schema::create('user_column_preferences', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->string('table_key');
+            $table->string('module');
             $table->json('visible_columns');
-            $table->unique(['user_id','table_key']);
+            $table->unique(['user_id','module']);
             $table->timestamps();
         });
     }
@@ -26,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('user_table_prefs');
+        Schema::dropIfExists('user_column_preferences');
     }
 };
