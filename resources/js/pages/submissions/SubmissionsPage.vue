@@ -4,7 +4,7 @@ import StatsCards from '@/components/StatsCards.vue'
 import Tabs from '@/components/Tabs.vue'
 
 // Forms
-import LeadSubmissionForm from '@/forms/LeadSubmissionForm/step1.vue'
+import LeadSubmissionForm from '@/forms/LeadSubmissionForms/step1.vue'
 import FieldSubmissionForm from '@/forms/FieldSubmissionForm/step1.vue'
 import CustomerSupportForm from '@/forms/CustomerSupportForm/step1.vue'
 import VASRequestForm from '@/forms/VASRequestForm/step1.vue'

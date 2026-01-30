@@ -4,7 +4,7 @@
     const emit = defineEmits(['update:modelValue'])
 
     const update = (key, value) => {
-    emit('update:modelValue', { ...modelValue, [key]: value })
+      emit('update:modelValue', { ...modelValue, [key]: value })
     }
 </script>
 

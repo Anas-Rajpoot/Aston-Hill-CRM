@@ -93,43 +93,43 @@ Route::middleware(['auth', 'verified', 'approved', '2fa_or_superadmin'])->group(
     Route::get('/notifications/poll', [NotificationController::class, 'poll'])
     ->name('notifications.poll');
 
-    Route::prefix('lead-submissions')->name('lead-submissions.')->group(function () {
+    // Route::prefix('lead-submissions')->name('lead-submissions.')->group(function () {
 
-        Route::get('/', [LeadSubmissionController::class, 'index'])->name('index');
-        Route::get('/datatable', [LeadSubmissionController::class, 'datatable'])->name('datatable');
+    //     Route::get('/', [LeadSubmissionController::class, 'index'])->name('index');
+    //     Route::get('/datatable', [LeadSubmissionController::class, 'datatable'])->name('datatable');
 
-        // Wizard
-        Route::get('/create/step-1', [LeadSubmissionController::class, 'createStep1'])->name('create.step1');
-        Route::post('/create/step-1', [LeadSubmissionController::class, 'storeStep1'])->name('store.step1');
+    //     // Wizard
+    //     Route::get('/create/step-1', [LeadSubmissionController::class, 'createStep1'])->name('create.step1');
+    //     Route::post('/create/step-1', [LeadSubmissionController::class, 'storeStep1'])->name('store.step1');
 
-        Route::get('/create/step-2', [LeadSubmissionController::class, 'createStep2'])->name('create.step2');
-        Route::post('/create/step-2', [LeadSubmissionController::class, 'storeStep2'])->name('store.step2');
+    //     Route::get('/create/step-2', [LeadSubmissionController::class, 'createStep2'])->name('create.step2');
+    //     Route::post('/create/step-2', [LeadSubmissionController::class, 'storeStep2'])->name('store.step2');
 
-        Route::get('/create/step-3', [LeadSubmissionController::class, 'createStep3'])->name('create.step3');
-        Route::post('/create/step-3', [LeadSubmissionController::class, 'storeStep3'])->name('store.step3');
+    //     Route::get('/create/step-3', [LeadSubmissionController::class, 'createStep3'])->name('create.step3');
+    //     Route::post('/create/step-3', [LeadSubmissionController::class, 'storeStep3'])->name('store.step3');
 
-        Route::get('/create/step-4', [LeadSubmissionController::class, 'createStep4'])->name('create.step4');
-        Route::post('/create/step-4', [LeadSubmissionController::class, 'storeStep4'])->name('store.step4');
+    //     Route::get('/create/step-4', [LeadSubmissionController::class, 'createStep4'])->name('create.step4');
+    //     Route::post('/create/step-4', [LeadSubmissionController::class, 'storeStep4'])->name('store.step4');
 
-        Route::get('/service-types', [LeadSubmissionController::class, 'serviceTypesByCategory'])
-            ->name('serviceTypesByCategory');
-        Route::get('/type-schema/{type}', [LeadSubmissionController::class, 'typeSchema'])
-            ->name('typeSchema');
+    //     Route::get('/service-types', [LeadSubmissionController::class, 'serviceTypesByCategory'])
+    //         ->name('serviceTypesByCategory');
+    //     Route::get('/type-schema/{type}', [LeadSubmissionController::class, 'typeSchema'])
+    //         ->name('typeSchema');
 
-        Route::post('/preferences/columns', [LeadSubmissionController::class, 'saveColumnPrefs'])
-            ->name('preferences.columns');
+    //     Route::post('/preferences/columns', [LeadSubmissionController::class, 'saveColumnPrefs'])
+    //         ->name('preferences.columns');
 
-        // Resource CRUD
-        Route::get('/{lead_submission}', [LeadSubmissionController::class, 'show'])->name('show');
-        Route::get('/{lead_submission}/edit', [LeadSubmissionController::class, 'edit'])->name('edit');
-        Route::put('/{lead_submission}', [LeadSubmissionController::class, 'update'])->name('update');
-        Route::delete('/{lead_submission}', [LeadSubmissionController::class, 'destroy'])->name('destroy');
+    //     // Resource CRUD
+    //     Route::get('/{lead_submission}', [LeadSubmissionController::class, 'show'])->name('show');
+    //     Route::get('/{lead_submission}/edit', [LeadSubmissionController::class, 'edit'])->name('edit');
+    //     Route::put('/{lead_submission}', [LeadSubmissionController::class, 'update'])->name('update');
+    //     Route::delete('/{lead_submission}', [LeadSubmissionController::class, 'destroy'])->name('destroy');
 
-        Route::get('/{lead_submission}/documents/{document}/download',
-                [LeadSubmissionController::class, 'downloadDocument']
-            )->name('documents.download');
+    //     Route::get('/{lead_submission}/documents/{document}/download',
+    //             [LeadSubmissionController::class, 'downloadDocument']
+    //         )->name('documents.download');
 
-    });
+    // });
 
     Route::get('/modules/{module}/columns', [ColumnPreferenceController::class, 'show'])->name('columns.preference.show');
     Route::post('/modules/{module}/columns', [ColumnPreferenceController::class, 'store'])->name('columns.preference.store');

@@ -1,4 +1,4 @@
-<aside class="w-64 bg-white border-r hidden md:flex md:flex-col">
+<!-- <aside class="w-64 bg-white border-r hidden md:flex md:flex-col">
     <div class="h-16 flex items-center px-6 border-b">
         <span class="text-lg font-semibold text-gray-800">Super Admin</span>
     </div>
@@ -99,4 +99,18 @@
             </button>
         </form>
     </div>
-</aside>
+</aside> -->
+
+
+<template>
+  <div class="flex">
+    <Sidebar />
+    <main class="flex-1">
+      <router-view />
+    </main>
+  </div>
+</template>
+
+<script setup>
+    import Sidebar from '@/components/Sidebar.vue'
+</script>

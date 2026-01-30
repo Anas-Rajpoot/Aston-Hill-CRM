@@ -1,14 +1,21 @@
-import './bootstrap';
+import './bootstrap'
+import Alpine from 'alpinejs'
+import $ from 'jquery'
 
-import Alpine from 'alpinejs';
+import { createApp } from 'vue'
+import { createPinia } from 'pinia'
+import router from './router'
 
-import $ from 'jquery';
-window.$ = window.jQuery = $;
+import App from './App.vue'
 
-import 'datatables.net';
-import 'datatables.net-dt/css/dataTables.dataTables.css';
+window.$ = window.jQuery = $
+window.Alpine = Alpine
+Alpine.start()
 
+import 'datatables.net'
+import 'datatables.net-dt/css/dataTables.dataTables.css'
 
-window.Alpine = Alpine;
-
-Alpine.start();
+const app = createApp(App)
+app.use(createPinia())
+app.use(router)
+app.mount('#app')

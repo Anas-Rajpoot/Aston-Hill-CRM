@@ -15,7 +15,8 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="font-sans antialiased">
-        <div class="min-h-screen flex">
+        <div id="app"></div>
+        <!-- <div class="min-h-screen flex">
 
             {{-- Sidebar (fixed width) --}}
             <aside class="w-64 shrink-0">
@@ -43,7 +44,7 @@
                 </footer>
 
             </div>
-        </div>
+        </div> -->
 
 
 <script>
