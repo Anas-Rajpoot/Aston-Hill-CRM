@@ -36,7 +36,7 @@ class RegisteredUserController extends Controller
      *
      * @throws \Illuminate\Validation\ValidationException
      */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): RedirectResponse|\Illuminate\Http\JsonResponse
     {
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -51,20 +51,22 @@ class RegisteredUserController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'phone'=>$request->phone,
-            'country'=>$request->country,
-            'timezone'=>$request->timezone,
-            'cnic_number'=>$request->cnic_number,
-            'status'=>'pending',
-            'two_factor_enabled'=>1
+            'phone' => $request->phone,
+            'country' => $request->country,
+            'timezone' => $request->timezone ?? '',
+            'cnic_number' => $request->cnic_number,
+            'status' => 'pending',
+            'two_factor_enabled' => 1,
         ]);
 
         User::role('superadmin')->each(function ($admin) use ($user) {
             $admin->notify(new NewUserApprovalNotification($user));
         });
 
-        return redirect()->route('login')
-        ->with('status', 'Your registration is completed. Please wait for super admin approval.')
-        ->with('success', 'Your registration is completed. Please wait for super admin approval.');
+        $message = 'Your registration is completed. Please wait for super admin approval.';
+        if ($request->expectsJson()) {
+            return response()->json(['message' => $message, 'redirect' => '/login']);
+        }
+        return redirect()->route('login')->with('status', $message)->with('success', $message);
     }
 }

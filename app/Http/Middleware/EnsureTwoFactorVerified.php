@@ -29,10 +29,13 @@ class EnsureTwoFactorVerified
 
         // If user has 2FA enabled but not verified in this session
         if ($user->two_factor_enabled && !$request->session()->get('2fa_passed')) {
-            // Avoid redirect loop
-            if (!$request->routeIs('2fa.verify.form', '2fa.verify', '2fa.setup', '2fa.enable')) {
-                return redirect()->route('2fa.verify.form');
+            if ($request->routeIs('2fa.verify.form', '2fa.verify', '2fa.setup', '2fa.enable', 'api.auth.2fa.verify')) {
+                return $next($request);
             }
+            if ($request->expectsJson()) {
+                return response()->json(['message' => '2FA verification required', 'redirect' => '/2fa/verify'], 403);
+            }
+            return redirect()->route('2fa.verify.form');
         }
 
         return $next($request);

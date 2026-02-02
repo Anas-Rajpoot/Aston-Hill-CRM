@@ -1,9 +1,10 @@
 import { defineStore } from 'pinia'
-import axios from '@/lib/axios'
+import { api, web } from '@/lib/axios'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null,
+    token: null, // for future token auth (separate frontend deploy)
     loading: false,
   }),
 
@@ -14,9 +15,11 @@ export const useAuthStore = defineStore('auth', {
   actions: {
     async fetchUser() {
       try {
-        // Ensure CSRF cookie is set first (required for SPA auth)
-        await axios.get('/sanctum/csrf-cookie')
-        const { data } = await axios.get('/me') // /api/me due to baseURL in axios.js
+        const hasToken = sessionStorage.getItem('api_token') || localStorage.getItem('api_token')
+        if (!hasToken) {
+          await web.get('/sanctum/csrf-cookie')
+        }
+        const { data } = await api.get('/me')
         const rolesRaw = data.roles ?? []
         const roles = Array.isArray(rolesRaw)
           ? rolesRaw.map((r) => (typeof r === 'string' ? r : r?.name)).filter(Boolean)
@@ -30,12 +33,22 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
-    async login(credentials) {
+    async login(credentials, options = {}) {
       this.loading = true
       try {
-        await axios.get('/sanctum/csrf-cookie') // CSRF cookie
-        await axios.post('/login', credentials) // login via Breeze
-        await this.fetchUser()                  // fetch authenticated user
+        if (!options.token) {
+          await web.get('/sanctum/csrf-cookie')
+        }
+        const headers = options.token ? { 'X-Request-Token': 'true' } : {}
+        const { data } = await api.post('/auth/login', credentials, { headers })
+        if (data.token) {
+          this.token = data.token
+          sessionStorage.setItem('api_token', data.token)
+          this.user = { ...data.user, roles: data.user?.roles ?? [] }
+          return data
+        }
+        await this.fetchUser()
+        return data
       } finally {
         this.loading = false
       }
@@ -43,10 +56,19 @@ export const useAuthStore = defineStore('auth', {
 
     async logout() {
       try {
-        await axios.post('/logout') // logout via Breeze
+        await api.post('/auth/logout')
       } finally {
         this.user = null
+        this.token = null
+        sessionStorage.removeItem('api_token')
+        localStorage.removeItem('api_token')
       }
+    },
+
+    async verify2FA(code) {
+      const { data } = await api.post('/auth/2fa/verify', { otp: code })
+      await this.fetchUser()
+      return data
     },
   },
 })

@@ -37,17 +37,13 @@ class NewUserApprovalNotification extends Notification
      */
     public function toMail(object $notifiable): MailMessage
     {
+        $editUrl = url('/users/' . $this->user->id . '/edit');
         return (new MailMessage)
             ->subject('New User Pending Approval')
             ->line('A new user has registered and is waiting for approval.')
             ->line('Name: ' . $this->user->name)
             ->line('Email: ' . $this->user->email)
-            ->action(
-                'Review User',
-                route('login', [
-                    'redirect' => url()->signedRoute('super-admin.users.review', ['user' => $this->user->id])
-                ])
-            );
+            ->action('Edit User', $editUrl);
     }
 
     /**
@@ -63,7 +59,7 @@ class NewUserApprovalNotification extends Notification
             'user_id' => $this->user->id,
             'name'    => $this->user->name,
             'email'   => $this->user->email,
-            'url'     => route('super-admin.users.review', $this->user->id),
+            'url'     => '/users/' . $this->user->id . '/edit',
             'message' => $this->user->name . " registered and is waiting for approval."
         ];
     }

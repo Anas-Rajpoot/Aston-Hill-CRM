@@ -10,9 +10,9 @@ class LeadSubmission extends Model
         'created_by','updated_by','step','status',
         'account_number','company_name','authorized_signatory_name','contact_number_gsm',
         'alternate_contact_number','email','address','emirate','location_coordinates',
-        'product','offer','mrc_aed','quantity','sales_agent_id','team_leader_id',
-        'manager_id','service_category_id','service_type_id','payload','submitted_at',
-        'remarks','approved_at','rejected_at','approved_by','rejected_by'
+        'product','offer','mrc_aed','quantity','ae_domain','gaid',
+        'sales_agent_id','team_leader_id','manager_id','service_category_id','service_type_id',
+        'payload','submitted_at','remarks','approved_at','rejected_at','approved_by','rejected_by'
     ];
 
     const STATUSES = ['draft','submitted','approved','rejected'];

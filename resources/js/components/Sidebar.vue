@@ -41,6 +41,7 @@ const navItems = [
 
 const settingsItems = [
   { to: '/settings', label: 'Settings' },
+  { to: '/settings/team-hierarchy', label: 'Team Hierarchy', show: () => userHasRole('superadmin') },
   { to: '/announcements', label: 'Announcements' },
   { to: '/notifications', label: 'Notifications' },
   { to: '/accounts', label: 'Accounts' },
@@ -109,6 +110,7 @@ const isActive = (to) => {
           <SidebarLink
             v-for="item in settingsItems"
             :key="item.to"
+            v-show="item.show?.() !== false"
             :to="item.to"
             :label="item.label"
             dark

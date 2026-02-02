@@ -18,4 +18,16 @@ import 'datatables.net-dt/css/dataTables.dataTables.css'
 const app = createApp(App)
 app.use(createPinia())
 app.use(router)
-app.mount('#app')
+
+const mountApp = () => {
+  const el = document.getElementById('app')
+  if (el) {
+    app.mount('#app')
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', mountApp)
+} else {
+  mountApp()
+}

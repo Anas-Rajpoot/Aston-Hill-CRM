@@ -12,25 +12,16 @@ use App\Http\Controllers\Auth\VerifyEmailController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
-    Route::get('register', [RegisteredUserController::class, 'create'])
-        ->name('register');
+    // Serve Vue SPA for auth pages (no sidebar, topbar, footer)
+    Route::get('register', fn () => view('layouts.app'))->name('register');
+    Route::get('login', fn () => view('layouts.app'))->name('login');
+    Route::get('forgot-password', fn () => view('layouts.app'))->name('password.request');
+    Route::get('reset-password/{token}', fn () => view('layouts.app'))->name('password.reset');
 
     Route::post('register', [RegisteredUserController::class, 'store']);
-
-    Route::get('login', [AuthenticatedSessionController::class, 'create'])
-        ->name('login');
-
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
-
-    Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
-        ->name('password.request');
-
     Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])
         ->name('password.email');
-
-    Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])
-        ->name('password.reset');
-
     Route::post('reset-password', [NewPasswordController::class, 'store'])
         ->name('password.store');
 });

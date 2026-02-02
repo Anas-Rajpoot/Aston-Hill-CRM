@@ -16,36 +16,6 @@
     </head>
     <body class="font-sans antialiased">
         <div id="app"></div>
-        <!-- <div class="min-h-screen flex">
-
-            {{-- Sidebar (fixed width) --}}
-            <aside class="w-64 shrink-0">
-                @include('layouts.sidebar')
-            </aside>
-
-            {{-- Right Side (Topbar + Content) --}}
-            <div class="flex-1 flex flex-col min-w-0">
-
-                {{-- Topbar --}}
-                <header class="shrink-0">
-                    @include('layouts.topbar')
-                </header>
-
-                {{-- Page Content --}}
-                <main class="flex-1 p-4 sm:p-6 overflow-y-auto">
-                    <div class="max-w-5xl mx-auto">
-                        @yield('content')
-                    </div>
-                </main>
-
-                {{-- Footer --}}
-                <footer class="shrink-0">
-                    @include('layouts.footer')
-                </footer>
-
-            </div>
-        </div> -->
-
 
 <script>
 (function () {

@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Storage;
 
 trait StoresLeadSubmissionDocuments
 {
-    protected function storeLeadDocument(LeadSubmission $leadSubmission, string $docKey, UploadedFile $file): LeadSubmissionDocument
+    protected function storeLeadSubmissionDocument(LeadSubmission $leadSubmission, string $docKey, UploadedFile $file): LeadSubmissionDocument
     {
         $dir = "lead-submissions/{$leadSubmission->id}/{$docKey}";
         $name = time() . '_' . preg_replace('/[^a-zA-Z0-9\.\-_]/', '_', $file->getClientOriginalName());

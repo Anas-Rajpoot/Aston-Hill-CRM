@@ -21,9 +21,10 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name','email','password','phone','country',
-        'timezone','cnic_number','status', 'approved_by',
+        'timezone','cnic_number','additional_notes','status', 'approved_by',
         'approved_at','rejected_by','rejected_at','rejection_reason',
-        'two_factor_enabled', 'two_factor_secret'
+        'two_factor_enabled', 'two_factor_secret',
+        'manager_id', 'team_leader_id',
     ];
 
     /**
@@ -56,4 +57,15 @@ class User extends Authenticatable
     {
         return $this->hasOne(\App\Models\LeadColumnPreference::class);
     }
-}
+
+    public function manager()
+    {
+        return $this->belongsTo(User::class, 'manager_id');
+    }
+
+    public function teamLeader()
+    {
+        return $this->belongsTo(User::class, 'team_leader_id');
+    }
+
+    }

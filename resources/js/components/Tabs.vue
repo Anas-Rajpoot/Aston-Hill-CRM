@@ -1,21 +1,32 @@
 <script setup>
-    defineProps({tabs: Array, active: String})
+defineProps({
+  tabs: { type: Array, required: true },
+  active: { type: String, required: true },
+})
 
-    const emit = defineEmits(['change'])
+const emit = defineEmits(['change'])
 </script>
 
 <template>
-  <div class="flex gap-2">
+  <div class="flex gap-1">
     <button
       v-for="tab in tabs"
       :key="tab.key"
+      type="button"
       @click="emit('change', tab.key)"
-      class="px-4 py-2 rounded-full text-sm transition"
+      class="px-5 py-2.5 rounded-full text-sm font-medium transition flex items-center gap-2"
       :class="active === tab.key
-        ? 'bg-lime-500 text-white'
-        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+        ? 'bg-green-500 text-white shadow-sm'
+        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'"
     >
-      {{ tab.label }}
+      <span>{{ tab.label }}</span>
+      <span
+        v-if="tab.count != null"
+        class="min-w-[1.25rem] h-5 px-1.5 rounded-full flex items-center justify-center text-xs font-medium"
+        :class="active === tab.key ? 'bg-green-600/80 text-white' : 'bg-gray-300 text-gray-600'"
+      >
+        {{ tab.count }}
+      </span>
     </button>
   </div>
 </template>

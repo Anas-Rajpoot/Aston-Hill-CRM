@@ -142,29 +142,164 @@ class LeadSubmissionController extends Controller
 
     public function storeStep1(Request $request)
     {
-        $data = $request->validate([
-            'company_name' => ['required','string','max:255'],
-            'account_number' => ['nullable','string','max:100'],
-            'authorized_signatory_name' => ['nullable','string','max:255'],
-            'contact_number_gsm' => ['nullable','string','max:50'],
-            'alternate_contact_number' => ['nullable','string','max:50'],
-            'email' => ['nullable','email','max:255'],
-            'address' => ['nullable','string','max:500'],
-            'emirates' => ['nullable','string','max:150'],
-            'location_coordinates' => ['nullable','string','max:100'],
-            'product' => ['nullable','string','max:150'],
-            'offer' => ['nullable','string','max:150'],
-            'mrc_aed' => ['nullable','string','max:50'],
-            'quantity' => ['nullable','integer','min:0'],
-            'remarks' => ['nullable','string','max:1000'],
+        $draft = $request->boolean('draft');
+        $rules = [
+            'company_name' => ['required', 'string', 'max:255'],
+            'account_number' => ['nullable', 'string', 'max:100'],
+            'authorized_signatory_name' => ['nullable', 'string', 'max:255'],
+            'contact_number_gsm' => [$draft ? 'nullable' : 'required', 'string', 'max:50'],
+            'alternate_contact_number' => ['nullable', 'string', 'max:50'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'address' => [$draft ? 'nullable' : 'required', 'string', 'max:500'],
+            'emirates' => [$draft ? 'nullable' : 'required', 'string', 'max:150'],
+            'emirate' => ['nullable', 'string', 'max:150'],
+            'location_coordinates' => ['nullable', 'string', 'max:100'],
+            'product' => [$draft ? 'nullable' : 'required', 'string', 'max:150'],
+            'offer' => ['nullable', 'string', 'max:500'],
+            'mrc_aed' => ['nullable', 'numeric', 'min:0'],
+            'quantity' => ['nullable', 'integer', 'min:0'],
+            'ae_domain' => ['nullable', 'string', 'max:255'],
+            'gaid' => ['nullable', 'string', 'max:255'],
+            'manager_id' => [$draft ? 'nullable' : 'required', 'integer', 'exists:users,id'],
+            'team_leader_id' => [$draft ? 'nullable' : 'required', 'integer', 'exists:users,id'],
+            'sales_agent_id' => [$draft ? 'nullable' : 'required', 'integer', 'exists:users,id'],
+            'remarks' => ['nullable', 'string', 'max:1000'],
+            'request_type' => ['nullable', 'string', 'max:120'],
+        ];
+        $messages = [
+            'company_name.required' => 'Company name is required.',
+            'contact_number_gsm.required' => 'Contact number (GSM) is required.',
+            'address.required' => 'Complete address is required.',
+            'emirates.required' => 'Emirates is required.',
+            'product.required' => 'Product is required.',
+            'manager_id.required' => 'Please select a manager.',
+            'team_leader_id.required' => 'Please select a team leader.',
+            'sales_agent_id.required' => 'Please select a sales agent.',
+            'email.email' => 'Please enter a valid email address.',
+        ];
+        $data = $request->validate($rules, $messages);
 
-            // If your figma has Request Type on step1:
-            'request_type' => ['nullable','string','max:120'],
-        ]);
+        $data['emirate'] = $data['emirate'] ?? $data['emirates'] ?? null;
+        unset($data['emirates']);
+        foreach (['manager_id', 'team_leader_id', 'sales_agent_id'] as $key) {
+            if (isset($data[$key]) && $data[$key] === '') {
+                $data[$key] = null;
+            }
+        }
 
         $leadSubmission = $this->leadSubmissionService->createDraftFromStep1($data, $request->user()->id);
 
-        return redirect()->route('lead-submissions.wizard.step2', $leadSubmission)->with('success', 'Step 1 saved.');
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'id' => $leadSubmission->id,
+                'message' => 'Step 1 saved.',
+            ], 201);
+        }
+
+    }
+
+    /**
+     * Get the current user's latest draft (for auto-resume).
+     */
+    public function currentDraft(Request $request)
+    {
+        $draft = LeadSubmission::where('created_by', $request->user()->id)
+            ->where('status', 'draft')
+            ->orderBy('updated_at', 'desc')
+            ->first();
+
+        if (!$draft) {
+            return response()->json(['draft' => null]);
+        }
+
+        return response()->json(['draft' => $draft]);
+    }
+
+    /**
+     * Update an existing draft (Step 1).
+     */
+    public function updateStep1(Request $request, LeadSubmission $lead)
+    {
+        // Only the creator can update their draft
+        if ($lead->created_by !== $request->user()->id) {
+            abort(403, 'Unauthorized');
+        }
+
+        // Only drafts can be updated via this endpoint
+        if ($lead->status !== 'draft') {
+            abort(422, 'Cannot update a submitted lead submission.');
+        }
+
+        $draft = $request->boolean('draft');
+        $rules = [
+            'company_name' => ['required', 'string', 'max:255'],
+            'account_number' => ['nullable', 'string', 'max:100'],
+            'authorized_signatory_name' => ['nullable', 'string', 'max:255'],
+            'contact_number_gsm' => [$draft ? 'nullable' : 'required', 'string', 'max:50'],
+            'alternate_contact_number' => ['nullable', 'string', 'max:50'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'address' => [$draft ? 'nullable' : 'required', 'string', 'max:500'],
+            'emirates' => [$draft ? 'nullable' : 'required', 'string', 'max:150'],
+            'emirate' => ['nullable', 'string', 'max:150'],
+            'location_coordinates' => ['nullable', 'string', 'max:100'],
+            'product' => [$draft ? 'nullable' : 'required', 'string', 'max:150'],
+            'offer' => ['nullable', 'string', 'max:500'],
+            'mrc_aed' => ['nullable', 'numeric', 'min:0'],
+            'quantity' => ['nullable', 'integer', 'min:0'],
+            'ae_domain' => ['nullable', 'string', 'max:255'],
+            'gaid' => ['nullable', 'string', 'max:255'],
+            'manager_id' => [$draft ? 'nullable' : 'required', 'integer', 'exists:users,id'],
+            'team_leader_id' => [$draft ? 'nullable' : 'required', 'integer', 'exists:users,id'],
+            'sales_agent_id' => [$draft ? 'nullable' : 'required', 'integer', 'exists:users,id'],
+            'remarks' => ['nullable', 'string', 'max:1000'],
+            'request_type' => ['nullable', 'string', 'max:120'],
+        ];
+        $messages = [
+            'company_name.required' => 'Company name is required.',
+            'contact_number_gsm.required' => 'Contact number (GSM) is required.',
+            'address.required' => 'Complete address is required.',
+            'emirates.required' => 'Emirates is required.',
+            'product.required' => 'Product is required.',
+            'manager_id.required' => 'Please select a manager.',
+            'team_leader_id.required' => 'Please select a team leader.',
+            'sales_agent_id.required' => 'Please select a sales agent.',
+            'email.email' => 'Please enter a valid email address.',
+        ];
+        $data = $request->validate($rules, $messages);
+
+        $data['emirate'] = $data['emirate'] ?? $data['emirates'] ?? null;
+        unset($data['emirates']);
+        foreach (['manager_id', 'team_leader_id', 'sales_agent_id'] as $key) {
+            if (isset($data[$key]) && $data[$key] === '') {
+                $data[$key] = null;
+            }
+        }
+        $data['updated_by'] = $request->user()->id;
+
+        $lead->update($data);
+
+        return response()->json([
+            'id' => $lead->id,
+            'message' => 'Draft updated.',
+        ]);
+    }
+
+    /**
+     * Discard (delete) a draft so user can start fresh.
+     */
+    public function discardDraft(Request $request, LeadSubmission $lead)
+    {
+        if ($lead->created_by !== $request->user()->id) {
+            abort(403, 'Unauthorized');
+        }
+
+        if ($lead->status !== 'draft') {
+            abort(422, 'Cannot discard a submitted lead submission.');
+        }
+
+        $lead->delete();
+
+        return response()->json(['message' => 'Draft discarded.']);
     }
 
     /** STEP 2 */
@@ -181,10 +316,24 @@ class LeadSubmissionController extends Controller
         $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
 
         $data = $request->validate([
-            'service_category_id' => ['required','exists:service_categories,id'],
+            'service_category_id' => ['required', 'exists:service_categories,id'],
+            'service_type_id' => ['required', 'exists:service_types,id'],
+        ], [
+            'service_category_id.required' => 'Please select a service category.',
+            'service_type_id.required' => 'Please select a service type.',
         ]);
 
+        // Ensure type belongs to the selected category
+        $type = ServiceType::findOrFail($data['service_type_id']);
+        if ((int) $type->service_category_id !== (int) $data['service_category_id']) {
+            return response()->json(['message' => 'Service type does not belong to the selected category.'], 422);
+        }
+
         $this->leadSubmissionService->saveStep2($leadSubmission, $data);
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json(['message' => 'Step 2 saved.']);
+        }
 
         return redirect()->route('lead-submissions.wizard.step3', $leadSubmission)->with('success', 'Step 2 saved.');
     }
@@ -268,24 +417,51 @@ class LeadSubmissionController extends Controller
         $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
 
         $type = ServiceType::findOrFail($leadSubmission->service_type_id);
-        $docDefs = LeadSchema::documents($type);
+        $docDefs = LeadSubmissionSchema::documents($type);
 
-        // Validate uploads (optional per doc) + max size
+        // Validate: PDF, DOC, DOCX, EML only; 3MB per file (frontend sends array)
         $rules = [];
-        foreach ($docDefs as $doc) {
-            $key = $doc['key'] ?? null;
-            if (!$key) continue;
-
-            $required = (bool)($doc['required'] ?? false);
-
-            // file validation
-            $rules["documents.$key"] = [
-                $required ? 'required' : 'nullable',
-                'file',
-                'max:10240', // 10MB
-            ];
+        $docKeys = array_filter(array_map(fn ($d) => $d['key'] ?? null, $docDefs));
+        foreach ($docKeys as $key) {
+            $rules["documents.$key"] = ['nullable', 'array'];
+            $rules["documents.$key.*"] = ['file', 'mimes:pdf,doc,docx,eml', 'max:3072'];
         }
-        $request->validate($rules);
+        // Allow additional custom document keys
+        $allDocKeys = array_keys($request->file('documents', []) ?: []);
+        foreach ($allDocKeys as $key) {
+            if (!in_array($key, $docKeys, true)) {
+                $rules["documents.$key"] = ['nullable', 'array'];
+                $rules["documents.$key.*"] = ['file', 'mimes:pdf,doc,docx,eml', 'max:3072'];
+            }
+        }
+        $request->validate($rules, [
+            'documents.*.*.mimes' => 'Each file must be PDF, DOC, DOCX, or EML.',
+            'documents.*.*.max' => 'Each file must not exceed 3MB.',
+        ]);
+
+        // Total size check (10MB)
+        $totalSize = 0;
+        $allKeys = array_unique(array_merge($docKeys, array_keys($request->file('documents', []) ?: [])));
+        foreach ($allKeys as $key) {
+            $files = $request->file("documents.$key");
+            if (!$files) continue;
+            $files = is_array($files) ? $files : [$files];
+            foreach ($files as $f) {
+                if ($f && $f->isValid()) {
+                    $totalSize += $f->getSize();
+                }
+            }
+        }
+        $existingSize = LeadSubmissionDocument::where('lead_submission_id', $leadSubmission->id)->sum('size');
+        if (($totalSize + $existingSize) > 10 * 1024 * 1024) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'message' => 'Total upload size must not exceed 10MB.',
+                    'errors' => ['documents' => ['Total upload size must not exceed 10MB.']],
+                ], 422);
+            }
+            return back()->withErrors(['documents' => 'Total upload size must not exceed 10MB.']);
+        }
 
         // Save documents in public/leads/{leadId}/...
         $this->leadSubmissionService->saveStep4Documents($request, $leadSubmission);
@@ -294,22 +470,39 @@ class LeadSubmissionController extends Controller
         if ($request->input('action') === 'submit') {
             $missing = $this->missingRequiredDocs($leadSubmission, $docDefs);
             if (!empty($missing)) {
+if ($request->expectsJson() || $request->ajax()) {
+                    return response()->json([
+                        'message' => 'Please upload all required documents.',
+                        'errors' => ['documents' => ['Missing required documents: ' . implode(', ', $missing)]],
+                    ], 422);
+                }
                 return back()->withErrors([
                     'documents' => 'Missing required documents: ' . implode(', ', $missing),
                 ]);
             }
 
             $this->leadSubmissionService->submit($leadSubmission);
+
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['message' => 'Lead Submission submitted successfully.']);
+            }
             return redirect()->route('lead-submissions.show', $leadSubmission)->with('success', 'Lead Submission submitted successfully.');
         }
 
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json(['message' => 'Documents saved.']);
+        }
         return back()->with('success', 'Documents saved.');
     }
 
-    /** SHOW */
+    /** SHOW (JSON for SPA) */
     public function show(Request $request, LeadSubmission $leadSubmission)
     {
         $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json($leadSubmission->load(['category:id,name', 'type:id,name,schema', 'documents']));
+        }
 
         $leadSubmission->load(['creator:id,name,email','category:id,name','type:id,name']);
         $docs = LeadSubmissionDocument::where('lead_submission_id', $leadSubmission->id)->get();
@@ -413,18 +606,37 @@ class LeadSubmissionController extends Controller
         return redirect()->route('lead-submissions.index')->with('success', 'Lead Submission deleted.');
     }
 
-    /** AJAX: types by category */
-    public function serviceTypesByCategory(Request $request)
+    /** AJAX: all categories */
+    public function categories()
+    {
+        return response()->json(
+            ServiceCategory::where('is_active', true)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name', 'slug'])
+        );
+    }
+
+    /** AJAX: types by category (service-types?service_category_id=X) */
+    public function serviceTypes(Request $request)
     {
         $request->validate([
-            'service_category_id' => ['required','exists:service_categories,id'],
+            'service_category_id' => ['required', 'exists:service_categories,id'],
         ]);
 
         $types = ServiceType::where('service_category_id', $request->service_category_id)
+            ->where('is_active', true)
+            ->orderBy('sort_order')
             ->orderBy('name')
-            ->get(['id','name']);
+            ->get(['id', 'name', 'slug']);
 
         return response()->json($types);
+    }
+
+    /** @deprecated use serviceTypes */
+    public function serviceTypesByCategory(Request $request)
+    {
+        return $this->serviceTypes($request);
     }
 
     /** AJAX: schema by type */

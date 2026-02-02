@@ -16,7 +16,7 @@ class LeadSubmissionService
 
     public function __construct(private LeadSubmissionRepositoryInterface $repo) {}
 
-    public function createDraftFromStep1(array $data, int $userId): Lead
+    public function createDraftFromStep1(array $data, int $userId): LeadSubmission
     {
         return $this->repo->createDraft([
             ...$data,
@@ -27,36 +27,52 @@ class LeadSubmissionService
 
     public function saveStep2(LeadSubmission $leadSubmission, array $data): LeadSubmission
     {
-        return $this->repo->updateLeadSubmission($leadSubmission, [
+        return $this->repo->updateLead($leadSubmission, [
             'service_category_id' => $data['service_category_id'],
+            'service_type_id' => $data['service_type_id'],
         ]);
     }
 
     public function saveStep3(LeadSubmission $leadSubmission, array $data): LeadSubmission
     {
-        // data: service_type_id + dynamic meta[]
         return DB::transaction(function () use ($leadSubmission, $data) {
-            $leadSubmission = $this->repo->updateLeadSubmission($leadSubmission, [
+            return $this->repo->updateLead($leadSubmission, [
                 'service_type_id' => $data['service_type_id'],
-                'meta' => $data['meta'] ?? [],
+                'payload' => array_merge($leadSubmission->payload ?? [], $data['meta'] ?? []),
             ]);
-
-            return $leadSubmission;
         });
     }
 
     public function saveStep4Documents(Request $request, LeadSubmission $leadSubmission): void
     {
-        $type = ServiceType::findOrFail($lead->service_type_id);
+        $type = ServiceType::findOrFail($leadSubmission->service_type_id);
         $docs = LeadSubmissionSchema::documents($type);
 
         foreach ($docs as $doc) {
             $key = $doc['key'] ?? null;
             if (!$key) continue;
 
-            if ($request->hasFile("documents.$key")) {
-                $file = $request->file("documents.$key");
-                $this->storeLeadSubmissionDocument($lead, $key, $file);
+            $files = $request->file("documents.$key");
+            if (!$files) continue;
+
+            $files = is_array($files) ? $files : [$files];
+            foreach ($files as $file) {
+                if ($file && $file->isValid()) {
+                    $this->storeLeadSubmissionDocument($leadSubmission, $key, $file);
+                }
+            }
+        }
+
+        // Save additional custom documents (keys like additional_*)
+        $allDocInput = $request->file('documents', []) ?: [];
+        foreach ($allDocInput as $key => $files) {
+            if (str_starts_with((string) $key, 'additional_')) {
+                $files = is_array($files) ? $files : [$files];
+                foreach ($files as $file) {
+                    if ($file && $file->isValid()) {
+                        $this->storeLeadSubmissionDocument($leadSubmission, $key, $file);
+                    }
+                }
             }
         }
     }

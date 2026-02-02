@@ -31,6 +31,8 @@ return new class extends Migration
             $table->text('offer')->nullable();
             $table->decimal('mrc_aed', 12, 2)->nullable();
             $table->unsignedInteger('quantity')->nullable();
+            $table->string('ae_domain', 255)->nullable();
+            $table->string('gaid', 255)->nullable();
             $table->foreignId('sales_agent_id')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('team_leader_id')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('manager_id')->nullable()->constrained('users')->nullOnDelete();

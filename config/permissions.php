@@ -21,6 +21,8 @@ return [
         // Submissions
         'submissions' => 'My Submissions',
         'submission_details' => 'Submission Details',
+        'lead-submissions' => 'Lead Submissions',
+        'field-submissions' => 'Field Submissions',
         'vas_requests' => 'VAS Requests',
 
         // Customer Support

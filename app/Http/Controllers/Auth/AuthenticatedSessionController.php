@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -27,62 +28,58 @@ class AuthenticatedSessionController extends Controller
     /**
      * Handle an incoming authentication request.
      */
-    public function store(LoginRequest $request): RedirectResponse
+    public function store(LoginRequest $request): RedirectResponse|JsonResponse
     {
         if (!Auth::attempt($request->only('email','password'))) {
             throw ValidationException::withMessages([
-                'email' => 'Invalid credentials'
+                'email' => ['Invalid credentials'],
             ]);
         }
 
         $request->session()->regenerate();
 
         UserLoginLog::where('user_id', auth()->id())
-                        ->whereNull('logout_at')
-                        ->latest('login_at')
-                        ->limit(1)
-                        ->update(['session_id' => $request->session()->getId()]);
+            ->whereNull('logout_at')
+            ->latest('login_at')
+            ->limit(1)
+            ->update(['session_id' => $request->session()->getId()]);
 
         $user = Auth::user();
-        
-        if ($request->filled('redirect')) {
-            $target = $request->input('redirect');
 
-            // only allow your app URL
-            if (str_starts_with($target, config('app.url'))) {
-                $request->session()->put('url.intended', $target);
-            }
-            // $request->session()->put('url.intended', $request->input('redirect'));
+        if ($request->filled('redirect') && str_starts_with($request->input('redirect'), config('app.url'))) {
+            $request->session()->put('url.intended', $request->input('redirect'));
         }
 
         if ($user->hasRole('superadmin')) {
             $request->session()->put('2fa_passed', true);
-
-            return redirect()->intended(route('dashboard'));// return redirect('dashboard');
+            return $this->loginResponse($request, '/');
         }
-        
+
         if ($user->status !== 'approved') {
             Auth::logout();
-
-            return redirect()->route('login')->with(
-                'status',
-                'Your registration is completed. Please wait for super admin approval.'
-            );
+            if ($request->expectsJson()) {
+                throw ValidationException::withMessages([
+                    'email' => ['Your registration is completed. Please wait for super admin approval.'],
+                ]);
+            }
+            return redirect()->route('login')->with('status', 'Your registration is completed. Please wait for super admin approval.');
         }
 
-        // If user has 2FA enabled, force OTP
         if ($user->two_factor_enabled) {
-            $request->session()->forget('2fa_passed'); // ensure fresh verification
-            return redirect()->route('2fa.verify.form');
+            $request->session()->forget('2fa_passed');
+            return $this->loginResponse($request, '/2fa/verify');
         }
-        
-        // If user does NOT have 2FA enabled, optionally send them to setup page:
-        // return redirect()->route('2fa.setup');
 
-        // Normal login
         $request->session()->put('2fa_passed', true);
-        return redirect()->intended(route('dashboard'));
-        // return redirect()->route('dashboard');
+        return $this->loginResponse($request, '/');
+    }
+
+    private function loginResponse(Request $request, string $redirect): RedirectResponse|JsonResponse
+    {
+        if ($request->expectsJson()) {
+            return response()->json(['redirect' => $redirect]);
+        }
+        return redirect()->intended($redirect === '/2fa/verify' ? route('2fa.verify.form') : route('dashboard'));
     }
 
     /**

@@ -15,10 +15,14 @@ return [
     |
     */
 
-    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', sprintf(
-        '%s',
-        '127.0.0.1,localhost,127.0.0.1:8000,127.0.0.1:5173'
-    ))),
+    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', implode(',', [
+        'localhost',
+        'localhost:8000',
+        'localhost:5173',
+        '127.0.0.1',
+        '127.0.0.1:8000',
+        '127.0.0.1:5173',
+    ]))),
 
     /*
     |--------------------------------------------------------------------------

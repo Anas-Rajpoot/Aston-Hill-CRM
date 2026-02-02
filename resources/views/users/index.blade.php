@@ -126,11 +126,6 @@
                                         View
                                     </a>
 
-                                    <a href="{{ route('super-admin.users.review', $user->id) }}"
-                                       class="rounded-md bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700">
-                                        Review
-                                    </a>
-
                                     <a href="{{ route('users.edit', $user->id) }}"
                                        class="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
                                         Edit

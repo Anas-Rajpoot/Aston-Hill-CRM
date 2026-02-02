@@ -79,22 +79,28 @@ class TwoFactorController extends Controller
 
         $user = $request->user();
 
-        // If 2FA not enabled, just continue
         if (!$user || !$user->two_factor_enabled) {
             $request->session()->put('2fa_passed', true);
-            return redirect()->intended(route('dashboard'));
+            return $request->expectsJson()
+                ? response()->json(['redirect' => '/'])
+                : redirect()->intended(route('dashboard'));
         }
 
         $google2fa = new Google2FA();
         $valid = $google2fa->verifyKey($user->two_factor_secret, $request->otp);
 
         if (!$valid) {
+            if ($request->expectsJson()) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['otp' => ['Invalid OTP.']]);
+            }
             return back()->withErrors(['otp' => 'Invalid OTP.']);
         }
 
         $request->session()->put('2fa_passed', true);
 
-        return redirect()->intended(route('dashboard'));
+        return $request->expectsJson()
+            ? response()->json(['redirect' => '/'])
+            : redirect()->intended(route('dashboard'));
     }
 
     public function disable(Request $request)

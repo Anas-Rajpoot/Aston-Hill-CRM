@@ -20,6 +20,8 @@ class DatabaseSeeder extends Seeder
             SuperAdminSeeder::class,
             CountrySeeder::class,
             PermissionSeeder::class,
+            ServiceCategorySeeder::class,
+            TeamRoleMappingSeeder::class,
         ]);
         // User::factory(10)->create();
 
