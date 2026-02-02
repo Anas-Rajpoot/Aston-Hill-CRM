@@ -51,8 +51,8 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::put('/lead-submissions/{lead}/step-1', [LeadSubmissionController::class, 'updateStep1']);
     Route::delete('/lead-submissions/{lead}/discard', [LeadSubmissionController::class, 'discardDraft']);
     Route::post('/lead-submissions/{lead}/step-2', [LeadSubmissionController::class, 'storeStep2']);
-    Route::post('/lead-submissions/{lead}/step-3', [LeadSubmissionController::class, 'storeStep3']);
-    Route::post('/lead-submissions/{lead}/step-4', [LeadSubmissionController::class, 'storeStep4']);
+    Route::post('/lead-submissions/{lead}/step-3', [LeadSubmissionController::class, 'storeStep4']); // step 3 in UI = documents
+    Route::post('/lead-submissions/{lead}/step-4', [LeadSubmissionController::class, 'storeStep4']); // backward compatibility
     Route::post('/lead-submissions/{lead}/submit', [LeadSubmissionController::class, 'submit']);
 
     // Column preferences

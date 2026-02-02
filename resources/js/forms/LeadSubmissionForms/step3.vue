@@ -24,6 +24,22 @@ const ALLOWED_EXT = ['.pdf', '.doc', '.docx', '.eml']
 const MAX_FILE_MB = 3
 const MAX_TOTAL_MB = 10
 
+/** Default document types (matches backend LeadSubmissionSchema) – always show 12 cards */
+const DEFAULT_DOCUMENTS = [
+  { key: 'trade_license', label: 'Trade License', required: true },
+  { key: 'establishment_card', label: 'Establishment Card', required: false },
+  { key: 'owner_emirates_id', label: 'Owner Emirates ID', required: true },
+  { key: 'loa_poa', label: 'LOA / POA', required: false },
+  { key: 'ejari', label: 'Ejari', required: true },
+  { key: 'proposal_form', label: 'Proposal Form', required: true },
+  { key: 'main_application', label: 'Main Application', required: true },
+  { key: 'customer_confirmation_email', label: 'Customer Confirmation Email', required: true },
+  { key: 'as_person_eid', label: 'AS Person EID', required: false },
+  { key: 'rfs_marketing_approvals', label: 'RFS / Marketing / Migration Approvals', required: false },
+  { key: 'fnp_binder', label: 'FNP Binder', required: true },
+  { key: 'etisatis_bill', label: 'Etisatis Bill', required: false },
+]
+
 const requiredCount = computed(() => docDefs.value.filter((d) => d.required).length)
 const uploadedRequiredCount = computed(() => {
   const uploaded = new Set()
@@ -68,10 +84,15 @@ onMounted(async () => {
     existingDocs.value = lead?.documents || []
     const typeId = lead?.service_type_id
     if (typeId) {
-      const schemaRes = await api.getTypeSchema(typeId)
-      docDefs.value = schemaRes?.data?.documents || []
+      try {
+        const schemaRes = await api.getTypeSchema(typeId)
+        const schemaDocs = schemaRes?.data?.documents || []
+        docDefs.value = schemaDocs.length > 0 ? schemaDocs : DEFAULT_DOCUMENTS
+      } catch {
+        docDefs.value = DEFAULT_DOCUMENTS
+      }
     } else {
-      docDefs.value = []
+      docDefs.value = DEFAULT_DOCUMENTS
     }
     // Initialize files ref for each doc key
     docDefs.value.forEach((d) => {
@@ -109,10 +130,21 @@ const removeFile = (key, idx) => {
   const arr = [...(files.value[key] || [])]
   arr.splice(idx, 1)
   files.value[key] = arr
-  clearErrors()
+  clearFieldError(`documents.${key}`)
+  const doc = docDefs.value.find((d) => d.key === key)
+  if (doc?.required) {
+    const hasExisting = existingDocs.value.some((ed) => ed.doc_key === key)
+    if (!hasExisting && arr.length === 0) {
+      setErrors({ response: { data: { errors: { [`documents.${key}`]: ['This document is required.'] } } } })
+    }
+  }
 }
 
+const MAX_ADDITIONAL_DOCS = 3
+const canAddMoreAdditional = computed(() => additionalDocs.value.length < MAX_ADDITIONAL_DOCS)
+
 const addAdditionalDoc = () => {
+  if (additionalDocs.value.length >= MAX_ADDITIONAL_DOCS) return
   additionalDocs.value.push({
     key: `additional_${Date.now()}`,
     label: `Additional Document ${additionalDocs.value.length + 1}`,
@@ -145,6 +177,7 @@ const buildFormData = () => {
   })
   additionalDocs.value.forEach((ad) => {
     ;(ad.files || []).forEach((f) => fd.append(`documents[${ad.key}][]`, f))
+    if (ad.key) fd.append(`document_labels[${ad.key}]`, (ad.label || '').trim())
   })
   return fd
 }
@@ -154,29 +187,42 @@ const validateBeforeSubmit = () => {
   if (totalSizeBytes.value > MAX_TOTAL_MB * 1024 * 1024) {
     err.documents = [`Total upload size must not exceed ${MAX_TOTAL_MB}MB.`]
   }
-  const missing = docDefs.value
+  docDefs.value
     .filter((d) => d.required)
-    .filter((d) => {
+    .forEach((d) => {
       const hasExisting = existingDocs.value.some((ed) => ed.doc_key === d.key)
       const hasNew = (files.value[d.key] || []).length > 0
-      return !hasExisting && !hasNew
+      if (!hasExisting && !hasNew) {
+        err[`documents.${d.key}`] = ['This document is required.']
+      }
     })
-  if (missing.length) {
-    err.documents = [
-      ...(err.documents || []),
-      `Please upload required documents: ${missing.map((m) => m.label).join(', ')}.`,
-    ]
-  }
-  return Object.keys(err).length ? err : null
+  additionalDocs.value.forEach((ad) => {
+    if ((ad.files || []).length > 0 && !(ad.label || '').trim()) {
+      err[`additional_docs.${ad.key}`] = ['Title is required when a document is uploaded.']
+    }
+  })
+  if (Object.keys(err).length) return err
+  return null
 }
 
 const saveDraft = async () => {
   clearErrors()
+  const draftErr = {}
+  additionalDocs.value.forEach((ad) => {
+    if ((ad.files || []).length > 0 && !(ad.label || '').trim()) {
+      draftErr[`additional_docs.${ad.key}`] = ['Title is required when a document is uploaded.']
+    }
+  })
+  if (Object.keys(draftErr).length) {
+    errors.value = draftErr
+    generalMessage.value = 'Please correct the errors below.'
+    return
+  }
   const fd = buildFormData()
   fd.append('action', 'save')
   saving.value = true
   try {
-    await api.storeStep4(props.leadId, fd)
+    await api.storeStep3(props.leadId, fd)
     const { data: lead } = await api.getLead(props.leadId)
     existingDocs.value = lead?.documents || []
     Object.keys(files.value).forEach((k) => (files.value[k] = []))
@@ -199,7 +245,7 @@ const submit = async () => {
   fd.append('action', 'submit')
   submitting.value = true
   try {
-    await api.storeStep4(props.leadId, fd)
+    await api.storeStep3(props.leadId, fd)
     emit('submitted')
   } catch (e) {
     setErrors(e)
@@ -224,18 +270,18 @@ const cancel = () => window.history.back()
     <!-- Title & Instructions -->
     <div>
       <h2 class="text-xl font-bold text-gray-900">Document Upload</h2>
-      <p class="mt-1 text-sm text-gray-600">
+      <p class="mt-1 text-sm text-gray-500">
         Please upload all required documents. You can upload multiple files for each document type.
-        <span class="font-medium">PDF, DOC, EML (Max 3MB per file and all is under 10MB)</span>
+        PDF, DOC, EML (Max 3MB per file and all is under 10MB)
       </p>
     </div>
 
-    <!-- Progress indicator -->
-    <div class="rounded-lg bg-blue-50 border border-blue-200 p-4 flex items-center gap-3">
-      <svg class="w-5 h-5 text-blue-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+    <!-- Required documents status bar (light blue) -->
+    <div class="rounded-lg bg-sky-50 border border-sky-200 p-4 flex items-center justify-center gap-2">
+      <svg class="w-5 h-5 text-sky-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
         <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
       </svg>
-      <p class="text-sm font-medium text-blue-800">
+      <p class="text-sm font-medium text-sky-800">
         {{ uploadedRequiredCount }} of {{ requiredCount }} required documents uploaded
       </p>
     </div>
@@ -248,72 +294,107 @@ const cancel = () => window.history.back()
       </ul>
     </div>
 
-    <!-- Document slots -->
+    <!-- Document cards (two-column grid) -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div
         v-for="doc in docDefs"
         :key="doc.key"
-        class="rounded-xl border border-gray-200 bg-white p-4 flex flex-col gap-3 shadow-sm"
+        class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm flex items-center justify-between gap-3"
       >
-        <div class="flex items-start gap-3">
+        <div class="flex items-center gap-3 min-w-0 flex-1">
           <div class="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
             <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>
-          <div class="min-w-0 flex-1">
-            <p class="font-semibold text-gray-900">{{ doc.label }}</p>
-            <p :class="doc.required ? 'text-red-600 text-sm font-medium' : 'text-gray-500 text-sm'">
+          <div class="min-w-0">
+            <p class="font-semibold text-gray-900 text-sm">{{ doc.label }}</p>
+            <p :class="doc.required ? 'text-red-600 text-xs font-medium' : 'text-gray-500 text-xs'">
               {{ doc.required ? 'Required' : 'Optional' }}
             </p>
+            <p v-if="getError(`documents.${doc.key}`)" class="text-red-600 text-xs mt-1">{{ getError(`documents.${doc.key}`) }}</p>
           </div>
         </div>
-
-        <div class="flex items-center gap-2 flex-wrap">
-          <label class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium cursor-pointer hover:bg-blue-700">
+        <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+          <div v-if="getDocFiles(doc.key).length || getExistingForKey(doc.key).length" class="flex flex-col items-end gap-0.5 max-w-[180px] min-w-0">
+            <template v-for="(f, idx) in getDocFiles(doc.key)" :key="'new-' + idx">
+              <span class="text-xs text-gray-700 truncate max-w-full" :title="f.name">{{ f.name }}</span>
+            </template>
+            <template v-for="ed in getExistingForKey(doc.key)" :key="'ex-' + ed.id">
+              <span class="text-xs text-gray-700 truncate max-w-full" :title="ed.original_name">{{ ed.original_name }}</span>
+            </template>
+          </div>
+          <label class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-sky-400 bg-white text-sky-600 text-sm font-medium cursor-pointer hover:bg-sky-50 shrink-0">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
             Upload
             <input type="file" class="hidden" accept=".pdf,.doc,.docx,.eml" multiple @change="(e) => onFileChange(doc.key, e)" />
           </label>
-          <div v-for="(f, idx) in getDocFiles(doc.key)" :key="idx" class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs">
-            <span class="truncate max-w-[120px]">{{ f.name }}</span>
-            <button type="button" @click="removeFile(doc.key, idx)" class="text-green-600 hover:text-green-800">×</button>
-          </div>
-          <div v-for="ed in getExistingForKey(doc.key)" :key="ed.id" class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-teal-100 text-teal-800 text-xs">
-            {{ ed.original_name }}
-          </div>
         </div>
-        <p v-if="getError(`documents.${doc.key}`)" class="text-sm text-red-600">{{ getError(`documents.${doc.key}`) }}</p>
       </div>
     </div>
 
-    <!-- Additional Documents -->
-    <div class="border-t border-gray-200 pt-4">
-      <div class="flex items-center justify-between mb-3">
+    <!-- Additional Documents (up to 3; one new field per click) -->
+    <div class="border-t border-gray-200 pt-6 mt-6">
+      <div class="flex items-center justify-between mb-4">
         <h3 class="text-base font-semibold text-gray-900">Additional Documents</h3>
         <button
+          v-if="canAddMoreAdditional"
           type="button"
           @click="addAdditionalDoc"
-          class="text-green-600 hover:text-green-700 font-medium text-sm flex items-center gap-1"
+          class="inline-flex items-center gap-2 text-sm font-medium text-green-600 hover:text-green-700"
         >
-          <span>+</span> Add Document
+          <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+          Add Document
         </button>
+        <span v-else class="text-sm text-gray-500">Maximum {{ MAX_ADDITIONAL_DOCS }} additional documents</span>
       </div>
       <div v-if="additionalDocs.length" class="space-y-3">
         <div
           v-for="(ad, idx) in additionalDocs"
           :key="ad.key"
-          class="flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-gray-50"
+          class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm flex flex-nowrap items-center gap-4"
         >
-          <input v-model="ad.label" type="text" placeholder="Document name" class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-          <label class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm cursor-pointer hover:bg-blue-700">
-            Upload
-            <input type="file" class="hidden" accept=".pdf,.doc,.docx,.eml" multiple @change="(e) => onAdditionalFileChange(idx, e)" />
-          </label>
-          <span v-if="ad.files?.length" class="text-sm text-gray-600">{{ ad.files.length }} file(s)</span>
-          <button type="button" @click="removeAdditionalDoc(idx)" class="text-red-600 hover:text-red-700 text-sm">Remove</button>
+          <!-- Document icon -->
+          <div class="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <!-- Label input (required when file uploaded) -->
+          <div class="min-w-0 flex-1 flex flex-col gap-0.5">
+            <input v-model="ad.label" type="text" :placeholder="`Additional Document ${idx + 1}`" class="w-full rounded-lg border px-3 py-2 text-sm font-semibold text-gray-900" :class="getError(`additional_docs.${ad.key}`) ? 'border-red-500' : 'border-gray-300'" @input="clearFieldError(`additional_docs.${ad.key}`)" />
+            <p v-if="getError(`additional_docs.${ad.key}`)" class="text-red-600 text-xs">{{ getError(`additional_docs.${ad.key}`) }}</p>
+          </div>
+          <!-- Upload + Remove on the right, same row -->
+          <div class="flex items-center gap-2 shrink-0 flex-nowrap">
+            <div v-if="ad.files?.length" class="w-6 h-6 rounded-full bg-blue-500 text-white text-xs font-bold flex items-center justify-center">
+              {{ ad.files.length }}
+            </div>
+            <label class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-sky-400 bg-white text-sky-600 text-sm font-medium cursor-pointer hover:bg-sky-50 whitespace-nowrap">
+              <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              Upload
+              <input type="file" class="hidden" accept=".pdf,.doc,.docx,.eml" multiple @change="(e) => onAdditionalFileChange(idx, e)" />
+            </label>
+            <button type="button" @click="removeAdditionalDoc(idx)" class="text-red-600 hover:text-red-700 text-sm font-medium whitespace-nowrap">Remove</button>
+          </div>
+        </div>
+        <div v-if="canAddMoreAdditional" class="mt-3">
+          <button
+            type="button"
+            @click="addAdditionalDoc"
+            class="inline-flex items-center gap-2 text-sm font-medium text-green-600 hover:text-green-700"
+          >
+            <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Add Document
+          </button>
         </div>
       </div>
     </div>
@@ -321,30 +402,33 @@ const cancel = () => window.history.back()
     <!-- Size info -->
     <p class="text-sm text-gray-500">Total size: {{ totalSizeMB }} MB / {{ MAX_TOTAL_MB }} MB</p>
 
-    <!-- Actions -->
+    <!-- Actions: 2 left (Back, Cancel), 2 right (Save as Draft, Submit Lead) -->
     <div class="flex flex-wrap items-center justify-between gap-3 pt-6 border-t border-gray-200">
       <div class="flex items-center gap-3">
         <button
           type="button"
           @click="goBack"
-          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-gray-100 text-gray-700 text-sm font-medium hover:bg-gray-200"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
           Back
         </button>
-        <button type="button" @click="cancel" class="px-4 py-2 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-100">
+        <button
+          type="button"
+          @click="cancel"
+          class="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50"
+        >
           Cancel
         </button>
       </div>
       <div class="flex items-center gap-3">
-        <span class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium">Step 3</span>
         <button
           type="button"
           :disabled="saving"
           @click="saveDraft"
-          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-gray-100 text-gray-700 text-sm font-medium hover:bg-gray-200 disabled:opacity-50"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
@@ -355,7 +439,7 @@ const cancel = () => window.history.back()
           type="button"
           :disabled="submitting"
           @click="submit"
-          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-500 disabled:opacity-50"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-lime-500 text-white text-sm font-medium hover:bg-lime-600 disabled:opacity-50"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />

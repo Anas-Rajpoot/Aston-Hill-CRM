@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/services/leadSubmissionsApi'
 import { useFormErrors } from '@/composables/useFormErrors'
@@ -14,6 +14,9 @@ const EMIRATES_OPTIONS = [
   'Fujairah',
 ]
 
+const props = defineProps({
+  leadId: { type: Number, default: null },
+})
 const router = useRouter()
 const emit = defineEmits(['next'])
 
@@ -35,7 +38,7 @@ const form = ref({
   location_coordinates: '25.2048, 55.2708',
   product: '',
   offer: '',
-  mrc_aed: '0.00',
+  mrc_aed: '0',
   quantity: '1',
   ae_domain: '',
   gaid: '',
@@ -48,6 +51,9 @@ const form = ref({
 const managers = ref([])
 const teamLeaders = ref([])
 const salesAgents = ref([])
+const settingFromSalesAgent = ref(false)
+/** When true, manager_id was set by TL or SA selection – don't clear TL/SA in manager watch */
+const settingFromChild = ref(false)
 const teamLabels = ref({
   manager: 'Manager Name',
   team_leader: 'Team Leader Name',
@@ -73,8 +79,12 @@ const formatDate = (dateStr) => {
   })
 }
 
-// Populate form from draft data
-const populateForm = (draft) => {
+// Populate form from draft/lead data. Set skipTeamWatchers=true when loading from API so watchers don't clear team dropdowns.
+const populateForm = (draft, skipTeamWatchers = false) => {
+  if (skipTeamWatchers) {
+    settingFromChild.value = true
+    settingFromSalesAgent.value = true
+  }
   form.value = {
     account_number: draft.account_number || '',
     company_name: draft.company_name || '',
@@ -87,14 +97,20 @@ const populateForm = (draft) => {
     location_coordinates: draft.location_coordinates || '25.2048, 55.2708',
     product: draft.product || '',
     offer: draft.offer || '',
-    mrc_aed: draft.mrc_aed ?? '0.00',
+    mrc_aed: draft.mrc_aed != null ? String(Math.max(0, parseInt(draft.mrc_aed, 10) || 0)) : '0',
     quantity: draft.quantity ?? '1',
     ae_domain: draft.ae_domain || '',
     gaid: draft.gaid || '',
-    manager_id: draft.manager_id || '',
-    team_leader_id: draft.team_leader_id || '',
-    sales_agent_id: draft.sales_agent_id || '',
+    manager_id: draft.manager_id != null ? String(draft.manager_id) : '',
+    team_leader_id: draft.team_leader_id != null ? String(draft.team_leader_id) : '',
+    sales_agent_id: draft.sales_agent_id != null ? String(draft.sales_agent_id) : '',
     remarks: draft.remarks || '',
+  }
+  if (skipTeamWatchers) {
+    nextTick(() => {
+      settingFromChild.value = false
+      settingFromSalesAgent.value = false
+    })
   }
 }
 
@@ -143,6 +159,10 @@ const filteredSalesAgents = computed(() => {
 watch(
   () => form.value.manager_id,
   () => {
+    if (settingFromChild.value) {
+      nextTick(() => { settingFromChild.value = false })
+      return
+    }
     form.value.team_leader_id = ''
     form.value.sales_agent_id = ''
   }
@@ -151,32 +171,46 @@ watch(
 watch(
   () => form.value.team_leader_id,
   (id) => {
-    if (!id) return
-    const tl = teamLeaders.value.find((u) => String(u.id) === String(id))
-    if (tl?.manager_id) form.value.manager_id = String(tl.manager_id)
-    form.value.sales_agent_id = ''
+    if (id) {
+      const tl = teamLeaders.value.find((u) => String(u.id) === String(id))
+      if (tl?.manager_id != null) {
+        settingFromChild.value = true
+        form.value.manager_id = String(tl.manager_id)
+        nextTick(() => { settingFromChild.value = false })
+      }
+      if (!settingFromSalesAgent.value) form.value.sales_agent_id = ''
+    } else {
+      form.value.manager_id = ''
+    }
   }
 )
 
-// Auto-fill manager and team leader when sales agent is selected
+// Auto-fill manager and team leader when sales agent is selected; clear parents when none selected
 watch(
   () => form.value.sales_agent_id,
   (id) => {
-    if (!id) return
-    const sa = salesAgents.value.find((u) => String(u.id) === String(id))
-    if (sa?.team_leader_id) form.value.team_leader_id = sa.team_leader_id
-    if (sa?.manager_id) form.value.manager_id = sa.manager_id
+    if (id) {
+      const sa = salesAgents.value.find((u) => String(u.id) === String(id))
+      if (sa) {
+        settingFromSalesAgent.value = true
+        settingFromChild.value = true
+        if (sa.team_leader_id != null) form.value.team_leader_id = String(sa.team_leader_id)
+        if (sa.manager_id != null) form.value.manager_id = String(sa.manager_id)
+        nextTick(() => {
+          settingFromSalesAgent.value = false
+          settingFromChild.value = false
+        })
+      }
+    } else {
+      form.value.team_leader_id = ''
+      form.value.manager_id = ''
+    }
   }
 )
 
 onMounted(async () => {
-  // Load team options and check for existing draft in parallel
   try {
-    const [teamRes, draftRes] = await Promise.all([
-      api.getTeamOptions(),
-      api.getCurrentDraft(),
-    ])
-
+    const teamRes = await api.getTeamOptions()
     managers.value = teamRes.data.managers || []
     teamLeaders.value = teamRes.data.team_leaders || []
     salesAgents.value = teamRes.data.sales_agents || []
@@ -184,11 +218,29 @@ onMounted(async () => {
       teamLabels.value = { ...teamLabels.value, ...teamRes.data.labels }
     }
 
-    if (draftRes.data.draft) {
-      const draft = draftRes.data.draft
-      draftId.value = draft.id
-      draftDate.value = draft.updated_at
-      populateForm(draft)
+    // When wizard passes leadId (e.g. user came back from step 2/3 or refreshed with lead_id), load that lead so dropdowns show selected values
+    if (props.leadId) {
+      try {
+        const leadRes = await api.getLead(props.leadId)
+        const lead = leadRes?.data
+        if (lead) {
+          draftId.value = lead.id
+          draftDate.value = lead.updated_at
+          populateForm(lead, true)
+        }
+      } catch (_) {
+        // Fall through to current draft check
+      }
+    }
+
+    if (!draftId.value) {
+      const draftRes = await api.getCurrentDraft()
+      if (draftRes.data.draft) {
+        const draft = draftRes.data.draft
+        draftId.value = draft.id
+        draftDate.value = draft.updated_at
+        populateForm(draft, true)
+      }
     }
   } catch (_) {
     // Silent fail for team options
@@ -257,33 +309,31 @@ const validateStep1 = () => {
   if (!form.value.team_leader_id) err.team_leader_id = [`${teamLabels.value.team_leader || 'Team Leader'} is required.`]
   if (!form.value.sales_agent_id) err.sales_agent_id = [`${teamLabels.value.sales_agent || 'Sales Agent'} is required.`]
   if (form.value.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.value.email)) err.email = ['Please enter a valid email address.']
-  if (form.value.mrc_aed && (isNaN(parseFloat(form.value.mrc_aed)) || parseFloat(form.value.mrc_aed) < 0)) err.mrc_aed = ['MRC must be a valid number.']
+  if (form.value.mrc_aed && (isNaN(parseInt(form.value.mrc_aed, 10)) || parseInt(form.value.mrc_aed, 10) < 0)) err.mrc_aed = ['MRC must be a valid whole number (0 or more).']
   if (form.value.quantity && (parseInt(form.value.quantity, 10) < 0 || !Number.isInteger(Number(form.value.quantity)))) err.quantity = ['Quantity must be a whole number.']
+  const gaidVal = form.value.gaid != null ? String(form.value.gaid).trim() : ''
+  if (gaidVal !== '' && !/^\d+$/.test(gaidVal)) err.gaid = ['GAID must contain only numbers.']
   return Object.keys(err).length ? err : null
 }
 
-// MRC (AED) increment/decrement
-const mrcStep = 0.01
+// MRC (AED) increment/decrement – start 0, step 1, up/down inside field
 const mrcUp = () => {
-  const v = parseFloat(form.value.mrc_aed) || 0
-  form.value.mrc_aed = (v + mrcStep).toFixed(2)
+  const v = Math.max(0, parseInt(form.value.mrc_aed, 10) || 0)
+  form.value.mrc_aed = String(v + 1)
   clearFieldError('mrc_aed')
 }
 const mrcDown = () => {
-  const v = parseFloat(form.value.mrc_aed) || 0
-  form.value.mrc_aed = Math.max(0, v - mrcStep).toFixed(2)
+  const v = Math.max(0, parseInt(form.value.mrc_aed, 10) || 0)
+  form.value.mrc_aed = String(Math.max(0, v - 1))
   clearFieldError('mrc_aed')
 }
 const onMrcInput = (e) => {
-  const v = e.target.value.replace(/[^0-9.]/g, '')
-  const parts = v.split('.')
-  if (parts.length > 2) return
-  if (parts[1]?.length > 2) return
-  form.value.mrc_aed = v || '0.00'
+  const v = e.target.value.replace(/\D/g, '')
+  form.value.mrc_aed = v === '' ? '0' : String(parseInt(v, 10) || 0)
   clearFieldError('mrc_aed')
 }
 const onGaidInput = (e) => {
-  form.value.gaid = e.target.value.replace(/\D/g, '')
+  form.value.gaid = e.target.value
   clearFieldError('gaid')
 }
 
@@ -482,21 +532,21 @@ const cancel = () => {
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">MRC (AED)</label>
-            <div class="flex rounded-lg border overflow-hidden" :class="getError('mrc_aed') ? 'border-red-500' : 'border-gray-300'">
+            <div class="flex w-full rounded-lg border overflow-hidden bg-white items-stretch" :class="getError('mrc_aed') ? 'border-red-500' : 'border-gray-300'">
               <input
                 :value="form.mrc_aed"
                 type="text"
-                inputmode="decimal"
-                placeholder="0.00"
-                :class="['flex-1 min-w-0 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-500', getError('mrc_aed') ? 'border-red-500' : '']"
+                inputmode="numeric"
+                placeholder="0"
+                :class="['min-w-0 flex-1 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-500 border-0', getError('mrc_aed') ? 'border-red-500' : '']"
                 @input="onMrcInput"
               />
-              <div class="flex flex-col border-l border-gray-300 shrink-0">
-                <button type="button" @click="mrcUp" class="px-2 py-1 text-gray-500 hover:bg-gray-100 border-b border-gray-200">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
+              <div class="flex border-l border-gray-300 shrink-0 bg-gray-50">
+                <button type="button" @click="mrcUp" class="px-2 py-1 text-gray-600 hover:bg-gray-100 border-r border-gray-200 focus:outline-none flex items-center justify-center" aria-label="Increase MRC">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
                 </button>
-                <button type="button" @click="mrcDown" class="px-2 py-1 text-gray-500 hover:bg-gray-100">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                <button type="button" @click="mrcDown" class="px-2 py-1 text-gray-600 hover:bg-gray-100 focus:outline-none flex items-center justify-center" aria-label="Decrease MRC">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                 </button>
               </div>
             </div>
@@ -554,7 +604,7 @@ const cancel = () => {
               @change="clearFieldError('manager_id')"
             >
               <option value="">Select {{ teamLabels.manager || 'Manager' }}</option>
-              <option v-for="u in managers" :key="u.id" :value="u.id">{{ u.name }}</option>
+              <option v-for="u in managers" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
             </select>
             <p v-if="getError('manager_id')" class="mt-1 text-sm text-red-600">{{ getError('manager_id') }}</p>
           </div>
@@ -566,7 +616,7 @@ const cancel = () => {
               @change="clearFieldError('team_leader_id')"
             >
               <option value="">Select {{ teamLabels.team_leader || 'Team Leader' }}</option>
-              <option v-for="u in filteredTeamLeaders" :key="u.id" :value="u.id">{{ u.name }}</option>
+              <option v-for="u in filteredTeamLeaders" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
             </select>
             <p v-if="getError('team_leader_id')" class="mt-1 text-sm text-red-600">{{ getError('team_leader_id') }}</p>
           </div>
@@ -578,7 +628,7 @@ const cancel = () => {
               @change="clearFieldError('sales_agent_id')"
             >
               <option value="">Select {{ teamLabels.sales_agent || 'Sales Agent' }}</option>
-              <option v-for="u in filteredSalesAgents" :key="u.id" :value="u.id">{{ u.name }}</option>
+              <option v-for="u in filteredSalesAgents" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
             </select>
             <p v-if="getError('sales_agent_id')" class="mt-1 text-sm text-red-600">{{ getError('sales_agent_id') }}</p>
           </div>

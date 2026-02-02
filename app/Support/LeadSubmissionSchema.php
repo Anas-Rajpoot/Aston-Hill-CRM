@@ -33,4 +33,10 @@ class LeadSubmissionSchema
         $docs = $type->schema['documents'] ?? [];
         return ! empty($docs) ? $docs : self::$defaultDocuments;
     }
+
+    /** Default document definitions when lead has no service type (e.g. step 3 documents before type set) */
+    public static function defaultDocuments(): array
+    {
+        return self::$defaultDocuments;
+    }
 }

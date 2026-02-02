@@ -9,27 +9,34 @@ use Illuminate\Support\Facades\Storage;
 
 trait StoresLeadSubmissionDocuments
 {
-    protected function storeLeadSubmissionDocument(LeadSubmission $leadSubmission, string $docKey, UploadedFile $file): LeadSubmissionDocument
+    protected function storeLeadSubmissionDocument(LeadSubmission $leadSubmission, string $docKey, UploadedFile $file, ?string $label = null): LeadSubmissionDocument
     {
         $dir = "lead-submissions/{$leadSubmission->id}/{$docKey}";
         $name = time() . '_' . preg_replace('/[^a-zA-Z0-9\.\-_]/', '_', $file->getClientOriginalName());
 
-        $path = $file->storeAs($dir, $name, 'public');
+        $filePath = $file->storeAs($dir, $name, 'public');
 
-        return LeadSubmissionDocument::create([
+        $data = [
             'lead_submission_id' => $leadSubmission->id,
             'doc_key' => $docKey,
-            'path' => $path,
-            'original_name' => $file->getClientOriginalName(),
+            'file_path' => $filePath,
+            'file_name' => $file->getClientOriginalName(),
             'mime' => $file->getMimeType(),
             'size' => $file->getSize(),
-        ]);
+        ];
+        if ($leadSubmission->service_type_id) {
+            $data['service_type_id'] = $leadSubmission->service_type_id;
+        }
+        if ($label !== null && $label !== '') {
+            $data['label'] = $label;
+        }
+        return LeadSubmissionDocument::create($data);
     }
 
     protected function deleteLeadSubmissionDocument(LeadSubmissionDocument $doc): void
     {
-        if ($doc->path) {
-            Storage::disk('public')->delete($doc->path);
+        if ($doc->file_path) {
+            Storage::disk('public')->delete($doc->file_path);
         }
         $doc->delete();
     }

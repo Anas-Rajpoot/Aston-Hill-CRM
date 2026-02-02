@@ -9,9 +9,11 @@ class LeadSubmissionDocument extends Model
 {
     protected $fillable = [
         'lead_submission_id',
+        'service_type_id',
         'doc_key',
-        'path',
-        'original_name',
+        'file_path',
+        'file_name',
+        'label',
         'mime',
         'size',
     ];

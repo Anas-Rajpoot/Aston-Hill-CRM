@@ -311,31 +311,36 @@ class LeadSubmissionController extends Controller
         return view('lead-submission.wizard.step2', compact('leadSubmission','categories'));
     }
 
-    public function storeStep2(Request $request, LeadSubmission $leadSubmission)
+    public function storeStep2(Request $request, LeadSubmission $lead)
     {
-        $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
+        $this->authorizeLeadSubmissionAccess($request, $lead);
 
         $data = $request->validate([
-            'service_category_id' => ['required', 'exists:service_categories,id'],
-            'service_type_id' => ['required', 'exists:service_types,id'],
+            'service_category_id' => ['required', 'integer', 'exists:service_categories,id'],
+            'service_type_id' => ['required', 'integer', 'exists:service_types,id'],
         ], [
             'service_category_id.required' => 'Please select a service category.',
             'service_type_id.required' => 'Please select a service type.',
         ]);
 
+        $categoryId = (int) $data['service_category_id'];
+        $typeId = (int) $data['service_type_id'];
+
         // Ensure type belongs to the selected category
-        $type = ServiceType::findOrFail($data['service_type_id']);
-        if ((int) $type->service_category_id !== (int) $data['service_category_id']) {
+        $type = ServiceType::findOrFail($typeId);
+        if ((int) $type->service_category_id !== $categoryId) {
             return response()->json(['message' => 'Service type does not belong to the selected category.'], 422);
         }
 
-        $this->leadSubmissionService->saveStep2($leadSubmission, $data);
+        $lead->service_category_id = $categoryId;
+        $lead->service_type_id = $typeId;
+        $lead->save();
 
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json(['message' => 'Step 2 saved.']);
         }
 
-        return redirect()->route('lead-submissions.wizard.step3', $leadSubmission)->with('success', 'Step 2 saved.');
+        return redirect()->route('lead-submissions.wizard.step3', $lead)->with('success', 'Step 2 saved.');
     }
 
     /** STEP 3 (dynamic fields from service_types.schema) */
@@ -412,12 +417,13 @@ class LeadSubmissionController extends Controller
         return view('lead-submission.wizard.step4', compact('leadSubmission','docDefs','existingDocs'));
     }
 
-    public function storeStep4(Request $request, LeadSubmission $leadSubmission)
+    public function storeStep4(Request $request, LeadSubmission $lead)
     {
-        $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
+        $this->authorizeLeadSubmissionAccess($request, $lead);
 
-        $type = ServiceType::findOrFail($leadSubmission->service_type_id);
-        $docDefs = LeadSubmissionSchema::documents($type);
+        $docDefs = $lead->service_type_id
+            ? LeadSubmissionSchema::documents(ServiceType::findOrFail($lead->service_type_id))
+            : LeadSubmissionSchema::defaultDocuments();
 
         // Validate: PDF, DOC, DOCX, EML only; 3MB per file (frontend sends array)
         $rules = [];
@@ -452,7 +458,7 @@ class LeadSubmissionController extends Controller
                 }
             }
         }
-        $existingSize = LeadSubmissionDocument::where('lead_submission_id', $leadSubmission->id)->sum('size');
+        $existingSize = LeadSubmissionDocument::where('lead_submission_id', $lead->id)->sum('size');
         if (($totalSize + $existingSize) > 10 * 1024 * 1024) {
             if ($request->expectsJson() || $request->ajax()) {
                 return response()->json([
@@ -464,11 +470,11 @@ class LeadSubmissionController extends Controller
         }
 
         // Save documents in public/leads/{leadId}/...
-        $this->leadSubmissionService->saveStep4Documents($request, $leadSubmission);
+        $this->leadSubmissionService->saveStep4Documents($request, $lead);
 
         // If submit action: enforce required docs exist (in DB or in request)
         if ($request->input('action') === 'submit') {
-            $missing = $this->missingRequiredDocs($leadSubmission, $docDefs);
+            $missing = $this->missingRequiredDocs($lead, $docDefs);
             if (!empty($missing)) {
 if ($request->expectsJson() || $request->ajax()) {
                     return response()->json([
@@ -481,12 +487,12 @@ if ($request->expectsJson() || $request->ajax()) {
                 ]);
             }
 
-            $this->leadSubmissionService->submit($leadSubmission);
+            $this->leadSubmissionService->submit($lead);
 
             if ($request->expectsJson() || $request->ajax()) {
                 return response()->json(['message' => 'Lead Submission submitted successfully.']);
             }
-            return redirect()->route('lead-submissions.show', $leadSubmission)->with('success', 'Lead Submission submitted successfully.');
+            return redirect()->route('lead-submissions.show', $lead)->with('success', 'Lead Submission submitted successfully.');
         }
 
         if ($request->expectsJson() || $request->ajax()) {
@@ -501,7 +507,24 @@ if ($request->expectsJson() || $request->ajax()) {
         $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
 
         if ($request->expectsJson() || $request->ajax()) {
-            return response()->json($leadSubmission->load(['category:id,name', 'type:id,name,schema', 'documents']));
+            $leadSubmission->load(['category:id,name', 'type:id,name,schema', 'documents']);
+            $type = $leadSubmission->type;
+            $docDefs = $type ? LeadSubmissionSchema::documents($type) : [];
+            $labelsByKey = collect($docDefs)->pluck('label', 'key')->all();
+            $documentsWithLabels = $leadSubmission->documents->map(function ($doc) use ($labelsByKey) {
+                return [
+                    'id' => $doc->id,
+                    'doc_key' => $doc->doc_key,
+                    'label' => $doc->label ?? $labelsByKey[$doc->doc_key] ?? $doc->doc_key,
+                    'path' => $doc->file_path,
+                    'original_name' => $doc->file_name,
+                    'mime' => $doc->mime,
+                    'size' => $doc->size,
+                ];
+            });
+            $data = $leadSubmission->toArray();
+            $data['documents'] = $documentsWithLabels->all();
+            return response()->json($data);
         }
 
         $leadSubmission->load(['creator:id,name,email','category:id,name','type:id,name']);
@@ -594,7 +617,7 @@ if ($request->expectsJson() || $request->ajax()) {
         // delete documents files
         $docs = LeadSubmissionDocument::where('lead_submission_id', $leadSubmission->id)->get();
         foreach ($docs as $d) {
-            if ($d->path) Storage::disk('public')->delete($d->path);
+            if ($d->file_path) Storage::disk('public')->delete($d->file_path);
             $d->delete();
         }
 

@@ -15,8 +15,8 @@ const emit = defineEmits(['next', 'back'])
 const router = useRouter()
 const categories = ref([])
 const serviceTypes = ref([])
-const selectedCategoryId = ref(props.initialCategoryId || '')
-const selectedTypeId = ref(props.initialTypeId || '')
+const selectedCategoryId = ref(props.initialCategoryId != null ? String(props.initialCategoryId) : '')
+const selectedTypeId = ref(props.initialTypeId != null ? String(props.initialTypeId) : '')
 const loading = ref(true)
 const saving = ref(false)
 const savingDraft = ref(false)
@@ -66,10 +66,10 @@ onMounted(async () => {
     const catId = props.initialCategoryId ?? lead?.service_category_id
     const typeId = props.initialTypeId ?? lead?.service_type_id
 
-    if (catId) {
-      selectedCategoryId.value = catId
+    if (catId != null && catId !== '') {
+      selectedCategoryId.value = String(catId)
       await fetchServiceTypes(catId)
-      selectedTypeId.value = typeId || ''
+      selectedTypeId.value = typeId != null && typeId !== '' ? String(typeId) : ''
     }
   } catch (e) {
     setErrors(e)
@@ -116,8 +116,8 @@ const saveDraft = async () => {
   savingDraft.value = true
   try {
     await api.storeStep2(props.leadId, {
-      service_category_id: selectedCategoryId.value,
-      service_type_id: selectedTypeId.value,
+      service_category_id: Number(selectedCategoryId.value),
+      service_type_id: Number(selectedTypeId.value),
     })
   } catch (e) {
     setErrors(e)
@@ -135,10 +135,10 @@ const submit = async () => {
   saving.value = true
   try {
     await api.storeStep2(props.leadId, {
-      service_category_id: selectedCategoryId.value,
-      service_type_id: selectedTypeId.value,
+      service_category_id: Number(selectedCategoryId.value),
+      service_type_id: Number(selectedTypeId.value),
     })
-    emit('next')
+    emit('next', selectedCategoryId.value, selectedTypeId.value)
   } catch (e) {
     setErrors(e)
   } finally {
@@ -185,7 +185,7 @@ const cancel = () => router.push('/submissions')
         >
           <div
             class="w-12 h-12 rounded-lg flex items-center justify-center shrink-0"
-            :class="selectedCategoryId === cat.id ? 'bg-blue-100' : 'bg-gray-100'"
+            :class="String(selectedCategoryId) === String(cat.id) ? 'bg-blue-100' : 'bg-gray-100'"
           >
             <!-- Fixed: wifi -->
             <svg v-if="getCategoryIcon(cat) === 'wifi'" class="w-6 h-6" :class="selectedCategoryId === cat.id ? 'text-blue-600' : 'text-gray-500'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -240,12 +240,12 @@ const cancel = () => router.push('/submissions')
           v-for="type in serviceTypes"
           :key="type.id"
           class="flex items-center gap-3 p-4 rounded-xl border border-gray-200 bg-white cursor-pointer hover:border-green-300 transition"
-          :class="{ 'border-green-500 bg-green-50': selectedTypeId === type.id }"
+          :class="{ 'border-green-500 bg-green-50': String(selectedTypeId) === String(type.id) }"
         >
           <input
             v-model="selectedTypeId"
             type="radio"
-            :value="type.id"
+            :value="String(type.id)"
             class="w-5 h-5 text-green-600 border-gray-300 focus:ring-green-500"
             @change="clearFieldError('service_type_id')"
           />
@@ -256,48 +256,55 @@ const cancel = () => router.push('/submissions')
       <p v-if="getError('service_type_id') || getError('service_category_id')" class="mt-2 text-sm text-red-600">{{ getError('service_type_id') || getError('service_category_id') }}</p>
     </div>
 
-    <!-- Actions -->
-    <div class="flex flex-wrap items-center justify-end gap-3 pt-6 border-t border-gray-200">
-      <button
-        type="button"
-        @click="goBack"
-        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-        </svg>
-        Back
-      </button>
-      <button
-        type="button"
-        @click="cancel"
-        class="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50"
-      >
-        Cancel
-      </button>
-      <span class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium">Step 2</span>
-      <button
-        type="button"
-        :disabled="savingDraft || !selectedCategoryId || !selectedTypeId"
-        @click="saveDraft"
-        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-gray-100 text-gray-700 text-sm font-medium hover:bg-gray-200 disabled:opacity-50"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-        </svg>
-        {{ savingDraft ? 'Saving...' : 'Save as Draft' }}
-      </button>
-      <button
-        type="button"
-        :disabled="saving || !selectedCategoryId || !selectedTypeId"
-        @click="submit"
-        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500 text-white text-sm font-medium hover:bg-green-600 disabled:opacity-50"
-      >
-        Next
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-        </svg>
-      </button>
+    <!-- Actions: left group (Back, Cancel, Step 2), right group (Save as Draft, Next) -->
+    <div class="flex flex-wrap items-center justify-between gap-3 pt-6 border-t border-gray-200">
+      <div class="flex items-center gap-3">
+        <button
+          type="button"
+          @click="goBack"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-gray-100 text-gray-700 text-sm font-medium hover:bg-gray-200"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          Back
+        </button>
+        <button
+          type="button"
+          @click="cancel"
+          class="px-4 py-2 rounded-lg border border-gray-300 bg-gray-100 text-gray-700 text-sm font-medium hover:bg-gray-200"
+        >
+          Cancel
+        </button>
+        <span class="px-4 py-2 rounded-lg bg-gray-800 text-white text-sm font-medium">Step 2</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <button
+          type="button"
+          :disabled="savingDraft || !selectedCategoryId || !selectedTypeId"
+          @click="saveDraft"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+        >
+          <!-- Document with folded corner and arrow (save draft icon) -->
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M14 2v6h6" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-6M9 15l3-3 3 3" />
+          </svg>
+          {{ savingDraft ? 'Saving...' : 'Save as Draft' }}
+        </button>
+        <button
+          type="button"
+          :disabled="saving || !selectedCategoryId || !selectedTypeId"
+          @click="submit"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-lime-500 text-white text-sm font-medium hover:bg-lime-600 disabled:opacity-50"
+        >
+          Next
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+          </svg>
+        </button>
+      </div>
     </div>
   </div>
 </template>

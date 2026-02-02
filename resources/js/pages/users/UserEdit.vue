@@ -142,7 +142,7 @@ onMounted(async () => {
   }
 })
 
-const save = async () => {
+const save = async (closeAfter = false) => {
   error.value = ''
   saving.value = true
   try {
@@ -157,7 +157,9 @@ const save = async () => {
     if (payload.team_leader_id) payload.team_leader_id = parseInt(payload.team_leader_id, 10)
     else payload.team_leader_id = null
     await usersApi.update(route.params.id, payload)
-    router.push({ path: '/users', query: { updated: form.value.name } })
+    if (closeAfter) {
+      router.push({ path: '/users', query: { updated: form.value.name } })
+    }
   } catch (e) {
     const msg = e?.response?.data?.message
     const errs = e?.response?.data?.errors
@@ -185,7 +187,7 @@ const cancel = () => router.push(`/users/${route.params.id}`)
       </svg>
     </div>
 
-    <form v-else @submit.prevent="save" class="space-y-6">
+    <form v-else @submit.prevent="save(true)" class="space-y-6">
       <div>
         <h1 class="text-2xl font-bold text-gray-900">Edit User</h1>
         <p class="mt-1 text-sm text-gray-500">Update user account and roles.</p>
@@ -350,13 +352,40 @@ const cancel = () => router.push(`/users/${route.params.id}`)
         </div>
       </div>
 
-      <div class="flex flex-wrap items-center gap-3">
-        <button type="submit" :disabled="saving" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
-          {{ saving ? 'Saving...' : 'Save Changes' }}
-        </button>
-        <button type="button" @click="cancel" class="inline-flex items-center rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
+      <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-gray-200">
+        <button
+          type="button"
+          @click="cancel"
+          class="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-900 hover:bg-gray-50"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
           Cancel
         </button>
+        <div class="flex items-center gap-3">
+          <button
+            type="button"
+            :disabled="saving"
+            @click="save(false)"
+            class="inline-flex items-center gap-2 rounded-xl border border-sky-400 bg-white px-5 py-2.5 text-sm font-medium text-sky-500 hover:bg-sky-50 disabled:opacity-50"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+            </svg>
+            {{ saving ? 'Saving...' : 'Save User' }}
+          </button>
+          <button
+            type="submit"
+            :disabled="saving"
+            class="inline-flex items-center gap-2 rounded-xl bg-lime-500 px-5 py-2.5 text-sm font-medium text-white hover:bg-lime-600 disabled:opacity-50"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+            </svg>
+            {{ saving ? 'Saving...' : 'Save & Close' }}
+          </button>
+        </div>
       </div>
     </form>
   </div>
