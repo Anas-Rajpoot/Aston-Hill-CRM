@@ -4,7 +4,11 @@
 
 /* Global UI */
 .btn-primary {
-  @apply px-4 py-2 rounded bg-lime-500 text-white hover:bg-lime-600;
+  @apply px-4 py-2 rounded text-black;
+  background-color: #7ED321;
+}
+.btn-primary:hover {
+  background-color: #6ab81e;
 }
 
 .btn-secondary {

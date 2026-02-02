@@ -3,6 +3,7 @@ import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/services/leadSubmissionsApi'
 import { useFormErrors } from '@/composables/useFormErrors'
+import { formatTeamLabel } from '@/composables/useTeamLabel'
 
 const EMIRATES_OPTIONS = [
   'Abu Dhabi',
@@ -305,14 +306,12 @@ const validateStep1 = () => {
   if (!form.value.address?.trim()) err.address = ['Complete address is required.']
   if (!form.value.emirates?.trim()) err.emirates = ['Emirates is required.']
   if (!form.value.product?.trim()) err.product = ['Product is required.']
-  if (!form.value.manager_id) err.manager_id = [`${teamLabels.value.manager || 'Manager'} is required.`]
-  if (!form.value.team_leader_id) err.team_leader_id = [`${teamLabels.value.team_leader || 'Team Leader'} is required.`]
-  if (!form.value.sales_agent_id) err.sales_agent_id = [`${teamLabels.value.sales_agent || 'Sales Agent'} is required.`]
+  if (!form.value.manager_id) err.manager_id = [`${formatTeamLabel(teamLabels.value.manager || 'manager')} is required.`]
+  if (!form.value.team_leader_id) err.team_leader_id = [`${formatTeamLabel(teamLabels.value.team_leader || 'team_leader')} is required.`]
+  if (!form.value.sales_agent_id) err.sales_agent_id = [`${formatTeamLabel(teamLabels.value.sales_agent || 'sales_agent')} is required.`]
   if (form.value.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.value.email)) err.email = ['Please enter a valid email address.']
   if (form.value.mrc_aed && (isNaN(parseInt(form.value.mrc_aed, 10)) || parseInt(form.value.mrc_aed, 10) < 0)) err.mrc_aed = ['MRC must be a valid whole number (0 or more).']
   if (form.value.quantity && (parseInt(form.value.quantity, 10) < 0 || !Number.isInteger(Number(form.value.quantity)))) err.quantity = ['Quantity must be a whole number.']
-  const gaidVal = form.value.gaid != null ? String(form.value.gaid).trim() : ''
-  if (gaidVal !== '' && !/^\d+$/.test(gaidVal)) err.gaid = ['GAID must contain only numbers.']
   return Object.keys(err).length ? err : null
 }
 
@@ -580,8 +579,7 @@ const cancel = () => {
             <input
               :value="form.gaid"
               type="text"
-              inputmode="numeric"
-              placeholder="Enter GAID (numbers only)"
+              placeholder="Enter GAID"
               :class="inputClass('gaid')"
               @input="onGaidInput"
             />
@@ -597,37 +595,37 @@ const cancel = () => {
         </h3>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">{{ teamLabels.manager || 'Manager Name' }} <span class="text-red-500">*</span></label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ formatTeamLabel(teamLabels.manager || 'manager') }} Name <span class="text-red-500">*</span></label>
             <select
               v-model="form.manager_id"
               :class="inputClass('manager_id')"
               @change="clearFieldError('manager_id')"
             >
-              <option value="">Select {{ teamLabels.manager || 'Manager' }}</option>
+              <option value="">Select {{ formatTeamLabel(teamLabels.manager || 'manager') }}</option>
               <option v-for="u in managers" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
             </select>
             <p v-if="getError('manager_id')" class="mt-1 text-sm text-red-600">{{ getError('manager_id') }}</p>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">{{ teamLabels.team_leader || 'Team Leader Name' }} <span class="text-red-500">*</span></label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ formatTeamLabel(teamLabels.team_leader || 'team_leader') }} Name <span class="text-red-500">*</span></label>
             <select
               v-model="form.team_leader_id"
               :class="inputClass('team_leader_id')"
               @change="clearFieldError('team_leader_id')"
             >
-              <option value="">Select {{ teamLabels.team_leader || 'Team Leader' }}</option>
+              <option value="">Select {{ formatTeamLabel(teamLabels.team_leader || 'team_leader') }}</option>
               <option v-for="u in filteredTeamLeaders" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
             </select>
             <p v-if="getError('team_leader_id')" class="mt-1 text-sm text-red-600">{{ getError('team_leader_id') }}</p>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">{{ teamLabels.sales_agent || 'Sales Agent Name' }} <span class="text-red-500">*</span></label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ formatTeamLabel(teamLabels.sales_agent || 'sales_agent') }} Name <span class="text-red-500">*</span></label>
             <select
               v-model="form.sales_agent_id"
               :class="inputClass('sales_agent_id')"
               @change="clearFieldError('sales_agent_id')"
             >
-              <option value="">Select {{ teamLabels.sales_agent || 'Sales Agent' }}</option>
+              <option value="">Select {{ formatTeamLabel(teamLabels.sales_agent || 'sales_agent') }}</option>
               <option v-for="u in filteredSalesAgents" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
             </select>
             <p v-if="getError('sales_agent_id')" class="mt-1 text-sm text-red-600">{{ getError('sales_agent_id') }}</p>
@@ -675,7 +673,7 @@ const cancel = () => {
           <button
             type="submit"
             :disabled="saving"
-            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500 text-white text-sm font-medium hover:bg-green-600 disabled:opacity-50"
+            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-50 bg-[#7ED321] hover:bg-[#6ab81e]"
           >
             Next
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -70,7 +70,10 @@ const submit = async (action) => {
         <button class="btn-dark" @click="submit('save')">
           Save
         </button>
-        <button class="btn-primary" @click="submit('submit')">
+        <button class="btn-primary inline-flex items-center gap-2" @click="submit('submit')">
+          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 12L3.269 3.126a59.768 59.768 0 0118.216-8.268 59.768 59.768 0 0118.216 8.268L18 12m-6 0h7.5" />
+          </svg>
           Submit Lead Submission
         </button>
       </div>

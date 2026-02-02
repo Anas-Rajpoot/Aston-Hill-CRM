@@ -4,8 +4,10 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\ColumnPreferenceController;
 use App\Http\Controllers\DataTableController;
 use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\CustomerSupportController;
 use App\Http\Controllers\FieldSubmissionController;
 use App\Http\Controllers\LeadSubmissionController;
+use App\Http\Controllers\VasRequestController;
 use App\Http\Controllers\LoginLogController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PersonalNoteController;
@@ -40,6 +42,18 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     // Field submissions
     Route::get('/field-submissions/team-options', [FieldSubmissionController::class, 'teamOptions']);
     Route::post('/field-submissions', [FieldSubmissionController::class, 'store']);
+
+    // Customer support
+    Route::get('/customer-support/team-options', [CustomerSupportController::class, 'teamOptions']);
+    Route::post('/customer-support', [CustomerSupportController::class, 'store']);
+
+    // VAS requests
+    Route::get('/vas-requests/team-options', [VasRequestController::class, 'teamOptions']);
+    Route::get('/vas-requests/document-schema', [VasRequestController::class, 'documentSchemaResponse']);
+    Route::post('/vas-requests/step-1', [VasRequestController::class, 'storeStep1']);
+    Route::get('/vas-requests/{vasRequest}', [VasRequestController::class, 'show'])->whereNumber('vasRequest');
+    Route::post('/vas-requests/{vasRequest}/step-2', [VasRequestController::class, 'storeStep2']);
+    Route::post('/vas-requests/{vasRequest}/submit', [VasRequestController::class, 'submit']);
 
     // Lead submissions (specific routes before {lead})
     Route::get('/lead-submissions/current-draft', [LeadSubmissionController::class, 'currentDraft']);

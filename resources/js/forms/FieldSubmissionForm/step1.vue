@@ -2,6 +2,7 @@
 import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import api from '@/services/fieldSubmissionsApi'
 import { useFormErrors } from '@/composables/useFormErrors'
+import { formatTeamLabel } from '@/composables/useTeamLabel'
 
 const EMIRATES = [
   'Abu Dhabi',
@@ -42,6 +43,8 @@ const teamLabels = ref({
 })
 const submitting = ref(false)
 const successMessage = ref('')
+/** Public URL for submit icon (in public/images/) – use bound :src so Vite does not try to import */
+const submitRequestIconUrl = '/images/submit-request-icon.png'
 
 const { errors, generalMessage, setErrors, clearErrors, clearFieldError, getError } = useFormErrors()
 
@@ -151,9 +154,9 @@ const validateForm = () => {
   if (!form.value.alternate_number?.trim()) err.alternate_number = ['Alternate number is required.']
   if (!form.value.emirates?.trim()) err.emirates = ['Emirates is required.']
   if (!form.value.complete_address?.trim()) err.complete_address = ['Complete address is required.']
-  if (!form.value.manager_id) err.manager_id = [`${teamLabels.value.manager || 'Manager'} is required.`]
-  if (!form.value.team_leader_id) err.team_leader_id = [`${teamLabels.value.team_leader || 'Team Leader'} is required.`]
-  if (!form.value.sales_agent_id) err.sales_agent_id = [`${teamLabels.value.sales_agent || 'Sales Agent'} is required.`]
+  if (!form.value.manager_id) err.manager_id = [`${formatTeamLabel(teamLabels.value.manager || 'manager')} is required.`]
+  if (!form.value.team_leader_id) err.team_leader_id = [`${formatTeamLabel(teamLabels.value.team_leader || 'team_leader')} is required.`]
+  if (!form.value.sales_agent_id) err.sales_agent_id = [`${formatTeamLabel(teamLabels.value.sales_agent || 'sales_agent')} is required.`]
   return Object.keys(err).length ? err : null
 }
 
@@ -397,14 +400,14 @@ const selectClass = (field) =>
         <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
             <label class="mb-1 block text-sm font-medium text-gray-700">
-              {{ teamLabels.manager || 'Manager Name' }} <span class="text-red-500">*</span>
+              {{ formatTeamLabel(teamLabels.manager || 'manager') }} Name <span class="text-red-500">*</span>
             </label>
             <select
               v-model="form.manager_id"
               :class="selectClass('manager_id')"
               @change="clearFieldError('manager_id')"
             >
-              <option value="">Select Manager</option>
+              <option value="">Select {{ formatTeamLabel(teamLabels.manager || 'manager') }}</option>
               <option v-for="u in managers" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
             </select>
             <p v-if="getError('manager_id')" class="mt-1 text-sm text-red-600">
@@ -413,14 +416,14 @@ const selectClass = (field) =>
           </div>
           <div>
             <label class="mb-1 block text-sm font-medium text-gray-700">
-              {{ teamLabels.team_leader || 'Team Leader Name' }} <span class="text-red-500">*</span>
+              {{ formatTeamLabel(teamLabels.team_leader || 'team_leader') }} Name <span class="text-red-500">*</span>
             </label>
             <select
               v-model="form.team_leader_id"
               :class="selectClass('team_leader_id')"
               @change="clearFieldError('team_leader_id')"
             >
-              <option value="">Select Team Leader</option>
+              <option value="">Select {{ formatTeamLabel(teamLabels.team_leader || 'team_leader') }}</option>
               <option v-for="u in filteredTeamLeaders" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
             </select>
             <p v-if="getError('team_leader_id')" class="mt-1 text-sm text-red-600">
@@ -429,14 +432,14 @@ const selectClass = (field) =>
           </div>
           <div>
             <label class="mb-1 block text-sm font-medium text-gray-700">
-              {{ teamLabels.sales_agent || 'Sales Agent Name' }} <span class="text-red-500">*</span>
+              {{ formatTeamLabel(teamLabels.sales_agent || 'sales_agent') }} Name <span class="text-red-500">*</span>
             </label>
             <select
               v-model="form.sales_agent_id"
               :class="selectClass('sales_agent_id')"
               @change="clearFieldError('sales_agent_id')"
             >
-              <option value="">Select Sales Agent</option>
+              <option value="">Select {{ formatTeamLabel(teamLabels.sales_agent || 'sales_agent') }}</option>
               <option v-for="u in filteredSalesAgents" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
             </select>
             <p v-if="getError('sales_agent_id')" class="mt-1 text-sm text-red-600">
@@ -457,22 +460,13 @@ const selectClass = (field) =>
         <button
           type="submit"
           :disabled="submitting"
-          class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-green-700 disabled:opacity-50"
+          class="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-black shadow-sm disabled:opacity-50 bg-[#7ED321] hover:bg-[#6ab81e]"
         >
-          <svg
-            class="h-4 w-4 shrink-0"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"
-            />
-          </svg>
+          <img
+            :src="submitRequestIconUrl"
+            alt=""
+            class="h-4 w-4 shrink-0 object-contain"
+          />
           {{ submitting ? 'Submitting...' : 'Submit Field Request' }}
         </button>
       </div>

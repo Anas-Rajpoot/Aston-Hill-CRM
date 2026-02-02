@@ -1,14 +1,18 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import Tabs from '@/components/Tabs.vue'
 
 // Forms
 import LeadSubmissionWizard from '@/forms/LeadSubmissionForms/LeadSubmissionWizard.vue'
 import FieldSubmissionForm from '@/forms/FieldSubmissionForm/step1.vue'
 import CustomerSupportForm from '@/forms/CustomerSupportForm/step1.vue'
-import VASRequestForm from '@/forms/VASRequestForm/step1.vue'
+import VasRequestWizard from '@/forms/VASRequestForm/VasRequestWizard.vue'
 
+const route = useRoute()
 const activeTab = ref('lead')
+/** Incremented on every tab click so the visible form remounts (clears success message, shows fresh form). */
+const formKey = ref(0)
 
 const tabs = [
   { key: 'lead', label: 'Lead Submissions' },
@@ -16,6 +20,17 @@ const tabs = [
   { key: 'support', label: 'Customer Support' },
   { key: 'vas', label: 'VAS Requests' },
 ]
+
+onMounted(() => {
+  if (route.query.vas_request_id != null && route.query.vas_request_id !== '') {
+    activeTab.value = 'vas'
+  }
+})
+
+function onTabChange(key) {
+  activeTab.value = key
+  formKey.value = Date.now()
+}
 </script>
 
 <template>
@@ -25,15 +40,15 @@ const tabs = [
       <Tabs
         :tabs="tabs"
         :active="activeTab"
-        @change="activeTab = $event"
+        @change="onTabChange"
       />
 
-      <!-- TAB CONTENT (white card, size like 3rd image) -->
+      <!-- TAB CONTENT (white card). Key forces remount on tab click so success message clears and fresh form shows. -->
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 sm:p-8">
-        <LeadSubmissionWizard v-if="activeTab === 'lead'" />
-        <FieldSubmissionForm v-if="activeTab === 'field'" />
-        <CustomerSupportForm v-if="activeTab === 'support'" />
-        <VASRequestForm v-if="activeTab === 'vas'" />
+        <LeadSubmissionWizard v-if="activeTab === 'lead'" :key="`lead-${formKey}`" />
+        <FieldSubmissionForm v-if="activeTab === 'field'" :key="`field-${formKey}`" />
+        <CustomerSupportForm v-if="activeTab === 'support'" :key="`support-${formKey}`" />
+        <VasRequestWizard v-if="activeTab === 'vas'" :key="`vas-${formKey}`" />
       </div>
     </div>
   </div>

@@ -9,10 +9,9 @@ const route = useRoute()
 const router = useRouter()
 
 const currentStep = ref(1)
-const leadId = ref(null)
+const vasRequestId = ref(null)
 const submitted = ref(false)
-const step2CategoryId = ref(null)
-const step2TypeId = ref(null)
+const draftSavedMessage = ref('')
 const isTransitioning = ref(false)
 
 const MIN_TRANSITION_MS = 120
@@ -27,25 +26,25 @@ function scrollToTop() {
 
 function readStepFromRoute() {
   const step = parseInt(route.query.step, 10)
-  const rawId = route.query.lead_id
+  const rawId = route.query.vas_request_id
   const id = rawId != null && rawId !== '' ? parseInt(rawId, 10) : null
   const validId = id != null && !Number.isNaN(id)
   if ((step === 2 || step === 3) && validId) {
     currentStep.value = step
-    leadId.value = id
+    vasRequestId.value = id
     return
   }
   currentStep.value = 1
-  leadId.value = validId ? id : null
+  vasRequestId.value = validId ? id : null
 }
 
 function syncUrlToStep() {
   if (submitted.value) return
   const step = currentStep.value
-  const id = leadId.value
+  const id = vasRequestId.value
   const query = {}
   if (step > 1) query.step = step
-  if (id) query.lead_id = id
+  if (id) query.vas_request_id = id
   if (Object.keys(query).length && JSON.stringify(route.query) !== JSON.stringify(query)) {
     router.replace({ path: route.path, query })
   }
@@ -67,14 +66,14 @@ onMounted(() => {
 })
 
 watch(
-  () => [route.query.step, route.query.lead_id],
+  () => [route.query.step, route.query.vas_request_id],
   () => { readStepFromRoute() },
   { immediate: false }
 )
 
 const onStep1Next = (id) => {
   isTransitioning.value = true
-  leadId.value = id
+  vasRequestId.value = id
   currentStep.value = 2
   syncUrlToStep()
   afterStepChange()
@@ -87,10 +86,8 @@ const onStep2Back = () => {
   afterStepChange()
 }
 
-const onStep2Next = (categoryId, typeId) => {
+const onStep2Next = () => {
   isTransitioning.value = true
-  step2CategoryId.value = categoryId
-  step2TypeId.value = typeId
   currentStep.value = 3
   syncUrlToStep()
   afterStepChange()
@@ -103,8 +100,15 @@ const onStep3Back = () => {
   afterStepChange()
 }
 
+const onDraftSaved = () => {
+  draftSavedMessage.value = 'Draft saved.'
+  scrollToTop()
+  setTimeout(() => { draftSavedMessage.value = '' }, 3000)
+}
+
 const onSubmitted = () => {
   submitted.value = true
+  draftSavedMessage.value = ''
   router.replace({ path: route.path })
   scrollToTop()
 }
@@ -113,43 +117,46 @@ const onSubmitted = () => {
 <template>
   <div class="space-y-6">
     <!-- Success message -->
-    <div v-if="submitted" class="rounded-lg bg-green-50 border border-green-200 p-6 text-center">
-      <svg class="mx-auto w-12 h-12 text-green-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div v-if="submitted" class="rounded-lg border border-green-200 bg-green-50 p-6 text-center">
+      <svg class="mx-auto mb-3 h-12 w-12 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
-      <h3 class="text-lg font-semibold text-green-800">Lead Submission Submitted</h3>
-      <p class="mt-1 text-sm text-green-600">Your lead submission has been submitted successfully.</p>
+      <h3 class="text-lg font-semibold text-green-800">VAS Request Submitted</h3>
+      <p class="mt-1 text-sm text-green-600">Your VAS request has been submitted successfully.</p>
     </div>
 
     <template v-else>
+      <div v-if="draftSavedMessage" class="rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-800">
+        {{ draftSavedMessage }}
+      </div>
+
       <div class="relative min-h-[320px]">
-        <!-- Rendering overlay: show instead of empty page while step is switching -->
         <div
           v-if="isTransitioning"
-          class="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-xl bg-gray-50 border border-gray-200 py-16 px-6"
+          class="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-xl border border-gray-200 bg-gray-50 py-16 px-6"
           aria-live="polite"
           aria-busy="true"
         >
-          <svg class="animate-spin h-10 w-10 text-green-500 mb-4" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+          <svg class="mb-4 h-10 w-10 animate-spin text-green-500" fill="none" viewBox="0 0 24 24" aria-hidden="true">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
           </svg>
           <p class="text-sm font-medium text-gray-700">Rendering...</p>
         </div>
 
-        <Step1 v-if="currentStep === 1" :lead-id="leadId" @next="onStep1Next" />
+        <Step1 v-if="currentStep === 1" @next="onStep1Next" />
         <Step2
           v-else-if="currentStep === 2"
-          :lead-id="leadId"
-          :initial-category-id="step2CategoryId"
-          :initial-type-id="step2TypeId"
+          :vas-request-id="vasRequestId"
           @back="onStep2Back"
+          @draft-saved="onDraftSaved"
           @next="onStep2Next"
         />
         <Step3
           v-else-if="currentStep === 3"
-          :lead-id="leadId"
+          :vas-request-id="vasRequestId"
           @back="onStep3Back"
+          @draft-saved="onDraftSaved"
           @submitted="onSubmitted"
         />
       </div>

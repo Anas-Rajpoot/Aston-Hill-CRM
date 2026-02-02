@@ -16,6 +16,8 @@ const loading = ref(true)
 const saving = ref(false)
 const submitting = ref(false)
 const additionalDocs = ref([]) // [{ key, label, files: File[] }]
+/** Public URL for submit icon (in public/images/) – use bound :src so Vite does not try to import */
+const submitRequestIconUrl = '/images/submit-request-icon.png'
 
 const { errors, generalMessage, setErrors, clearErrors, clearFieldError, getError } = useFormErrors()
 
@@ -24,19 +26,19 @@ const ALLOWED_EXT = ['.pdf', '.doc', '.docx', '.eml']
 const MAX_FILE_MB = 3
 const MAX_TOTAL_MB = 10
 
-/** Default document types (matches backend LeadSubmissionSchema) – always show 12 cards */
+/** Default document types (matches backend LeadSubmissionSchema) – only Trade License required */
 const DEFAULT_DOCUMENTS = [
   { key: 'trade_license', label: 'Trade License', required: true },
   { key: 'establishment_card', label: 'Establishment Card', required: false },
-  { key: 'owner_emirates_id', label: 'Owner Emirates ID', required: true },
+  { key: 'owner_emirates_id', label: 'Owner Emirates ID', required: false },
   { key: 'loa_poa', label: 'LOA / POA', required: false },
-  { key: 'ejari', label: 'Ejari', required: true },
-  { key: 'proposal_form', label: 'Proposal Form', required: true },
-  { key: 'main_application', label: 'Main Application', required: true },
-  { key: 'customer_confirmation_email', label: 'Customer Confirmation Email', required: true },
+  { key: 'ejari', label: 'Ejari', required: false },
+  { key: 'proposal_form', label: 'Proposal Form', required: false },
+  { key: 'main_application', label: 'Main Application', required: false },
+  { key: 'customer_confirmation_email', label: 'Customer Confirmation Email', required: false },
   { key: 'as_person_eid', label: 'AS Person EID', required: false },
   { key: 'rfs_marketing_approvals', label: 'RFS / Marketing / Migration Approvals', required: false },
-  { key: 'fnp_binder', label: 'FNP Binder', required: true },
+  { key: 'fnp_binder', label: 'FNP Binder', required: false },
   { key: 'etisatis_bill', label: 'Etisatis Bill', required: false },
 ]
 
@@ -94,6 +96,8 @@ onMounted(async () => {
     } else {
       docDefs.value = DEFAULT_DOCUMENTS
     }
+    // Only Trade License is required; normalize in case API returned different flags
+    docDefs.value = docDefs.value.map((d) => ({ ...d, required: d.key === 'trade_license' }))
     // Initialize files ref for each doc key
     docDefs.value.forEach((d) => {
       if (d.key && !(d.key in files.value)) files.value[d.key] = []
@@ -309,9 +313,6 @@ const cancel = () => window.history.back()
           </div>
           <div class="min-w-0">
             <p class="font-semibold text-gray-900 text-sm">{{ doc.label }}</p>
-            <p :class="doc.required ? 'text-red-600 text-xs font-medium' : 'text-gray-500 text-xs'">
-              {{ doc.required ? 'Required' : 'Optional' }}
-            </p>
             <p v-if="getError(`documents.${doc.key}`)" class="text-red-600 text-xs mt-1">{{ getError(`documents.${doc.key}`) }}</p>
           </div>
         </div>
@@ -439,12 +440,14 @@ const cancel = () => window.history.back()
           type="button"
           :disabled="submitting"
           @click="submit"
-          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-lime-500 text-white text-sm font-medium hover:bg-lime-600 disabled:opacity-50"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-black text-sm font-medium disabled:opacity-50 bg-[#7ED321] hover:bg-[#6ab81e]"
         >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-          </svg>
-          {{ submitting ? 'Submitting...' : 'Submit Lead' }}
+          <img
+            :src="submitRequestIconUrl"
+            alt=""
+            class="h-4 w-4 shrink-0 object-contain"
+          />
+          <span class="text-black">{{ submitting ? 'Submitting...' : 'Submit Lead' }}</span>
         </button>
       </div>
     </div>
