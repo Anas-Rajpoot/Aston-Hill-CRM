@@ -66,14 +66,30 @@ class BreadcrumbTrail
 
     private function shouldTrack(Request $request): bool
     {
-        if (!$request->isMethod('get')) return false;
-        if ($request->ajax() || $request->wantsJson()) return false;
-        if ($request->routeIs('login', 'register', 'password.*')) return false;
-        if (!$request->route()) return false;
+        if (! $request->isMethod('get')) {
+            return false;
+        }
+        if ($request->ajax() || $request->wantsJson()) {
+            return false;
+        }
+        if ($request->routeIs('login', 'register', 'password.*')) {
+            return false;
+        }
+        if (! $request->route()) {
+            return false;
+        }
+        // Skip SPA document routes (unnamed closure returning view) – no session read/write for faster first byte.
+        if ($request->route()->getName() === null) {
+            return false;
+        }
 
         $path = ltrim($request->path(), '/');
-        if (str_starts_with($path, '.well-known')) return false;
-        if (str_starts_with($path, 'build/') || str_starts_with($path, 'storage/') || str_starts_with($path, 'vendor/')) return false;
+        if (str_starts_with($path, '.well-known')) {
+            return false;
+        }
+        if (str_starts_with($path, 'build/') || str_starts_with($path, 'storage/') || str_starts_with($path, 'vendor/')) {
+            return false;
+        }
 
         return true;
     }

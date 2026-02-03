@@ -1,82 +1,295 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import api from '@/services/leadSubmissionsApi'
 import { useFormErrors } from '@/composables/useFormErrors'
 
 const props = defineProps({
-  leadId: Number,
-  docDefs: Array
+  leadId: { type: Number, required: true },
 })
 
-const files = ref({})
-const progress = ref(0)
+const emit = defineEmits(['back', 'submitted'])
 
-const { errors, setErrors, clearErrors } = useFormErrors()
+const lead = ref(null)
+const loading = ref(true)
+const submitting = ref(false)
 
-const onFileChange = (key, e) => {
-  files.value[key] = e.target.files[0]
+const { errors, generalMessage, setErrors, clearErrors, getError } = useFormErrors()
+
+const documentsByKey = computed(() => {
+  const list = lead.value?.documents || []
+  const byKey = {}
+  list.forEach((doc) => {
+    if (!byKey[doc.doc_key]) byKey[doc.doc_key] = []
+    byKey[doc.doc_key].push(doc)
+  })
+  return byKey
+})
+
+const totalDocCount = computed(() => lead.value?.documents?.length ?? 0)
+
+/** True when the lead has no primary data (empty/incomplete draft). */
+const isEmptyDraft = computed(() => {
+  const l = lead.value
+  if (!l) return false
+  const hasPrimary = (l.company_name && l.company_name.trim()) || (l.contact_number_gsm && l.contact_number_gsm.trim())
+  const hasService = (l.category_name && l.category_name.trim()) || (l.type_name && l.type_name.trim()) || l.service_category_id || l.service_type_id
+  return !hasPrimary && !hasService
+})
+
+function formatSize(bytes) {
+  if (bytes == null || bytes === 0) return '—'
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 
-const submit = async (action) => {
-  clearErrors()
+function formatDate(dateStr) {
+  if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
 
-  const fd = new FormData()
-  fd.append('action', action)
+/** Truncate string to maxLen characters and append "..." if longer. */
+function truncate(val, maxLen = 80) {
+  if (val == null || val === '') return ''
+  const s = String(val).trim()
+  if (s.length <= maxLen) return s
+  return s.slice(0, maxLen) + '...'
+}
 
-  Object.entries(files.value).forEach(([key, file]) => {
-    fd.append(`documents[${key}]`, file)
-  })
-
+onMounted(async () => {
+  loading.value = true
   try {
-    await api.storeStep4(props.leadId, fd, {
-      onUploadProgress(e) {
-        progress.value = Math.round((e.loaded * 100) / e.total)
-      }
-    })
+    const res = await api.getLead(props.leadId)
+    lead.value = res?.data ?? null
   } catch (e) {
     setErrors(e)
+  } finally {
+    loading.value = false
   }
+})
+
+async function submit() {
+  clearErrors()
+  submitting.value = true
+  try {
+    await api.submit(props.leadId)
+    emit('submitted')
+  } catch (e) {
+    setErrors(e)
+  } finally {
+    submitting.value = false
+  }
+}
+
+function goBack() {
+  emit('back')
+}
+
+function close() {
+  window.history.back()
 }
 </script>
 
 <template>
-  <div class="space-y-4">
-    <WizardSteps :step="4" />
+  <div class="space-y-8">
+    <div
+      v-if="generalMessage || Object.keys(errors).length"
+      class="rounded-lg border border-red-200 bg-red-50 p-4"
+    >
+      <p class="text-sm font-medium text-red-800">{{ generalMessage }}</p>
+      <ul class="mt-2 list-inside list-disc space-y-0.5 text-sm text-red-700">
+        <li v-for="(msgs, field) in errors" :key="field">{{ getError(field) }}</li>
+      </ul>
+    </div>
 
-    <form @submit.prevent class="space-y-4">
+    <div v-if="loading" class="flex justify-center items-center py-12">
+      <svg class="animate-spin h-8 w-8 text-green-500" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+      </svg>
+      <span class="ml-3 text-gray-600">Loading...</span>
+    </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div v-for="doc in docDefs" :key="doc.key">
-          <label class="text-xs font-medium text-gray-600">
-            {{ doc.label }}
-            <span v-if="doc.required" class="text-red-600">*</span>
-          </label>
+    <template v-else-if="lead">
+      <!-- Empty draft: no step 1/2 data -->
+      <div
+        v-if="isEmptyDraft"
+        class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800"
+      >
+        <p class="text-sm font-medium">This draft has no details yet.</p>
+        <p class="mt-1 text-sm">Please go back to Step 1 to complete the form, then continue through the steps.</p>
+      </div>
 
-          <input
-            type="file"
-            class="w-full rounded-md border-gray-300"
-            @change="e => onFileChange(doc.key, e)"
-          />
+      <!-- Page Title -->
+      <h2 class="text-xl font-bold text-gray-900">Review Lead Submission</h2>
 
-          <p v-if="errors[`documents.${doc.key}`]" class="text-xs text-red-600">
-            {{ errors[`documents.${doc.key}`][0] }}
-          </p>
+      <!-- Part 1: Primary Information -->
+      <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <h3 class="mb-3 text-base font-semibold text-gray-800">Primary Information</h3>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div>
+            <p class="text-xs text-gray-500">Account Number</p>
+            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.account_number) || '—' }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">Company Name as per Trade License</p>
+            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.company_name) || '—' }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">Authorized Signatory Name</p>
+            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.authorized_signatory_name) || '—' }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">Contact Number (GSM)</p>
+            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.contact_number_gsm) || '—' }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">Alternate Contact Number</p>
+            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.alternate_contact_number) || '—' }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">Email ID</p>
+            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.email) || '—' }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">Complete Address as per Ejari</p>
+            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.address) || '—' }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">Emirates</p>
+            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.emirate) || '—' }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">Location Coordinates</p>
+            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.location_coordinates) || '—' }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">Product</p>
+            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.product) || '—' }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">Offer</p>
+            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.offer) || '—' }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">MRC (AED)</p>
+            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.mrc_aed) || '—' }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">Quantity</p>
+            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.quantity) || '—' }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">.ae Domain</p>
+            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.ae_domain) || '—' }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">GAID</p>
+            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.gaid) || '—' }}</p>
+          </div>
+          <div class="sm:col-span-2 lg:col-span-3">
+            <p class="text-xs text-gray-500">Comment / Remarks</p>
+            <p class="mt-0.5 whitespace-pre-wrap text-sm font-medium text-gray-900">{{ truncate(lead.remarks) || '—' }}</p>
+          </div>
         </div>
       </div>
 
-      <progress v-if="progress" :value="progress" max="100" />
-
-      <div class="flex justify-end gap-2">
-        <button class="btn-dark" @click="submit('save')">
-          Save
-        </button>
-        <button class="btn-primary inline-flex items-center gap-2" @click="submit('submit')">
-          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 12L3.269 3.126a59.768 59.768 0 0118.216-8.268 59.768 59.768 0 0118.216 8.268L18 12m-6 0h7.5" />
-          </svg>
-          Submit Lead Submission
-        </button>
+      <!-- Part 2: Team Information -->
+      <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <h3 class="mb-3 text-base font-semibold text-gray-800">Team Information</h3>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div>
+            <p class="text-xs text-gray-500">Manager Name</p>
+            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.manager_name) || '—' }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">Team Leader Name</p>
+            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.team_leader_name) || '—' }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">Sales Agent Name</p>
+            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.sales_agent_name) || '—' }}</p>
+          </div>
+        </div>
       </div>
-    </form>
+
+      <!-- Part 3: Service Category & Service Type -->
+      <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <h3 class="mb-3 text-base font-semibold text-gray-800">Service Category & Service Type</h3>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <p class="text-xs text-gray-500">Service Category</p>
+            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.category_name || lead.category?.name) || '—' }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">Service Type</p>
+            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.type_name || lead.type?.name) || '—' }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Part 4: Documents -->
+      <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <h3 class="mb-3 text-base font-semibold text-gray-800">
+          Documents ({{ totalDocCount }} {{ totalDocCount === 1 ? 'file' : 'files' }})
+        </h3>
+        <div v-if="totalDocCount === 0" class="text-sm text-gray-500">No documents uploaded.</div>
+        <div v-else class="space-y-3">
+          <div
+            v-for="(docs, key) in documentsByKey"
+            :key="key"
+            class="rounded border border-gray-200 bg-gray-50 p-3"
+          >
+            <p class="text-sm font-medium text-gray-800">
+              {{ truncate(docs[0]?.label || key) || key }} ({{ docs.length }} {{ docs.length === 1 ? 'file' : 'files' }})
+            </p>
+            <ul class="mt-2 space-y-1 pl-4 text-sm text-gray-600">
+              <li v-for="doc in docs" :key="doc.id">
+                {{ truncate(doc.original_name) || 'File' }}
+                <span v-if="doc.size != null" class="text-gray-500">({{ formatSize(doc.size) }})</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 pt-6">
+        <div class="flex items-center gap-3">
+          <button
+            type="button"
+            @click="goBack"
+            class="inline-flex items-center gap-2 rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-teal-600"
+          >
+            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+            Back
+          </button>
+          <span class="rounded-lg bg-[#121d2c] px-4 py-2.5 text-sm font-medium text-white shadow-sm">Step 4</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <button
+            type="button"
+            @click="close"
+            class="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-teal-600"
+          >
+            Close
+          </button>
+          <button
+            type="button"
+            @click="submit"
+            :disabled="submitting"
+            class="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-black shadow-sm disabled:opacity-50 bg-[#7ED321] hover:bg-[#6ab81e]"
+          >
+            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 12L3.269 3.126a59.768 59.768 0 0118.216-8.268 59.768 59.768 0 0118.216 8.268L18 12m-6 0h7.5" />
+            </svg>
+            <span class="text-black">{{ submitting ? 'Submitting...' : 'Submit Lead Submission' }}</span>
+          </button>
+        </div>
+      </div>
+    </template>
   </div>
 </template>

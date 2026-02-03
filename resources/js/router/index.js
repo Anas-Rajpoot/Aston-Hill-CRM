@@ -2,30 +2,18 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import AppLayout from '@/layouts/AppLayout.vue'
 import Dashboard from '@/pages/Dashboard.vue'
-import UsersPage from '@/pages/users/UsersPage.vue'
-import UserShow from '@/pages/users/UserShow.vue'
-import UserEdit from '@/pages/users/UserEdit.vue'
-import UserCreate from '@/pages/users/UserCreate.vue'
-import LeadSubmissions from '@/pages/LeadSubmissions.vue'
-import SubmissionsPage from '@/pages/submissions/SubmissionsPage.vue'
 import PlaceholderPage from '@/pages/PlaceholderPage.vue'
-import TeamHierarchyPage from '@/pages/settings/TeamHierarchyPage.vue'
-import Login from '@/pages/auth/Login.vue'
-import Register from '@/pages/auth/Register.vue'
-import ForgotPassword from '@/pages/auth/ForgotPassword.vue'
-import ResetPassword from '@/pages/auth/ResetPassword.vue'
-import TwoFactorVerify from '@/pages/auth/TwoFactorVerify.vue'
 import { useAuthStore } from '@/stores/auth'
 
+// Lazy-load heavy pages so initial HTML + JS parse stays fast (DOMContentLoaded < 3s).
 const ph = (title) => ({ component: PlaceholderPage, props: { title } })
 
-// Auth pages – no sidebar, topbar, footer
 const authRoutes = [
-  { path: '/login', name: 'login', component: Login },
-  { path: '/register', name: 'register', component: Register },
-  { path: '/forgot-password', name: 'forgot-password', component: ForgotPassword },
-  { path: '/reset-password/:token', name: 'reset-password', component: ResetPassword },
-  { path: '/2fa/verify', name: '2fa-verify', component: TwoFactorVerify },
+  { path: '/login', name: 'login', component: () => import('@/pages/auth/Login.vue') },
+  { path: '/register', name: 'register', component: () => import('@/pages/auth/Register.vue') },
+  { path: '/forgot-password', name: 'forgot-password', component: () => import('@/pages/auth/ForgotPassword.vue') },
+  { path: '/reset-password/:token', name: 'reset-password', component: () => import('@/pages/auth/ResetPassword.vue') },
+  { path: '/2fa/verify', name: '2fa-verify', component: () => import('@/pages/auth/TwoFactorVerify.vue') },
 ]
 
 const routes = [
@@ -37,12 +25,12 @@ const routes = [
     component: AppLayout,
     children: [
       { path: '', component: Dashboard, name: 'home' },
-      { path: 'submissions', component: SubmissionsPage },
-      { path: 'lead-submissions', component: LeadSubmissions },
-      { path: 'users', component: UsersPage },
-      { path: 'users/create', component: UserCreate },
-      { path: 'users/:id', component: UserShow },
-      { path: 'users/:id/edit', component: UserEdit },
+      { path: 'submissions', component: () => import('@/pages/submissions/SubmissionsPage.vue') },
+      { path: 'lead-submissions', component: () => import('@/pages/LeadSubmissions.vue') },
+      { path: 'users', component: () => import('@/pages/users/UsersPage.vue') },
+      { path: 'users/create', component: () => import('@/pages/users/UserCreate.vue') },
+      { path: 'users/:id', component: () => import('@/pages/users/UserShow.vue') },
+      { path: 'users/:id/edit', component: () => import('@/pages/users/UserEdit.vue') },
       { path: 'back-office', ...ph('Back Office') },
       { path: 'field-head', ...ph('Field Head') },
       { path: 'customer-support', ...ph('Customer Support') },
@@ -53,7 +41,7 @@ const routes = [
       { path: 'attendance-log', ...ph('Attendance Log') },
       { path: 'reports', ...ph('Reports') },
       { path: 'settings', ...ph('Settings') },
-      { path: 'settings/team-hierarchy', component: TeamHierarchyPage },
+      { path: 'settings/team-hierarchy', component: () => import('@/pages/settings/TeamHierarchyPage.vue') },
       { path: 'announcements', ...ph('Announcements') },
       { path: 'notifications', ...ph('Notifications') },
       { path: 'accounts', ...ph('Accounts') },
@@ -61,8 +49,12 @@ const routes = [
       { path: 'login-logs', ...ph('Login Logs') },
       { path: 'expenses', ...ph('Expense Tracker') },
       { path: 'personal-notes', ...ph('Personal Notes') },
-      { path: 'roles', ...ph('Roles') },
-      { path: 'permissions', ...ph('Permissions') },
+      { path: 'roles', component: () => import('@/pages/roles/RolesPage.vue') },
+      { path: 'roles/create', component: () => import('@/pages/roles/RoleCreate.vue') },
+      { path: 'roles/:role', redirect: (to) => ({ path: `/roles/${to.params.role}/permissions` }) },
+      { path: 'roles/:role/edit', component: () => import('@/pages/roles/RoleEdit.vue') },
+      { path: 'roles/:role/permissions', component: () => import('@/pages/roles/RolePermissions.vue') },
+      { path: 'permissions', component: () => import('@/pages/roles/PermissionsPage.vue') },
     ],
   },
 ]

@@ -62,8 +62,23 @@ class LeadSubmission extends Model
     }
 
     public function creator()
-    { 
-        return $this->belongsTo(User::class,'created_by'); 
+    {
+        return $this->belongsTo(User::class,'created_by');
+    }
+
+    public function manager()
+    {
+        return $this->belongsTo(User::class, 'manager_id');
+    }
+
+    public function teamLeader()
+    {
+        return $this->belongsTo(User::class, 'team_leader_id');
+    }
+
+    public function salesAgent()
+    {
+        return $this->belongsTo(User::class, 'sales_agent_id');
     }
 
     public function scopeFilter($q, array $f)

@@ -10,7 +10,7 @@ const props = defineProps({
   initialTypeId: { type: [Number, String], default: null },
 })
 
-const emit = defineEmits(['next', 'back'])
+const emit = defineEmits(['next', 'back', 'update-selection'])
 
 const router = useRouter()
 const categories = ref([])
@@ -63,8 +63,8 @@ onMounted(async () => {
     categories.value = catsRes.data || []
 
     const lead = leadRes?.data
-    const catId = props.initialCategoryId ?? lead?.service_category_id
-    const typeId = props.initialTypeId ?? lead?.service_type_id
+    const catId = props.initialCategoryId ?? lead?.service_category_id ?? null
+    const typeId = props.initialTypeId ?? lead?.service_type_id ?? null
 
     if (catId != null && catId !== '') {
       selectedCategoryId.value = String(catId)
@@ -81,9 +81,14 @@ onMounted(async () => {
 watch(selectedCategoryId, async (newId) => {
   selectedTypeId.value = ''
   serviceTypes.value = []
+  emit('update-selection', newId || null, null)
   if (newId) {
     await fetchServiceTypes(newId)
   }
+})
+
+watch(selectedTypeId, (newId) => {
+  emit('update-selection', selectedCategoryId.value || null, newId || null)
 })
 
 const fetchServiceTypes = async (categoryId) => {

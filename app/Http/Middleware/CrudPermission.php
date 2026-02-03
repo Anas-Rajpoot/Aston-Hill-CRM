@@ -39,6 +39,7 @@ class CrudPermission
             'edit'    => 'edit',
             'update'  => 'edit',
             'destroy' => 'delete',
+            'submit'  => 'create',
         ];
 
         $permAction = $map[$action] ?? null;

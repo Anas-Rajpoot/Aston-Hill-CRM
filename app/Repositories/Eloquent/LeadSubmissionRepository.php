@@ -25,6 +25,10 @@ class LeadSubmissionRepository implements LeadSubmissionRepositoryInterface
         return $leadSubmission->refresh();
     }
 
+    /**
+     * Mark lead submission as submitted in the database (uses model's table/connection).
+     * Note: LeadSubmissionController::submit() also updates the model directly to ensure persistence.
+     */
     public function submit(LeadSubmission $leadSubmission): LeadSubmission
     {
         $leadSubmission->update([

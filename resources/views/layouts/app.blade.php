@@ -59,26 +59,7 @@ function markNotificationRead(id) {
     });
 }
 </script>
-
-@if(auth()->check())
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    if (!window.Echo) return;
-
-    window.Echo.private(`App.Models.User.{{ auth()->id() }}`)
-        .notification((notification) => {
-
-            const badge = document.getElementById('notif-count');
-            if (badge) {
-                badge.style.display = 'inline-block';
-                badge.innerText = (parseInt(badge.innerText || 0) + 1);
-            }
-
-            console.log('New notification:', notification);
-        });
-});
-</script>
-@endif
+{{-- Echo/notification subscription moved to Vue (after /bootstrap) to avoid auth()->check() on every SPA document request. --}}
 
 </body>
 </html>

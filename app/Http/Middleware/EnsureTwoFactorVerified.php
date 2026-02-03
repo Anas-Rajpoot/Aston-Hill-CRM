@@ -2,14 +2,18 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\UserPermissionResolver;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnsureTwoFactorVerified
 {
+    public const SESSION_ROLES_KEY = '_user_roles';
+
     /**
      * Handle an incoming request.
+     * Superadmin bypass is cached in session so we do not run Spatie role queries on every request.
      *
      * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
      */
@@ -17,13 +21,18 @@ class EnsureTwoFactorVerified
     {
         $user = $request->user();
 
-        // Not logged in? let auth middleware handle it
-        if (!$user) {
+        if (! $user) {
             return $next($request);
         }
 
-        // Superadmin bypass 2FA (as you want)
-        if (method_exists($user, 'hasRole') && $user->hasRole('superadmin')) {
+        // Superadmin bypass 2FA: use session-cached roles so we avoid hasRole() DB hit every request.
+        $roles = $request->session()->get(self::SESSION_ROLES_KEY);
+        if ($roles === null) {
+            $resolved = UserPermissionResolver::getRolesAndPermissions((int) $user->id, $user->getMorphClass());
+            $roles = $resolved['roles'];
+            $request->session()->put(self::SESSION_ROLES_KEY, $roles);
+        }
+        if (in_array('superadmin', $roles, true)) {
             return $next($request);
         }
 

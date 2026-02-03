@@ -19,4 +19,19 @@ export default defineConfig({
             '@': path.resolve(__dirname, 'resources/js'),
         },
     },
+    build: {
+        // Fewer, larger chunks = fewer requests; browser caches them (fast repeat loads)
+        rollupOptions: {
+            output: {
+                manualChunks: (id) => {
+                    if (id.includes('node_modules')) return 'vendor';
+                },
+                chunkFileNames: 'js/[name]-[hash].js',
+                entryFileNames: 'js/[name]-[hash].js',
+                assetFileNames: 'assets/[name]-[hash][extname]',
+            },
+        },
+        chunkSizeWarningLimit: 600,
+        sourcemap: false, // Faster build; set true if you need to debug production
+    },
 });

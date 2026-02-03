@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import api from '@/services/leadSubmissionsApi'
+import api, { invalidateCurrentDraftCache } from '@/services/leadSubmissionsApi'
 import { useFormErrors } from '@/composables/useFormErrors'
 import { formatTeamLabel } from '@/composables/useTeamLabel'
 
@@ -17,9 +17,11 @@ const EMIRATES_OPTIONS = [
 
 const props = defineProps({
   leadId: { type: Number, default: null },
+  /** When true and leadId is null, do not load current draft (e.g. after "New lead submission"). */
+  skipLoadDraft: { type: Boolean, default: false },
 })
 const router = useRouter()
-const emit = defineEmits(['next'])
+const emit = defineEmits(['next', 'draft-saved'])
 
 // Draft state
 const draftId = ref(null)
@@ -219,22 +221,20 @@ onMounted(async () => {
       teamLabels.value = { ...teamLabels.value, ...teamRes.data.labels }
     }
 
-    // When wizard passes leadId (e.g. user came back from step 2/3 or refreshed with lead_id), load that lead so dropdowns show selected values
+    // When wizard passes leadId, always use that lead so we never mix two different drafts (e.g. getCurrentDraft returning another id).
     if (props.leadId) {
+      draftId.value = props.leadId
       try {
         const leadRes = await api.getLead(props.leadId)
         const lead = leadRes?.data
         if (lead) {
-          draftId.value = lead.id
           draftDate.value = lead.updated_at
           populateForm(lead, true)
         }
       } catch (_) {
-        // Fall through to current draft check
+        // Keep draftId as props.leadId; form stays empty so user can fill and save
       }
-    }
-
-    if (!draftId.value) {
+    } else if (!props.skipLoadDraft) {
       const draftRes = await api.getCurrentDraft()
       if (draftRes.data.draft) {
         const draft = draftRes.data.draft
@@ -262,6 +262,7 @@ const discardAndStartFresh = async () => {
   discarding.value = true
   try {
     await api.discardDraft(draftId.value)
+    invalidateCurrentDraftCache()
     resetForm()
   } catch (e) {
     setErrors(e)
@@ -290,6 +291,8 @@ const saveDraft = async () => {
     if (data?.id) {
       draftId.value = data.id
       draftDate.value = new Date().toISOString()
+      invalidateCurrentDraftCache()
+      emit('draft-saved', data.id)
     }
   } catch (e) {
     setErrors(e)
@@ -354,7 +357,10 @@ const submit = async () => {
       response = await api.storeStep1(form.value)
     }
     const data = response.data
-    if (data?.id) emit('next', data.id)
+    if (data?.id) {
+      invalidateCurrentDraftCache()
+      emit('next', data.id)
+    }
   } catch (e) {
     setErrors(e)
   } finally {

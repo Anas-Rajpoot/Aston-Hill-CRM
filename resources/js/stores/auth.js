@@ -1,11 +1,37 @@
 import { defineStore } from 'pinia'
 import { api, web } from '@/lib/axios'
 
+const BOOTSTRAP_CACHE_KEY = 'auth_bootstrap'
+const BOOTSTRAP_CACHE_TTL_MS = 4 * 60 * 1000 // 4 min – under server 5 min
+
+function getBootstrapFromStorage() {
+  try {
+    const raw = localStorage.getItem(BOOTSTRAP_CACHE_KEY)
+    if (!raw) return null
+    const { at, data } = JSON.parse(raw)
+    if (Date.now() - at > BOOTSTRAP_CACHE_TTL_MS) return null
+    return data
+  } catch {
+    return null
+  }
+}
+
+function setBootstrapInStorage(data) {
+  try {
+    localStorage.setItem(BOOTSTRAP_CACHE_KEY, JSON.stringify({ at: Date.now(), data }))
+  } catch {
+    //
+  }
+}
+
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null,
-    token: null, // for future token auth (separate frontend deploy)
+    token: null,
     loading: false,
+    _fetchPromise: null,
+    _lastFetchedAt: 0,
+    _meMaxAgeMs: 55 * 1000,
   }),
 
   getters: {
@@ -14,29 +40,70 @@ export const useAuthStore = defineStore('auth', {
 
   actions: {
     async fetchUser() {
+      if (this._fetchPromise) return this._fetchPromise
+      if (this.user && this._lastFetchedAt && Date.now() - this._lastFetchedAt < this._meMaxAgeMs) {
+        return
+      }
+      const promise = this._doFetchUser()
+      this._fetchPromise = promise
+      try {
+        await promise
+      } finally {
+        this._fetchPromise = null
+      }
+    },
+
+    async _doFetchUser() {
       try {
         const hasToken = sessionStorage.getItem('api_token') || localStorage.getItem('api_token')
-        if (!hasToken) {
+        const hasCsrfFromPage = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+        if (!hasToken && !hasCsrfFromPage) {
           await web.get('/sanctum/csrf-cookie')
         }
-        const { data } = await api.get('/me')
-        const rolesRaw = data.roles ?? []
-        const roles = Array.isArray(rolesRaw)
-          ? rolesRaw.map((r) => (typeof r === 'string' ? r : r?.name)).filter(Boolean)
-          : []
-        this.user = {
-          ...data,
-          roles,
+
+        const cached = getBootstrapFromStorage()
+        if (cached?.user) {
+          this.user = {
+            id: cached.user.id,
+            name: cached.user.name,
+            email: cached.user.email,
+            roles: cached.user.roles ?? [],
+            permissions: cached.permissions ?? [],
+          }
+          this._lastFetchedAt = Date.now()
         }
+
+        try {
+          const { data } = await api.get('/bootstrap')
+          const u = data.user ?? data
+          const roles = Array.isArray(u.roles) ? u.roles.map((r) => (typeof r === 'string' ? r : r?.name)).filter(Boolean) : []
+          this.user = { id: u.id, name: u.name, email: u.email, roles, permissions: data.permissions ?? [] }
+          this._lastFetchedAt = Date.now()
+          setBootstrapInStorage({ user: this.user, permissions: this.user.permissions })
+          return
+        } catch {
+          if (this.user) return
+        }
+        const { data } = await api.get('/me')
+        const roles = Array.isArray(data.roles) ? data.roles.map((r) => (typeof r === 'string' ? r : r?.name)).filter(Boolean) : []
+        this.user = { ...data, roles, permissions: [] }
+        this._lastFetchedAt = Date.now()
       } catch {
         this.user = null
+        this._lastFetchedAt = 0
+        try {
+          localStorage.removeItem(BOOTSTRAP_CACHE_KEY)
+        } catch {
+          //
+        }
       }
     },
 
     async login(credentials, options = {}) {
       this.loading = true
       try {
-        if (!options.token) {
+        const hasCsrfFromPage = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+        if (!options.token && !hasCsrfFromPage) {
           await web.get('/sanctum/csrf-cookie')
         }
         const headers = options.token ? { 'X-Request-Token': 'true' } : {}
@@ -44,7 +111,15 @@ export const useAuthStore = defineStore('auth', {
         if (data.token) {
           this.token = data.token
           sessionStorage.setItem('api_token', data.token)
-          this.user = { ...data.user, roles: data.user?.roles ?? [] }
+          this.user = { ...data.user, permissions: data.user?.permissions ?? [] }
+          this._lastFetchedAt = Date.now()
+          setBootstrapInStorage({ user: this.user, permissions: this.user.permissions })
+          return data
+        }
+        if (data.user && data.permissions) {
+          this.user = { ...data.user, permissions: data.permissions }
+          this._lastFetchedAt = Date.now()
+          setBootstrapInStorage({ user: this.user, permissions: data.permissions })
           return data
         }
         await this.fetchUser()
@@ -60,8 +135,14 @@ export const useAuthStore = defineStore('auth', {
       } finally {
         this.user = null
         this.token = null
+        this._lastFetchedAt = 0
         sessionStorage.removeItem('api_token')
         localStorage.removeItem('api_token')
+        try {
+          localStorage.removeItem(BOOTSTRAP_CACHE_KEY)
+        } catch {
+          //
+        }
       }
     },
 

@@ -37,6 +37,7 @@ class AuthenticatedSessionController extends Controller
         }
 
         $request->session()->regenerate();
+        $request->session()->forget(\App\Http\Middleware\EnsureTwoFactorVerified::SESSION_ROLES_KEY);
 
         UserLoginLog::where('user_id', auth()->id())
             ->whereNull('logout_at')

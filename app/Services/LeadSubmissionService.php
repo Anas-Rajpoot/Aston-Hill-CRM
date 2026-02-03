@@ -43,42 +43,59 @@ class LeadSubmissionService
         });
     }
 
+    /**
+     * Save documents for step 3. One document per doc_key per lead: replace existing before storing.
+     */
     public function saveStep4Documents(Request $request, LeadSubmission $leadSubmission): void
     {
-        $type = ServiceType::findOrFail($leadSubmission->service_type_id);
-        $docs = LeadSubmissionSchema::documents($type);
+        DB::transaction(function () use ($request, $leadSubmission) {
+            $type = ServiceType::findOrFail($leadSubmission->service_type_id);
+            $docs = LeadSubmissionSchema::documents($type);
 
-        foreach ($docs as $doc) {
-            $key = $doc['key'] ?? null;
-            if (!$key) continue;
+            foreach ($docs as $doc) {
+                $key = $doc['key'] ?? null;
+                if (! $key) continue;
 
-            $files = $request->file("documents.$key");
-            if (!$files) continue;
+                $files = $request->file("documents.{$key}");
+                if (! $files) continue;
 
-            $files = is_array($files) ? $files : [$files];
-            foreach ($files as $file) {
-                if ($file && $file->isValid()) {
-                    $this->storeLeadSubmissionDocument($leadSubmission, $key, $file);
-                }
-            }
-        }
-
-        // Save additional custom documents (keys like additional_*)
-        $labels = $request->input('document_labels', []);
-        $allDocInput = $request->file('documents', []) ?: [];
-        foreach ($allDocInput as $key => $files) {
-            if (str_starts_with((string) $key, 'additional_')) {
-                $title = is_array($labels) ? ($labels[$key] ?? null) : null;
-                if (is_string($title)) {
-                    $title = trim($title) ?: null;
-                }
                 $files = is_array($files) ? $files : [$files];
+                $this->deleteDocumentsByKey($leadSubmission, $key);
                 foreach ($files as $file) {
                     if ($file && $file->isValid()) {
-                        $this->storeLeadSubmissionDocument($leadSubmission, $key, $file, $title);
+                        $this->storeLeadSubmissionDocument($leadSubmission, $key, $file);
                     }
                 }
             }
+
+            $labels = $request->input('document_labels', []);
+            $allDocInput = $request->file('documents', []) ?: [];
+            foreach ($allDocInput as $key => $files) {
+                if (str_starts_with((string) $key, 'additional_')) {
+                    $this->deleteDocumentsByKey($leadSubmission, $key);
+                    $title = is_array($labels) ? ($labels[$key] ?? null) : null;
+                    if (is_string($title)) {
+                        $title = trim($title) ?: null;
+                    }
+                    $files = is_array($files) ? $files : [$files];
+                    foreach ($files as $file) {
+                        if ($file && $file->isValid()) {
+                            $this->storeLeadSubmissionDocument($leadSubmission, $key, $file, $title);
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    /** Delete all documents for this lead and doc_key (used when replacing with new upload). */
+    protected function deleteDocumentsByKey(LeadSubmission $leadSubmission, string $docKey): void
+    {
+        $existing = \App\Models\LeadSubmissionDocument::where('lead_submission_id', $leadSubmission->id)
+            ->where('doc_key', $docKey)
+            ->get();
+        foreach ($existing as $doc) {
+            $this->deleteLeadSubmissionDocument($doc);
         }
     }
 

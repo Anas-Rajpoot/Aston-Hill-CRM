@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\FieldSubmissionController;
 use App\Models\TeamRoleMapping;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Spatie\Permission\Models\Role;
 
 class TeamRoleMappingController extends Controller
@@ -55,6 +57,7 @@ class TeamRoleMappingController extends Controller
         ]);
 
         TeamRoleMapping::updateMappings($data);
+        Cache::forget(FieldSubmissionController::CACHE_KEY_TEAM_OPTIONS);
 
         return response()->json(['message' => 'Team hierarchy roles updated.']);
     }

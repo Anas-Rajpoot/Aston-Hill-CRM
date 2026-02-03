@@ -10,9 +10,12 @@ use App\Models\LeadSubmissionDocument;
 use App\Services\LeadSubmissionService;
 use App\Support\LeadSubmissionSchema;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Yajra\DataTables\Facades\DataTables;
 use App\Http\Resources\LeadSubmissionResource;
+use App\Http\Resources\LeadSubmissionShowResource;
 
 class LeadSubmissionController extends Controller
 {
@@ -186,8 +189,17 @@ class LeadSubmissionController extends Controller
                 $data[$key] = null;
             }
         }
+        $payload = array_intersect_key($data, array_flip([
+            'account_number', 'company_name', 'authorized_signatory_name', 'contact_number_gsm',
+            'alternate_contact_number', 'email', 'address', 'emirate', 'location_coordinates',
+            'product', 'offer', 'mrc_aed', 'quantity', 'ae_domain', 'gaid',
+            'manager_id', 'team_leader_id', 'sales_agent_id', 'remarks', 'request_type',
+        ]));
+        $data['payload'] = $payload;
+        $data['step'] = 1;
 
         $leadSubmission = $this->leadSubmissionService->createDraftFromStep1($data, $request->user()->id);
+        self::forgetCurrentDraftCache((int) $request->user()->id);
 
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
@@ -198,21 +210,51 @@ class LeadSubmissionController extends Controller
 
     }
 
+    private const CURRENT_DRAFT_CACHE_TTL = 120; // 2 min
+
+    private static function currentDraftCacheKey(int $userId): string
+    {
+        return 'lead_submissions_current_draft_'.$userId;
+    }
+
     /**
-     * Get the current user's latest draft (for auto-resume).
+     * Get the current user's latest draft (for auto-resume on wizard load).
+     * Cached per user 2 min to avoid repeated heavy queries; invalidated on create/update/discard.
      */
     public function currentDraft(Request $request)
     {
-        $draft = LeadSubmission::where('created_by', $request->user()->id)
-            ->where('status', 'draft')
-            ->orderBy('updated_at', 'desc')
-            ->first();
+        $userId = (int) $request->user()->id;
+        $cacheKey = self::currentDraftCacheKey($userId);
 
-        if (!$draft) {
-            return response()->json(['draft' => null]);
-        }
+        $payload = Cache::remember($cacheKey, self::CURRENT_DRAFT_CACHE_TTL, function () use ($userId) {
+            $draft = LeadSubmission::where('created_by', $userId)
+                ->where('status', 'draft')
+                ->with([
+                    'category:id,name',
+                    'type:id,name,schema',
+                    'documents',
+                    'creator:id,name',
+                    'manager:id,name',
+                    'teamLeader:id,name',
+                    'salesAgent:id,name',
+                ])
+                ->orderBy('updated_at', 'desc')
+                ->first();
 
-        return response()->json(['draft' => $draft]);
+            if (! $draft) {
+                return ['draft' => null];
+            }
+
+            return ['draft' => (new LeadSubmissionShowResource($draft))->resolve()];
+        });
+
+        return response()->json($payload)->header('Cache-Control', 'private, max-age=120');
+    }
+
+    /** Invalidate current-draft cache for user (call after create/update/discard). */
+    public static function forgetCurrentDraftCache(int $userId): void
+    {
+        Cache::forget(self::currentDraftCacheKey($userId));
     }
 
     /**
@@ -275,8 +317,18 @@ class LeadSubmissionController extends Controller
             }
         }
         $data['updated_by'] = $request->user()->id;
+        $payloadKeys = [
+            'account_number', 'company_name', 'authorized_signatory_name', 'contact_number_gsm',
+            'alternate_contact_number', 'email', 'address', 'emirate', 'location_coordinates',
+            'product', 'offer', 'mrc_aed', 'quantity', 'ae_domain', 'gaid',
+            'manager_id', 'team_leader_id', 'sales_agent_id', 'remarks', 'request_type',
+        ];
+        $payload = array_merge($lead->payload ?? [], array_intersect_key($data, array_flip($payloadKeys)));
+        $data['payload'] = $payload;
+        $data['step'] = 1;
 
         $lead->update($data);
+        self::forgetCurrentDraftCache((int) $request->user()->id);
 
         return response()->json([
             'id' => $lead->id,
@@ -298,6 +350,7 @@ class LeadSubmissionController extends Controller
         }
 
         $lead->delete();
+        self::forgetCurrentDraftCache((int) $request->user()->id);
 
         return response()->json(['message' => 'Draft discarded.']);
     }
@@ -332,8 +385,15 @@ class LeadSubmissionController extends Controller
             return response()->json(['message' => 'Service type does not belong to the selected category.'], 422);
         }
 
+        $category = ServiceCategory::find($categoryId);
         $lead->service_category_id = $categoryId;
         $lead->service_type_id = $typeId;
+        $payload = array_merge($lead->payload ?? [], [
+            'category_name' => $category?->name,
+            'type_name' => $type->name,
+        ]);
+        $lead->payload = $payload;
+        $lead->step = 2;
         $lead->save();
 
         if ($request->expectsJson() || $request->ajax()) {
@@ -469,8 +529,15 @@ class LeadSubmissionController extends Controller
             return back()->withErrors(['documents' => 'Total upload size must not exceed 10MB.']);
         }
 
-        // Save documents in public/leads/{leadId}/...
+        // Save documents in public/leads/{leadId}/... (replace-by-doc_key: one doc per type per lead)
         $this->leadSubmissionService->saveStep4Documents($request, $lead);
+
+        // Persist wizard step: step_after=4 when user clicked Next (to review), 3 when Save as Draft
+        $lead->step = (int) $request->input('step_after', $request->input('action') === 'submit' ? 4 : 3);
+        if ($lead->step < 1 || $lead->step > 4) {
+            $lead->step = $request->input('action') === 'submit' ? 4 : 3;
+        }
+        $lead->save();
 
         // If submit action: enforce required docs exist (in DB or in request)
         if ($request->input('action') === 'submit') {
@@ -501,35 +568,40 @@ if ($request->expectsJson() || $request->ajax()) {
         return back()->with('success', 'Documents saved.');
     }
 
-    /** SHOW (JSON for SPA) */
-    public function show(Request $request, LeadSubmission $leadSubmission)
+    /**
+     * SHOW (JSON for SPA).
+     * Fetch lead by ID from database (query by id, no route model binding for JSON).
+     * Returns lead + step + service + documents for wizard and review.
+     */
+    public function show(Request $request, $lead)
     {
+        $id = (int) $lead;
+        if ($id < 1) {
+            return response()->json(['message' => 'Lead submission not found.'], 404);
+        }
+
+        $leadSubmission = LeadSubmission::with([
+            'category:id,name',
+            'type:id,name,schema',
+            'documents',
+            'creator:id,name',
+            'manager:id,name',
+            'teamLeader:id,name',
+            'salesAgent:id,name',
+        ])->find($id);
+
+        if (! $leadSubmission) {
+            return response()->json(['message' => 'Lead submission not found.'], 404);
+        }
+
         $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
 
         if ($request->expectsJson() || $request->ajax()) {
-            $leadSubmission->load(['category:id,name', 'type:id,name,schema', 'documents']);
-            $type = $leadSubmission->type;
-            $docDefs = $type ? LeadSubmissionSchema::documents($type) : [];
-            $labelsByKey = collect($docDefs)->pluck('label', 'key')->all();
-            $documentsWithLabels = $leadSubmission->documents->map(function ($doc) use ($labelsByKey) {
-                return [
-                    'id' => $doc->id,
-                    'doc_key' => $doc->doc_key,
-                    'label' => $doc->label ?? $labelsByKey[$doc->doc_key] ?? $doc->doc_key,
-                    'path' => $doc->file_path,
-                    'original_name' => $doc->file_name,
-                    'mime' => $doc->mime,
-                    'size' => $doc->size,
-                ];
-            });
-            $data = $leadSubmission->toArray();
-            $data['documents'] = $documentsWithLabels->all();
-            return response()->json($data);
+            return response()->json((new LeadSubmissionShowResource($leadSubmission))->resolve());
         }
 
         $leadSubmission->load(['creator:id,name,email','category:id,name','type:id,name']);
         $docs = LeadSubmissionDocument::where('lead_submission_id', $leadSubmission->id)->get();
-
         $type = $leadSubmission->type;
         $fields = $type ? LeadSubmissionSchema::fields($type) : [];
 
@@ -758,20 +830,25 @@ if ($request->expectsJson() || $request->ajax()) {
         return $missing;
     }
 
-    public function submit(LeadSubmission $leadSubmission)
+    public function submit($lead)
     {
+        $leadSubmission = LeadSubmission::findOrFail($lead);
         $this->authorize('submit', $leadSubmission);
 
-        $leadSubmission->submit();
+        // UPDATE existing row only (avoid INSERT / created_by error)
+        $leadSubmission->update([
+            'status' => 'submitted',
+            'submitted_at' => now(),
+        ]);
 
-        // Notification
-        Notification::send(
-            User::role('superadmin')->get(),
-            new LeadSubmittedNotification($leadSubmission)
-        );
+        if (request()->expectsJson() || request()->ajax()) {
+            return response()->json([
+                'message' => 'Lead submission submitted successfully.',
+            ], 200);
+        }
 
         return redirect()->route('lead-submissions.index')
-            ->with('success','Lead submission submitted successfully');
+            ->with('success', 'Lead submission submitted successfully');
     }
 
 }

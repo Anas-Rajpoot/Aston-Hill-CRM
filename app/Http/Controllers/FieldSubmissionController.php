@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\FieldSubmissionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class FieldSubmissionController extends Controller
@@ -60,65 +61,73 @@ class FieldSubmissionController extends Controller
         ], 201);
     }
 
+    /** Cache key for team options; invalidate when super admin updates team role mappings. */
+    public const CACHE_KEY_TEAM_OPTIONS = 'field_submissions_team_options';
+    private const TTL_TEAM_OPTIONS = 300; // 5 min
+
     /**
      * Return users for Manager, Team Leader, Sales Agent dropdowns.
-     * Uses dynamic team_role_mappings – super admin can change role names/assignments without effect.
+     * Cached 5 min to avoid repeated Spatie User::role() queries; invalidate on mapping change.
      */
     public function teamOptions(Request $request): JsonResponse
     {
-        $formatUsers = function ($users, bool $includeHierarchy = false) {
-            return $users->map(fn (User $user) => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'label' => $user->name . ' (' . $user->email . ')',
-                ...($includeHierarchy ? [
-                    'manager_id' => $user->manager_id ?? $user->teamLeader?->manager_id ?? null,
-                    'team_leader_id' => $user->team_leader_id ?? null,
-                ] : []),
-            ])->values()->all();
-        };
+        $data = Cache::remember(self::CACHE_KEY_TEAM_OPTIONS, self::TTL_TEAM_OPTIONS, function () {
+            $formatUsers = function ($users, bool $includeHierarchy = false) {
+                return $users->map(fn (User $user) => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'label' => $user->name . ' (' . $user->email . ')',
+                    ...($includeHierarchy ? [
+                        'manager_id' => $user->manager_id ?? $user->teamLeader?->manager_id ?? null,
+                        'team_leader_id' => $user->team_leader_id ?? null,
+                    ] : []),
+                ])->values()->all();
+            };
 
-        // Get role_ids from DB; fallback to config (role names) if no mappings yet
-        $mappings = $this->resolveTeamRoleMappings();
+            $mappings = $this->resolveTeamRoleMappings();
+            $managers = collect();
+            $teamLeaders = collect();
+            $salesAgents = collect();
+            $labels = ['manager' => 'Manager', 'team_leader' => 'Team Leader', 'sales_agent' => 'Sales Agent'];
 
-        $managers = collect();
-        $teamLeaders = collect();
-        $salesAgents = collect();
-        $labels = ['manager' => 'Manager', 'team_leader' => 'Team Leader', 'sales_agent' => 'Sales Agent'];
-
-        foreach (['manager', 'team_leader', 'sales_agent'] as $slotKey) {
-            $roleId = $mappings[$slotKey]['role_id'] ?? null;
-            if (!$roleId) {
-                continue;
-            }
-            try {
-                $role = \Spatie\Permission\Models\Role::find($roleId);
-                if (!$role) continue;
-                $users = User::role($role)->with(['teamLeader:id,manager_id', 'manager:id'])
-                    ->orderBy('name')
-                    ->get(['id', 'name', 'email', 'manager_id', 'team_leader_id']);
-
-                $labels[$slotKey] = $mappings[$slotKey]['label'] ?? ucfirst(str_replace('_', ' ', $slotKey));
-
-                if ($slotKey === 'manager') {
-                    $managers = $users;
-                } elseif ($slotKey === 'team_leader') {
-                    $teamLeaders = $users;
-                } elseif ($slotKey === 'sales_agent') {
-                    $salesAgents = $users;
+            foreach (['manager', 'team_leader', 'sales_agent'] as $slotKey) {
+                $roleId = $mappings[$slotKey]['role_id'] ?? null;
+                if (! $roleId) {
+                    continue;
                 }
-            } catch (\Throwable $e) {
-                Log::debug("Team role slot '{$slotKey}' role_id {$roleId} error: " . $e->getMessage());
-            }
-        }
+                try {
+                    $role = \Spatie\Permission\Models\Role::find($roleId);
+                    if (! $role) {
+                        continue;
+                    }
+                    $users = User::role($role)->with(['teamLeader:id,manager_id', 'manager:id'])
+                        ->orderBy('name')
+                        ->get(['id', 'name', 'email', 'manager_id', 'team_leader_id']);
 
-        return response()->json([
-            'managers' => $formatUsers($managers, true),
-            'team_leaders' => $formatUsers($teamLeaders, true),
-            'sales_agents' => $formatUsers($salesAgents, true),
-            'labels' => $labels,
-        ]);
+                    $labels[$slotKey] = $mappings[$slotKey]['label'] ?? ucfirst(str_replace('_', ' ', $slotKey));
+
+                    if ($slotKey === 'manager') {
+                        $managers = $users;
+                    } elseif ($slotKey === 'team_leader') {
+                        $teamLeaders = $users;
+                    } else {
+                        $salesAgents = $users;
+                    }
+                } catch (\Throwable $e) {
+                    Log::debug("Team role slot '{$slotKey}' role_id {$roleId} error: " . $e->getMessage());
+                }
+            }
+
+            return [
+                'managers' => $formatUsers($managers, true),
+                'team_leaders' => $formatUsers($teamLeaders, true),
+                'sales_agents' => $formatUsers($salesAgents, true),
+                'labels' => $labels,
+            ];
+        });
+
+        return response()->json($data)->header('Cache-Control', 'private, max-age=300');
     }
 
     /**

@@ -17,12 +17,7 @@ use App\Http\Controllers\NotificationController;
 // Sanctum CSRF cookie (required for session-based SPA auth)
 Route::get('/sanctum/csrf-cookie', [\Laravel\Sanctum\Http\Controllers\CsrfCookieController::class, 'show']);
 
-// Serve Vue SPA for root (Vue router handles auth and redirects guests to /login)
-Route::get('/', fn () => view('layouts.app'));
-
-// Serve Vue SPA for dashboard (Vue handles the UI)
-Route::get('/dashboard', fn () => view('layouts.app'))
-    ->middleware(['auth', 'verified', 'approved', '2fa_or_superadmin'])->name('dashboard');
+// SPA document routes (/, /dashboard, /submissions, etc.) are in routes/spa.php with spa_shell middleware only.
 
 Route::get('super-admin/dashboard', function () {
     return view('dashboard');
@@ -30,55 +25,12 @@ Route::get('super-admin/dashboard', function () {
 
 Route::middleware(['auth', 'verified', 'approved', '2fa_or_superadmin'])->group(function () {
 
-    // Vue SPA routes – serve layouts.app so #app exists (Vue Router handles the rest)
-    Route::get('/users', fn () => view('layouts.app'));
-    Route::get('/users/create', fn () => view('layouts.app'));
-    Route::get('/users/{user}', fn () => view('layouts.app'))->whereNumber('user');
-    Route::get('/users/{user}/edit', fn () => view('layouts.app'))->whereNumber('user');
-    Route::get('/submissions', fn () => view('layouts.app'));
-    Route::get('/lead-submissions', fn () => view('layouts.app'));
-    Route::get('/announcements', fn () => view('layouts.app'));
-    Route::get('/announcements/create', fn () => view('layouts.app'));
-    Route::get('/announcements/{announcement}', fn () => view('layouts.app'));
-    Route::get('/announcements/{announcement}/edit', fn () => view('layouts.app'));
-    Route::get('/notifications', fn () => view('layouts.app'));
-    Route::get('/accounts', fn () => view('layouts.app'));
-    Route::get('/accounts/create', fn () => view('layouts.app'));
-    Route::get('/accounts/{account}', fn () => view('layouts.app'));
-    Route::get('/accounts/{account}/edit', fn () => view('layouts.app'));
-    Route::get('/expenses', fn () => view('layouts.app'));
-    Route::get('/expenses/create', fn () => view('layouts.app'));
-    Route::get('/expenses/{expense}', fn () => view('layouts.app'));
-    Route::get('/expenses/{expense}/edit', fn () => view('layouts.app'));
-    Route::get('/personal-notes', fn () => view('layouts.app'));
-    Route::get('/personal-notes/create', fn () => view('layouts.app'));
-    Route::get('/personal-notes/{personal_note}', fn () => view('layouts.app'));
-    Route::get('/personal-notes/{personal_note}/edit', fn () => view('layouts.app'));
-    Route::get('/email-followups', fn () => view('layouts.app'));
-    Route::get('/email-followups/create', fn () => view('layouts.app'));
-    Route::get('/email-followups/{email_followup}', fn () => view('layouts.app'));
-    Route::get('/email-followups/{email_followup}/edit', fn () => view('layouts.app'));
-    Route::get('/login-logs', fn () => view('layouts.app'));
-    Route::get('/login-logs/timeline/{user}', fn () => view('layouts.app'));
-    Route::get('/back-office', fn () => view('layouts.app'));
-    Route::get('/field-head', fn () => view('layouts.app'));
-    Route::get('/customer-support', fn () => view('layouts.app'));
-    Route::get('/vas-requests', fn () => view('layouts.app'));
-    Route::get('/clients', fn () => view('layouts.app'));
-    Route::get('/gsm-tracker', fn () => view('layouts.app'));
-    Route::get('/employees', fn () => view('layouts.app'));
-    Route::get('/attendance-log', fn () => view('layouts.app'));
-    Route::get('/reports', fn () => view('layouts.app'));
-    Route::get('/settings', fn () => view('layouts.app'));
-    Route::get('/settings/team-hierarchy', fn () => view('layouts.app'));
-
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     Route::resource('accounts', AccountController::class)->middleware('crud_permission:accounts');
 
-    Route::get('login-logs', [LoginLogController::class, 'index'])->name('login-logs.index');
     Route::get('login-logs/datatable', [LoginLogController::class, 'datatable'])->name('login-logs.datatable');
 
     Route::get('login-logs/export/csv', [LoginLogController::class, 'exportCsv'])->name('login-logs.export.csv');
@@ -176,21 +128,7 @@ Route::middleware(['auth', 'verified', 'approved', '2fa_or_superadmin'])->group(
 
 Route::middleware(['auth','role:superadmin'])->prefix('super-admin')->name('super-admin.')->group(function () {
 
-    // Vue SPA routes for super-admin
-    Route::get('/roles', fn () => view('layouts.app'));
-    Route::get('/roles/create', fn () => view('layouts.app'));
-    Route::get('/roles/{role}', fn () => view('layouts.app'));
-    Route::get('/roles/{role}/edit', fn () => view('layouts.app'));
-    Route::get('/roles/{role}/permissions', fn () => view('layouts.app'));
-    Route::get('/permissions', fn () => view('layouts.app'));
-    Route::get('/permissions/create', fn () => view('layouts.app'));
-    Route::get('/permissions/{permission}', fn () => view('layouts.app'));
-    Route::get('/permissions/{permission}/edit', fn () => view('layouts.app'));
-
-    // User edit/approval – handled via API PUT /users/{user}
-
-    // Route::post('/admin/users/{user}/approve', [UserController::class, 'update'])
-    //     ->name('admin.users.update');
+    // SPA document routes for super-admin (e.g. /super-admin/roles) are in routes/spa.php.
 
     Route::resource('roles', RoleController::class);
     Route::get('roles/{role}/permissions', [RoleController::class, 'editPermissions'])->name('roles.permissions.edit');
@@ -201,14 +139,11 @@ Route::middleware(['auth','role:superadmin'])->prefix('super-admin')->name('supe
     Route::resource('permissions', PermissionController::class);
 });
 
-// 2FA routes
+// 2FA routes (GET /2fa/verify SPA shell is in routes/spa.php)
 Route::middleware(['auth'])->group(function () {
     Route::get('/2fa/setup', [TwoFactorController::class, 'setup'])->name('2fa.setup');
     Route::post('/2fa/enable', [TwoFactorController::class, 'enable'])->name('2fa.enable');
     Route::post('/2fa/disable', [TwoFactorController::class, 'disable'])->name('2fa.disable');
-
-    // Serve Vue SPA for 2FA verify page
-    Route::get('/2fa/verify', fn () => view('layouts.app'))->name('2fa.verify.form');
     Route::post('/2fa/verify', [TwoFactorController::class, 'verify'])->name('2fa.verify')->middleware('throttle:5,1');
 });
 

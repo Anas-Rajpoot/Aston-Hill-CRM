@@ -1,11 +1,43 @@
 import api from '@/lib/axios'
 
+const TEAM_OPTIONS_TTL_MS = 2 * 60 * 1000  // 2 min
+const CURRENT_DRAFT_TTL_MS = 60 * 1000    // 1 min
+
+let _teamOptionsPromise = null
+let _teamOptionsAt = 0
+let _currentDraftPromise = null
+let _currentDraftAt = 0
+
+function getTeamOptionsCached() {
+  if (_teamOptionsPromise && Date.now() - _teamOptionsAt < TEAM_OPTIONS_TTL_MS) {
+    return _teamOptionsPromise
+  }
+  _teamOptionsAt = Date.now()
+  _teamOptionsPromise = api.get('/field-submissions/team-options')
+  return _teamOptionsPromise
+}
+
+function getCurrentDraftCached() {
+  if (_currentDraftPromise && Date.now() - _currentDraftAt < CURRENT_DRAFT_TTL_MS) {
+    return _currentDraftPromise
+  }
+  _currentDraftAt = Date.now()
+  _currentDraftPromise = api.get('/lead-submissions/current-draft')
+  return _currentDraftPromise
+}
+
+/** Call after creating/updating/discarding a draft so next getCurrentDraft fetches fresh. */
+export function invalidateCurrentDraftCache() {
+  _currentDraftPromise = null
+  _currentDraftAt = 0
+}
+
 export default {
   getTeamOptions() {
-    return api.get('/field-submissions/team-options')
+    return getTeamOptionsCached()
   },
   getCurrentDraft() {
-    return api.get('/lead-submissions/current-draft')
+    return getCurrentDraftCached()
   },
   storeStep1(data, draft = false) {
     return api.post('/lead-submissions/step-1', { ...data, draft })

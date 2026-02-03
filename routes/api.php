@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\MeController;
 use App\Http\Controllers\ColumnPreferenceController;
 use App\Http\Controllers\DataTableController;
 use App\Http\Controllers\ExpenseController;
@@ -14,6 +15,7 @@ use App\Http\Controllers\PersonalNoteController;
 use App\Http\Controllers\EmailFollowUpController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\SuperAdmin\TeamRoleMappingController;
+use App\Http\Controllers\Api\SuperAdmin\RoleApiController;
 use App\Http\Controllers\Api\UserController;
 use App\Models\Country;
 use Illuminate\Http\Request;
@@ -37,7 +39,8 @@ Route::post('/auth/login', [AuthController::class, 'login'])->middleware('web');
 // ----- Protected (auth:sanctum = session OR token) – web middleware for session auth -----
 Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_superadmin'])->group(function () {
 
-    Route::get('/me', fn (Request $request) => $request->user()->load('roles'));
+    Route::get('/me', MeController::class);
+    Route::get('/bootstrap', \App\Http\Controllers\Api\BootstrapController::class);
 
     // Field submissions
     Route::get('/field-submissions/team-options', [FieldSubmissionController::class, 'teamOptions']);
@@ -104,4 +107,10 @@ Route::middleware(['web', 'auth:sanctum'])->group(function () {
 Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_superadmin', 'role:superadmin'])->prefix('super-admin')->group(function () {
     Route::get('/team-role-mappings', [TeamRoleMappingController::class, 'index']);
     Route::put('/team-role-mappings', [TeamRoleMappingController::class, 'update']);
+
+    Route::get('/permissions/structure', [RoleApiController::class, 'permissionsStructure']);
+    Route::get('/roles/{role}/permissions-page', [RoleApiController::class, 'permissionsPageData']);
+    Route::get('/roles/{role}/permissions', [RoleApiController::class, 'rolePermissions']);
+    Route::put('/roles/{role}/permissions', [RoleApiController::class, 'updateRolePermissions']);
+    Route::apiResource('roles', RoleApiController::class);
 });

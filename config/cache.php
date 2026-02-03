@@ -15,7 +15,8 @@ return [
     |
     */
 
-    'default' => env('CACHE_STORE', 'database'),
+    // Use 'file' for local by default (faster than database); set CACHE_STORE in .env to override
+    'default' => env('CACHE_STORE', env('APP_ENV', 'production') === 'local' ? 'file' : 'database'),
 
     /*
     |--------------------------------------------------------------------------

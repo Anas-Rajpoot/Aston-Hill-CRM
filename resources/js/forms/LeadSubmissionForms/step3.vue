@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import api from '@/services/leadSubmissionsApi'
 import { useFormErrors } from '@/composables/useFormErrors'
 
@@ -7,7 +7,7 @@ const props = defineProps({
   leadId: { type: Number, required: true },
 })
 
-const emit = defineEmits(['back', 'submitted'])
+const emit = defineEmits(['back', 'next', 'submitted'])
 
 const docDefs = ref([])
 const existingDocs = ref([])
@@ -15,9 +15,7 @@ const files = ref({}) // { key: File[] }
 const loading = ref(true)
 const saving = ref(false)
 const submitting = ref(false)
-const additionalDocs = ref([]) // [{ key, label, files: File[] }]
-/** Public URL for submit icon (in public/images/) – use bound :src so Vite does not try to import */
-const submitRequestIconUrl = '/images/submit-request-icon.png'
+const additionalDocs = ref([]) // [{ key, label, files: File[], existingItems?: [{ id, original_name }] }]
 
 const { errors, generalMessage, setErrors, clearErrors, clearFieldError, getError } = useFormErrors()
 
@@ -42,16 +40,21 @@ const DEFAULT_DOCUMENTS = [
   { key: 'etisatis_bill', label: 'Etisatis Bill', required: false },
 ]
 
-const requiredCount = computed(() => docDefs.value.filter((d) => d.required).length)
-const uploadedRequiredCount = computed(() => {
-  const uploaded = new Set()
-  docDefs.value.forEach((d) => {
-    if (!d.required) return
-    const hasExisting = existingDocs.value.some((ed) => ed.doc_key === d.key)
-    const hasNew = files.value[d.key]?.length > 0
-    if (hasExisting || hasNew) uploaded.add(d.key)
-  })
-  return uploaded.size
+/** Total number of documents uploaded (existing schema docs + new schema files + additional docs). */
+const uploadedDocCount = computed(() => {
+  const schemaExisting = existingDocs.value.filter((d) => !String(d.doc_key || '').startsWith('additional_')).length
+  const newSchema = Object.values(files.value).flat().filter(Boolean).length
+  const additionalCount = additionalDocs.value.reduce((sum, ad) => {
+    const existing = (ad.existingItems || []).length
+    const newFiles = ad.files?.length || 0
+    return sum + existing + newFiles
+  }, 0)
+  return schemaExisting + newSchema + additionalCount
+})
+
+const uploadedStatusText = computed(() => {
+  const n = uploadedDocCount.value
+  return n === 1 ? '1 document is uploaded' : `${n} documents are uploaded`
 })
 const totalSizeBytes = computed(() => {
   let total = existingDocs.value.reduce((s, d) => s + (d.size || 0), 0)
@@ -78,12 +81,13 @@ const validateFile = (file, docKey) => {
   return null
 }
 
-onMounted(async () => {
+async function loadData() {
   loading.value = true
   try {
     const leadRes = await api.getLead(props.leadId)
     const lead = leadRes?.data
-    existingDocs.value = lead?.documents || []
+    const docs = Array.isArray(lead?.documents) ? lead.documents : []
+    existingDocs.value = docs
     const typeId = lead?.service_type_id
     if (typeId) {
       try {
@@ -102,12 +106,35 @@ onMounted(async () => {
     docDefs.value.forEach((d) => {
       if (d.key && !(d.key in files.value)) files.value[d.key] = []
     })
+    // Populate additionalDocs from saved additional documents (when returning from Step 4)
+    const additionalByKey = {}
+    docs.forEach((d) => {
+      const key = d.doc_key || ''
+      if (key.startsWith('additional_')) {
+        if (!additionalByKey[key]) {
+          additionalByKey[key] = { key, label: d.label || 'Additional Document', files: [], existingItems: [] }
+        }
+        additionalByKey[key].existingItems.push({ id: d.id, original_name: d.original_name })
+      }
+    })
+    additionalDocs.value = Object.values(additionalByKey)
   } catch (e) {
     setErrors(e)
   } finally {
     loading.value = false
   }
+}
+
+onMounted(() => {
+  loadData()
 })
+
+watch(
+  () => props.leadId,
+  (newId, oldId) => {
+    if (newId && newId !== oldId) loadData()
+  }
+)
 
 const onFileChange = (key, e) => {
   const selected = Array.from(e.target?.files || [])
@@ -174,6 +201,17 @@ const removeAdditionalDoc = (idx) => {
 const getDocFiles = (key) => files.value[key] || []
 const getExistingForKey = (key) => existingDocs.value.filter((d) => d.doc_key === key)
 
+/** Truncate long filenames so they don't overlap the document type label (max 28 chars). */
+function truncateFileName(name, maxLen = 28) {
+  if (!name || typeof name !== 'string') return ''
+  const t = name.trim()
+  if (t.length <= maxLen) return t
+  const ext = (t.match(/\.[a-zA-Z0-9]+$/)?.[0] || '').slice(0, 6)
+  const base = t.slice(0, t.length - ext.length)
+  if (base.length + ext.length <= maxLen) return t
+  return base.slice(0, Math.max(0, maxLen - ext.length - 3)) + '...' + ext
+}
+
 const buildFormData = () => {
   const fd = new FormData()
   Object.entries(files.value).forEach(([key, arr]) => {
@@ -224,11 +262,13 @@ const saveDraft = async () => {
   }
   const fd = buildFormData()
   fd.append('action', 'save')
+  fd.append('step_after', '3')
   saving.value = true
   try {
     await api.storeStep3(props.leadId, fd)
-    const { data: lead } = await api.getLead(props.leadId)
-    existingDocs.value = lead?.documents || []
+    const res = await api.getLead(props.leadId)
+    const lead = res?.data?.data ?? res?.data
+    existingDocs.value = Array.isArray(lead?.documents) ? lead.documents : []
     Object.keys(files.value).forEach((k) => (files.value[k] = []))
   } catch (e) {
     setErrors(e)
@@ -237,7 +277,7 @@ const saveDraft = async () => {
   }
 }
 
-const submit = async () => {
+const goNext = async () => {
   clearErrors()
   const frontendErr = validateBeforeSubmit()
   if (frontendErr) {
@@ -246,11 +286,16 @@ const submit = async () => {
     return
   }
   const fd = buildFormData()
-  fd.append('action', 'submit')
+  fd.append('action', 'save')
+  fd.append('step_after', '4')
   submitting.value = true
   try {
     await api.storeStep3(props.leadId, fd)
-    emit('submitted')
+    const res = await api.getLead(props.leadId)
+    const updatedLead = res?.data
+    existingDocs.value = Array.isArray(updatedLead?.documents) ? updatedLead.documents : []
+    Object.keys(files.value).forEach((k) => (files.value[k] = []))
+    emit('next')
   } catch (e) {
     setErrors(e)
   } finally {
@@ -286,7 +331,7 @@ const cancel = () => window.history.back()
         <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
       </svg>
       <p class="text-sm font-medium text-sky-800">
-        {{ uploadedRequiredCount }} of {{ requiredCount }} required documents uploaded
+        {{ uploadedStatusText }}
       </p>
     </div>
 
@@ -303,28 +348,28 @@ const cancel = () => window.history.back()
       <div
         v-for="doc in docDefs"
         :key="doc.key"
-        class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm flex items-center justify-between gap-3"
+        class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
       >
-        <div class="flex items-center gap-3 min-w-0 flex-1">
+        <div class="flex items-start gap-3 min-w-0 flex-1">
           <div class="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
             <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>
-          <div class="min-w-0">
+          <div class="min-w-0 flex-1">
             <p class="font-semibold text-gray-900 text-sm">{{ doc.label }}</p>
+            <div v-if="getDocFiles(doc.key).length || getExistingForKey(doc.key).length" class="mt-1 flex flex-col gap-0.5">
+              <template v-for="(f, idx) in getDocFiles(doc.key)" :key="'new-' + idx">
+                <span class="text-xs text-gray-600 truncate max-w-full" :title="f.name">{{ truncateFileName(f.name) }}</span>
+              </template>
+              <template v-for="ed in getExistingForKey(doc.key)" :key="'ex-' + ed.id">
+                <span class="text-xs text-gray-600 truncate max-w-full" :title="ed.original_name">{{ truncateFileName(ed.original_name) }}</span>
+              </template>
+            </div>
             <p v-if="getError(`documents.${doc.key}`)" class="text-red-600 text-xs mt-1">{{ getError(`documents.${doc.key}`) }}</p>
           </div>
         </div>
-        <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-          <div v-if="getDocFiles(doc.key).length || getExistingForKey(doc.key).length" class="flex flex-col items-end gap-0.5 max-w-[180px] min-w-0">
-            <template v-for="(f, idx) in getDocFiles(doc.key)" :key="'new-' + idx">
-              <span class="text-xs text-gray-700 truncate max-w-full" :title="f.name">{{ f.name }}</span>
-            </template>
-            <template v-for="ed in getExistingForKey(doc.key)" :key="'ex-' + ed.id">
-              <span class="text-xs text-gray-700 truncate max-w-full" :title="ed.original_name">{{ ed.original_name }}</span>
-            </template>
-          </div>
+        <div class="flex items-center gap-2 shrink-0">
           <label class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-sky-400 bg-white text-sky-600 text-sm font-medium cursor-pointer hover:bg-sky-50 shrink-0">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -369,11 +414,18 @@ const cancel = () => window.history.back()
           <div class="min-w-0 flex-1 flex flex-col gap-0.5">
             <input v-model="ad.label" type="text" :placeholder="`Additional Document ${idx + 1}`" class="w-full rounded-lg border px-3 py-2 text-sm font-semibold text-gray-900" :class="getError(`additional_docs.${ad.key}`) ? 'border-red-500' : 'border-gray-300'" @input="clearFieldError(`additional_docs.${ad.key}`)" />
             <p v-if="getError(`additional_docs.${ad.key}`)" class="text-red-600 text-xs">{{ getError(`additional_docs.${ad.key}`) }}</p>
+            <!-- Show existing uploaded files (when returning from Step 4) -->
+            <div v-if="(ad.existingItems?.length || 0) > 0 && !ad.files?.length" class="mt-1 flex flex-col gap-0.5">
+              <span v-for="item in (ad.existingItems || [])" :key="item.id" class="text-xs text-gray-700 truncate max-w-full" :title="item.original_name">{{ item.original_name }}</span>
+            </div>
           </div>
           <!-- Upload + Remove on the right, same row -->
           <div class="flex items-center gap-2 shrink-0 flex-nowrap">
             <div v-if="ad.files?.length" class="w-6 h-6 rounded-full bg-blue-500 text-white text-xs font-bold flex items-center justify-center">
               {{ ad.files.length }}
+            </div>
+            <div v-else-if="ad.existingItems?.length" class="w-6 h-6 rounded-full bg-gray-400 text-white text-xs font-bold flex items-center justify-center">
+              {{ ad.existingItems.length }}
             </div>
             <label class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-sky-400 bg-white text-sky-600 text-sm font-medium cursor-pointer hover:bg-sky-50 whitespace-nowrap">
               <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -403,7 +455,7 @@ const cancel = () => window.history.back()
     <!-- Size info -->
     <p class="text-sm text-gray-500">Total size: {{ totalSizeMB }} MB / {{ MAX_TOTAL_MB }} MB</p>
 
-    <!-- Actions: 2 left (Back, Cancel), 2 right (Save as Draft, Submit Lead) -->
+    <!-- Actions: 2 left (Back, Cancel), 2 right (Save as Draft, Next) -->
     <div class="flex flex-wrap items-center justify-between gap-3 pt-6 border-t border-gray-200">
       <div class="flex items-center gap-3">
         <button
@@ -439,15 +491,13 @@ const cancel = () => window.history.back()
         <button
           type="button"
           :disabled="submitting"
-          @click="submit"
+          @click="goNext"
           class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-black text-sm font-medium disabled:opacity-50 bg-[#7ED321] hover:bg-[#6ab81e]"
         >
-          <img
-            :src="submitRequestIconUrl"
-            alt=""
-            class="h-4 w-4 shrink-0 object-contain"
-          />
-          <span class="text-black">{{ submitting ? 'Submitting...' : 'Submit Lead' }}</span>
+          <span class="text-black">{{ submitting ? 'Saving...' : 'Next' }}</span>
+          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+          </svg>
         </button>
       </div>
     </div>

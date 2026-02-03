@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Models\LeadSubmission;
 use App\Models\User;
 
 class LeadSubmissionPolicy
