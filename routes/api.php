@@ -45,6 +45,19 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     // Field submissions
     Route::get('/field-submissions/team-options', [FieldSubmissionController::class, 'teamOptions']);
     Route::post('/field-submissions', [FieldSubmissionController::class, 'store']);
+    Route::get('/field-submissions', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'index']);
+    Route::get('/field-submissions/filters', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'filters']);
+    Route::get('/field-submissions/edit-options', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'editOptions']);
+    Route::get('/field-submissions/columns', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'columns']);
+    Route::post('/field-submissions/columns', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'saveColumns']);
+    Route::get('/field-submissions/{fieldSubmission}/documents/{document}/download', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'downloadDocument'])
+        ->whereNumber(['fieldSubmission', 'document']);
+    Route::get('/field-submissions/{fieldSubmission}', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'show'])
+        ->whereNumber('fieldSubmission');
+    Route::put('/field-submissions/{fieldSubmission}', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'update'])
+        ->whereNumber('fieldSubmission');
+    Route::patch('/field-submissions/{fieldSubmission}/status', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'updateStatus'])
+        ->whereNumber('fieldSubmission');
 
     // Customer support
     Route::get('/customer-support/team-options', [CustomerSupportController::class, 'teamOptions']);
@@ -59,6 +72,21 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::post('/vas-requests/{vasRequest}/submit', [VasRequestController::class, 'submit']);
 
     // Lead submissions (specific routes before {lead})
+    Route::get('/lead-submissions', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'index']);
+    Route::get('/lead-submissions/filters', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'filters']);
+    Route::get('/lead-submissions/columns', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'columns']);
+    Route::post('/lead-submissions/columns', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'saveColumns']);
+    Route::get('/lead-submissions/back-office-options', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'backOfficeOptions']);
+    Route::patch('/lead-submissions/{lead}/status', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'updateStatus'])
+        ->whereNumber('lead');
+    Route::patch('/lead-submissions/{lead}/status-changed-at', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'updateStatusChangedAt'])
+        ->whereNumber('lead');
+    Route::put('/lead-submissions/{lead}/back-office', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'updateBackOffice'])
+        ->whereNumber('lead');
+    Route::get('/lead-submissions/{lead}/documents/bulk-download', [LeadSubmissionController::class, 'bulkDownloadDocuments'])
+        ->whereNumber('lead');
+    Route::get('/lead-submissions/{lead}/documents/{document}/download', [LeadSubmissionController::class, 'downloadDocument'])
+        ->whereNumber('lead')->whereNumber('document');
     Route::get('/lead-submissions/current-draft', [LeadSubmissionController::class, 'currentDraft']);
     Route::get('/lead-submissions/categories', [LeadSubmissionController::class, 'categories']);
     Route::get('/lead-submissions/service-types', [LeadSubmissionController::class, 'serviceTypes']);
@@ -68,7 +96,7 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::put('/lead-submissions/{lead}/step-1', [LeadSubmissionController::class, 'updateStep1']);
     Route::delete('/lead-submissions/{lead}/discard', [LeadSubmissionController::class, 'discardDraft']);
     Route::post('/lead-submissions/{lead}/step-2', [LeadSubmissionController::class, 'storeStep2']);
-    Route::post('/lead-submissions/{lead}/step-3', [LeadSubmissionController::class, 'storeStep4']); // step 3 in UI = documents
+    Route::post('/lead-submissions/{lead}/step-3', [LeadSubmissionController::class, 'storeStep4']); // Vue step 3 = documents
     Route::post('/lead-submissions/{lead}/step-4', [LeadSubmissionController::class, 'storeStep4']); // backward compatibility
     Route::post('/lead-submissions/{lead}/submit', [LeadSubmissionController::class, 'submit']);
 

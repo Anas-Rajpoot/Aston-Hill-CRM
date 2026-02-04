@@ -5,7 +5,10 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 use App\Models\Account;
+use App\Models\FieldSubmission;
+use App\Models\LeadSubmission;
 use App\Policies\AccountPolicy;
+use App\Policies\FieldSubmissionPolicy;
 use App\Policies\LeadSubmissionPolicy;
 use App\Repositories\Contracts\LeadSubmissionRepositoryInterface;
 use App\Repositories\Eloquent\LeadSubmissionRepository;
@@ -30,6 +33,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Gate::policy(LeadSubmission::class, LeadSubmissionPolicy::class);
+        Gate::policy(FieldSubmission::class, FieldSubmissionPolicy::class);
         Gate::before(function ($user, $ability) {
             return $user->hasRole('superadmin') ? true : null;
         });

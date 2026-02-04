@@ -26,8 +26,8 @@ const primaryRole = computed(() => {
 const navItems = [
   { to: '/', label: 'Dashboard' },
   { to: '/submissions', label: 'Submissions' },
-  { to: '/back-office', label: 'Back Office' },
-  { to: '/field-head', label: 'Field Head' },
+  { to: '/lead-submissions', label: 'Lead Submissions' },
+  { to: '/field-submissions', label: 'Field Submissions' },
   { to: '/customer-support', label: 'Customer Support' },
   { to: '/vas-requests', label: 'VAS Requests' },
   { to: '/clients', label: 'Clients' },

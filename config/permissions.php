@@ -106,6 +106,19 @@ return [
                 ['key' => 'view_sla_alerts', 'label' => 'View SLA Alerts', 'priority' => 'medium'],
             ],
         ],
+        'lead' => [
+            'label' => 'Lead Submissions (Listing)',
+            'icon' => 'submissions',
+            'permissions' => [
+                ['key' => 'view', 'label' => 'View Leads', 'priority' => 'high'],
+                ['key' => 'view.all', 'label' => 'View All Leads', 'priority' => 'high'],
+                ['key' => 'view.assigned', 'label' => 'View Assigned Leads', 'priority' => 'high'],
+                ['key' => 'view.created', 'label' => 'View Created Leads', 'priority' => 'high'],
+                ['key' => 'create', 'label' => 'Create Lead', 'priority' => 'high'],
+                ['key' => 'edit', 'label' => 'Edit Lead', 'priority' => 'medium'],
+                ['key' => 'delete', 'label' => 'Delete Lead', 'priority' => 'medium'],
+            ],
+        ],
         'lead-submissions' => [
             'label' => 'Submissions (Main Hub)',
             'icon' => 'submissions',

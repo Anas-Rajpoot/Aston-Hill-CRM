@@ -119,10 +119,14 @@ class FieldSubmissionController extends Controller
                 }
             }
 
+            // Field executives: same pool as sales agents for dropdown (assign field agent).
+            $fieldExecutives = $salesAgents;
+
             return [
                 'managers' => $formatUsers($managers, true),
                 'team_leaders' => $formatUsers($teamLeaders, true),
                 'sales_agents' => $formatUsers($salesAgents, true),
+                'field_executives' => $formatUsers($fieldExecutives, false),
                 'labels' => $labels,
             ];
         });

@@ -1,0 +1,582 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\FieldSubmission;
+use App\Models\UserColumnPreference;
+use App\Traits\StoresFieldSubmissionDocuments;
+use App\Models\FieldSubmissionDocument;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
+
+/**
+ * Field Submissions Listing API – same pattern as Lead Submissions.
+ */
+class FieldSubmissionApiController extends Controller
+{
+    use StoresFieldSubmissionDocuments;
+
+    private const MODULE = 'field_submissions';
+
+    private const MAX_DOCUMENT_SIZE_MB = 10;
+
+    private const MAX_DOCUMENTS_TOTAL_MB = 20;
+
+    private const ALLOWED_COLUMNS = [
+        'id', 'company_name', 'contact_number', 'product', 'emirates', 'complete_address',
+        'status', 'submitted_at', 'created_at', 'created_by',
+        'manager_id', 'team_leader_id', 'sales_agent_id',
+        'field_executive_id', 'field_status', 'meeting_date', 'updated_at',
+    ];
+
+    /** Columns that are computed or from relations in formatRow (no direct DB select). */
+    private const COMPUTED_COLUMNS = ['field_agent', 'target_date', 'sla_timer', 'sla_status', 'last_updated'];
+
+    private const BASE_COLUMNS = ['id', 'status'];
+
+    public function __construct()
+    {
+        $this->middleware(['auth:sanctum']);
+    }
+
+    public function index(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', FieldSubmission::class);
+
+        $validated = $request->validate([
+            'page' => ['sometimes', 'integer', 'min:1'],
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
+            'sort' => ['sometimes', 'string', Rule::in(array_merge(self::ALLOWED_COLUMNS, self::COMPUTED_COLUMNS, ['creator', 'sales_agent', 'team_leader', 'manager', 'field_agent']))],
+            'order' => ['sometimes', 'string', Rule::in(['asc', 'desc'])],
+            'columns' => ['sometimes', 'array'],
+            'columns.*' => ['string', Rule::in(array_merge(self::ALLOWED_COLUMNS, self::COMPUTED_COLUMNS, ['creator', 'sales_agent', 'team_leader', 'manager', 'field_agent']))],
+            'status' => ['sometimes', 'nullable', 'string', Rule::in(FieldSubmission::STATUSES)],
+            'q' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'company_name' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'product' => ['sometimes', 'nullable', 'string', 'max:150'],
+            'emirates' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'from' => ['sometimes', 'nullable', 'date'],
+            'to' => ['sometimes', 'nullable', 'date', 'after_or_equal:from'],
+            'submitted_from' => ['sometimes', 'nullable', 'date'],
+            'submitted_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:submitted_from'],
+            'sales_agent_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'team_leader_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'manager_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+        ]);
+
+        $user = $request->user();
+        $columns = $this->resolveColumns($user, $validated['columns'] ?? null);
+        $perPage = (int) ($validated['per_page'] ?? 15);
+        $page = (int) ($validated['page'] ?? 1);
+        $sort = $validated['sort'] ?? 'created_at';
+        $order = $validated['order'] ?? 'desc';
+
+        $baseQuery = FieldSubmission::query()->visibleTo($user);
+        $this->applyFilters($baseQuery, $validated);
+        $total = $baseQuery->count();
+
+        $dataQuery = FieldSubmission::query()->visibleTo($user);
+        $this->applyFilters($dataQuery, $validated);
+        $this->applySort($dataQuery, $sort, $order);
+
+        $selectColumns = $this->buildSelectColumns($columns);
+        $dataQuery->select($selectColumns);
+
+        $eagerLoad = [];
+        if (in_array('creator', $columns, true)) {
+            $eagerLoad['creator'] = fn ($q) => $q->select('id', 'name', 'email');
+        }
+        if (in_array('sales_agent', $columns, true) || in_array('team_leader', $columns, true) || in_array('manager', $columns, true)) {
+            $eagerLoad['salesAgent'] = fn ($q) => $q->select('id', 'name');
+            $eagerLoad['teamLeader'] = fn ($q) => $q->select('id', 'name');
+            $eagerLoad['manager'] = fn ($q) => $q->select('id', 'name');
+        }
+        if (in_array('field_agent', $columns, true)) {
+            $eagerLoad['fieldExecutive'] = fn ($q) => $q->select('id', 'name');
+        }
+        if (!empty($eagerLoad)) {
+            $dataQuery->with($eagerLoad);
+        }
+
+        $offset = ($page - 1) * $perPage;
+        $items = $dataQuery->skip($offset)->take($perPage)->get()->map(function ($row) use ($columns) {
+            return $this->formatRow($row, $columns);
+        });
+
+        $lastPage = $total > 0 ? (int) ceil($total / $perPage) : 1;
+
+        return response()->json([
+            'data' => $items,
+            'meta' => [
+                'current_page' => $page,
+                'last_page' => $lastPage,
+                'per_page' => $perPage,
+                'total' => $total,
+            ],
+        ]);
+    }
+
+    private function resolveColumns($user, ?array $requestColumns): array
+    {
+        $allAllowed = array_merge(self::ALLOWED_COLUMNS, self::COMPUTED_COLUMNS, ['creator', 'sales_agent', 'team_leader', 'manager', 'field_agent']);
+        if (!empty($requestColumns)) {
+            $allowed = array_intersect($requestColumns, $allAllowed);
+            return array_values(array_unique(array_merge(self::BASE_COLUMNS, $allowed)));
+        }
+
+        $cacheKey = "col_pref_{$user->id}_" . self::MODULE;
+        $preference = Cache::remember($cacheKey, 3600, function () use ($user) {
+            return UserColumnPreference::where('user_id', $user->id)
+                ->where('module', self::MODULE)
+                ->first();
+        });
+
+        $cols = $preference?->visible_columns ?? config('modules.field_submissions.default_columns', []);
+        $cols = is_array($cols) ? $cols : [];
+        $allowed = array_intersect($cols, $allAllowed);
+        return array_values(array_unique(array_merge(self::BASE_COLUMNS, $allowed)));
+    }
+
+    private function applyFilters($query, array $validated): void
+    {
+        if (!empty($validated['status'])) {
+            $query->where('status', $validated['status']);
+        }
+        if (!empty($validated['from'])) {
+            $query->where('created_at', '>=', $validated['from'] . ' 00:00:00');
+        }
+        if (!empty($validated['to'])) {
+            $query->where('created_at', '<=', $validated['to'] . ' 23:59:59');
+        }
+        if (!empty($validated['submitted_from'])) {
+            $query->where('submitted_at', '>=', $validated['submitted_from'] . ' 00:00:00');
+        }
+        if (!empty($validated['submitted_to'])) {
+            $query->where('submitted_at', '<=', $validated['submitted_to'] . ' 23:59:59');
+        }
+        if (!empty($validated['company_name'])) {
+            $term = '%' . addcslashes($validated['company_name'], '%_\\') . '%';
+            $query->where('company_name', 'like', $term);
+        }
+        if (!empty($validated['product'])) {
+            $term = '%' . addcslashes($validated['product'], '%_\\') . '%';
+            $query->where('product', 'like', $term);
+        }
+        if (!empty($validated['emirates'])) {
+            $term = '%' . addcslashes($validated['emirates'], '%_\\') . '%';
+            $query->where('emirates', 'like', $term);
+        }
+        if (!empty($validated['sales_agent_id'])) {
+            $query->where('sales_agent_id', $validated['sales_agent_id']);
+        }
+        if (!empty($validated['team_leader_id'])) {
+            $query->where('team_leader_id', $validated['team_leader_id']);
+        }
+        if (!empty($validated['manager_id'])) {
+            $query->where('manager_id', $validated['manager_id']);
+        }
+        if (!empty($validated['q'])) {
+            $term = '%' . addcslashes($validated['q'], '%_\\') . '%';
+            $query->where(function ($w) use ($term) {
+                $w->where('company_name', 'like', $term)
+                    ->orWhere('contact_number', 'like', $term)
+                    ->orWhere('product', 'like', $term)
+                    ->orWhere('emirates', 'like', $term);
+            });
+        }
+    }
+
+    private function applySort($query, string $sort, string $order): void
+    {
+        if ($sort === 'creator') {
+            $query->join('users as creator_users', 'field_submissions.created_by', '=', 'creator_users.id')
+                ->orderBy('creator_users.name', $order);
+        } elseif (in_array($sort, ['sales_agent', 'team_leader', 'manager'], true)) {
+            $col = $sort . '_id';
+            $alias = $sort . '_users';
+            $query->leftJoin("users as {$alias}", "field_submissions.{$col}", '=', "{$alias}.id")
+                ->orderBy("{$alias}.name", $order);
+        } elseif ($sort === 'field_agent') {
+            $query->leftJoin('users as field_agent_users', 'field_submissions.field_executive_id', '=', 'field_agent_users.id')
+                ->orderBy('field_agent_users.name', $order);
+        } elseif (in_array($sort, ['target_date', 'sla_timer', 'sla_status', 'last_updated'], true)) {
+            $dbCol = $sort === 'target_date' ? 'meeting_date' : ($sort === 'last_updated' ? 'updated_at' : 'meeting_date');
+            $query->orderBy('field_submissions.' . $dbCol, $order);
+        } elseif (in_array($sort, self::ALLOWED_COLUMNS, true)) {
+            $query->orderBy('field_submissions.' . $sort, $order);
+        }
+    }
+
+    private function buildSelectColumns(array $columns): array
+    {
+        $dbColumns = array_filter($columns, fn ($c) => in_array($c, self::ALLOWED_COLUMNS, true));
+        $base = array_unique(array_merge(self::BASE_COLUMNS, $dbColumns));
+        if (in_array('creator', $columns, true)) {
+            $base[] = 'created_by';
+        }
+        foreach (['sales_agent', 'team_leader', 'manager', 'field_agent'] as $rel) {
+            $idCol = $rel === 'field_agent' ? 'field_executive_id' : $rel . '_id';
+            if (in_array($rel, $columns, true) && in_array($idCol, $base, true) === false) {
+                $base[] = $idCol;
+            }
+        }
+        if (in_array('field_status', $columns, true) || in_array('target_date', $columns, true) || in_array('sla_timer', $columns, true) || in_array('sla_status', $columns, true)) {
+            $base[] = 'meeting_date';
+            $base[] = 'field_status';
+        }
+        if (in_array('last_updated', $columns, true)) {
+            $base[] = 'updated_at';
+        }
+        $base = array_unique($base);
+        return array_map(fn ($c) => 'field_submissions.' . $c, $base);
+    }
+
+    private function formatRow(FieldSubmission $row, array $columns): array
+    {
+        $out = [];
+        foreach ($columns as $col) {
+            if ($col === 'creator') {
+                $out['creator'] = $row->relationLoaded('creator')
+                    ? ['id' => $row->creator?->id, 'name' => $row->creator?->name ?? '-']
+                    : null;
+            } elseif ($col === 'sales_agent') {
+                $out['sales_agent'] = $row->relationLoaded('salesAgent') ? ($row->salesAgent?->name ?? '-') : '-';
+            } elseif ($col === 'team_leader') {
+                $out['team_leader'] = $row->relationLoaded('teamLeader') ? ($row->teamLeader?->name ?? '-') : '-';
+            } elseif ($col === 'manager') {
+                $out['manager'] = $row->relationLoaded('manager') ? ($row->manager?->name ?? '-') : '-';
+            } elseif ($col === 'field_agent') {
+                $name = $row->relationLoaded('fieldExecutive') ? ($row->fieldExecutive?->name ?? null) : null;
+                $out['field_agent'] = $name ?: 'Unassigned';
+            } elseif ($col === 'target_date') {
+                $out['target_date'] = $row->meeting_date ? $row->meeting_date->format('d/M/Y H:i') : null;
+            } elseif ($col === 'last_updated') {
+                $out['last_updated'] = $row->updated_at ? $row->updated_at->format('d/M/Y H:i') : null;
+            } elseif ($col === 'sla_timer') {
+                $out['sla_timer'] = $this->computeSlaTimer($row);
+            } elseif ($col === 'sla_status') {
+                $out['sla_status'] = $this->computeSlaStatus($row);
+            } elseif (in_array($col, ['submitted_at'], true)) {
+                $out[$col] = $row->$col ? $row->$col->format('d/M/Y H:i') : null;
+            } elseif (in_array($col, ['created_at'], true)) {
+                $out[$col] = $row->$col ? $row->$col->format('d/M/Y') : null;
+            } else {
+                $out[$col] = $row->$col ?? null;
+            }
+        }
+        return $out;
+    }
+
+    private function computeSlaTimer(FieldSubmission $row): ?string
+    {
+        $completedStatuses = ['Survey Completed', 'Completed', 'Visited'];
+        if (in_array($row->field_status, $completedStatuses, true)) {
+            return 'Completed';
+        }
+        if (! $row->meeting_date) {
+            return null;
+        }
+        $targetEnd = $row->meeting_date->endOfDay();
+        $now = now();
+        if ($targetEnd->isPast()) {
+            $totalMins = $targetEnd->diffInMinutes($now);
+            $h = (int) floor($totalMins / 60);
+            $m = $totalMins % 60;
+            return "Breached by {$h}h {$m}m";
+        }
+        $totalMins = $now->diffInMinutes($targetEnd, false);
+        $h = (int) floor($totalMins / 60);
+        $m = $totalMins % 60;
+        return "{$h}h {$m}m remaining";
+    }
+
+    private function computeSlaStatus(FieldSubmission $row): ?string
+    {
+        $completedStatuses = ['Survey Completed', 'Completed', 'Visited'];
+        if (in_array($row->field_status, $completedStatuses, true)) {
+            return 'Completed';
+        }
+        if (! $row->meeting_date) {
+            return null;
+        }
+        $targetEnd = $row->meeting_date->endOfDay();
+        $now = now();
+        if ($targetEnd->isPast()) {
+            return 'Breached';
+        }
+        $hoursRemaining = $now->diffInHours($targetEnd, false) + $now->diffInMinutes($targetEnd, false) / 60;
+        return $hoursRemaining <= 4 ? 'Approaching' : 'On Time';
+    }
+
+    public function filters(): JsonResponse
+    {
+        $this->authorize('viewAny', FieldSubmission::class);
+
+        $products = FieldSubmission::query()
+            ->whereNotNull('product')
+            ->where('product', '!=', '')
+            ->distinct()
+            ->pluck('product')
+            ->filter()
+            ->sort()
+            ->values()
+            ->take(50)
+            ->all();
+
+        $emirates = FieldSubmission::query()
+            ->whereNotNull('emirates')
+            ->where('emirates', '!=', '')
+            ->distinct()
+            ->pluck('emirates')
+            ->filter()
+            ->sort()
+            ->values()
+            ->take(30)
+            ->all();
+
+        return response()->json([
+            'statuses' => array_map(fn ($s) => ['value' => $s, 'label' => ucfirst($s)], FieldSubmission::STATUSES),
+            'products' => array_values($products),
+            'emirates' => array_values($emirates),
+        ]);
+    }
+
+    public function columns(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', FieldSubmission::class);
+
+        $config = config('modules.field_submissions.columns', []);
+        $allColumns = [];
+        foreach ($config as $key => $def) {
+            $allColumns[] = [
+                'key' => $key,
+                'label' => $def['label'] ?? $key,
+            ];
+        }
+
+        $pref = UserColumnPreference::where('user_id', $request->user()->id)
+            ->where('module', self::MODULE)
+            ->first();
+
+        $visible = $pref?->visible_columns ?? config('modules.field_submissions.default_columns', []);
+
+        return response()->json([
+            'all_columns' => $allColumns,
+            'visible_columns' => $visible,
+        ]);
+    }
+
+    public function saveColumns(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', FieldSubmission::class);
+
+        $data = $request->validate([
+            'visible_columns' => ['required', 'array', 'min:1'],
+            'visible_columns.*' => ['string', Rule::in(array_merge(self::ALLOWED_COLUMNS, self::COMPUTED_COLUMNS, ['creator', 'sales_agent', 'team_leader', 'manager', 'field_agent', 'field_status']))],
+        ]);
+
+        UserColumnPreference::updateOrCreate(
+            ['user_id' => $request->user()->id, 'module' => self::MODULE],
+            ['visible_columns' => $data['visible_columns']]
+        );
+
+        Cache::forget("col_pref_{$request->user()->id}_" . self::MODULE);
+
+        return response()->json(['success' => true]);
+    }
+
+    public function updateStatus(Request $request, FieldSubmission $fieldSubmission): JsonResponse
+    {
+        $this->authorize('update', $fieldSubmission);
+
+        $data = $request->validate([
+            'status' => ['required', 'string', Rule::in(FieldSubmission::STATUSES)],
+        ]);
+
+        $fieldSubmission->update([
+            'status' => $data['status'],
+            'submitted_at' => $data['status'] === 'submitted' ? now() : $fieldSubmission->submitted_at,
+        ]);
+
+        return response()->json([
+            'id' => $fieldSubmission->id,
+            'status' => $fieldSubmission->status,
+            'submitted_at' => $fieldSubmission->submitted_at?->format('d-M-Y'),
+        ]);
+    }
+
+    /**
+     * GET /api/field-submissions/{fieldSubmission}
+     * Single field submission for view/edit (authorized by field_head.view).
+     */
+    public function show(Request $request, FieldSubmission $fieldSubmission): JsonResponse
+    {
+        $this->authorize('view', $fieldSubmission);
+
+        $fieldSubmission->load([
+            'creator:id,name',
+            'manager:id,name',
+            'teamLeader:id,name',
+            'salesAgent:id,name',
+            'fieldExecutive:id,name',
+            'documents',
+        ]);
+
+        $documents = $fieldSubmission->documents->map(fn ($d) => [
+            'id' => $d->id,
+            'doc_key' => $d->doc_key,
+            'label' => $d->label ?? $d->doc_key,
+            'file_path' => $d->file_path,
+            'original_name' => $d->file_name,
+            'mime' => $d->mime,
+            'size' => $d->size,
+        ])->values()->all();
+
+        return response()->json([
+            'id' => $fieldSubmission->id,
+            'company_name' => $fieldSubmission->company_name,
+            'contact_number' => $fieldSubmission->contact_number,
+            'product' => $fieldSubmission->product,
+            'alternate_number' => $fieldSubmission->alternate_number,
+            'emirates' => $fieldSubmission->emirates,
+            'location_coordinates' => $fieldSubmission->location_coordinates,
+            'complete_address' => $fieldSubmission->complete_address,
+            'additional_notes' => $fieldSubmission->additional_notes,
+            'special_instruction' => $fieldSubmission->special_instruction,
+            'manager_id' => $fieldSubmission->manager_id,
+            'team_leader_id' => $fieldSubmission->team_leader_id,
+            'sales_agent_id' => $fieldSubmission->sales_agent_id,
+            'field_executive_id' => $fieldSubmission->field_executive_id,
+            'meeting_date' => $fieldSubmission->meeting_date?->format('Y-m-d'),
+            'field_status' => $fieldSubmission->field_status,
+            'remarks_by_field_agent' => $fieldSubmission->remarks_by_field_agent,
+            'status' => $fieldSubmission->status,
+            'submitted_at' => $fieldSubmission->submitted_at?->toIso8601String(),
+            'created_at' => $fieldSubmission->created_at?->toIso8601String(),
+            'updated_at' => $fieldSubmission->updated_at?->toIso8601String(),
+            'manager_name' => $fieldSubmission->manager?->name,
+            'team_leader_name' => $fieldSubmission->teamLeader?->name,
+            'sales_agent_name' => $fieldSubmission->salesAgent?->name,
+            'field_executive_name' => $fieldSubmission->fieldExecutive?->name,
+            'creator_name' => $fieldSubmission->creator?->name,
+            'documents' => $documents,
+        ]);
+    }
+
+    /**
+     * PUT /api/field-submissions/{fieldSubmission}
+     * Update field submission (Field Head Edit). Authorized by field_head.view (update policy).
+     * Accepts JSON or multipart; optional documents[] for photographic proof.
+     */
+    public function update(Request $request, FieldSubmission $fieldSubmission): JsonResponse
+    {
+        $this->authorize('update', $fieldSubmission);
+
+        $rules = [
+            'company_name' => ['required', 'string', 'max:255'],
+            'contact_number' => ['required', 'string', 'max:50'],
+            'complete_address' => ['required', 'string', 'max:1000'],
+            'product' => ['required', 'string', 'max:255'],
+            'emirates' => ['required', 'string', 'max:100'],
+            'location_coordinates' => ['nullable', 'string', 'max:100'],
+            'additional_notes' => ['nullable', 'string', 'max:2000'],
+            'special_instruction' => ['nullable', 'string', 'max:2000'],
+            'manager_id' => ['required', 'exists:users,id'],
+            'team_leader_id' => ['required', 'exists:users,id'],
+            'sales_agent_id' => ['required', 'exists:users,id'],
+            'field_executive_id' => ['nullable', 'exists:users,id'],
+            'meeting_date' => ['nullable', 'date'],
+            'field_status' => ['nullable', 'string', 'max:80', Rule::in(FieldSubmission::FIELD_STATUSES)],
+            'remarks_by_field_agent' => ['nullable', 'string', 'max:5000'],
+            'documents' => ['sometimes', 'array', 'max:10'],
+            'documents.*' => ['file', 'max:' . (self::MAX_DOCUMENT_SIZE_MB * 1024)],
+        ];
+
+        $data = $request->validate($rules);
+
+        $documents = $request->file('documents', []);
+        $documents = is_array($documents) ? $documents : [];
+
+        $existingSize = $fieldSubmission->documents()->sum('size');
+        $newSize = 0;
+        foreach ($documents as $file) {
+            if ($file && $file->isValid()) {
+                $newSize += $file->getSize();
+            }
+        }
+        if (($existingSize + $newSize) > (self::MAX_DOCUMENTS_TOTAL_MB * 1024 * 1024)) {
+            return response()->json([
+                'message' => 'Total document size must not exceed ' . self::MAX_DOCUMENTS_TOTAL_MB . 'MB.',
+                'errors' => ['documents' => ['Total size limit exceeded.']],
+            ], 422);
+        }
+
+        $toUpdate = array_diff_key($data, array_flip(['documents']));
+        $fieldSubmission->update($toUpdate);
+
+        foreach ($documents as $file) {
+            if ($file && $file->isValid()) {
+                $this->storeFieldSubmissionDocument($fieldSubmission, 'photographic_proof', $file, 'Photographic Proof');
+            }
+        }
+
+        return response()->json([
+            'id' => $fieldSubmission->id,
+            'message' => 'Field submission updated.',
+        ]);
+    }
+
+    /**
+     * GET /api/field-submissions/{fieldSubmission}/documents/{document}/download
+     * Download a single document. Authorized same as view.
+     */
+    public function downloadDocument(Request $request, FieldSubmission $fieldSubmission, int $document)
+    {
+        $this->authorize('view', $fieldSubmission);
+
+        $doc = FieldSubmissionDocument::where('field_submission_id', $fieldSubmission->id)
+            ->where('id', $document)
+            ->first();
+        if (! $doc || ! $doc->file_path) {
+            return response()->json(['message' => 'Document not found.'], 404);
+        }
+        $fullPath = Storage::disk('public')->path($doc->file_path);
+        if (! is_file($fullPath)) {
+            return response()->json(['message' => 'File not found.'], 404);
+        }
+        $filename = $doc->file_name ?: basename($doc->file_path);
+
+        return response()->file($fullPath, [
+            'Content-Disposition' => 'attachment; filename="' . addslashes($filename) . '"',
+        ]);
+    }
+
+    /**
+     * GET /api/field-submissions/edit-options
+     * Options for field head edit form (emirates, field statuses). Requires field_head.view.
+     */
+    public function editOptions(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', FieldSubmission::class);
+
+        $emirates = FieldSubmission::query()
+            ->whereNotNull('emirates')
+            ->where('emirates', '!=', '')
+            ->distinct()
+            ->pluck('emirates')
+            ->filter()
+            ->sort()
+            ->values()
+            ->take(30)
+            ->all();
+
+        return response()->json([
+            'emirates' => array_values($emirates),
+            'field_statuses' => array_map(fn ($s) => ['value' => $s, 'label' => $s], FieldSubmission::FIELD_STATUSES),
+        ]);
+    }
+}

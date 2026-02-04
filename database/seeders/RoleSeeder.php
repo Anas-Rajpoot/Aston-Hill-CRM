@@ -18,13 +18,18 @@ class RoleSeeder extends Seeder
             'manager',
             'team_leader',
             'sales_agent',
+            'back_office',
         ];
 
+        $guards = ['web', 'sanctum'];
+
         foreach ($roles as $role) {
-            Role::firstOrCreate([
-                'name' => $role,
-                'guard_name' => 'web'
-            ]);
+            foreach ($guards as $guard) {
+                Role::firstOrCreate([
+                    'name' => $role,
+                    'guard_name' => $guard,
+                ]);
+            }
         }
     }
 }

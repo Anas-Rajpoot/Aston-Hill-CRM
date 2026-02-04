@@ -34,6 +34,7 @@ class LeadSubmissionRepository implements LeadSubmissionRepositoryInterface
         $leadSubmission->update([
             'status' => 'submitted',
             'submitted_at' => now(),
+            'status_changed_at' => now(),
         ]);
 
         return $leadSubmission->refresh();

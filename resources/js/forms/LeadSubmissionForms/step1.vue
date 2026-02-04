@@ -279,6 +279,14 @@ const saveDraft = async () => {
     generalMessage.value = 'Please correct the errors below.'
     return
   }
+  if (form.value.ae_domain?.trim()) {
+    const aeResult = validateAeDomain(form.value.ae_domain)
+    if (!aeResult.valid) {
+      errors.value = { ae_domain: [aeResult.message] }
+      generalMessage.value = 'Please correct the errors below.'
+      return
+    }
+  }
   savingDraft.value = true
   try {
     let response
@@ -301,6 +309,26 @@ const saveDraft = async () => {
   }
 }
 
+// .ae Domain validation (same rules as backend)
+const AE_DOMAIN_FORBIDDEN_KEYWORDS = ['lac', 'rac', 'rat', 'sgns']
+const AE_DOMAIN_SPECIAL = /[@#$%^&*()\-+={}\[\]:;'"\\<>,_?/!_`|\s]/
+function validateAeDomain(value) {
+  const v = (value || '').trim()
+  if (!v) return { valid: false, message: 'Enter Domain Name' }
+  if (/\s/.test(v)) return { valid: false, message: 'The domain must not contain spaces.' }
+  if (/[0-9]/.test(v)) return { valid: false, message: 'The domain must not contain numbers (0–9).' }
+  if (AE_DOMAIN_SPECIAL.test(v)) return { valid: false, message: 'The domain must not contain special characters such as: @ # $ % ^ & * ( ) - + = { } [ ] : ; \' " \\ <> , ? / ! _ ` |' }
+  const lower = v.toLowerCase()
+  for (const kw of AE_DOMAIN_FORBIDDEN_KEYWORDS) {
+    if (lower.includes(kw)) return { valid: false, message: 'The domain must not contain these keywords (case-insensitive): LAC, RAC, RAT, SGNS.' }
+  }
+  if ((v.match(/\./g) || []).length !== 1) return { valid: false, message: 'The domain must contain only one dot (.).' }
+  if (!lower.endsWith('.ae')) return { valid: false, message: 'The domain must end with .ae (example: example.ae).' }
+  return { valid: true, message: 'You can use this Domain.' }
+}
+
+const aeDomainValidation = computed(() => validateAeDomain(form.value.ae_domain))
+
 // Frontend validation for required fields (Step 1)
 const validateStep1 = () => {
   const err = {}
@@ -309,6 +337,8 @@ const validateStep1 = () => {
   if (!form.value.address?.trim()) err.address = ['Complete address is required.']
   if (!form.value.emirates?.trim()) err.emirates = ['Emirates is required.']
   if (!form.value.product?.trim()) err.product = ['Product is required.']
+  const aeResult = validateAeDomain(form.value.ae_domain)
+  if (!aeResult.valid) err.ae_domain = [aeResult.message]
   if (!form.value.manager_id) err.manager_id = [`${formatTeamLabel(teamLabels.value.manager || 'manager')} is required.`]
   if (!form.value.team_leader_id) err.team_leader_id = [`${formatTeamLabel(teamLabels.value.team_leader || 'team_leader')} is required.`]
   if (!form.value.sales_agent_id) err.sales_agent_id = [`${formatTeamLabel(teamLabels.value.sales_agent || 'sales_agent')} is required.`]
@@ -574,11 +604,17 @@ const cancel = () => {
             <input
               v-model="form.ae_domain"
               type="text"
-              placeholder="Enter Domain"
+              placeholder="Enter Domain (e.g. example.ae)"
               :class="inputClass('ae_domain')"
               @input="clearFieldError('ae_domain')"
             />
             <p v-if="getError('ae_domain')" class="mt-1 text-sm text-red-600">{{ getError('ae_domain') }}</p>
+            <p v-else-if="form.ae_domain?.trim() && aeDomainValidation.valid" class="mt-1 text-sm text-green-600">
+              {{ aeDomainValidation.message }}
+            </p>
+            <p v-else-if="form.ae_domain?.trim() && !aeDomainValidation.valid" class="mt-1 text-sm text-red-600">
+              {{ aeDomainValidation.message }}
+            </p>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">GAID</label>

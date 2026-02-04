@@ -57,7 +57,7 @@ Route::get('/login-logs', $spa)->name('login-logs.index');
 Route::get('/login-logs/timeline/{user}', $spa);
 
 Route::get('/back-office', $spa);
-Route::get('/field-head', $spa);
+Route::get('/field-submissions', $spa);
 Route::get('/customer-support', $spa);
 Route::get('/vas-requests', $spa);
 Route::get('/clients', $spa);

@@ -2,6 +2,8 @@
 
 namespace App\Http\Resources;
 
+use App\Models\ServiceCategory;
+use App\Models\ServiceType;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -61,8 +63,9 @@ class LeadSubmissionShowResource extends JsonResource
             // Relation names (for review page)
             'category' => $this->whenLoaded('category', fn () => $this->category ? $this->category->only(['id', 'name']) : null),
             'type' => $this->whenLoaded('type', fn () => $this->type ? $this->type->only(['id', 'name', 'schema']) : null),
-            'category_name' => $this->category?->name,
-            'type_name' => $this->type?->name,
+            // Always resolve names from service_categories / service_types by ID (used by detail + edit submission)
+            'category_name' => $this->service_category_id ? (ServiceCategory::where('id', $this->service_category_id)->value('name') ?? $this->category?->name) : ($this->category?->name ?? null),
+            'type_name' => $this->service_type_id ? (ServiceType::where('id', $this->service_type_id)->value('name') ?? $this->type?->name) : ($this->type?->name ?? null),
             'manager_name' => $this->manager?->name,
             'team_leader_name' => $this->teamLeader?->name,
             'sales_agent_name' => $this->salesAgent?->name,
@@ -72,8 +75,26 @@ class LeadSubmissionShowResource extends JsonResource
             'team_leader' => $this->whenLoaded('teamLeader', fn () => $this->teamLeader ? $this->teamLeader->only(['id', 'name']) : null),
             'sales_agent' => $this->whenLoaded('salesAgent', fn () => $this->salesAgent ? $this->salesAgent->only(['id', 'name']) : null),
             'documents' => $documents,
-            'created_at' => $this->created_at,
-            'updated_at' => $this->updated_at,
+            'submitted_at' => $this->submitted_at?->toIso8601String(),
+            'status_changed_at' => $this->status_changed_at?->toIso8601String(),
+            'created_at' => $this->created_at?->toIso8601String(),
+            'updated_at' => $this->updated_at?->toIso8601String(),
+            // Back office (edit submission form)
+            'executive_id' => $this->executive_id,
+            'executive_name' => $this->executive?->name,
+            'executive' => $this->whenLoaded('executive', fn () => $this->executive ? $this->executive->only(['id', 'name']) : null),
+            'call_verification' => $this->call_verification,
+            'pending_from_sales' => $this->pending_from_sales,
+            'documents_verification' => $this->documents_verification,
+            'submission_date_from' => $this->submission_date_from?->format('Y-m-d'),
+            'back_office_notes' => $this->back_office_notes,
+            'activity' => $this->activity,
+            'back_office_account' => $this->back_office_account,
+            'work_order' => $this->work_order,
+            'du_status' => $this->du_status,
+            'completion_date' => $this->completion_date?->format('Y-m-d'),
+            'du_remarks' => $this->du_remarks,
+            'additional_note' => $this->additional_note,
         ];
     }
 }

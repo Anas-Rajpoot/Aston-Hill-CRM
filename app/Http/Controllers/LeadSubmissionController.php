@@ -13,9 +13,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Yajra\DataTables\Facades\DataTables;
 use App\Http\Resources\LeadSubmissionResource;
 use App\Http\Resources\LeadSubmissionShowResource;
+use App\Rules\AeDomainRule;
 
 class LeadSubmissionController extends Controller
 {
@@ -58,7 +60,7 @@ class LeadSubmissionController extends Controller
         $q = LeadSubmission::query()->with(['creator:id,name,email','category:id,name','type:id,name']);
 
         // Your restriction logic belongs here:
-        if (!$request->user()->hasRole('superadmin') && !$request->user()->can('lead-submissions.view_all')) {
+        if (!$request->user()->hasRole('superadmin') && !$request->user()->can('lead.view.all')) {
             $q->where('created_by', $request->user()->id);
         }
 
@@ -161,7 +163,7 @@ class LeadSubmissionController extends Controller
             'offer' => ['nullable', 'string', 'max:500'],
             'mrc_aed' => ['nullable', 'numeric', 'min:0'],
             'quantity' => ['nullable', 'integer', 'min:0'],
-            'ae_domain' => ['nullable', 'string', 'max:255'],
+            'ae_domain' => [$draft ? 'nullable' : 'required', 'string', 'max:255', new AeDomainRule()],
             'gaid' => ['nullable', 'string', 'max:255'],
             'manager_id' => [$draft ? 'nullable' : 'required', 'integer', 'exists:users,id'],
             'team_leader_id' => [$draft ? 'nullable' : 'required', 'integer', 'exists:users,id'],
@@ -175,6 +177,7 @@ class LeadSubmissionController extends Controller
             'address.required' => 'Complete address is required.',
             'emirates.required' => 'Emirates is required.',
             'product.required' => 'Product is required.',
+            'ae_domain.required' => 'Enter Domain Name',
             'manager_id.required' => 'Please select a manager.',
             'team_leader_id.required' => 'Please select a team leader.',
             'sales_agent_id.required' => 'Please select a sales agent.',
@@ -288,7 +291,7 @@ class LeadSubmissionController extends Controller
             'offer' => ['nullable', 'string', 'max:500'],
             'mrc_aed' => ['nullable', 'numeric', 'min:0'],
             'quantity' => ['nullable', 'integer', 'min:0'],
-            'ae_domain' => ['nullable', 'string', 'max:255'],
+            'ae_domain' => [$draft ? 'nullable' : 'required', 'string', 'max:255', new AeDomainRule()],
             'gaid' => ['nullable', 'string', 'max:255'],
             'manager_id' => [$draft ? 'nullable' : 'required', 'integer', 'exists:users,id'],
             'team_leader_id' => [$draft ? 'nullable' : 'required', 'integer', 'exists:users,id'],
@@ -302,6 +305,7 @@ class LeadSubmissionController extends Controller
             'address.required' => 'Complete address is required.',
             'emirates.required' => 'Emirates is required.',
             'product.required' => 'Product is required.',
+            'ae_domain.required' => 'Enter Domain Name',
             'manager_id.required' => 'Please select a manager.',
             'team_leader_id.required' => 'Please select a team leader.',
             'sales_agent_id.required' => 'Please select a sales agent.',
@@ -588,6 +592,7 @@ if ($request->expectsJson() || $request->ajax()) {
             'manager:id,name',
             'teamLeader:id,name',
             'salesAgent:id,name',
+            'executive:id,name',
         ])->find($id);
 
         if (! $leadSubmission) {
@@ -743,12 +748,79 @@ if ($request->expectsJson() || $request->ajax()) {
         ]);
     }
 
+    /**
+     * Download a single document. Authorized same as show.
+     */
+    public function downloadDocument(Request $request, $lead, $document)
+    {
+        $leadSubmission = LeadSubmission::find((int) $lead);
+        if (! $leadSubmission) {
+            return response()->json(['message' => 'Lead submission not found.'], 404);
+        }
+        $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
+
+        $doc = LeadSubmissionDocument::where('lead_submission_id', $leadSubmission->id)
+            ->where('id', (int) $document)
+            ->first();
+        if (! $doc || ! $doc->file_path) {
+            return response()->json(['message' => 'Document not found.'], 404);
+        }
+        $fullPath = Storage::disk('public')->path($doc->file_path);
+        if (! is_file($fullPath)) {
+            return response()->json(['message' => 'File not found.'], 404);
+        }
+        $filename = $doc->file_name ?: basename($doc->file_path);
+
+        return response()->file($fullPath, [
+            'Content-Disposition' => 'attachment; filename="'.addslashes($filename).'"',
+        ]);
+    }
+
+    /**
+     * Bulk download all documents as a zip. Authorized same as show.
+     */
+    public function bulkDownloadDocuments(Request $request, $lead): StreamedResponse
+    {
+        $leadSubmission = LeadSubmission::with('documents')->find((int) $lead);
+        if (! $leadSubmission) {
+            abort(404, 'Lead submission not found.');
+        }
+        $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
+
+        $documents = $leadSubmission->documents->filter(fn ($d) => $d->file_path && is_file(Storage::disk('public')->path($d->file_path)));
+        if ($documents->isEmpty()) {
+            abort(404, 'No documents to download.');
+        }
+
+        $zip = new \ZipArchive;
+        $tempPath = storage_path('app/temp/lead-'.$leadSubmission->id.'-'.uniqid().'.zip');
+        if (! is_dir(dirname($tempPath))) {
+            mkdir(dirname($tempPath), 0755, true);
+        }
+        if ($zip->open($tempPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+            abort(500, 'Could not create archive.');
+        }
+        foreach ($documents as $index => $doc) {
+            $fullPath = Storage::disk('public')->path($doc->file_path);
+            $baseName = $doc->file_name ?: basename($doc->file_path);
+            $zip->addFile($fullPath, (string) ($index + 1).'-'.$baseName);
+        }
+        $zip->close();
+
+        return response()->streamDownload(function () use ($tempPath) {
+            echo file_get_contents($tempPath);
+            @unlink($tempPath);
+        }, 'lead-submission-'.$leadSubmission->id.'-documents.zip', [
+            'Content-Type' => 'application/zip',
+        ]);
+    }
+
     /** ACCESS CONTROL: owner-only unless superadmin or leads.view_all */
     private function authorizeLeadSubmissionAccess(Request $request, LeadSubmission $leadSubmission): void
     {
         $user = $request->user();
 
-        if ($user->hasRole('superadmin') || $user->can('lead_submissions.view_all')) {
+        if ($user->hasRole('superadmin') || $user->hasRole('back_office') || $user->can('lead.view.all')) {
             return;
         }
 
@@ -839,6 +911,7 @@ if ($request->expectsJson() || $request->ajax()) {
         $leadSubmission->update([
             'status' => 'submitted',
             'submitted_at' => now(),
+            'status_changed_at' => now(),
         ]);
 
         if (request()->expectsJson() || request()->ajax()) {
