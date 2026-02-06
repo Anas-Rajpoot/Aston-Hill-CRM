@@ -6,6 +6,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import fieldSubmissionsApi from '@/services/fieldSubmissionsApi'
 import { useAuthStore } from '@/stores/auth'
+import Breadcrumbs from '@/components/Breadcrumbs.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -118,6 +119,7 @@ async function load() {
     submission.value = null
   } finally {
     loading.value = false
+    window.scrollTo(0, 0)
   }
 }
 
@@ -202,48 +204,33 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] py-6 px-4 sm:px-6">
-    <div class="mx-auto max-w-4xl">
-      <!-- Header -->
-      <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div class="flex items-center gap-3">
-          <button
-            type="button"
-            class="rounded p-2 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-            aria-label="Back"
-            @click="goBack"
-          >
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-          </button>
-          <h1 class="text-xl font-semibold text-gray-900">Field Head Edit</h1>
-          <span
-            v-if="auth.user?.name"
-            class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-green-600 text-sm font-medium text-white"
-          >
-            {{ auth.user.name.charAt(0).toUpperCase() }}
-          </span>
+  <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] p-0">
+    <div class="mx-auto max-w-4xl px-2 sm:px-4">
+      <!-- Single white card: heading + border + form (same background, thin border between) -->
+      <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
+        <!-- Heading: same background as form -->
+        <div class="px-4 py-4 sm:px-5">
+          <h1 class="text-xl font-semibold text-gray-900">Edit Field Submission</h1>
+          <Breadcrumbs />
         </div>
-      </div>
+        <div class="border-t border-gray-200" />
 
-      <div v-if="loading" class="flex justify-center py-16">
-        <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-        </svg>
-      </div>
+        <div v-if="loading" class="flex justify-center px-4 py-16 sm:px-5">
+          <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        </div>
 
-      <div v-else-if="!submission" class="rounded-lg border border-gray-200 bg-white p-8 text-center text-gray-500">
-        Unable to load submission. You may not have permission to view it.
-      </div>
+        <div v-else-if="!submission" class="px-4 py-8 text-center text-gray-500 sm:px-5">
+          Unable to load submission. You may not have permission to view it.
+        </div>
 
-      <form v-else class="space-y-6" @submit.prevent="submitForm">
-        <!-- Primary Information -->
-        <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 class="mb-4 text-sm font-semibold text-gray-900">Primary Information</h2>
-          <div class="grid gap-4 sm:grid-cols-2">
-            <div class="sm:col-span-2">
+        <form v-else class="px-4 py-5 sm:px-5" @submit.prevent="submitForm">
+        <!-- Section 1: Primary Information -->
+        <h2 class="mb-4 text-sm font-semibold text-gray-900">Primary Information</h2>
+        <div class="grid gap-4 sm:grid-cols-2">
+            <div>
               <label class="block text-sm font-medium text-gray-700">Company Name <span class="text-red-500">*</span></label>
               <input
                 v-model="form.company_name"
@@ -252,16 +239,27 @@ onMounted(() => {
                 class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
               />
             </div>
-            <div>
+            <div class="relative">
               <label class="block text-sm font-medium text-gray-700">Contact Number <span class="text-red-500">*</span></label>
               <input
                 v-model="form.contact_number"
                 type="text"
                 required
-                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 pr-9 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
               />
+              <button
+                v-if="form.contact_number"
+                type="button"
+                class="absolute right-2 top-8 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                aria-label="Clear"
+                @click="form.contact_number = ''"
+              >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-            <div class="sm:col-span-2">
+            <div>
               <label class="block text-sm font-medium text-gray-700">Complete Address <span class="text-red-500">*</span></label>
               <input
                 v-model="form.complete_address"
@@ -295,165 +293,150 @@ onMounted(() => {
               <input
                 v-model="form.location_coordinates"
                 type="text"
+                placeholder="e.g. 12.2048, 55.2708"
                 class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
               />
             </div>
-            <div class="sm:col-span-2">
+            <div>
               <label class="block text-sm font-medium text-gray-700">Remarks / Comment</label>
               <textarea
                 v-model="form.special_instruction"
-                rows="2"
+                rows="3"
                 placeholder="Enter any remarks or comments"
                 class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
               />
             </div>
-            <div class="sm:col-span-2">
+            <div>
               <label class="block text-sm font-medium text-gray-700">Additional Notes</label>
               <textarea
                 v-model="form.additional_notes"
-                rows="2"
+                rows="3"
                 placeholder="Enter any additional notes"
                 class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
               />
             </div>
-          </div>
         </div>
 
-        <!-- Team Member -->
-        <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 class="mb-4 text-sm font-semibold text-gray-900">Team Member</h2>
-          <div class="grid gap-4 sm:grid-cols-3">
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Sales Agent Name <span class="text-red-500">*</span></label>
-              <select
-                v-model="form.sales_agent_id"
-                required
-                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-              >
-                <option :value="null">Select</option>
-                <option v-for="u in filteredSalesAgents" :key="u.id" :value="u.id">{{ u.name }}</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Team Leader Name <span class="text-red-500">*</span></label>
-              <select
-                v-model="form.team_leader_id"
-                required
-                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-              >
-                <option :value="null">Select</option>
-                <option v-for="u in filteredTeamLeaders" :key="u.id" :value="u.id">{{ u.name }}</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Manager Name <span class="text-red-500">*</span></label>
-              <select
-                v-model="form.manager_id"
-                required
-                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-              >
-                <option :value="null">Select</option>
-                <option v-for="u in teamOptions.managers" :key="u.id" :value="u.id">{{ u.name }}</option>
-              </select>
-            </div>
+        <!-- Section 2: Team Member -->
+        <h2 class="mb-4 mt-8 text-sm font-semibold text-gray-900">Team Member</h2>
+        <div class="grid gap-4 sm:grid-cols-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Sales Agent Name <span class="text-red-500">*</span></label>
+            <select
+              v-model="form.sales_agent_id"
+              required
+              class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            >
+              <option :value="null">Select</option>
+              <option v-for="u in filteredSalesAgents" :key="u.id" :value="u.id">{{ u.name }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Team Leader Name <span class="text-red-500">*</span></label>
+            <select
+              v-model="form.team_leader_id"
+              required
+              class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            >
+              <option :value="null">Select</option>
+              <option v-for="u in filteredTeamLeaders" :key="u.id" :value="u.id">{{ u.name }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Manager Name <span class="text-red-500">*</span></label>
+            <select
+              v-model="form.manager_id"
+              required
+              class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            >
+              <option :value="null">Select</option>
+              <option v-for="u in teamOptions.managers" :key="u.id" :value="u.id">{{ u.name }}</option>
+            </select>
           </div>
         </div>
-
-        <!-- Additional Notes (Field Executive section) -->
-        <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 class="mb-4 text-sm font-semibold text-gray-900">Additional Notes</h2>
-          <div class="grid gap-4 sm:grid-cols-3">
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Field Executive Name</label>
-              <select
-                v-model="form.field_executive_id"
-                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-              >
-                <option :value="null">Select</option>
-                <option v-for="u in teamOptions.field_executives" :key="u.id" :value="u.id">{{ u.name }}</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Status</label>
-              <select
-                v-model="form.field_status"
-                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-              >
-                <option value="">Select</option>
-                <option v-for="s in editOptions.field_statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Meeting Date</label>
-              <input
-                v-model="form.meeting_date"
-                type="date"
-                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-              />
-            </div>
+        <div class="mt-4 grid gap-4 sm:grid-cols-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Field Executive Name <span class="text-red-500">*</span></label>
+            <select
+              v-model="form.field_executive_id"
+              class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            >
+              <option :value="null">Select</option>
+              <option v-for="u in teamOptions.field_executives" :key="u.id" :value="u.id">{{ u.name }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Status <span class="text-red-500">*</span></label>
+            <select
+              v-model="form.field_status"
+              class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            >
+              <option value="">Select</option>
+              <option v-for="s in editOptions.field_statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Meeting Date <span class="text-red-500">*</span></label>
+            <input
+              v-model="form.meeting_date"
+              type="date"
+              class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            />
           </div>
         </div>
-
-        <!-- Photographic Proof -->
-        <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 class="mb-4 text-sm font-semibold text-gray-900">Photographic Proof</h2>
-          <input ref="fileInput" type="file" multiple accept="image/*,.pdf" class="hidden" @change="onFileChange" />
-          <div class="flex flex-wrap items-center gap-4">
+        <div class="mt-4 grid gap-4 sm:grid-cols-2">
+          <div class="flex flex-col">
+            <label class="block text-sm font-medium text-gray-700">Photographic Proof <span class="text-red-500">*</span></label>
+            <input ref="fileInput" type="file" multiple accept="image/*,.pdf" class="hidden" @change="onFileChange" />
             <div
-              class="flex flex-1 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 py-8 px-4 hover:border-green-400 hover:bg-green-50/50"
+              class="mt-1 flex min-h-[120px] flex-1 items-center gap-3 rounded-lg border border-gray-300 bg-white px-3 py-2"
               @click="triggerFileSelect"
             >
-              <svg class="h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="h-8 w-8 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              <span class="mt-2 text-sm text-gray-600">Upload Required Document</span>
+              <span class="min-w-0 flex-1 text-sm text-gray-600">Upload Required Document</span>
+              <button
+                type="button"
+                class="flex-shrink-0 rounded bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-100"
+                @click.stop="triggerFileSelect"
+              >
+                <span class="inline-flex items-center gap-1">
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  Upload
+                </span>
+              </button>
             </div>
-            <button
-              type="button"
-              class="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-              @click="triggerFileSelect"
-            >
-              Upload
-            </button>
+            <div v-if="existingDocuments.length || newFiles.length" class="mt-2 flex flex-wrap gap-2">
+              <template v-for="doc in existingDocuments" :key="doc.id">
+                <div class="flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-2 py-1 text-xs">
+                  <span class="max-w-[140px] truncate">{{ docDisplayName(doc) }}</span>
+                  <button type="button" class="text-blue-600 hover:underline" @click="downloadDoc(doc)">Download</button>
+                </div>
+              </template>
+              <template v-for="(f, idx) in newFiles" :key="'new-' + idx">
+                <div class="flex items-center gap-2 rounded border border-green-200 bg-green-50 px-2 py-1 text-xs">
+                  <span class="max-w-[140px] truncate">{{ f.name }}</span>
+                  <button type="button" class="text-red-600 hover:underline" @click="removeNewFile(idx)">Remove</button>
+                </div>
+              </template>
+            </div>
           </div>
-          <!-- Existing documents -->
-          <div v-if="existingDocuments.length" class="mt-4 flex flex-wrap gap-2">
-            <div
-              v-for="doc in existingDocuments"
-              :key="doc.id"
-              class="flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
-            >
-              <span class="truncate max-w-[200px]">{{ docDisplayName(doc) }}</span>
-              <button type="button" class="text-blue-600 hover:underline" @click="downloadDoc(doc)">Download</button>
-            </div>
-          </div>
-          <!-- New files to upload -->
-          <div v-if="newFiles.length" class="mt-4 flex flex-wrap gap-2">
-            <div
-              v-for="(f, idx) in newFiles"
-              :key="idx"
-              class="flex items-center gap-2 rounded border border-green-200 bg-green-50 px-3 py-2 text-sm"
-            >
-              <span class="truncate max-w-[200px]">{{ f.name }}</span>
-              <span class="text-gray-500">({{ formatFileSize(f.size) }})</span>
-              <button type="button" class="text-red-600 hover:underline" @click="removeNewFile(idx)">Remove</button>
-            </div>
+          <div class="flex flex-col">
+            <label class="block text-sm font-medium text-gray-700">Remarks</label>
+            <textarea
+              v-model="form.remarks_by_field_agent"
+              rows="5"
+              placeholder="Remarks by Field Agent"
+              class="mt-1 min-h-[120px] w-full flex-1 resize-y rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            />
           </div>
         </div>
 
-        <!-- Remarks by Field Agent -->
-        <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 class="mb-4 text-sm font-semibold text-gray-900">Remarks</h2>
-          <textarea
-            v-model="form.remarks_by_field_agent"
-            rows="3"
-            placeholder="Remarks by Field Agent"
-            class="block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-          />
-        </div>
-
-        <!-- Actions -->
-        <div class="flex flex-wrap items-center justify-end gap-3 border-t border-gray-200 pt-4">
+        <!-- Actions (footer inside same card) -->
+        <div class="mt-8 flex flex-wrap items-center justify-end gap-3 border-t border-gray-200 pt-4">
           <button
             type="button"
             class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -464,16 +447,17 @@ onMounted(() => {
           <button
             type="submit"
             :disabled="saving"
-            class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70"
+            class="inline-flex items-center gap-2 rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70"
           >
-            <span v-if="saving">Saving...</span>
-            <span v-else>Submit Field Head</span>
-            <svg v-if="!saving" class="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg v-if="!saving" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
             </svg>
+            <span v-if="saving">Saving...</span>
+            <span v-else>Update Field Submission</span>
           </button>
         </div>
-      </form>
+        </form>
+      </div>
     </div>
   </div>
 </template>

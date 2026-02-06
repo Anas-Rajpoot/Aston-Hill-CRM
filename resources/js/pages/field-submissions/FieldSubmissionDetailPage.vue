@@ -6,6 +6,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import fieldSubmissionsApi from '@/services/fieldSubmissionsApi'
 import { useAuthStore } from '@/stores/auth'
+import Breadcrumbs from '@/components/Breadcrumbs.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -115,6 +116,7 @@ function docDisplayName(doc) {
 
 async function load() {
   if (!id.value) return
+  window.scrollTo(0, 0)
   loading.value = true
   submission.value = null
   try {
@@ -124,6 +126,7 @@ async function load() {
     submission.value = null
   } finally {
     loading.value = false
+    window.scrollTo(0, 0)
   }
 }
 
@@ -155,55 +158,53 @@ onMounted(() => load())
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] py-6 px-4 sm:px-6">
-    <div class="mx-auto max-w-4xl">
-      <!-- Header -->
-      <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div class="flex items-center gap-3">
-          <button
-            type="button"
-            class="rounded p-2 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-            aria-label="Back"
-            @click="goBack"
-          >
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-          </button>
-          <h1 class="text-xl font-semibold text-gray-900">Field Submission Details</h1>
+  <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] p-0">
+    <div class="mx-auto max-w-4xl px-2 sm:px-3">
+      <!-- Single white card: heading + breadcrumbs + detail (same background, thin border between) -->
+      <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
+        <!-- Heading + breadcrumbs: same white background -->
+        <div class="px-4 py-4 sm:px-5">
+          <div class="mb-3 flex flex-wrap items-center justify-between gap-4">
+            <h1 class="text-xl font-semibold text-gray-900">Field Submission Details</h1>
+            <div class="flex items-center gap-2">
+              <button
+                v-if="canEdit"
+                type="button"
+                class="rounded bg-green-500 px-4 py-2 text-sm font-medium text-white hover:bg-green-600"
+                @click="goToEdit"
+              >
+                Edit Submission
+              </button>
+              <button
+                type="button"
+                class="rounded p-2 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                aria-label="Close"
+                @click="goBack"
+              >
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <Breadcrumbs />
         </div>
-        <div class="flex items-center gap-2">
-          <button
-            type="button"
-            class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            @click="goBack"
-          >
-            Close
-          </button>
-          <button
-            v-if="canEdit"
-            type="button"
-            class="rounded bg-green-500 px-4 py-2 text-sm font-medium text-white hover:bg-green-600"
-            @click="goToEdit"
-          >
-            Edit Submission
-          </button>
+
+        <!-- Thin border between heading area and detail part -->
+        <div class="border-t border-gray-200" />
+
+        <div v-if="loading" class="flex justify-center px-4 py-16 sm:px-5">
+          <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
         </div>
-      </div>
 
-      <div v-if="loading" class="flex justify-center py-16">
-        <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-        </svg>
-      </div>
+        <div v-else-if="!submission" class="px-4 py-8 text-center text-gray-500 sm:px-5">
+          Unable to load submission. You may not have permission to view it.
+        </div>
 
-      <div v-else-if="!submission" class="rounded-lg border border-gray-200 bg-white p-8 text-center text-gray-500 shadow-sm">
-        Unable to load submission. You may not have permission to view it.
-      </div>
-
-      <div v-else class="rounded-lg border border-gray-200 bg-white shadow-sm">
-        <div class="px-6 py-5">
+        <div v-else class="px-4 py-5 sm:px-5">
           <!-- Basic Information -->
           <section class="mb-6">
             <h2 class="mb-3 text-sm font-semibold text-gray-900">Basic Information</h2>
@@ -213,20 +214,16 @@ onMounted(() => load())
                 <div class="mt-1 text-sm font-medium text-gray-800">{{ submissionId(submission) }}</div>
               </div>
               <div>
-                <label class="block text-xs font-medium text-gray-500">Company Name</label>
-                <div class="mt-1 text-sm font-medium text-gray-800">{{ displayVal(submission.company_name) }}</div>
-              </div>
-              <div>
                 <label class="block text-xs font-medium text-gray-500">Submission Date</label>
                 <div class="mt-1 text-sm font-medium text-gray-800">{{ formatDateTime(submission.submitted_at) }}</div>
               </div>
               <div>
-                <label class="block text-xs font-medium text-gray-500">Contact Number</label>
-                <div class="mt-1 text-sm font-medium text-gray-800">{{ displayVal(submission.contact_number) }}</div>
+                <label class="block text-xs font-medium text-gray-500">Company Name</label>
+                <div class="mt-1 text-sm font-medium text-gray-800">{{ displayVal(submission.company_name) }}</div>
               </div>
               <div>
-                <label class="block text-xs font-medium text-gray-500">Alternate Number</label>
-                <div class="mt-1 text-sm font-medium text-gray-800">{{ displayVal(submission.alternate_number) }}</div>
+                <label class="block text-xs font-medium text-gray-500">Contact Number</label>
+                <div class="mt-1 text-sm font-medium text-gray-800">{{ displayVal(submission.contact_number) }}</div>
               </div>
             </div>
           </section>
@@ -367,7 +364,7 @@ onMounted(() => load())
           </section>
         </div>
 
-        <div class="border-t border-gray-200 px-6 py-4 text-right">
+        <div v-if="submission" class="border-t border-gray-200 px-4 py-4 text-right sm:px-5">
           <button
             type="button"
             class="rounded bg-lime-500 px-4 py-2 text-sm font-medium text-white hover:bg-lime-600"

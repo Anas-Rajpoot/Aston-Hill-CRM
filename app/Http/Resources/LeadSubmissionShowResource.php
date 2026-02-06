@@ -53,6 +53,12 @@ class LeadSubmissionShowResource extends JsonResource
             'gaid' => $this->gaid,
             'remarks' => $this->remarks,
             'request_type' => $this->request_type,
+            // Request Type: use DB column submission_type (new|resubmission), fallback to payload for existing rows
+            'submission_type' => match ($this->submission_type) {
+                'resubmission' => 'Resubmission',
+                'new' => 'New Submission',
+                default => ! empty($this->payload['is_resubmission'] ?? $this->payload['resubmission_reason'] ?? null) ? 'Resubmission' : 'New Submission',
+            },
             // Team IDs
             'manager_id' => $this->manager_id,
             'team_leader_id' => $this->team_leader_id,

@@ -119,8 +119,19 @@ class FieldSubmissionController extends Controller
                 }
             }
 
-            // Field executives: same pool as sales agents for dropdown (assign field agent).
-            $fieldExecutives = $salesAgents;
+            // Field executives: users with field_agent role only (for assign field technician).
+            $fieldExecutives = collect();
+            try {
+                $fieldAgentRole = \Spatie\Permission\Models\Role::where('name', 'field_agent')->first();
+                if ($fieldAgentRole) {
+                    $fieldExecutives = User::role($fieldAgentRole)->orderBy('name')->get(['id', 'name', 'email']);
+                }
+            } catch (\Throwable $e) {
+                Log::debug('Field agent role lookup: ' . $e->getMessage());
+            }
+            if ($fieldExecutives->isEmpty()) {
+                $fieldExecutives = $salesAgents;
+            }
 
             return [
                 'managers' => $formatUsers($managers, true),

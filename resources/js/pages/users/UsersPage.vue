@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import usersApi from '@/services/usersApi'
+import Breadcrumbs from '@/components/Breadcrumbs.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -233,6 +234,7 @@ watch(
       <h1 class="text-2xl font-bold text-gray-900">Users</h1>
       <p class="mt-1 text-sm text-gray-500">Manage system users, assign roles, and control access.</p>
     </div>
+    <Breadcrumbs />
 
     <!-- Success message -->
     <div
@@ -371,7 +373,7 @@ watch(
         </div>
         <!-- Apply/Reset on left -->
         <div class="mt-4 flex items-center justify-start gap-2">
-          <button type="button" @click="applyFilters" class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+          <button type="button" @click="applyFilters" class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
@@ -390,7 +392,7 @@ watch(
     <!-- Table (no overflow - page scroll only) -->
     <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
       <div v-if="loading" class="flex justify-center items-center py-16">
-        <svg class="animate-spin h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24">
+        <svg class="animate-spin h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
         </svg>

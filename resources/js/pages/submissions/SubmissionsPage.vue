@@ -7,6 +7,7 @@ import { ref, onMounted, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
 import Tabs from '@/components/Tabs.vue'
 import SubmissionFormSkeleton from '@/components/skeletons/SubmissionFormSkeleton.vue'
+import Breadcrumbs from '@/components/Breadcrumbs.vue'
 
 function asyncForm(loader) {
   return defineAsyncComponent({
@@ -56,6 +57,8 @@ function onLeadNewSubmission() {
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] py-6 px-4 sm:px-6">
     <div class="max-w-6xl mx-auto space-y-6">
+      <h1 class="text-xl font-semibold text-gray-900">Submissions</h1>
+      <Breadcrumbs />
       <!-- TABS (dark bar like 1st image) -->
       <Tabs
         :tabs="tabs"

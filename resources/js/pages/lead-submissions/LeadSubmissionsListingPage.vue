@@ -10,8 +10,10 @@ import FiltersBar from '@/components/lead-submissions/FiltersBar.vue'
 import AdvancedFilters from '@/components/lead-submissions/AdvancedFilters.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import EditSubmissionModal from '@/components/lead-submissions/EditSubmissionModal.vue'
+import AssignBackOfficeModal from '@/components/lead-submissions/AssignBackOfficeModal.vue'
 import LeadTable from '@/components/lead-submissions/LeadTable.vue'
 import Pagination from '@/components/Pagination.vue'
+import Breadcrumbs from '@/components/Breadcrumbs.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -29,7 +31,7 @@ const filterOptions = ref({
 const leads = ref([])
 const meta = ref({ current_page: 1, last_page: 1, per_page: 15, total: 0 })
 const allColumns = ref([])
-const visibleColumns = ref(['submitted_at', 'created_at', 'account_number', 'company_name', 'category', 'type', 'product', 'mrc_aed', 'quantity', 'manager', 'team_leader', 'sales_agent', 'creator', 'email', 'contact_number_gsm', 'status', 'status_changed_at'])
+const visibleColumns = ref(['submitted_at', 'submission_type', 'account_number', 'company_name', 'category', 'type', 'product', 'mrc_aed', 'quantity', 'manager', 'team_leader', 'sales_agent', 'status', 'sla_timer', 'executive', 'status_changed_at', 'creator', 'email', 'contact_number_gsm'])
 const sort = ref('created_at')
 const order = ref('desc')
 const advancedVisible = ref(false)
@@ -37,6 +39,8 @@ const columnModalVisible = ref(false)
 const exportLoading = ref(false)
 const editModalVisible = ref(false)
 const editLeadId = ref(null)
+const assignModalVisible = ref(false)
+const assignLeadRow = ref(null)
 
 const filters = ref({
   q: '',
@@ -99,6 +103,7 @@ const COLUMN_LABELS = {
   id: 'ID',
   submitted_at: 'Submission Date',
   created_at: 'Created',
+  submission_type: 'Type',
   account_number: 'Account Number',
   company_name: 'Company Name',
   category: 'Service Category',
@@ -110,8 +115,10 @@ const COLUMN_LABELS = {
   team_leader: 'Team Leader',
   manager: 'Manager',
   status: 'Status',
+  sla_timer: 'SLA Timer',
   status_changed_at: 'Last Updated',
   creator: 'Created By',
+  executive: 'Back Office Executive',
   email: 'Email',
   contact_number_gsm: 'Contact',
 }
@@ -160,6 +167,7 @@ async function onExport() {
 }
 
 async function load() {
+  window.scrollTo(0, 0)
   loading.value = true
   try {
     const data = await leadSubmissionsApi.index(buildParams())
@@ -167,6 +175,7 @@ async function load() {
     meta.value = data.meta ?? meta.value
   } finally {
     loading.value = false
+    window.scrollTo(0, 0)
   }
 }
 
@@ -279,7 +288,7 @@ async function onUpdateStatus(leadId, newStatus) {
       row.status = prevStatus
       row.status_changed_at = prevChangedAt
     }
-    load()
+    load().catch(() => { /* reload failed, e.g. server down; row already reverted */ })
   }
 }
 
@@ -308,6 +317,22 @@ function openEditModal(leadId) {
   editModalVisible.value = true
 }
 
+function openAssignModal(row) {
+  if (!row) return
+  assignLeadRow.value = row
+  assignModalVisible.value = true
+}
+
+function onAssignModalSaved() {
+  assignLeadRow.value = null
+  load()
+}
+
+function onAssignModalClose() {
+  assignModalVisible.value = false
+  assignLeadRow.value = null
+}
+
 function onEditModalSaved() {
   load()
 }
@@ -327,7 +352,7 @@ onMounted(() => {
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] py-6 px-4 sm:px-6">
     <div class="mx-auto max-w-7xl space-y-4">
-      <!-- Top: title + Bulk Assign, Export -->
+      <!-- Top: title (left), Bulk Assign + Export (right) -->
       <div class="flex flex-wrap items-center justify-between gap-4">
         <h1 class="text-xl font-semibold text-gray-900">Lead Submissions</h1>
         <div class="flex flex-wrap items-center gap-2">
@@ -370,6 +395,7 @@ onMounted(() => {
           </button>
         </div>
       </div>
+      <Breadcrumbs />
 
       <!-- Export in progress message -->
       <div
@@ -434,6 +460,7 @@ onMounted(() => {
           @update-status="onUpdateStatus"
           @update-status-changed-at="onUpdateStatusChangedAt"
           @open-edit="openEditModal"
+          @open-assign="openAssignModal"
         />
         <div
           class="flex flex-wrap items-center gap-4 border-t border-gray-200 bg-gray-100 px-4 py-3"
@@ -469,6 +496,13 @@ onMounted(() => {
       :lead-id="editLeadId"
       @close="editModalVisible = false"
       @saved="onEditModalSaved"
+    />
+
+    <AssignBackOfficeModal
+      :visible="assignModalVisible"
+      :lead="assignLeadRow"
+      @close="onAssignModalClose"
+      @saved="onAssignModalSaved"
     />
   </div>
 </template>

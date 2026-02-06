@@ -12,7 +12,7 @@ class LeadSubmission extends Model
         'alternate_contact_number','email','address','emirate','location_coordinates',
         'product','offer','mrc_aed','quantity','ae_domain','gaid',
         'sales_agent_id','team_leader_id','manager_id','executive_id','service_category_id','service_type_id',
-        'payload','submitted_at','remarks','approved_at','rejected_at','approved_by','rejected_by',
+        'payload','submitted_at','submission_type','remarks','approved_at','rejected_at','approved_by','rejected_by',
         'call_verification','pending_from_sales','documents_verification','submission_date_from',
         'back_office_notes','activity','back_office_account','work_order','du_status','completion_date','du_remarks','additional_note',
     ];

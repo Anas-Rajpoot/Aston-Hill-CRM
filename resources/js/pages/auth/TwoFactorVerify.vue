@@ -28,19 +28,23 @@ const submit = async () => {
   <div class="min-h-screen flex items-center justify-center bg-gray-100 px-4">
     <div class="w-full max-w-md bg-white rounded-xl shadow-lg p-8">
       <h1 class="text-xl font-semibold text-gray-800 mb-2">Two-Factor Verification</h1>
-      <p class="text-sm text-gray-600 mb-6">
-        Enter the 6-digit code from your Google Authenticator app.
-      </p>
+      <div class="text-sm text-gray-600 mb-6 space-y-3">
+        <p><strong>Where to get the 6-digit code</strong></p>
+        <p>Open <strong>Google Authenticator</strong> (or Microsoft Authenticator, etc.) on your phone, find the entry for this app, and use the 6-digit code shown there. The code changes every 30 seconds.</p>
+        <p><strong>Where to enter it</strong></p>
+        <p>Type that code in the box below and click Verify.</p>
+      </div>
       <form @submit.prevent="submit" class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">OTP Code</label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">6-digit code</label>
           <input
             v-model="code"
             type="text"
             inputmode="numeric"
             maxlength="6"
             placeholder="000000"
-            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-center text-lg tracking-widest"
+            autocomplete="one-time-code"
+            class="w-full rounded-lg border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-center text-lg tracking-widest"
           />
           <p v-if="error" class="mt-2 text-sm text-red-600">{{ error }}</p>
         </div>
@@ -52,6 +56,9 @@ const submit = async () => {
           {{ loading ? 'Verifying...' : 'Verify' }}
         </button>
       </form>
+      <p class="mt-4 text-center text-sm text-gray-500">
+        Haven’t set up 2FA yet? <a href="/2fa/setup" class="text-indigo-600 hover:underline">Set up Google Authenticator</a> (log in without 2FA first, then open this link).
+      </p>
     </div>
   </div>
 </template>

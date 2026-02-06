@@ -6,6 +6,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/lib/axios'
+import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import SkeletonList from '@/components/skeletons/SkeletonList.vue'
 
 const router = useRouter()
@@ -34,6 +35,7 @@ const goToRolePermissions = (role) => {
         Permissions are set per role. Choose a role below to view or edit its permissions, or go to Roles to create and manage roles.
       </p>
     </div>
+    <Breadcrumbs />
 
     <div class="rounded-xl border border-gray-200 bg-white shadow-sm p-6">
       <div class="flex flex-wrap items-center justify-between gap-4 mb-4">

@@ -8,6 +8,7 @@ import { useRouter } from 'vue-router'
 import api from '@/lib/axios'
 import SkeletonStatsCards from '@/components/skeletons/SkeletonStatsCards.vue'
 import SkeletonTable from '@/components/skeletons/SkeletonTable.vue'
+import Breadcrumbs from '@/components/Breadcrumbs.vue'
 
 const router = useRouter()
 const roles = ref([])
@@ -106,6 +107,7 @@ onUnmounted(() => {
         Add New Role
       </button>
     </div>
+    <Breadcrumbs />
 
     <div v-if="successMessage" class="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700 flex items-center justify-between">
       <span>{{ successMessage }}</span>

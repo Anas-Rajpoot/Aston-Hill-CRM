@@ -43,7 +43,7 @@ class UserController extends Controller
             ->latest();
 
         $users = $query->clone()->paginate($request->get('per_page', 10));
-        $roles = Role::orderBy('name')->get(['id', 'name']);
+        $roles = Role::orderBy('name')->get(['id', 'name', 'description']);
 
         $statsQuery = User::query();
         if (!$request->user()->hasRole('superadmin')) {
@@ -160,7 +160,7 @@ class UserController extends Controller
         $user->load('roles:id,name');
         $lastLog = UserLoginLog::where('user_id', $user->id)->orderByDesc('login_at')->first();
         $user->last_login_at = $lastLog?->login_at ? (is_object($lastLog->login_at) ? $lastLog->login_at->format('c') : (string) $lastLog->login_at) : null;
-        $roles = Role::orderBy('name')->get(['id', 'name']);
+        $roles = Role::orderBy('name')->get(['id', 'name', 'description']);
         $mappings = TeamRoleMapping::allMappings();
         $managerRoleId = TeamRoleMapping::roleIdFor('manager');
         $teamLeaderRoleId = TeamRoleMapping::roleIdFor('team_leader');

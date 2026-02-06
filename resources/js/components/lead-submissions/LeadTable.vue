@@ -14,7 +14,7 @@ const props = defineProps({
   loading: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['sort', 'updateStatus', 'updateStatusChangedAt', 'openEdit'])
+const emit = defineEmits(['sort', 'updateStatus', 'updateStatusChangedAt', 'openEdit', 'openAssign'])
 let router = null
 try {
   router = useRouter()
@@ -51,6 +51,16 @@ const canEditBackOffice = computed(() => {
     return name === 'superadmin' || name === 'backoffice' || name === 'back_office'
   })
 })
+
+/** Resubmit: rejected only; super admin or the user who submitted (creator / created_by). */
+function canResubmit(row) {
+  if (row.status !== 'rejected') return false
+  const roles = auth.user?.roles ?? []
+  const isSuperAdmin = Array.isArray(roles) && roles.some((r) => (typeof r === 'string' ? r : r?.name) === 'superadmin')
+  if (isSuperAdmin) return true
+  const creatorId = row.creator?.id ?? row.created_by
+  return creatorId != null && Number(creatorId) === Number(auth.user?.id)
+}
 
 /** { rowId, col: 'status' | 'status_changed_at' } when a cell is in edit mode */
 const editingCell = ref(null)
@@ -107,6 +117,7 @@ const columnLabels = {
   id: 'ID',
   submitted_at: 'Submission Date',
   created_at: 'Created',
+  submission_type: 'Type',
   account_number: 'Account Number',
   company_name: 'Company Name',
   category: 'Service Category',
@@ -118,8 +129,10 @@ const columnLabels = {
   team_leader: 'Team Leader',
   manager: 'Manager',
   status: 'Status',
+  sla_timer: 'SLA Timer',
   status_changed_at: 'Last Updated',
   creator: 'Created By',
+  executive: 'Back Office Executive',
   email: 'Email',
   contact_number_gsm: 'Contact',
 }
@@ -128,7 +141,7 @@ const SORTABLE_COLUMNS = [
   'id', 'submitted_at', 'created_at', 'account_number', 'company_name',
   'category', 'type', 'product', 'mrc_aed', 'quantity', 'status',
   'status_changed_at', 'sales_agent', 'team_leader', 'manager', 'creator',
-  'email', 'contact_number_gsm',
+  'executive', 'email', 'contact_number_gsm', 'submission_type', 'sla_timer',
 ]
 
 function label(col) {
@@ -346,6 +359,39 @@ function statusBadgeClass(status) {
             <template v-else-if="col === 'mrc_aed'">
               {{ row.mrc_aed != null ? Number(row.mrc_aed).toLocaleString() : '—' }}
             </template>
+            <template v-else-if="col === 'executive'">
+              <button
+                v-if="row[col] === 'Unassigned' && canEditBackOffice"
+                type="button"
+                class="text-left text-sm text-blue-600 hover:underline"
+                @click="$emit('openAssign', row)"
+              >
+                Unassigned
+              </button>
+              <span v-else>{{ row[col] ?? '—' }}</span>
+            </template>
+            <template v-else-if="col === 'submission_type'">
+              <span
+                :class="[
+                  'inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium',
+                  row[col] === 'Resubmission' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800',
+                ]"
+              >
+                {{ row[col] === 'Resubmission' ? 'Resubmission' : 'New Submission' }}
+              </span>
+            </template>
+            <template v-else-if="col === 'sla_timer'">
+              <span
+                v-if="row[col]"
+                :class="[
+                  'inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium',
+                  String(row[col]).startsWith('Overdue') ? 'bg-red-100 text-red-800' : String(row[col]).includes('h left') ? 'bg-orange-100 text-orange-800' : 'bg-green-100 text-green-800',
+                ]"
+              >
+                {{ row[col] }}
+              </span>
+              <span v-else>—</span>
+            </template>
             <template v-else-if="['company_name', 'account_number', 'product', 'type', 'email'].includes(col)">
               {{ truncate(formatValue(row, col), 18) }}
             </template>
@@ -370,7 +416,7 @@ function statusBadgeClass(status) {
                 </svg>
               </button>
               <button
-                v-if="canEditBackOffice"
+                v-if="canEditBackOffice && !canResubmit(row)"
                 type="button"
                 class="rounded-full p-1.5 text-green-600 hover:bg-green-50"
                 title="Edit Submission"
@@ -380,8 +426,16 @@ function statusBadgeClass(status) {
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                 </svg>
               </button>
+              <template v-else-if="canResubmit(row)">
+                <router-link
+                  :to="{ path: `/lead-submissions/${row.id}/resubmit` }"
+                  class="rounded bg-blue-800 px-2 py-1 text-xs font-medium text-white hover:bg-blue-900"
+                >
+                  Resubmit
+                </router-link>
+              </template>
               <button
-                v-else
+                v-else-if="!canResubmit(row) && row.status !== 'rejected'"
                 type="button"
                 class="rounded-full p-1.5 text-green-600 hover:bg-green-50"
                 title="Edit"
@@ -391,13 +445,6 @@ function statusBadgeClass(status) {
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                 </svg>
               </button>
-              <router-link
-                v-if="row.status === 'rejected' && canEdit"
-                :to="{ path: '/submissions', query: { lead_id: row.id } }"
-                class="rounded bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700"
-              >
-                Resubmit
-              </router-link>
             </div>
           </td>
         </tr>

@@ -27,6 +27,7 @@ const routes = [
       { path: '', component: Dashboard, name: 'home' },
       { path: 'submissions', component: () => import('@/pages/submissions/SubmissionsPage.vue') },
       { path: 'lead-submissions', component: () => import('@/pages/lead-submissions/LeadSubmissionsListingPage.vue') },
+      { path: 'lead-submissions/:id/resubmit', component: () => import('@/pages/lead-submissions/LeadResubmissionPage.vue'), name: 'lead-resubmission' },
       { path: 'lead-submissions/:id', component: () => import('@/pages/lead-submissions/LeadSubmissionDetailPage.vue'), name: 'lead-submission-detail' },
       { path: 'users', component: () => import('@/pages/users/UsersPage.vue') },
       { path: 'users/create', component: () => import('@/pages/users/UserCreate.vue') },
@@ -65,6 +66,9 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
+  scrollBehavior() {
+    return { top: 0 }
+  },
 })
 
 const authPaths = ['/login', '/register', '/forgot-password', '/2fa/verify']
@@ -74,13 +78,15 @@ router.beforeEach(async (to, from, next) => {
   const auth = useAuthStore()
   const authPath = isAuthPath(to.path)
 
-  if (!auth.user) await auth.fetchUser()
-
-  if (authPath && auth.isAuthenticated && to.path !== '/2fa/verify') {
-    return next('/')
+  // Allow /2fa/verify without requiring auth.user so login → 2fa redirect always shows the page
+  if (to.path === '/2fa/verify') {
+    return next()
   }
-  if (to.path === '/2fa/verify' && !auth.isAuthenticated) {
-    return next('/login')
+
+  if (!auth.user || !auth.user.pending2FA) await auth.fetchUser()
+
+  if (authPath && auth.isAuthenticated) {
+    return next('/')
   }
   if (!authPath && !auth.isAuthenticated) {
     return next('/login')

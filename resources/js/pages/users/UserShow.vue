@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import usersApi from '@/services/usersApi'
+import Breadcrumbs from '@/components/Breadcrumbs.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -74,7 +75,7 @@ const onResetPassword = () => {
 <template>
   <div class="space-y-0">
     <div v-if="loading" class="flex justify-center py-16">
-      <svg class="animate-spin h-8 w-8 text-indigo-500" fill="none" viewBox="0 0 24 24">
+      <svg class="animate-spin h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
       </svg>
@@ -103,7 +104,9 @@ const onResetPassword = () => {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
+          </div>
         </div>
+        <Breadcrumbs />
       </div>
 
       <!-- Profile summary: Avatar, Name, User ID -->

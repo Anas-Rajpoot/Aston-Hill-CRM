@@ -54,6 +54,7 @@ export const useAuthStore = defineStore('auth', {
     },
 
     async _doFetchUser() {
+      if (this.user?.pending2FA) return
       try {
         const hasToken = sessionStorage.getItem('api_token') || localStorage.getItem('api_token')
         const hasCsrfFromPage = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
@@ -122,6 +123,15 @@ export const useAuthStore = defineStore('auth', {
           setBootstrapInStorage({ user: this.user, permissions: data.permissions })
           return data
         }
+        if (data.redirect === '/2fa/verify') {
+          this.user = { pending2FA: true }
+          try {
+            localStorage.removeItem(BOOTSTRAP_CACHE_KEY)
+          } catch {
+            //
+          }
+          return data
+        }
         await this.fetchUser()
         return data
       } finally {
@@ -148,6 +158,7 @@ export const useAuthStore = defineStore('auth', {
 
     async verify2FA(code) {
       const { data } = await api.post('/auth/2fa/verify', { otp: code })
+      this.user = null
       await this.fetchUser()
       return data
     },

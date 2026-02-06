@@ -45,6 +45,28 @@ const leadSubmissionsApi = {
     return api.get(`/lead-submissions/${id}`)
   },
 
+  /** Resubmission form: load lead + categories + document definitions (rejected only). */
+  getResubmissionData(id) {
+    return api.get(`/lead-submissions/${id}/resubmission-data`)
+  },
+
+  /** Resubmit: submit form (action: 'draft' | 'submit') and optional document files. */
+  resubmit(id, payload, files = null) {
+    const form = new FormData()
+    Object.entries(payload).forEach(([k, v]) => {
+      if (v != null && v !== '') form.append(k, v)
+    })
+    if (files) {
+      Object.entries(files).forEach(([key, fileList]) => {
+        const list = Array.isArray(fileList) ? fileList : [fileList]
+        list.forEach((f) => f && form.append(`documents[${key}][]`, f))
+      })
+    }
+    return api.post(`/lead-submissions/${id}/resubmit`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+
   discardDraft(id) {
     return api.delete(`/lead-submissions/${id}/discard`)
   },

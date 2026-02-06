@@ -7,6 +7,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import api from '@/lib/axios'
 import SkeletonPermissionCards from '@/components/skeletons/SkeletonPermissionCards.vue'
+import Breadcrumbs from '@/components/Breadcrumbs.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -151,6 +152,7 @@ watch(roleId, load)
         {{ saving ? 'Saving…' : 'Save Changes' }}
       </button>
     </div>
+    <Breadcrumbs />
 
     <div v-if="successMessage" class="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700">
       {{ successMessage }}

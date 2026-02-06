@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
@@ -20,7 +20,8 @@ const submit = async () => {
       password: password.value,
     })
     const redirect = data?.redirect || '/'
-    router.push(redirect)
+    await nextTick()
+    await router.push(redirect)
   } catch (e) {
     const err = e?.response?.data
     error.value = err?.errors?.email?.[0] || err?.message || 'Invalid credentials'

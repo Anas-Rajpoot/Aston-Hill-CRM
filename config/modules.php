@@ -49,6 +49,7 @@ return [
         'columns' => [
             'id' => ['label' => 'ID', 'filter' => null, 'sortable' => true],
             'submitted_at' => ['label' => 'Submission Date', 'filter' => 'date', 'sortable' => true],
+            'submission_type' => ['label' => 'Type', 'filter' => null, 'sortable' => false],
             'account_number' => ['label' => 'Account Number', 'filter' => 'text', 'sortable' => true],
             'company_name' => ['label' => 'Company Name', 'filter' => 'text', 'sortable' => true],
             'category' => ['label' => 'Service Category', 'filter' => 'select', 'sortable' => true],
@@ -60,14 +61,17 @@ return [
             'team_leader' => ['label' => 'Team Leader', 'filter' => null, 'sortable' => true],
             'manager' => ['label' => 'Manager', 'filter' => null, 'sortable' => true],
             'status' => ['label' => 'Status', 'filter' => 'select', 'sortable' => true],
+            'sla_timer' => ['label' => 'SLA Timer', 'filter' => null, 'sortable' => false],
             'status_changed_at' => ['label' => 'Last Updated', 'filter' => 'date', 'sortable' => true],
             'created_at' => ['label' => 'Created', 'filter' => 'date', 'sortable' => true],
             'creator' => ['label' => 'Created By', 'filter' => null, 'sortable' => false],
+            'executive' => ['label' => 'Back Office Executive', 'filter' => null, 'sortable' => false],
             'email' => ['label' => 'Email', 'filter' => 'text', 'sortable' => true],
             'contact_number_gsm' => ['label' => 'Contact', 'filter' => 'text', 'sortable' => false],
         ],
-        'default_columns' => ['submitted_at', 'created_at', 'account_number', 'company_name', 'category', 'type', 'product', 'mrc_aed', 'quantity', 'manager', 'team_leader', 'sales_agent', 'creator', 'email', 'contact_number_gsm', 'status', 'status_changed_at'],
+        'default_columns' => ['submitted_at', 'submission_type', 'account_number', 'company_name', 'category', 'type', 'product', 'mrc_aed', 'quantity', 'manager', 'team_leader', 'sales_agent', 'status', 'sla_timer', 'executive', 'status_changed_at', 'creator', 'email', 'contact_number_gsm'],
         'default_sort' => ['created_at', 'desc'],
+        'sla_days' => 7,
     ],
 
     'field_submissions' => [

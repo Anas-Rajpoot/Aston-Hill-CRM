@@ -14,7 +14,7 @@ const props = defineProps({
   loading: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['sort', 'updateStatus'])
+const emit = defineEmits(['sort', 'updateStatus', 'assignTechnician'])
 const router = useRouter()
 const auth = useAuthStore()
 const perms = computed(() => auth.user?.permissions ?? [])
@@ -225,7 +225,16 @@ function slaTimerClass(slaTimer, slaStatus) {
               </span>
             </template>
             <template v-else-if="col === 'field_agent'">
+              <button
+                v-if="canEdit && row[col] === 'Unassigned'"
+                type="button"
+                class="cursor-pointer text-red-600 underline hover:text-red-700"
+                @click="$emit('assignTechnician', row)"
+              >
+                Unassigned
+              </button>
               <span
+                v-else
                 :class="row[col] === 'Unassigned' ? 'text-red-600' : 'font-semibold text-gray-900'"
               >
                 {{ formatValue(row, col) }}

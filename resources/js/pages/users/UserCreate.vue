@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import usersApi from '@/services/usersApi'
+import Breadcrumbs from '@/components/Breadcrumbs.vue'
 
 const router = useRouter()
 const form = ref({
@@ -59,6 +60,7 @@ const save = async () => {
       <h1 class="text-2xl font-bold text-gray-900">Add New User</h1>
       <p class="mt-1 text-sm text-gray-500">Create a new user account and assign roles.</p>
     </div>
+    <Breadcrumbs />
 
     <form @submit.prevent="save" class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-4 max-w-2xl">
       <div v-if="error" class="rounded-lg bg-red-50 border border-red-200 p-4 text-sm text-red-700">{{ error }}</div>

@@ -2,8 +2,11 @@
 /**
  * Column customization modal – checkboxes per column, Check All / Uncheck All.
  * Shows only columns user has permission to view (from API).
+ * Requires at least 4 columns to be selected before saving.
  */
 import { ref, watch } from 'vue'
+
+const MIN_COLUMNS = 4
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -14,15 +17,20 @@ const props = defineProps({
 const emit = defineEmits(['update:visible', 'save'])
 
 const localSelected = ref([...props.visibleColumns])
+const errorMessage = ref('')
 
 watch(
   () => [props.visible, props.visibleColumns],
   ([vis, cols]) => {
-    if (vis) localSelected.value = [...(cols || [])]
+    if (vis) {
+      localSelected.value = [...(cols || [])]
+      errorMessage.value = ''
+    }
   }
 )
 
 function toggle(col) {
+  errorMessage.value = ''
   const key = col.key
   if (localSelected.value.includes(key)) {
     localSelected.value = localSelected.value.filter((c) => c !== key)
@@ -32,19 +40,27 @@ function toggle(col) {
 }
 
 function checkAll() {
+  errorMessage.value = ''
   localSelected.value = props.allColumns.map((c) => c.key)
 }
 
 function uncheckAll() {
+  errorMessage.value = ''
   localSelected.value = []
 }
 
 function save() {
+  if (localSelected.value.length < MIN_COLUMNS) {
+    errorMessage.value = 'Please select at least 4 columns.'
+    return
+  }
+  errorMessage.value = ''
   emit('save', [...localSelected.value])
   emit('update:visible', false)
 }
 
 function close() {
+  errorMessage.value = ''
   emit('update:visible', false)
 }
 </script>
@@ -109,6 +125,7 @@ function close() {
                 <span class="text-sm">{{ col.label }}</span>
               </label>
             </div>
+            <p v-if="errorMessage" class="mt-3 text-sm text-red-600">{{ errorMessage }}</p>
           </div>
           <div class="flex flex-shrink-0 justify-end gap-2 border-t border-gray-200 bg-gray-50 px-4 py-3">
             <button
@@ -121,7 +138,6 @@ function close() {
             <button
               type="button"
               class="rounded bg-green-600 px-3 py-1.5 text-sm text-white hover:bg-green-700"
-              :disabled="localSelected.length === 0"
               @click="save"
             >
               Save

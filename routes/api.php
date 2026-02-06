@@ -58,6 +58,8 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
         ->whereNumber('fieldSubmission');
     Route::patch('/field-submissions/{fieldSubmission}/status', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'updateStatus'])
         ->whereNumber('fieldSubmission');
+    Route::patch('/field-submissions/{fieldSubmission}/assign-field-technician', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'assignFieldTechnician'])
+        ->whereNumber('fieldSubmission');
 
     // Customer support
     Route::get('/customer-support/team-options', [CustomerSupportController::class, 'teamOptions']);
@@ -92,6 +94,8 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::get('/lead-submissions/service-types', [LeadSubmissionController::class, 'serviceTypes']);
     Route::get('/lead-submissions/type-schema/{type}', [LeadSubmissionController::class, 'typeSchema']);
     Route::post('/lead-submissions/step-1', [LeadSubmissionController::class, 'storeStep1']);
+    Route::get('/lead-submissions/{lead}/resubmission-data', [LeadSubmissionController::class, 'resubmissionData'])->whereNumber('lead');
+    Route::post('/lead-submissions/{lead}/resubmit', [LeadSubmissionController::class, 'resubmit'])->whereNumber('lead');
     Route::get('/lead-submissions/{lead}', [LeadSubmissionController::class, 'show'])->whereNumber('lead');
     Route::put('/lead-submissions/{lead}/step-1', [LeadSubmissionController::class, 'updateStep1']);
     Route::delete('/lead-submissions/{lead}/discard', [LeadSubmissionController::class, 'discardDraft']);

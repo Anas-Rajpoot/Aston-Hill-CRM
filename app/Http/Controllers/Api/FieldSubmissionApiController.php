@@ -531,6 +531,26 @@ class FieldSubmissionApiController extends Controller
     }
 
     /**
+     * PATCH /api/field-submissions/{fieldSubmission}/assign-field-technician
+     * Assign a field technician (field executive) to a submission. Body: field_executive_id.
+     */
+    public function assignFieldTechnician(Request $request, FieldSubmission $fieldSubmission): JsonResponse
+    {
+        $this->authorize('update', $fieldSubmission);
+
+        $data = $request->validate([
+            'field_executive_id' => ['required', 'integer', 'exists:users,id'],
+        ]);
+
+        $fieldSubmission->update(['field_executive_id' => $data['field_executive_id']]);
+
+        return response()->json([
+            'id' => $fieldSubmission->id,
+            'message' => 'Field technician assigned.',
+        ]);
+    }
+
+    /**
      * GET /api/field-submissions/{fieldSubmission}/documents/{document}/download
      * Download a single document. Authorized same as view.
      */

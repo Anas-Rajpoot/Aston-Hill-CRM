@@ -29,8 +29,8 @@ class LeadSubmissionApiController extends Controller
         'created_at', 'submitted_at', 'created_by', 'product', 'mrc_aed', 'quantity',
     ];
 
-    /** Base columns required for every row (id for links, status for inline edit). */
-    private const BASE_COLUMNS = ['id', 'status'];
+    /** Base columns required for every row (id for links, status for inline edit, created_by for resubmit). */
+    private const BASE_COLUMNS = ['id', 'status', 'created_by'];
 
     public function __construct()
     {
@@ -48,10 +48,10 @@ class LeadSubmissionApiController extends Controller
         $validated = $request->validate([
             'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
-            'sort' => ['sometimes', 'string', Rule::in(array_merge(self::ALLOWED_COLUMNS, ['creator', 'type', 'category', 'sales_agent', 'team_leader', 'manager']))],
+            'sort' => ['sometimes', 'string', Rule::in(array_merge(self::ALLOWED_COLUMNS, ['creator', 'type', 'category', 'sales_agent', 'team_leader', 'manager', 'executive', 'submission_type', 'sla_timer']))],
             'order' => ['sometimes', 'string', Rule::in(['asc', 'desc'])],
             'columns' => ['sometimes', 'array'],
-            'columns.*' => ['string', Rule::in(array_merge(self::ALLOWED_COLUMNS, ['creator', 'type', 'category', 'sales_agent', 'team_leader', 'manager']))],
+            'columns.*' => ['string', Rule::in(array_merge(self::ALLOWED_COLUMNS, ['creator', 'type', 'category', 'sales_agent', 'team_leader', 'manager', 'executive', 'submission_type', 'sla_timer']))],
             'service_type_id' => ['sometimes', 'nullable', 'integer', 'exists:service_types,id'],
             'status' => ['sometimes', 'nullable', 'string', Rule::in(LeadSubmission::STATUSES)],
             'service_category_id' => ['sometimes', 'nullable', 'integer', 'exists:service_categories,id'],
@@ -110,6 +110,9 @@ class LeadSubmissionApiController extends Controller
                 $eagerLoad[$rel] = fn ($q) => $q->select('id', 'name');
             }
         }
+        if (in_array('executive', $columns, true)) {
+            $eagerLoad['executive'] = fn ($q) => $q->select('id', 'name');
+        }
         if (!empty($eagerLoad)) {
             $dataQuery->with($eagerLoad);
         }
@@ -138,7 +141,7 @@ class LeadSubmissionApiController extends Controller
     private function resolveColumns($user, ?array $requestColumns): array
     {
         if (!empty($requestColumns)) {
-            $allowed = array_intersect($requestColumns, array_merge(self::ALLOWED_COLUMNS, ['creator', 'type', 'category', 'sales_agent', 'team_leader', 'manager']));
+            $allowed = array_intersect($requestColumns, array_merge(self::ALLOWED_COLUMNS, ['creator', 'type', 'category', 'sales_agent', 'team_leader', 'manager', 'executive', 'submission_type', 'sla_timer']));
             return array_values(array_unique(array_merge(self::BASE_COLUMNS, $allowed)));
         }
 
@@ -152,7 +155,7 @@ class LeadSubmissionApiController extends Controller
         $cols = $preference?->visible_columns ?? config('modules.lead_submissions.default_columns', []);
         $cols = is_array($cols) ? $cols : [];
 
-        $allowed = array_intersect($cols, array_merge(self::ALLOWED_COLUMNS, ['creator', 'type', 'category', 'sales_agent', 'team_leader', 'manager']));
+        $allowed = array_intersect($cols, array_merge(self::ALLOWED_COLUMNS, ['creator', 'type', 'category', 'sales_agent', 'team_leader', 'manager', 'executive', 'submission_type', 'sla_timer']));
         return array_values(array_unique(array_merge(self::BASE_COLUMNS, $allowed)));
     }
 
@@ -263,6 +266,16 @@ class LeadSubmissionApiController extends Controller
         if (in_array('creator', $columns, true)) {
             $base[] = 'created_by';
         }
+        if (in_array('executive', $columns, true)) {
+            $base[] = 'executive_id';
+        }
+        if (in_array('submission_type', $columns, true)) {
+            $base[] = 'submission_type';
+            $base[] = 'payload';
+        }
+        if (in_array('sla_timer', $columns, true)) {
+            $base[] = 'submitted_at';
+        }
         foreach (['sales_agent', 'team_leader', 'manager'] as $rel) {
             if (in_array($rel, $columns, true)) {
                 $base[] = $rel . '_id';
@@ -291,6 +304,20 @@ class LeadSubmissionApiController extends Controller
                 $row['team_leader'] = $lead->relationLoaded('teamLeader') ? ($lead->teamLeader?->name ?? '-') : '-';
             } elseif ($col === 'manager') {
                 $row['manager'] = $lead->relationLoaded('manager') ? ($lead->manager?->name ?? '-') : '-';
+            } elseif ($col === 'executive') {
+                $row['executive'] = $lead->relationLoaded('executive') && $lead->executive
+                    ? $lead->executive->name
+                    : 'Unassigned';
+            } elseif ($col === 'submission_type') {
+                $row['submission_type'] = match ($lead->submission_type) {
+                    'resubmission' => 'Resubmission',
+                    'new' => 'New Submission',
+                    default => ! empty(($lead->payload ?? [])['is_resubmission'] ?? ($lead->payload ?? [])['resubmission_reason'] ?? null) ? 'Resubmission' : 'New Submission',
+                };
+            } elseif ($col === 'sla_timer') {
+                $row['sla_timer'] = $this->computeLeadSlaTimer($lead);
+            } elseif ($col === 'created_by') {
+                $row['created_by'] = $lead->created_by;
             } elseif (in_array($col, ['created_at', 'submitted_at', 'status_changed_at'], true)) {
                 $row[$col] = $lead->$col ? $lead->$col->toIso8601String() : null;
             } elseif ($col === 'mrc_aed' && $lead->mrc_aed !== null) {
@@ -300,6 +327,30 @@ class LeadSubmissionApiController extends Controller
             }
         }
         return $row;
+    }
+
+    /**
+     * SLA Timer for lead submission: due = submitted_at + SLA days. Returns "Xd left", "Xh left", or "Overdue Xd".
+     */
+    private function computeLeadSlaTimer(LeadSubmission $lead): ?string
+    {
+        $submittedAt = $lead->submitted_at ?? $lead->created_at;
+        if (! $submittedAt) {
+            return null;
+        }
+        $slaDays = (int) config('modules.lead_submissions.sla_days', 7);
+        $due = $submittedAt->copy()->addDays($slaDays)->endOfDay();
+        $now = now();
+        if ($due->isPast()) {
+            $daysOverdue = (int) $now->diffInDays($due);
+            return 'Overdue ' . $daysOverdue . 'd';
+        }
+        $totalHours = (int) $now->diffInHours($due, false);
+        $totalDays = (int) floor($totalHours / 24);
+        if ($totalDays >= 1) {
+            return $totalDays . 'd left';
+        }
+        return $totalHours . 'h left';
     }
 
     /**
@@ -376,7 +427,7 @@ class LeadSubmissionApiController extends Controller
 
         $data = $request->validate([
             'visible_columns' => ['required', 'array', 'min:1'],
-            'visible_columns.*' => ['string', Rule::in(array_merge(self::ALLOWED_COLUMNS, ['creator', 'type', 'category', 'sales_agent', 'team_leader', 'manager']))],
+            'visible_columns.*' => ['string', Rule::in(array_merge(self::ALLOWED_COLUMNS, ['creator', 'type', 'category', 'sales_agent', 'team_leader', 'manager', 'executive', 'submission_type', 'sla_timer']))],
         ]);
 
         UserColumnPreference::updateOrCreate(
@@ -450,10 +501,6 @@ class LeadSubmissionApiController extends Controller
             ->orderBy('name')
             ->get(['id', 'name'])
             ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name]);
-
-        if ($executives->isEmpty()) {
-            $executives = User::orderBy('name')->take(50)->get(['id', 'name'])->map(fn ($u) => ['id' => $u->id, 'name' => $u->name]);
-        }
 
         return response()->json([
             'executives' => $executives->values()->all(),

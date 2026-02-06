@@ -18,6 +18,7 @@ use Yajra\DataTables\Facades\DataTables;
 use App\Http\Resources\LeadSubmissionResource;
 use App\Http\Resources\LeadSubmissionShowResource;
 use App\Rules\AeDomainRule;
+use App\Rules\AllowedDocumentFile;
 
 class LeadSubmissionController extends Controller
 {
@@ -494,18 +495,18 @@ class LeadSubmissionController extends Controller
         $docKeys = array_filter(array_map(fn ($d) => $d['key'] ?? null, $docDefs));
         foreach ($docKeys as $key) {
             $rules["documents.$key"] = ['nullable', 'array'];
-            $rules["documents.$key.*"] = ['file', 'mimes:pdf,doc,docx,eml', 'max:3072'];
+            $rules["documents.$key.*"] = ['file', new AllowedDocumentFile(), 'max:3072'];
         }
         // Allow additional custom document keys
         $allDocKeys = array_keys($request->file('documents', []) ?: []);
         foreach ($allDocKeys as $key) {
             if (!in_array($key, $docKeys, true)) {
                 $rules["documents.$key"] = ['nullable', 'array'];
-                $rules["documents.$key.*"] = ['file', 'mimes:pdf,doc,docx,eml', 'max:3072'];
+                $rules["documents.$key.*"] = ['file', new AllowedDocumentFile(), 'max:3072'];
             }
         }
         $request->validate($rules, [
-            'documents.*.*.mimes' => 'Each file must be PDF, DOC, DOCX, or EML.',
+            'documents.*.*' => 'Each file must be PDF, DOC, DOCX, or EML.',
             'documents.*.*.max' => 'Each file must not exceed 3MB.',
         ]);
 
@@ -912,6 +913,7 @@ if ($request->expectsJson() || $request->ajax()) {
             'status' => 'submitted',
             'submitted_at' => now(),
             'status_changed_at' => now(),
+            'submission_type' => $leadSubmission->submission_type ?? 'new',
         ]);
 
         if (request()->expectsJson() || request()->ajax()) {
@@ -922,6 +924,138 @@ if ($request->expectsJson() || $request->ajax()) {
 
         return redirect()->route('lead-submissions.index')
             ->with('success', 'Lead submission submitted successfully');
+    }
+
+    /**
+     * GET resubmission form data: lead + categories + document definitions.
+     * Only for rejected leads; only super admin or creator.
+     */
+    public function resubmissionData(Request $request, $lead)
+    {
+        $leadSubmission = LeadSubmission::with([
+            'category:id,name',
+            'type:id,name,schema',
+            'documents',
+            'creator:id,name',
+        ])->findOrFail((int) $lead);
+
+        $this->authorize('resubmit', $leadSubmission);
+
+        if ($leadSubmission->status !== 'rejected') {
+            return response()->json(['message' => 'Only rejected submissions can be resubmitted.'], 422);
+        }
+
+        $categories = ServiceCategory::where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'slug']);
+        $resubmissionDocDefs = [
+            ['key' => 'trade_license', 'label' => 'Trade License', 'required' => true],
+            ['key' => 'establishment_card', 'label' => 'Establishment Card', 'required' => false],
+            ['key' => 'owner_emirates_id', 'label' => 'Owner Emirates ID', 'required' => true],
+            ['key' => 'vat_certificate', 'label' => 'VAT Certificate', 'required' => false],
+        ];
+
+        $leadArr = (new LeadSubmissionShowResource($leadSubmission))->resolve();
+        $payload = $leadSubmission->payload ?? [];
+        $leadArr['resubmission_reason'] = $payload['resubmission_reason'] ?? null;
+        $leadArr['previous_activity'] = $payload['previous_activity'] ?? null;
+
+        return response()->json([
+            'lead' => $leadArr,
+            'categories' => $categories,
+            'resubmission_documents' => $resubmissionDocDefs,
+        ]);
+    }
+
+    /**
+     * POST resubmit: update rejected lead with form data + documents, then set status to submitted.
+     * Only super admin or creator.
+     */
+    public function resubmit(Request $request, $lead)
+    {
+        $leadSubmission = LeadSubmission::findOrFail((int) $lead);
+        $this->authorize('resubmit', $leadSubmission);
+
+        if ($leadSubmission->status !== 'rejected') {
+            return response()->json(['message' => 'Only rejected submissions can be resubmitted.'], 422);
+        }
+
+        $isDraft = $request->input('action') === 'draft';
+
+        $rules = [
+            'account_number' => ['nullable', 'string', 'max:100'],
+            'company_name' => [$isDraft ? 'nullable' : 'required', 'string', 'max:255'],
+            'contact_number_gsm' => [$isDraft ? 'nullable' : 'required', 'string', 'max:50'],
+            'alternate_contact_number' => ['nullable', 'string', 'max:50'],
+            'address' => ['nullable', 'string', 'max:500'],
+            'previous_activity' => ['nullable', 'string', 'max:2000'],
+            'resubmission_reason' => ['nullable', 'string', 'max:2000'],
+            'remarks' => ['nullable', 'string', 'max:2000'],
+            'service_category_id' => ['nullable', 'integer', 'exists:service_categories,id'],
+            'service_type_id' => ['nullable', 'integer', 'exists:service_types,id'],
+        ];
+
+        $data = $request->validate($rules);
+
+        $payload = array_merge($leadSubmission->payload ?? [], [
+            'resubmission_reason' => $data['resubmission_reason'] ?? null,
+            'previous_activity' => $data['previous_activity'] ?? null,
+            'is_resubmission' => true, // mark so Request Type shows "Resubmission" on detail page
+        ]);
+
+        $update = [
+            'account_number' => $data['account_number'] ?? $leadSubmission->account_number,
+            'company_name' => $data['company_name'] ?? $leadSubmission->company_name,
+            'contact_number_gsm' => $data['contact_number_gsm'] ?? $leadSubmission->contact_number_gsm,
+            'alternate_contact_number' => $data['alternate_contact_number'] ?? $leadSubmission->alternate_contact_number,
+            'address' => $data['address'] ?? $leadSubmission->address,
+            'remarks' => $data['remarks'] ?? $leadSubmission->remarks,
+            'payload' => $payload,
+            'submission_type' => 'resubmission',
+            'updated_by' => $request->user()->id,
+        ];
+
+        if (!empty($data['service_category_id'])) {
+            $update['service_category_id'] = $data['service_category_id'];
+        }
+        if (!empty($data['service_type_id'])) {
+            $update['service_type_id'] = $data['service_type_id'];
+        }
+
+        $leadSubmission->update($update);
+
+        // Document uploads (resubmission doc keys)
+        $docKeys = ['trade_license', 'establishment_card', 'owner_emirates_id', 'vat_certificate'];
+        $fileRules = [];
+        foreach ($docKeys as $key) {
+            $fileRules["documents.{$key}"] = ['nullable', 'array'];
+            $fileRules["documents.{$key}.*"] = ['file', new AllowedDocumentFile(), 'max:3072'];
+        }
+        $request->validate($fileRules, [
+            'documents.*.*' => 'Each file must be PDF, DOC, DOCX, or EML.',
+            'documents.*.*.max' => 'Each file must not exceed 3MB.',
+        ]);
+        $this->leadSubmissionService->saveResubmissionDocuments($request, $leadSubmission, $docKeys);
+
+        if (!$isDraft) {
+            // Require Trade License on submit (must exist after saving uploads)
+            if (!$leadSubmission->documents()->where('doc_key', 'trade_license')->exists()) {
+                return response()->json(['message' => 'Trade License is required.'], 422);
+            }
+            // Submit: clear rejected state, set submitted, mark as resubmission
+            $leadSubmission->update([
+                'status' => 'submitted',
+                'submitted_at' => now(),
+                'status_changed_at' => now(),
+                'submission_type' => 'resubmission',
+                'rejected_at' => null,
+                'rejected_by' => null,
+            ]);
+        }
+
+        return response()->json([
+            'id' => $leadSubmission->id,
+            'message' => $isDraft ? 'Resubmission draft saved.' : 'Lead resubmitted successfully.',
+            'status' => $leadSubmission->fresh()->status,
+        ], $isDraft ? 200 : 200);
     }
 
 }

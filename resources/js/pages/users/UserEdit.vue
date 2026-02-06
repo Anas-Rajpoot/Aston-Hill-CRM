@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import usersApi from '@/services/usersApi'
 import api from '@/lib/axios'
+import Breadcrumbs from '@/components/Breadcrumbs.vue'
 
 const ROLE_DESCRIPTIONS = {
   superadmin: 'Full system access with all administrative privileges. Can manage users, roles, and system configurations.',
@@ -68,6 +69,19 @@ const filteredTeamLeaders = computed(() => {
   const mid = form.value.manager_id
   if (!mid) return teamLeaders.value
   return teamLeaders.value.filter((t) => String(t.manager_id) === String(mid))
+})
+
+/** Roles shown in Role Assignment: no superadmin, deduplicated by name so e.g. "Back Office" appears once. */
+const assignableRoles = computed(() => {
+  const list = (roles.value ?? []).filter((r) => (r?.name ?? '').toLowerCase() !== 'superadmin')
+  const seen = new Map()
+  for (const r of list) {
+    if (!r?.id) continue
+    const nameKey = (r.name ?? '').toLowerCase().replace(/\s+/g, '_')
+    if (seen.has(nameKey)) continue
+    seen.set(nameKey, r)
+  }
+  return Array.from(seen.values())
 })
 
 const roleDescription = (role) => ROLE_DESCRIPTIONS[role?.name?.toLowerCase()] || ''
@@ -174,14 +188,8 @@ const cancel = () => router.push(`/users/${route.params.id}`)
 
 <template>
   <div class="space-y-6">
-    <nav class="flex text-sm text-gray-500">
-      <router-link to="/users" class="hover:text-gray-700">Users</router-link>
-      <span class="mx-2">/</span>
-      <span class="text-gray-900 font-medium">Edit User</span>
-    </nav>
-
     <div v-if="loading" class="flex justify-center py-16">
-      <svg class="animate-spin h-8 w-8 text-indigo-500" fill="none" viewBox="0 0 24 24">
+      <svg class="animate-spin h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
       </svg>
@@ -192,6 +200,7 @@ const cancel = () => router.push(`/users/${route.params.id}`)
         <h1 class="text-2xl font-bold text-gray-900">Edit User</h1>
         <p class="mt-1 text-sm text-gray-500">Update user account and roles.</p>
       </div>
+      <Breadcrumbs />
 
       <div v-if="error" class="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
         {{ error }}
@@ -249,26 +258,24 @@ const cancel = () => router.push(`/users/${route.params.id}`)
           <label class="block text-sm font-medium text-gray-700 mb-3">Assigned Role(s) <span class="text-red-500">*</span></label>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <label
-              v-for="r in roles"
+              v-for="r in assignableRoles"
               :key="r.id"
               class="flex items-start gap-3 p-4 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer"
-              :class="{ 'opacity-60': r.name === 'superadmin' }"
             >
               <input
                 v-model="form.roles"
                 type="checkbox"
                 :value="r.id"
-                :disabled="r.name === 'superadmin' && !isSuperAdmin"
                 class="mt-1 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
               />
               <div class="min-w-0 flex-1">
                 <span class="font-medium text-gray-900 block">{{ r.name.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()) }}</span>
-                <p v-if="roleDescription(r)" class="mt-1 text-xs text-gray-500">{{ roleDescription(r) }}</p>
+                <p v-if="(r.description || roleDescription(r))" class="mt-1 text-xs text-gray-500">{{ r.description || roleDescription(r) }}</p>
               </div>
             </label>
           </div>
           <p class="mt-4 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-            Note: Multiple roles can be assigned. Super Admin role is locked and only assignable by Super Admin. Role changes apply immediately after save.
+            Note: Multiple roles can be assigned. Role changes apply immediately after save.
           </p>
           <div v-show="showTeamLeaderDropdown" class="mt-4 space-y-4">
             <div>

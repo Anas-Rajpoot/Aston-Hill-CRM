@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/lib/axios'
+import Breadcrumbs from '@/components/Breadcrumbs.vue'
 
 const auth = useAuthStore()
 const loading = ref(true)
@@ -24,7 +25,7 @@ const slotLabels = ref({
 onMounted(async () => {
   loading.value = true
   try {
-    const { data } = await web.get('/super-admin/team-role-mappings')
+    const { data } = await api.get('/super-admin/team-role-mappings')
     roles.value = data.roles || []
     if (data.mappings) {
       mappings.value = {
@@ -66,9 +67,10 @@ const save = async () => {
         Assign Spatie roles to the three hierarchy slots. Super admin can change role names or reassign roles – forms will adapt automatically.
       </p>
     </div>
+    <Breadcrumbs />
 
     <div v-if="loading" class="flex items-center justify-center py-12">
-      <svg class="animate-spin h-8 w-8 text-green-500" fill="none" viewBox="0 0 24 24">
+      <svg class="animate-spin h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
       </svg>

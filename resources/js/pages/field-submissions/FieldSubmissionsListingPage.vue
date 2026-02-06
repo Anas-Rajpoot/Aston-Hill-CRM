@@ -7,8 +7,10 @@ import fieldSubmissionsApi from '@/services/fieldSubmissionsApi'
 import FiltersBar from '@/components/field-submissions/FiltersBar.vue'
 import AdvancedFilters from '@/components/field-submissions/AdvancedFilters.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
+import AssignFieldTechnicianModal from '@/components/field-submissions/AssignFieldTechnicianModal.vue'
 import FieldTable from '@/components/field-submissions/FieldTable.vue'
 import Pagination from '@/components/Pagination.vue'
+import Breadcrumbs from '@/components/Breadcrumbs.vue'
 
 const loading = ref(true)
 const filterOptions = ref({
@@ -30,6 +32,9 @@ const sort = ref('created_at')
 const order = ref('desc')
 const advancedVisible = ref(false)
 const columnModalVisible = ref(false)
+const assignModalVisible = ref(false)
+const assignSubmission = ref(null)
+const fieldTechnicians = ref([])
 const exportLoading = ref(false)
 
 const filters = ref({
@@ -137,6 +142,7 @@ async function onExport() {
 }
 
 async function load() {
+  window.scrollTo(0, 0)
   loading.value = true
   try {
     const data = await fieldSubmissionsApi.index(buildParams())
@@ -144,6 +150,7 @@ async function load() {
     meta.value = data.meta ?? meta.value
   } finally {
     loading.value = false
+    window.scrollTo(0, 0)
   }
 }
 
@@ -308,6 +315,7 @@ onMounted(() => {
           </button>
         </div>
       </div>
+      <Breadcrumbs />
 
       <div
         v-if="exportLoading"
@@ -368,6 +376,7 @@ onMounted(() => {
           :loading="loading"
           @sort="onSort"
           @update-status="onUpdateStatus"
+          @assign-technician="onOpenAssignTechnician"
         />
         <div
           class="flex flex-wrap items-center justify-between gap-4 border-t border-gray-200 bg-gray-100 px-4 py-3"
@@ -397,6 +406,13 @@ onMounted(() => {
       :visible-columns="visibleColumns"
       @update:visible="columnModalVisible = $event"
       @save="onSaveColumns"
+    />
+    <AssignFieldTechnicianModal
+      :visible="assignModalVisible"
+      :submission="assignSubmission"
+      :field-technicians="fieldTechnicians"
+      @close="assignModalVisible = false; assignSubmission = null"
+      @assign="onAssignFieldTechnician"
     />
   </div>
 </template>

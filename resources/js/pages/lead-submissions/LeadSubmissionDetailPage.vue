@@ -6,6 +6,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import leadSubmissionsApi from '@/services/leadSubmissionsApi'
 import { useAuthStore } from '@/stores/auth'
+import Breadcrumbs from '@/components/Breadcrumbs.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -81,6 +82,7 @@ function formatFileSize(bytes) {
 async function loadLead() {
   const id = leadId.value
   if (!id) return
+  window.scrollTo(0, 0)
   loading.value = true
   lead.value = null
   try {
@@ -90,6 +92,7 @@ async function loadLead() {
     lead.value = null
   } finally {
     loading.value = false
+    window.scrollTo(0, 0)
   }
 }
 
@@ -138,31 +141,12 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] py-6 px-4 sm:px-6">
+  <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] p-0">
     <div class="mx-auto max-w-5xl">
       <!-- Header -->
-      <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div class="flex items-center gap-3">
-          <button
-            type="button"
-            class="rounded p-2 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-            aria-label="Back"
-            @click="goBack"
-          >
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-          </button>
-          <h1 class="text-xl font-semibold text-gray-900">Submission Details</h1>
-        </div>
-        <div class="flex gap-2">
-          <button
-            type="button"
-            class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            @click="goBack"
-          >
-            Back to list
-          </button>
+      <div class="mb-4 flex flex-wrap items-center justify-between gap-4">
+        <h1 class="text-xl font-semibold text-gray-900">Submission Details</h1>
+        <div class="flex items-center gap-2">
           <button
             v-if="canEditBackOffice && lead"
             type="button"
@@ -171,8 +155,19 @@ onMounted(() => {
           >
             Edit Submission
           </button>
+          <button
+            type="button"
+            class="rounded p-2 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+            aria-label="Close"
+            @click="goBack"
+          >
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
       </div>
+      <Breadcrumbs />
 
       <div v-if="loading" class="flex justify-center py-16">
         <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
@@ -210,7 +205,7 @@ onMounted(() => {
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Request Type</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.request_type) }}</div>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.submission_type) }}</div>
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Authorized Signatory</label>

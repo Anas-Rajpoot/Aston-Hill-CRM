@@ -31,6 +31,14 @@ export default {
     return data
   },
 
+  async assignFieldTechnician(fieldSubmissionId, fieldExecutiveId) {
+    const { data } = await api.patch(
+      `/field-submissions/${fieldSubmissionId}/assign-field-technician`,
+      { field_executive_id: fieldExecutiveId }
+    )
+    return data
+  },
+
   async getSubmission(id) {
     const { data } = await api.get(`/field-submissions/${id}`)
     return data

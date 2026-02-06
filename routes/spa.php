@@ -25,6 +25,8 @@ Route::get('/users/{user}/edit', $spa)->whereNumber('user');
 
 Route::get('/submissions', $spa);
 Route::get('/lead-submissions', $spa);
+Route::get('/lead-submissions/{id}/resubmit', $spa)->whereNumber('id');
+Route::get('/lead-submissions/{id}', $spa)->whereNumber('id');
 
 Route::get('/announcements', $spa);
 Route::get('/announcements/create', $spa);
@@ -58,6 +60,8 @@ Route::get('/login-logs/timeline/{user}', $spa);
 
 Route::get('/back-office', $spa);
 Route::get('/field-submissions', $spa);
+Route::get('/field-submissions/{id}/edit', $spa)->whereNumber('id');
+Route::get('/field-submissions/{id}', $spa)->whereNumber('id');
 Route::get('/customer-support', $spa);
 Route::get('/vas-requests', $spa);
 Route::get('/clients', $spa);
