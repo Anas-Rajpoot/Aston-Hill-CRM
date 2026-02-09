@@ -159,7 +159,7 @@ onMounted(() => load())
 
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] p-0">
-    <div class="mx-auto max-w-4xl px-2 sm:px-3">
+    <div class="mx-auto max-w-7xl px-1 sm:px-2">
       <!-- Single white card: heading + breadcrumbs + detail (same background, thin border between) -->
       <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
         <!-- Heading + breadcrumbs: same white background -->
@@ -208,7 +208,7 @@ onMounted(() => load())
           <!-- Basic Information -->
           <section class="mb-6">
             <h2 class="mb-3 text-sm font-semibold text-gray-900">Basic Information</h2>
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div>
                 <label class="block text-xs font-medium text-gray-500">Submission ID</label>
                 <div class="mt-1 text-sm font-medium text-gray-800">{{ submissionId(submission) }}</div>
@@ -231,7 +231,7 @@ onMounted(() => load())
           <!-- Location & Product -->
           <section class="mb-6">
             <h2 class="mb-3 text-sm font-semibold text-gray-900">Location & Product</h2>
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div>
                 <label class="block text-xs font-medium text-gray-500">Emirates</label>
                 <div class="mt-1 text-sm font-medium text-gray-800">{{ displayVal(submission.emirates) }}</div>
@@ -254,7 +254,7 @@ onMounted(() => load())
           <!-- Team Assignment -->
           <section class="mb-6">
             <h2 class="mb-3 text-sm font-semibold text-gray-900">Team Assignment</h2>
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div>
                 <label class="block text-xs font-medium text-gray-500">Sales Agent</label>
                 <div class="mt-1 text-sm font-medium text-gray-800">{{ displayVal(submission.sales_agent_name) }}</div>
@@ -281,7 +281,7 @@ onMounted(() => load())
           <!-- Status & Timeline -->
           <section class="mb-6">
             <h2 class="mb-3 text-sm font-semibold text-gray-900">Status & Timeline</h2>
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div>
                 <label class="block text-xs font-medium text-gray-500">Status</label>
                 <div class="mt-1">
@@ -344,19 +344,19 @@ onMounted(() => load())
             </div>
           </section>
 
-          <!-- Notes & Remarks (form fields not duplicated above) -->
+          <!-- Notes & Remarks (three in one row) -->
           <section class="mb-2">
             <h2 class="mb-3 text-sm font-semibold text-gray-900">Notes & Remarks</h2>
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div class="sm:col-span-2">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div>
                 <label class="block text-xs font-medium text-gray-500">Remarks / Comment</label>
                 <div class="mt-1 text-sm font-medium text-gray-800">{{ displayVal(submission.special_instruction) }}</div>
               </div>
-              <div class="sm:col-span-2">
+              <div>
                 <label class="block text-xs font-medium text-gray-500">Additional Notes</label>
                 <div class="mt-1 text-sm font-medium text-gray-800">{{ displayVal(submission.additional_notes) }}</div>
               </div>
-              <div class="sm:col-span-2">
+              <div>
                 <label class="block text-xs font-medium text-gray-500">Remarks by Field Agent</label>
                 <div class="mt-1 text-sm font-medium text-gray-800">{{ displayVal(submission.remarks_by_field_agent) }}</div>
               </div>

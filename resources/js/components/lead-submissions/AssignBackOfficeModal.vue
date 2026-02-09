@@ -3,13 +3,15 @@
  * Assign to Back Office Executive – modal when clicking "Unassigned" on listing.
  * Only for super admin or back office role. Submission details + select executive + optional notes.
  */
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import leadSubmissionsApi from '@/services/leadSubmissionsApi'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
-  /** Row from table: { id, account_number, company_name, product, ... } */
+  /** Row from table: { id, account_number, company_name, product, ... } – single assign */
   lead: { type: Object, default: null },
+  /** For bulk assign: array of lead IDs. When set, modal assigns one executive to all. */
+  bulkLeadIds: { type: Array, default: () => [] },
 })
 
 const emit = defineEmits(['close', 'saved'])
@@ -21,16 +23,19 @@ const executiveId = ref(null)
 const assignmentNotes = ref('')
 const error = ref(null)
 
+const isBulk = computed(() => Array.isArray(props.bulkLeadIds) && props.bulkLeadIds.length > 0)
+
 watch(
-  () => [props.visible, props.lead],
-  async ([visible, lead]) => {
+  () => [props.visible, props.lead, props.bulkLeadIds],
+  async ([visible, lead, bulkIds]) => {
     if (!visible) {
       executiveId.value = null
       assignmentNotes.value = ''
       error.value = null
       return
     }
-    if (!lead?.id) return
+    const hasWork = lead?.id || (Array.isArray(bulkIds) && bulkIds.length > 0)
+    if (!hasWork) return
     loading.value = true
     error.value = null
     try {
@@ -52,8 +57,6 @@ function close() {
 }
 
 async function assign() {
-  const id = props.lead?.id
-  if (!id) return
   if (executiveId.value == null || executiveId.value === '') {
     error.value = 'Please select a back office executive.'
     return
@@ -61,10 +64,18 @@ async function assign() {
   saving.value = true
   error.value = null
   try {
-    await leadSubmissionsApi.updateBackOffice(id, {
-      executive_id: executiveId.value ? Number(executiveId.value) : null,
-      back_office_notes: assignmentNotes.value?.trim() || undefined,
-    })
+    if (isBulk.value) {
+      await leadSubmissionsApi.bulkAssign(props.bulkLeadIds, {
+        executive_id: Number(executiveId.value),
+      })
+    } else {
+      const id = props.lead?.id
+      if (!id) return
+      await leadSubmissionsApi.updateBackOffice(id, {
+        executive_id: executiveId.value ? Number(executiveId.value) : null,
+        back_office_notes: assignmentNotes.value?.trim() || undefined,
+      })
+    }
     emit('saved')
     close()
   } catch (e) {
@@ -91,7 +102,9 @@ function displayVal(val) {
     >
       <div class="w-full max-w-md rounded-lg bg-white shadow-xl">
         <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-          <h2 id="assign-modal-title" class="text-lg font-semibold text-gray-900">Assign to Back Office Executive</h2>
+          <h2 id="assign-modal-title" class="text-lg font-semibold text-gray-900">
+            {{ isBulk ? `Assign ${bulkLeadIds.length} submission(s) to Back Office` : 'Assign to Back Office Executive' }}
+          </h2>
           <button
             type="button"
             class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
@@ -113,7 +126,7 @@ function displayVal(val) {
 
         <template v-else>
           <div class="space-y-4 px-6 py-4">
-            <div class="rounded-lg border border-gray-200 bg-gray-50/80 p-4">
+            <div v-if="!isBulk" class="rounded-lg border border-gray-200 bg-gray-50/80 p-4">
               <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Submission Details</p>
               <dl class="grid grid-cols-1 gap-3 sm:grid-cols-1">
                 <div>
@@ -129,6 +142,9 @@ function displayVal(val) {
                   <dd class="mt-0.5 text-sm font-medium text-gray-900">{{ displayVal(lead?.product) }}</dd>
                 </div>
               </dl>
+            </div>
+            <div v-else class="rounded-lg border border-gray-200 bg-blue-50/80 p-4">
+              <p class="text-sm font-medium text-gray-900">{{ bulkLeadIds.length }} submission(s) selected for assignment.</p>
             </div>
 
             <div>
@@ -173,7 +189,7 @@ function displayVal(val) {
               :disabled="saving"
               @click="assign"
             >
-              {{ saving ? 'Assigning...' : 'Assign Submission' }}
+              {{ saving ? 'Assigning...' : (isBulk ? `Assign ${bulkLeadIds.length} submission(s)` : 'Assign Submission') }}
             </button>
           </div>
         </template>

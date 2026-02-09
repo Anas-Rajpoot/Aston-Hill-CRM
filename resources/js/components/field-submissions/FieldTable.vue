@@ -1,8 +1,8 @@
 <script setup>
 /**
- * Field Submissions table – sortable headers, status badges, inline status edit, view/edit actions.
+ * Field Submissions table – sortable headers, inline edit: dropdown on click, input on double-click.
  */
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
@@ -12,13 +12,36 @@ const props = defineProps({
   sort: { type: String, default: 'created_at' },
   order: { type: String, default: 'desc' },
   loading: { type: Boolean, default: false },
+  /** Selected row IDs (for bulk assign). */
+  selectedIds: { type: Array, default: () => [] },
+  currentPage: { type: Number, default: 1 },
+  perPage: { type: Number, default: 10 },
+  /** Options for dropdowns: managers, teamLeaders, salesAgents, field_executives, field_statuses. */
+  editOptions: { type: Object, default: () => ({}) },
 })
 
-const emit = defineEmits(['sort', 'updateStatus', 'assignTechnician'])
+const emit = defineEmits(['sort', 'updateStatus', 'assignTechnician', 'update:selectedIds', 'updateCell'])
 const router = useRouter()
 const auth = useAuthStore()
 const perms = computed(() => auth.user?.permissions ?? [])
 const canEdit = computed(() => perms.value.includes('field_head.view') || perms.value.includes('field_head.list'))
+
+/** Who can inline-edit rows: superadmin, field_head, field_agent, back_office. */
+const canInlineEdit = computed(() => {
+  if (canEdit.value) return true
+  const roles = auth.user?.roles ?? []
+  if (!Array.isArray(roles)) return false
+  const hasRole = (name) => roles.some((r) => (typeof r === 'string' ? r : r?.name) === name)
+  return hasRole('superadmin') || hasRole('field_agent') || hasRole('back_office') || hasRole('backoffice')
+})
+
+/** Superadmin or field_agent role can click "Unassigned" to open assign field technician pop-up. */
+const canOpenAssignFieldAgent = computed(() => {
+  const roles = auth.user?.roles ?? []
+  if (!Array.isArray(roles)) return canEdit.value
+  const hasRole = (name) => roles.some((r) => (typeof r === 'string' ? r : r?.name) === name)
+  return hasRole('superadmin') || hasRole('field_agent') || canEdit.value
+})
 
 function goToEdit(row) {
   if (row?.id) router.push(`/field-submissions/${row.id}/edit`)
@@ -86,9 +109,56 @@ function formatDate(d) {
   return `${day}-${months[date.getMonth()]}-${date.getFullYear()}`
 }
 
-function truncate(str, max = 20) {
+/** Single row per cell: 30 chars + "..." and full value on hover. */
+const TRUNCATE_LENGTH = 30
+function truncate(str, max = TRUNCATE_LENGTH) {
   if (!str || typeof str !== 'string') return '—'
-  return str.length > max ? str.slice(0, max) + '...' : str
+  const s = String(str)
+  return s.length > max ? s.slice(0, max) + '...' : s
+}
+
+/** Full value for tooltip (title); use with truncate() for display. */
+function fullValue(row, col) {
+  if (col === 'target_date' || col === 'last_updated' || col === 'submitted_at') return row[col] ?? ''
+  if (col === 'created_at') return formatDate(row[col]) || ''
+  const val = formatValue(row, col)
+  if (val == null || val === '—') return ''
+  return String(val)
+}
+
+/** Columns that display text and should be truncated to 30 chars with title tooltip. */
+const TRUNCATE_COLUMNS = [
+  'company_name', 'contact_number', 'product', 'emirates', 'complete_address',
+  'sales_agent', 'team_leader', 'manager', 'field_agent', 'creator',
+  'status', 'field_status', 'sla_timer', 'sla_status', 'target_date', 'last_updated', 'submitted_at', 'created_at',
+]
+function shouldTruncate(col) {
+  return TRUNCATE_COLUMNS.includes(col)
+}
+function cellTitle(row, col) {
+  if (col === 'id' || !shouldTruncate(col)) return undefined
+  const full = fullValue(row, col)
+  return full || undefined
+}
+
+const selectedSet = computed(() => new Set((props.selectedIds || []).map(String)))
+const allRowIds = computed(() => props.data.map((r) => r.id))
+const isAllSelected = computed(() => allRowIds.value.length > 0 && allRowIds.value.every((id) => selectedSet.value.has(String(id))))
+
+function toggleSelectAll() {
+  if (isAllSelected.value) {
+    emit('update:selectedIds', [])
+  } else {
+    emit('update:selectedIds', [...allRowIds.value])
+  }
+}
+
+function toggleRow(id) {
+  const idStr = String(id)
+  const next = new Set(selectedSet.value)
+  if (next.has(idStr)) next.delete(idStr)
+  else next.add(idStr)
+  emit('update:selectedIds', Array.from(next).map(Number))
 }
 
 const STATUS_BADGES = {
@@ -126,6 +196,89 @@ function slaTimerClass(slaTimer, slaStatus) {
   if (slaStatus === 'Approaching') return 'text-amber-600 font-medium'
   return 'text-green-600'
 }
+
+/** Inline edit: dropdown (click) vs input (double-click). */
+const editingCell = ref(null)
+const inlineEditValue = ref('')
+
+/** Same as field submission form: dropdowns for select fields, input for text/date. */
+const DROPDOWN_COLUMNS = ['status', 'field_status', 'emirates', 'manager', 'team_leader', 'sales_agent', 'field_agent']
+const READ_ONLY_COLUMNS = ['id', 'sla_timer', 'sla_status', 'creator', 'submitted_at', 'created_at', 'last_updated']
+
+function isDropdownColumn(col) {
+  return DROPDOWN_COLUMNS.includes(col)
+}
+function isInputColumn(col) {
+  return !READ_ONLY_COLUMNS.includes(col) && !DROPDOWN_COLUMNS.includes(col)
+}
+
+function getCellValueForEdit(row, col) {
+  if (col === 'manager') return row.manager_id ?? ''
+  if (col === 'team_leader') return row.team_leader_id ?? ''
+  if (col === 'sales_agent') return row.sales_agent_id ?? ''
+  if (col === 'field_agent') return row.field_executive_id ?? ''
+  if (col === 'field_status') return row.field_status ?? ''
+  if (col === 'target_date') {
+    const v = row.meeting_date ?? row.target_date
+    if (!v) return ''
+    const d = new Date(v)
+    if (Number.isNaN(d.getTime())) return ''
+    return d.toISOString().slice(0, 10)
+  }
+  return row[col] != null ? String(row[col]) : ''
+}
+
+function openDropdownEdit(row, col) {
+  if (!canInlineEdit.value) return
+  editingCell.value = { rowId: row.id, col }
+  inlineEditValue.value = getCellValueForEdit(row, col)
+}
+
+function openInputEdit(row, col) {
+  if (!canInlineEdit.value) return
+  editingCell.value = { rowId: row.id, col }
+  inlineEditValue.value = getCellValueForEdit(row, col)
+}
+
+function saveInlineEdit() {
+  if (!editingCell.value) return
+  const { rowId, col } = editingCell.value
+  let value = inlineEditValue.value
+  if (col === 'target_date') value = value || null
+  if (['manager', 'team_leader', 'sales_agent', 'field_agent'].includes(col)) {
+    value = value === '' || value == null ? null : Number(value)
+  }
+  emit('updateCell', rowId, col, value)
+  editingCell.value = null
+}
+
+function cancelInlineEdit() {
+  editingCell.value = null
+}
+
+function getOptionsForColumn(col) {
+  const opt = props.editOptions || {}
+  switch (col) {
+    case 'emirates':
+      return (opt.emirates || []).map((e) => ({ value: typeof e === 'string' ? e : e.value, label: typeof e === 'string' ? e : (e.label || e.value) }))
+    case 'manager':
+      return (opt.managers || []).map((m) => ({ value: m.id, label: m.name }))
+    case 'team_leader':
+      return (opt.teamLeaders || []).map((t) => ({ value: t.id, label: t.name }))
+    case 'sales_agent':
+      return (opt.salesAgents || []).map((s) => ({ value: s.id, label: s.name }))
+    case 'field_agent':
+      return [{ value: null, label: 'Unassigned' }, ...(opt.field_executives || []).map((e) => ({ value: e.id, label: e.name }))]
+    case 'field_status':
+      return (opt.field_statuses || []).map((s) => ({ value: s.value, label: s.label || s.value }))
+    default:
+      return []
+  }
+}
+
+function isEditing(rowId, col) {
+  return editingCell.value && editingCell.value.rowId === rowId && editingCell.value.col === col
+}
 </script>
 
 <template>
@@ -153,20 +306,27 @@ function slaTimerClass(slaTimer, slaStatus) {
 
     <table class="min-w-full">
       <thead>
-        <tr class="border-b border-gray-200 bg-gray-100">
+        <tr class="border-b border-black bg-green-600">
           <th class="w-10 px-3 py-3 text-left">
-            <input type="checkbox" class="rounded border-gray-300" aria-label="Select all" />
+            <input
+              type="checkbox"
+              class="rounded border-gray-300"
+              aria-label="Select all"
+              :checked="isAllSelected"
+              :indeterminate="selectedSet.size > 0 && !isAllSelected"
+              @change="toggleSelectAll"
+            />
           </th>
           <th
             v-for="col in columns"
             :key="col"
             scope="col"
-            class="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-600"
+            class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold uppercase tracking-wider text-white"
           >
             <button
               v-if="sortable(col)"
               type="button"
-              class="inline-flex items-center gap-1 hover:text-gray-900"
+              class="inline-flex items-center gap-1 font-bold text-white hover:text-white/90"
               @click="toggleSort(col)"
             >
               {{ label(col) }}
@@ -181,15 +341,15 @@ function slaTimerClass(slaTimer, slaStatus) {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
               </svg>
             </button>
-            <span v-else>{{ label(col) }}</span>
+            <span v-else class="font-bold text-white">{{ label(col) }}</span>
           </th>
-          <th scope="col" class="whitespace-nowrap px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-600">
-            ACTIONS
+          <th scope="col" class="whitespace-nowrap px-4 py-3 text-right text-sm font-bold uppercase tracking-wider text-white">
+            Actions
           </th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-gray-100 bg-white">
-        <tr v-if="!loading && !data.length">
+      <tbody class="bg-white">
+        <tr v-if="!loading && !data.length" class="border-b-2 border-black bg-white">
           <td :colspan="columns.length + 2" class="px-4 py-12 text-center text-gray-500">
             No field submissions found.
           </td>
@@ -197,17 +357,58 @@ function slaTimerClass(slaTimer, slaStatus) {
         <tr
           v-for="row in data"
           :key="row.id"
-          class="hover:bg-gray-50/50"
+          class="border-b border-black bg-white hover:bg-gray-50/50"
         >
           <td class="w-10 px-3 py-3">
-            <input type="checkbox" class="rounded border-gray-300" :value="row.id" />
+            <input
+              type="checkbox"
+              class="rounded border-gray-300"
+              :checked="selectedSet.has(String(row.id))"
+              aria-label="Select row"
+              @change="toggleRow(row.id)"
+            />
           </td>
           <td
             v-for="col in columns"
             :key="col"
-            class="px-4 py-3 text-sm text-gray-900"
+            class="whitespace-nowrap px-4 py-3 text-sm text-gray-900"
+            :class="{ 'cursor-pointer': canInlineEdit && isDropdownColumn(col) && !isEditing(row.id, col), 'cursor-text': canInlineEdit && isInputColumn(col) && !isEditing(row.id, col) }"
+            :title="cellTitle(row, col)"
           >
-            <template v-if="col === 'status' && canEdit">
+            <!-- Dropdown edit (click or double-click to open) -->
+            <template v-if="canInlineEdit && isEditing(row.id, col) && isDropdownColumn(col)">
+              <div class="flex flex-col gap-1.5">
+                <select
+                  v-model="inlineEditValue"
+                  class="w-full min-w-[120px] max-w-[200px] rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  @keydown.enter="saveInlineEdit"
+                  @keydown.esc="cancelInlineEdit"
+                >
+                  <option v-for="o in getOptionsForColumn(col)" :key="String(o.value)" :value="o.value">{{ o.label }}</option>
+                </select>
+                <div class="flex gap-1">
+                  <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
+                  <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
+                </div>
+              </div>
+            </template>
+            <!-- Input edit (double-click to open) – save on Save button only -->
+            <template v-else-if="canInlineEdit && isEditing(row.id, col) && isInputColumn(col)">
+              <div class="flex flex-col gap-1.5">
+                <input
+                  v-model="inlineEditValue"
+                  :type="col === 'target_date' ? 'date' : 'text'"
+                  class="w-full min-w-[100px] max-w-[220px] rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  @keydown.enter="saveInlineEdit"
+                  @keydown.esc="cancelInlineEdit"
+                />
+                <div class="flex gap-1">
+                  <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
+                  <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
+                </div>
+              </div>
+            </template>
+            <template v-else-if="col === 'status' && canInlineEdit">
               <select
                 :value="row.status"
                 class="rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
@@ -224,28 +425,46 @@ function slaTimerClass(slaTimer, slaStatus) {
                 {{ row.status ? row.status.charAt(0).toUpperCase() + row.status.slice(1) : '—' }}
               </span>
             </template>
-            <template v-else-if="col === 'field_agent'">
+            <template v-else-if="col === 'field_agent' && canOpenAssignFieldAgent && row[col] === 'Unassigned'">
               <button
-                v-if="canEdit && row[col] === 'Unassigned'"
                 type="button"
                 class="cursor-pointer text-red-600 underline hover:text-red-700"
                 @click="$emit('assignTechnician', row)"
               >
                 Unassigned
               </button>
+            </template>
+            <template v-else-if="col === 'field_agent' && canInlineEdit">
               <span
-                v-else
-                :class="row[col] === 'Unassigned' ? 'text-red-600' : 'font-semibold text-gray-900'"
-              >
-                {{ formatValue(row, col) }}
+                class="cursor-pointer hover:bg-gray-100 rounded px-0.5 font-semibold text-gray-900"
+                @click="openDropdownEdit(row, col)"
+                @dblclick="openDropdownEdit(row, col)"
+              >{{ truncate(formatValue(row, col)) }}</span>
+            </template>
+            <template v-else-if="col === 'field_agent' && canOpenAssignFieldAgent">
+              <span
+                class="cursor-pointer hover:bg-gray-100 rounded px-0.5 font-semibold text-gray-900"
+                @click="$emit('assignTechnician', row)"
+              >{{ truncate(formatValue(row, col)) }}</span>
+            </template>
+            <template v-else-if="col === 'field_agent'">
+              <span :class="row[col] === 'Unassigned' ? 'text-red-600' : 'font-semibold text-gray-900'">
+                {{ truncate(formatValue(row, col)) }}
               </span>
+            </template>
+            <template v-else-if="canInlineEdit && isDropdownColumn(col)">
+              <span
+                class="cursor-pointer hover:bg-gray-100 rounded px-0.5 min-w-0 inline-block max-w-full truncate"
+                @click="openDropdownEdit(row, col)"
+                @dblclick="openDropdownEdit(row, col)"
+              >{{ truncate(formatValue(row, col)) }}</span>
             </template>
             <template v-else-if="col === 'field_status'">
               <span
                 v-if="row[col]"
-                :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', fieldStatusBadgeClass(row[col])]"
+                :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap', fieldStatusBadgeClass(row[col])]"
               >
-                {{ row[col] }}
+                {{ truncate(row[col]) }}
               </span>
               <span v-else>—</span>
             </template>
@@ -254,26 +473,47 @@ function slaTimerClass(slaTimer, slaStatus) {
                 {{ row.sla_timer ?? '—' }}
               </span>
             </template>
-            <template v-else-if="['target_date', 'last_updated', 'submitted_at'].includes(col)">
-              {{ row[col] ?? '—' }}
+            <template v-else-if="['last_updated', 'submitted_at'].includes(col)">
+              {{ truncate(row[col] ?? '—') }}
             </template>
             <template v-else-if="col === 'sla_status'">
-              {{ row[col] ?? '—' }}
+              {{ truncate(row[col] ?? '—') }}
             </template>
-            <template v-else-if="['created_at'].includes(col)">
+            <template v-else-if="col === 'created_at'">
               {{ formatDate(row[col]) }}
             </template>
-            <template v-else-if="['company_name', 'product', 'emirates'].includes(col)">
-              {{ truncate(formatValue(row, col), 18) }}
+            <template v-else-if="col === 'target_date'">
+              <span
+                v-if="canInlineEdit"
+                class="cursor-text hover:bg-gray-50 rounded px-0.5"
+                @dblclick="openInputEdit(row, col)"
+              >{{ truncate(row[col] ?? '—') }}</span>
+              <span v-else>{{ truncate(row[col] ?? '—') }}</span>
             </template>
-            <template v-else-if="col === 'complete_address'">
-              {{ truncate(formatValue(row, col), 25) }}
+            <template v-else-if="['company_name', 'product', 'contact_number', 'complete_address', 'sales_agent', 'team_leader', 'manager', 'creator'].includes(col)">
+              <span
+                v-if="canInlineEdit && isInputColumn(col)"
+                class="cursor-text hover:bg-gray-50 rounded px-0.5"
+                @dblclick="openInputEdit(row, col)"
+              >{{ truncate(formatValue(row, col)) }}</span>
+              <span
+                v-else-if="canInlineEdit && isDropdownColumn(col)"
+                class="cursor-pointer hover:bg-gray-100 rounded px-0.5 min-w-0 inline-block max-w-full truncate"
+                @click="openDropdownEdit(row, col)"
+                @dblclick="openDropdownEdit(row, col)"
+              >{{ truncate(formatValue(row, col)) }}</span>
+              <span v-else>{{ truncate(formatValue(row, col)) }}</span>
             </template>
             <template v-else>
-              {{ formatValue(row, col) }}
+              <span
+                v-if="canInlineEdit && isInputColumn(col)"
+                class="cursor-text hover:bg-gray-50 rounded px-0.5"
+                @dblclick="openInputEdit(row, col)"
+              >{{ col === 'id' ? formatValue(row, col) : truncate(formatValue(row, col)) }}</span>
+              <span v-else>{{ col === 'id' ? formatValue(row, col) : truncate(formatValue(row, col)) }}</span>
             </template>
           </td>
-          <td class="px-4 py-3 text-right">
+          <td class="whitespace-nowrap px-4 py-3 text-right">
             <div class="inline-flex items-center gap-2">
               <button
                 type="button"

@@ -56,10 +56,10 @@ class LeadSubmissionPolicy
         return $lead->status === 'draft' && (int) $lead->created_by === (int) $user->id;
     }
 
-    /** Resubmit: only rejected leads; only super admin or the original submitter (created_by). */
+    /** Resubmit: rejected or submitted leads; only super admin or the original submitter (created_by). */
     public function resubmit(User $user, LeadSubmission $lead): bool
     {
-        if ($lead->status !== 'rejected') {
+        if (! in_array($lead->status, ['rejected', 'submitted'])) {
             return false;
         }
         if ($user->hasRole('superadmin')) {

@@ -26,6 +26,7 @@ Route::get('/users/{user}/edit', $spa)->whereNumber('user');
 Route::get('/submissions', $spa);
 Route::get('/lead-submissions', $spa);
 Route::get('/lead-submissions/{id}/resubmit', $spa)->whereNumber('id');
+Route::get('/lead-submissions/{id}/edit', $spa)->whereNumber('id');
 Route::get('/lead-submissions/{id}', $spa)->whereNumber('id');
 
 Route::get('/announcements', $spa);

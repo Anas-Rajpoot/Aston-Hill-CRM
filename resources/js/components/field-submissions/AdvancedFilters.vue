@@ -100,6 +100,7 @@ const activeCount = computed(() => {
           <input
             v-model="filters.from"
             type="date"
+            placeholder="DD-MM-YYYY"
             class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           />
@@ -109,6 +110,7 @@ const activeCount = computed(() => {
           <input
             v-model="filters.to"
             type="date"
+            placeholder="DD-MM-YYYY"
             class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           />
@@ -118,6 +120,7 @@ const activeCount = computed(() => {
           <input
             v-model="filters.submitted_from"
             type="date"
+            placeholder="DD-MM-YYYY"
             class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           />
@@ -127,6 +130,7 @@ const activeCount = computed(() => {
           <input
             v-model="filters.submitted_to"
             type="date"
+            placeholder="DD-MM-YYYY"
             class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           />

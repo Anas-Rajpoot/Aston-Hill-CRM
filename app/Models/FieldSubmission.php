@@ -80,6 +80,11 @@ class FieldSubmission extends Model
         return $this->hasMany(FieldSubmissionDocument::class);
     }
 
+    public function audits()
+    {
+        return $this->hasMany(FieldSubmissionAudit::class)->orderByDesc('changed_at');
+    }
+
     /** Visibility for listing: user must have field_head.list to see submissions. */
     public function scopeVisibleTo($query, User $user)
     {

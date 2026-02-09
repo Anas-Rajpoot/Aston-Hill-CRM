@@ -2,14 +2,13 @@
 /**
  * Lead Submissions Listing – high-performance module with filters, column customization, inline editing.
  */
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import leadSubmissionsApi from '@/services/leadSubmissionsApi'
 import FiltersBar from '@/components/lead-submissions/FiltersBar.vue'
 import AdvancedFilters from '@/components/lead-submissions/AdvancedFilters.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
-import EditSubmissionModal from '@/components/lead-submissions/EditSubmissionModal.vue'
 import AssignBackOfficeModal from '@/components/lead-submissions/AssignBackOfficeModal.vue'
 import LeadTable from '@/components/lead-submissions/LeadTable.vue'
 import Pagination from '@/components/Pagination.vue'
@@ -31,16 +30,27 @@ const filterOptions = ref({
 const leads = ref([])
 const meta = ref({ current_page: 1, last_page: 1, per_page: 15, total: 0 })
 const allColumns = ref([])
-const visibleColumns = ref(['submitted_at', 'submission_type', 'account_number', 'company_name', 'category', 'type', 'product', 'mrc_aed', 'quantity', 'manager', 'team_leader', 'sales_agent', 'status', 'sla_timer', 'executive', 'status_changed_at', 'creator', 'email', 'contact_number_gsm'])
-const sort = ref('created_at')
+const visibleColumns = ref(['id', 'submitted_at', 'submission_type', 'account_number', 'company_name', 'category', 'type', 'product', 'mrc_aed', 'quantity', 'manager', 'team_leader', 'sales_agent', 'status', 'executive', 'sla_timer', 'status_changed_at', 'creator', 'email', 'contact_number_gsm'])
+const sort = ref('submitted_at')
 const order = ref('desc')
 const advancedVisible = ref(false)
 const columnModalVisible = ref(false)
 const exportLoading = ref(false)
-const editModalVisible = ref(false)
-const editLeadId = ref(null)
 const assignModalVisible = ref(false)
 const assignLeadRow = ref(null)
+/** For bulk assign: lead IDs to assign. When set, modal runs in bulk mode. */
+const assignBulkIds = ref([])
+const selectedLeadIds = ref([])
+/** Shown when user clicks Bulk Assign with no rows selected. */
+const bulkAssignMessage = ref('')
+const canBulkAssign = (() => {
+  const roles = auth.user?.roles ?? []
+  if (!Array.isArray(roles)) return false
+  return roles.some((r) => {
+    const name = typeof r === 'string' ? r : r?.name
+    return name === 'superadmin' || name === 'back_office' || name === 'backoffice'
+  })
+})()
 
 const filters = ref({
   q: '',
@@ -56,10 +66,8 @@ const filters = ref({
   submitted_to: '',
   updated_from: '',
   updated_to: '',
-  mrc_min: '',
-  mrc_max: '',
-  quantity_min: '',
-  quantity_max: '',
+  mrc: '',
+  quantity: '',
   sales_agent_id: null,
   team_leader_id: null,
   manager_id: null,
@@ -89,10 +97,8 @@ function buildParams() {
   if (f.submitted_to) p.submitted_to = f.submitted_to
   if (f.updated_from) p.updated_from = f.updated_from
   if (f.updated_to) p.updated_to = f.updated_to
-  if (f.mrc_min !== '' && f.mrc_min != null) p.mrc_min = f.mrc_min
-  if (f.mrc_max !== '' && f.mrc_max != null) p.mrc_max = f.mrc_max
-  if (f.quantity_min !== '' && f.quantity_min != null) p.quantity_min = f.quantity_min
-  if (f.quantity_max !== '' && f.quantity_max != null) p.quantity_max = f.quantity_max
+  if (f.mrc !== '' && f.mrc != null) p.mrc = f.mrc
+  if (f.quantity !== '' && f.quantity != null) p.quantity = f.quantity
   if (f.sales_agent_id) p.sales_agent_id = f.sales_agent_id
   if (f.team_leader_id) p.team_leader_id = f.team_leader_id
   if (f.manager_id) p.manager_id = f.manager_id
@@ -101,26 +107,47 @@ function buildParams() {
 
 const COLUMN_LABELS = {
   id: 'ID',
-  submitted_at: 'Submission Date',
-  created_at: 'Created',
-  submission_type: 'Type',
+  submitted_at: 'Lead Creation Date',
+  updated_at: 'Updated',
+  submission_type: 'Request Type',
   account_number: 'Account Number',
   company_name: 'Company Name',
+  authorized_signatory_name: 'Authorized Signatory',
+  email: 'Email',
+  contact_number_gsm: 'Contact (GSM)',
+  alternate_contact_number: 'Alternate Contact',
+  address: 'Address',
+  emirate: 'Emirate',
+  location_coordinates: 'Location Coordinates',
   category: 'Service Category',
   type: 'Service Type',
   product: 'Product',
+  offer: 'Offer',
   mrc_aed: 'MRC (AED)',
   quantity: 'Qty',
+  ae_domain: 'AE Domain',
+  gaid: 'GAID',
+  remarks: 'Remarks',
   sales_agent: 'Sales Agent',
   team_leader: 'Team Leader',
   manager: 'Manager',
   status: 'Status',
   sla_timer: 'SLA Timer',
+  executive: 'Back Office Executive',
   status_changed_at: 'Last Updated',
   creator: 'Created By',
-  executive: 'Back Office Executive',
-  email: 'Email',
-  contact_number_gsm: 'Contact',
+  call_verification: 'Call Verification',
+  pending_from_sales: 'Pending From Sales',
+  documents_verification: 'Documents Verification',
+  submission_date_from: 'Submission Date From',
+  back_office_notes: 'Back Office Notes',
+  activity: 'Activity',
+  back_office_account: 'Back Office Account',
+  work_order: 'Work Order',
+  du_status: 'DU Status',
+  completion_date: 'Completion Date',
+  du_remarks: 'DU Remarks',
+  additional_note: 'Additional Note',
 }
 
 function escapeCsv(val) {
@@ -181,12 +208,14 @@ async function load() {
 
 async function loadFilters() {
   try {
-    const [filtersRes, teamRes] = await Promise.all([
+    const [filtersRes, teamRes, backOfficeRes] = await Promise.all([
       leadSubmissionsApi.filters(),
       leadSubmissionsApi.getTeamOptions().catch(() => ({ data: {} })),
+      leadSubmissionsApi.getBackOfficeOptions().catch(() => ({})),
     ])
     const data = filtersRes
-    const team = teamRes?.data ?? {}
+    const team = teamRes?.data ?? teamRes ?? {}
+    const bo = backOfficeRes || {}
     filterOptions.value = {
       categories: data.categories ?? [],
       types: data.types ?? [],
@@ -195,17 +224,36 @@ async function loadFilters() {
       managers: team.managers ?? [],
       teamLeaders: team.team_leaders ?? [],
       salesAgents: team.sales_agents ?? [],
+      executives: bo.executives ?? [],
+      call_verification_options: bo.call_verification_options ?? [],
+      pending_from_sales_options: bo.pending_from_sales_options ?? [],
+      documents_verification_options: bo.documents_verification_options ?? [],
+      du_status_options: bo.du_status_options ?? [],
     }
   } catch {
     //
   }
 }
 
+/** Ensure sla_timer column always comes immediately after executive. */
+function ensureSlaAfterExecutive(columns) {
+  if (!Array.isArray(columns)) return columns
+  const i = columns.indexOf('executive')
+  const j = columns.indexOf('sla_timer')
+  if (i === -1 || j === -1) return columns
+  if (j === i + 1) return columns
+  const withoutSla = columns.filter((c) => c !== 'sla_timer')
+  const insertAt = withoutSla.indexOf('executive') + 1
+  return [...withoutSla.slice(0, insertAt), 'sla_timer', ...withoutSla.slice(insertAt)]
+}
+
 async function loadColumns() {
   try {
     const data = await leadSubmissionsApi.columns()
     allColumns.value = data.all_columns ?? []
-    visibleColumns.value = data.visible_columns ?? visibleColumns.value
+    const visible = data.visible_columns ?? visibleColumns.value
+    let cols = Array.isArray(visible) ? visible.filter((c) => c !== 'created_at') : visibleColumns.value
+    visibleColumns.value = ensureSlaAfterExecutive(cols)
   } catch {
     //
   }
@@ -231,10 +279,8 @@ function resetFilters() {
     submitted_to: '',
     updated_from: '',
     updated_to: '',
-    mrc_min: '',
-    mrc_max: '',
-    quantity_min: '',
-    quantity_max: '',
+    mrc: '',
+    quantity: '',
     sales_agent_id: null,
     team_leader_id: null,
     manager_id: null,
@@ -252,8 +298,9 @@ function onSort({ sort: s, order: o }) {
 
 async function onSaveColumns(cols) {
   try {
-    await leadSubmissionsApi.saveColumns(cols)
-    visibleColumns.value = cols
+    const ordered = ensureSlaAfterExecutive(cols)
+    await leadSubmissionsApi.saveColumns(ordered)
+    visibleColumns.value = ordered
     meta.value.current_page = 1
     load()
   } catch {
@@ -305,33 +352,100 @@ async function onUpdateStatusChangedAt(leadId, statusChangedAtIso) {
   }
 }
 
+/** Map display column name to API field name for updateBackOffice. */
+const COLUMN_TO_API_FIELD = {
+  category: 'service_category_id',
+  type: 'service_type_id',
+  executive: 'executive_id',
+  manager: 'manager_id',
+  team_leader: 'team_leader_id',
+  sales_agent: 'sales_agent_id',
+}
+
+async function onUpdateCell(leadId, field, value) {
+  const apiField = COLUMN_TO_API_FIELD[field] ?? field
+  const row = leads.value.find((r) => r.id === leadId)
+  const prev = row ? { ...row } : null
+  if (row) {
+    if (field === 'category' && value != null) {
+      row.service_category_id = value
+      row.category = filterOptions.value.categories.find((c) => c.id === value)?.name ?? row.category
+    } else if (field === 'type' && value != null) {
+      row.service_type_id = value
+      row.type = filterOptions.value.types.find((t) => t.id === value)?.name ?? row.type
+    } else if (field === 'executive' && value != null) {
+      row.executive_id = value
+      row.executive = filterOptions.value.executives.find((e) => e.id === value)?.name ?? 'Unassigned'
+    } else if (field === 'manager' && value != null) {
+      row.manager_id = value
+      row.manager = filterOptions.value.managers.find((m) => m.id === value)?.name ?? row.manager
+    } else if (field === 'team_leader' && value != null) {
+      row.team_leader_id = value
+      row.team_leader = filterOptions.value.teamLeaders.find((t) => t.id === value)?.name ?? row.team_leader
+    } else if (field === 'sales_agent' && value != null) {
+      row.sales_agent_id = value
+      row.sales_agent = filterOptions.value.salesAgents.find((s) => s.id === value)?.name ?? row.sales_agent
+    } else if (field === 'submission_type') {
+      row.submission_type = value === 'resubmission' ? 'Resubmission' : 'New Submission'
+    } else if (field === 'status') {
+      row.status = value
+    } else {
+      row[field] = value
+    }
+  }
+  try {
+    await leadSubmissionsApi.updateBackOffice(leadId, { [apiField]: value })
+  } catch {
+    if (prev) Object.assign(row, prev)
+    load()
+  }
+}
+
 function onPageChange(page) {
   meta.value.current_page = page
   load()
 }
 
-function openEditModal(leadId) {
+function openEditPage(leadId) {
   const id = leadId != null ? Number(leadId) : null
   if (id == null) return
-  editLeadId.value = id
-  editModalVisible.value = true
+  router.push({ path: `/lead-submissions/${id}/edit` })
 }
 
 function openAssignModal(row) {
   if (!row) return
   assignLeadRow.value = row
+  assignBulkIds.value = []
+  assignModalVisible.value = true
+}
+
+function openBulkAssign() {
+  bulkAssignMessage.value = ''
+  if (selectedLeadIds.value.length === 0) {
+    bulkAssignMessage.value = 'Please select at least one row.'
+    return
+  }
+  assignLeadRow.value = null
+  assignBulkIds.value = [...selectedLeadIds.value]
   assignModalVisible.value = true
 }
 
 function onAssignModalSaved() {
   assignLeadRow.value = null
+  assignBulkIds.value = []
+  selectedLeadIds.value = []
   load()
 }
 
 function onAssignModalClose() {
   assignModalVisible.value = false
   assignLeadRow.value = null
+  assignBulkIds.value = []
 }
+
+watch(selectedLeadIds, (ids) => {
+  if (ids && ids.length > 0) bulkAssignMessage.value = ''
+}, { deep: true })
 
 function onEditModalSaved() {
   load()
@@ -350,16 +464,18 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] py-6 px-4 sm:px-6">
+  <div class="min-h-[calc(100vh-4rem)] bg-white py-6 px-4 sm:px-6">
     <div class="mx-auto max-w-7xl space-y-4">
       <!-- Top: title (left), Bulk Assign + Export (right) -->
       <div class="flex flex-wrap items-center justify-between gap-4">
         <h1 class="text-xl font-semibold text-gray-900">Lead Submissions</h1>
         <div class="flex flex-wrap items-center gap-2">
           <button
+            v-if="canBulkAssign"
             type="button"
             class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
             title="Bulk Assign"
+            @click="openBulkAssign"
           >
             <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -394,6 +510,14 @@ onMounted(() => {
             {{ exportLoading ? 'Exporting...' : 'Export' }}
           </button>
         </div>
+      </div>
+      <!-- Message when Bulk Assign clicked with no selection -->
+      <div
+        v-if="bulkAssignMessage"
+        class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"
+        role="alert"
+      >
+        {{ bulkAssignMessage }}
       </div>
       <Breadcrumbs />
 
@@ -456,14 +580,19 @@ onMounted(() => {
           :sort="sort"
           :order="order"
           :loading="loading"
+          :current-page="meta.current_page"
+          :per-page="meta.per_page"
+          :edit-options="filterOptions"
+          v-model:selected-ids="selectedLeadIds"
           @sort="onSort"
           @update-status="onUpdateStatus"
           @update-status-changed-at="onUpdateStatusChangedAt"
-          @open-edit="openEditModal"
+          @update-cell="onUpdateCell"
+          @open-edit="openEditPage"
           @open-assign="openAssignModal"
         />
         <div
-          class="flex flex-wrap items-center gap-4 border-t border-gray-200 bg-gray-100 px-4 py-3"
+          class="flex flex-wrap items-center gap-4 border-t border-black bg-white px-4 py-3"
           :class="meta.last_page > 1 ? 'justify-between' : 'justify-start'"
         >
           <p class="text-sm text-gray-600">
@@ -491,16 +620,10 @@ onMounted(() => {
       @save="onSaveColumns"
     />
 
-    <EditSubmissionModal
-      :visible="editModalVisible"
-      :lead-id="editLeadId"
-      @close="editModalVisible = false"
-      @saved="onEditModalSaved"
-    />
-
     <AssignBackOfficeModal
       :visible="assignModalVisible"
       :lead="assignLeadRow"
+      :bulk-lead-ids="assignBulkIds"
       @close="onAssignModalClose"
       @saved="onAssignModalSaved"
     />

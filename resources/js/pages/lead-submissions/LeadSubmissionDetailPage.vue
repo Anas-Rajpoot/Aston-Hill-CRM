@@ -15,6 +15,7 @@ const auth = useAuthStore()
 const loading = ref(true)
 const lead = ref(null)
 const bulkDownloading = ref(false)
+const audits = ref([])
 
 const leadId = computed(() => {
   const id = route.params.id
@@ -40,7 +41,7 @@ function formatDate(d) {
   if (Number.isNaN(date.getTime())) return '—'
   const day = String(date.getDate()).padStart(2, '0')
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  return `${day}/${months[date.getMonth()]}/${date.getFullYear()}`
+  return `${day}-${months[date.getMonth()]}-${date.getFullYear()}`
 }
 
 function submissionDateDisplay(l) {
@@ -88,12 +89,26 @@ async function loadLead() {
   try {
     const res = await leadSubmissionsApi.getLead(id)
     lead.value = res?.data ?? res
+    if (lead.value?.id) {
+      const auditRes = await leadSubmissionsApi.getAudits(id)
+      audits.value = auditRes?.data ?? []
+    } else {
+      audits.value = []
+    }
   } catch {
     lead.value = null
+    audits.value = []
   } finally {
     loading.value = false
     window.scrollTo(0, 0)
   }
+}
+
+function fieldLabel(fieldName) {
+  if (!fieldName) return '—'
+  return String(fieldName)
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 function goBack() {
@@ -101,7 +116,7 @@ function goBack() {
 }
 
 function goToEdit() {
-  if (lead.value?.id) router.push({ path: '/lead-submissions', query: { openEdit: lead.value.id } })
+  if (lead.value?.id) router.push({ path: `/lead-submissions/${lead.value.id}/edit` })
 }
 
 async function downloadDoc(doc) {
@@ -142,32 +157,32 @@ onMounted(() => {
 
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] p-0">
-    <div class="mx-auto max-w-5xl">
-      <!-- Header -->
-      <div class="mb-4 flex flex-wrap items-center justify-between gap-4">
-        <h1 class="text-xl font-semibold text-gray-900">Submission Details</h1>
-        <div class="flex items-center gap-2">
-          <button
-            v-if="canEditBackOffice && lead"
-            type="button"
-            class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-            @click="goToEdit"
-          >
-            Edit Submission
-          </button>
-          <button
-            type="button"
-            class="rounded p-2 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-            aria-label="Close"
-            @click="goBack"
-          >
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+    <div class="mx-auto max-w-5xl px-2 sm:px-4">
+      <!-- Header + Breadcrumb: background and border like content section -->
+      <div class="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <h1 class="text-xl font-semibold text-gray-900">Submission Details</h1>
+          <div class="flex items-center gap-2">
+            <router-link
+              to="/lead-submissions"
+              class="rounded border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              Back to List
+            </router-link>
+            <button
+              v-if="canEditBackOffice && lead"
+              type="button"
+              class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+              @click="goToEdit"
+            >
+              Edit Submission
+            </button>
+          </div>
+        </div>
+        <div class="mt-3 border-t border-gray-100 pt-3">
+          <Breadcrumbs />
         </div>
       </div>
-      <Breadcrumbs />
 
       <div v-if="loading" class="flex justify-center py-16">
         <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
@@ -301,10 +316,6 @@ onMounted(() => {
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.manager_name) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Back Office</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.executive_name) }}</div>
-                </div>
-                <div>
                   <label class="block text-xs font-medium text-gray-500">Created By</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.creator_name) }}</div>
                 </div>
@@ -320,19 +331,23 @@ onMounted(() => {
               <h2 class="mb-3 text-sm font-semibold text-gray-900">Back Office Details</h2>
               <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Call Verification</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.call_verification) }}</div>
+                  <label class="block text-xs font-medium text-gray-500">Back Office</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.executive_name) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Pending from Sales</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.pending_from_sales) }}</div>
+                  <label class="block text-xs font-medium text-gray-500">Call Verification</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.call_verification) }}</div>
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Documents Verification</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.documents_verification) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Submission Date From</label>
+                  <label class="block text-xs font-medium text-gray-500">Status</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ formatStatus(lead.status) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Submission Date</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ formatDate(lead.submission_date_from) }}</div>
                 </div>
                 <div>
@@ -340,7 +355,7 @@ onMounted(() => {
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.activity) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Account (BO)</label>
+                  <label class="block text-xs font-medium text-gray-500">Account</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.back_office_account) }}</div>
                 </div>
                 <div>
@@ -367,6 +382,35 @@ onMounted(() => {
               <div class="mt-3">
                 <label class="block text-xs font-medium text-gray-500">Additional Note</label>
                 <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 whitespace-pre-wrap">{{ displayVal(lead.additional_note) }}</div>
+              </div>
+            </section>
+
+            <!-- Change history (audit log) -->
+            <section class="mb-6">
+              <h2 class="mb-3 text-sm font-semibold text-gray-900">Change History</h2>
+              <p class="mb-3 text-xs text-gray-500">All field changes with previous value, new value, date/time and who made the change.</p>
+              <div v-if="audits.length === 0" class="rounded-lg border border-gray-200 bg-gray-50 py-6 text-center text-sm text-gray-500">No changes recorded yet.</div>
+              <div v-else class="overflow-x-auto rounded-lg border border-gray-200">
+                <table class="min-w-full text-left text-sm">
+                  <thead class="border-b border-gray-200 bg-gray-100">
+                    <tr>
+                      <th class="px-4 py-2 font-semibold text-gray-900">Field</th>
+                      <th class="px-4 py-2 font-semibold text-gray-900">Old Value</th>
+                      <th class="px-4 py-2 font-semibold text-gray-900">New Value</th>
+                      <th class="px-4 py-2 font-semibold text-gray-900">Date & Time</th>
+                      <th class="px-4 py-2 font-semibold text-gray-900">Changed By</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-100 bg-white">
+                    <tr v-for="a in audits" :key="a.id" class="hover:bg-gray-50/50">
+                      <td class="whitespace-nowrap px-4 py-2 font-medium text-gray-800">{{ fieldLabel(a.field_name) }}</td>
+                      <td class="max-w-[200px] truncate px-4 py-2 text-gray-600" :title="a.old_value">{{ a.old_value ?? '—' }}</td>
+                      <td class="max-w-[200px] truncate px-4 py-2 text-gray-600" :title="a.new_value">{{ a.new_value ?? '—' }}</td>
+                      <td class="whitespace-nowrap px-4 py-2 text-gray-600">{{ a.changed_at ? formatDateTime(a.changed_at) : '—' }}</td>
+                      <td class="whitespace-nowrap px-4 py-2 text-gray-600">{{ a.changed_by_name ?? '—' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </section>
 

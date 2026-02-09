@@ -937,12 +937,15 @@ if ($request->expectsJson() || $request->ajax()) {
             'type:id,name,schema',
             'documents',
             'creator:id,name',
+            'manager:id,name',
+            'teamLeader:id,name',
+            'salesAgent:id,name',
         ])->findOrFail((int) $lead);
 
         $this->authorize('resubmit', $leadSubmission);
 
-        if ($leadSubmission->status !== 'rejected') {
-            return response()->json(['message' => 'Only rejected submissions can be resubmitted.'], 422);
+        if (! in_array($leadSubmission->status, ['rejected', 'submitted'])) {
+            return response()->json(['message' => 'Only rejected or submitted submissions can be resubmitted.'], 422);
         }
 
         $categories = ServiceCategory::where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'slug']);
@@ -974,8 +977,8 @@ if ($request->expectsJson() || $request->ajax()) {
         $leadSubmission = LeadSubmission::findOrFail((int) $lead);
         $this->authorize('resubmit', $leadSubmission);
 
-        if ($leadSubmission->status !== 'rejected') {
-            return response()->json(['message' => 'Only rejected submissions can be resubmitted.'], 422);
+        if (! in_array($leadSubmission->status, ['rejected', 'submitted'])) {
+            return response()->json(['message' => 'Only rejected or submitted submissions can be resubmitted.'], 422);
         }
 
         $isDraft = $request->input('action') === 'draft';
@@ -983,14 +986,24 @@ if ($request->expectsJson() || $request->ajax()) {
         $rules = [
             'account_number' => ['nullable', 'string', 'max:100'],
             'company_name' => [$isDraft ? 'nullable' : 'required', 'string', 'max:255'],
+            'authorized_signatory_name' => ['nullable', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255'],
             'contact_number_gsm' => [$isDraft ? 'nullable' : 'required', 'string', 'max:50'],
             'alternate_contact_number' => ['nullable', 'string', 'max:50'],
             'address' => ['nullable', 'string', 'max:500'],
+            'emirate' => ['nullable', 'string', 'max:100'],
+            'location_coordinates' => ['nullable', 'string', 'max:100'],
             'previous_activity' => ['nullable', 'string', 'max:2000'],
             'resubmission_reason' => ['nullable', 'string', 'max:2000'],
             'remarks' => ['nullable', 'string', 'max:2000'],
             'service_category_id' => ['nullable', 'integer', 'exists:service_categories,id'],
             'service_type_id' => ['nullable', 'integer', 'exists:service_types,id'],
+            'product' => ['nullable', 'string', 'max:255'],
+            'offer' => ['nullable', 'string', 'max:255'],
+            'mrc_aed' => ['nullable', 'string', 'max:50'],
+            'quantity' => ['nullable', 'string', 'max:50'],
+            'ae_domain' => ['nullable', 'string', 'max:255'],
+            'gaid' => ['nullable', 'string', 'max:100'],
         ];
 
         $data = $request->validate($rules);
@@ -1004,9 +1017,19 @@ if ($request->expectsJson() || $request->ajax()) {
         $update = [
             'account_number' => $data['account_number'] ?? $leadSubmission->account_number,
             'company_name' => $data['company_name'] ?? $leadSubmission->company_name,
+            'authorized_signatory_name' => $data['authorized_signatory_name'] ?? $leadSubmission->authorized_signatory_name,
+            'email' => $data['email'] ?? $leadSubmission->email,
             'contact_number_gsm' => $data['contact_number_gsm'] ?? $leadSubmission->contact_number_gsm,
             'alternate_contact_number' => $data['alternate_contact_number'] ?? $leadSubmission->alternate_contact_number,
             'address' => $data['address'] ?? $leadSubmission->address,
+            'emirate' => $data['emirate'] ?? $leadSubmission->emirate,
+            'location_coordinates' => $data['location_coordinates'] ?? $leadSubmission->location_coordinates,
+            'product' => $data['product'] ?? $leadSubmission->product,
+            'offer' => $data['offer'] ?? $leadSubmission->offer,
+            'mrc_aed' => $data['mrc_aed'] ?? $leadSubmission->mrc_aed,
+            'quantity' => $data['quantity'] ?? $leadSubmission->quantity,
+            'ae_domain' => $data['ae_domain'] ?? $leadSubmission->ae_domain,
+            'gaid' => $data['gaid'] ?? $leadSubmission->gaid,
             'remarks' => $data['remarks'] ?? $leadSubmission->remarks,
             'payload' => $payload,
             'submission_type' => 'resubmission',

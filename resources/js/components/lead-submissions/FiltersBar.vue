@@ -20,6 +20,19 @@ const filteredTypes = computed(() => {
   return types.filter((t) => t.service_category_id === categoryId)
 })
 
+const categoriesById = computed(() => {
+  const map = {}
+  for (const c of props.filterOptions.categories ?? []) {
+    map[c.id] = c.name
+  }
+  return map
+})
+
+function typeOptionLabel(type) {
+  const catName = categoriesById.value[type.service_category_id]
+  return catName ? `${type.name} (${catName})` : type.name
+}
+
 function onCategoryChange() {
   props.filters.service_type_id = null
 }
@@ -34,7 +47,7 @@ function onCategoryChange() {
       :disabled="loading"
       @change="onCategoryChange"
     >
-      <option :value="null">All Categories</option>
+      <option :value="null">Service Categories</option>
       <option v-for="c in filterOptions.categories" :key="c.id" :value="c.id">
         {{ c.name }}
       </option>
@@ -46,9 +59,9 @@ function onCategoryChange() {
       class="min-w-[200px] rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
       :disabled="loading"
     >
-      <option :value="null">All Types</option>
+      <option :value="null">Service Types</option>
       <option v-for="t in filteredTypes" :key="t.id" :value="t.id">
-        {{ t.name }}
+        {{ typeOptionLabel(t) }}
       </option>
     </select>
 
@@ -58,7 +71,7 @@ function onCategoryChange() {
       class="min-w-[200px] rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
       :disabled="loading"
     >
-      <option value="">All Statuses</option>
+      <option value="">Status</option>
       <option v-for="s in filterOptions.statuses" :key="s.value" :value="s.value">
         {{ s.label }}
       </option>

@@ -4,10 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\LeadSubmission;
+use App\Models\LeadSubmissionAudit;
 use App\Models\ServiceCategory;
 use App\Models\ServiceType;
 use App\Models\User;
 use App\Models\UserColumnPreference;
+use App\Rules\AllowedDocumentFile;
+use App\Services\LeadSubmissionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -24,15 +27,20 @@ class LeadSubmissionApiController extends Controller
 
     /** Whitelist of allowed columns for SELECT (prevents SQL injection / unauthorized exposure). */
     private const ALLOWED_COLUMNS = [
-        'id', 'company_name', 'account_number', 'email', 'contact_number_gsm',
+        'id', 'company_name', 'account_number', 'authorized_signatory_name', 'email', 'contact_number_gsm',
+        'alternate_contact_number', 'address', 'emirate', 'location_coordinates',
         'service_category_id', 'service_type_id', 'status', 'status_changed_at',
-        'created_at', 'submitted_at', 'created_by', 'product', 'mrc_aed', 'quantity',
+        'submitted_at', 'updated_at', 'created_by', 'product', 'offer', 'mrc_aed', 'quantity',
+        'ae_domain', 'gaid', 'remarks', 'submission_type',
+        'call_verification', 'pending_from_sales', 'documents_verification', 'submission_date_from',
+        'back_office_notes', 'activity', 'back_office_account', 'work_order', 'du_status', 'completion_date',
+        'du_remarks', 'additional_note',
     ];
 
     /** Base columns required for every row (id for links, status for inline edit, created_by for resubmit). */
     private const BASE_COLUMNS = ['id', 'status', 'created_by'];
 
-    public function __construct()
+    public function __construct(private LeadSubmissionService $leadSubmissionService)
     {
         $this->middleware(['auth:sanctum']);
     }
@@ -65,10 +73,8 @@ class LeadSubmissionApiController extends Controller
             'submitted_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:submitted_from'],
             'updated_from' => ['sometimes', 'nullable', 'date'],
             'updated_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:updated_from'],
-            'mrc_min' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-            'mrc_max' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-            'quantity_min' => ['sometimes', 'nullable', 'integer', 'min:0'],
-            'quantity_max' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'mrc' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'quantity' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'sales_agent_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'team_leader_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'manager_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
@@ -78,7 +84,7 @@ class LeadSubmissionApiController extends Controller
         $columns = $this->resolveColumns($user, $validated['columns'] ?? null);
         $perPage = (int) ($validated['per_page'] ?? 15);
         $page = (int) ($validated['page'] ?? 1);
-        $sort = $validated['sort'] ?? 'created_at';
+        $sort = $validated['sort'] ?? 'submitted_at';
         $order = $validated['order'] ?? 'desc';
 
         // Base query: visibility + filters only (no joins). Used for fast count.
@@ -200,17 +206,11 @@ class LeadSubmissionApiController extends Controller
             $term = '%' . addcslashes($validated['product'], '%_\\') . '%';
             $query->where('product', 'like', $term);
         }
-        if (isset($validated['mrc_min']) && $validated['mrc_min'] !== '' && $validated['mrc_min'] !== null) {
-            $query->where('mrc_aed', '>=', (float) $validated['mrc_min']);
+        if (isset($validated['mrc']) && $validated['mrc'] !== '' && $validated['mrc'] !== null) {
+            $query->where('mrc_aed', (float) $validated['mrc']);
         }
-        if (isset($validated['mrc_max']) && $validated['mrc_max'] !== '' && $validated['mrc_max'] !== null) {
-            $query->where('mrc_aed', '<=', (float) $validated['mrc_max']);
-        }
-        if (isset($validated['quantity_min']) && $validated['quantity_min'] !== '' && $validated['quantity_min'] !== null) {
-            $query->where('quantity', '>=', (int) $validated['quantity_min']);
-        }
-        if (isset($validated['quantity_max']) && $validated['quantity_max'] !== '' && $validated['quantity_max'] !== null) {
-            $query->where('quantity', '<=', (int) $validated['quantity_max']);
+        if (isset($validated['quantity']) && $validated['quantity'] !== '' && $validated['quantity'] !== null) {
+            $query->where('quantity', (int) $validated['quantity']);
         }
         if (!empty($validated['sales_agent_id'])) {
             $query->where('sales_agent_id', $validated['sales_agent_id']);
@@ -243,8 +243,8 @@ class LeadSubmissionApiController extends Controller
         } elseif ($sort === 'category') {
             $query->leftJoin('service_categories', 'lead_submissions.service_category_id', '=', 'service_categories.id')
                 ->orderBy('service_categories.name', $order);
-        } elseif (in_array($sort, ['sales_agent', 'team_leader', 'manager'], true)) {
-            $col = $sort . '_id';
+        } elseif (in_array($sort, ['sales_agent', 'team_leader', 'manager', 'executive'], true)) {
+            $col = $sort === 'executive' ? 'executive_id' : $sort . '_id';
             $alias = $sort . '_users';
             $query->leftJoin("users as {$alias}", "lead_submissions.{$col}", '=', "{$alias}.id")
                 ->orderBy("{$alias}.name", $order);
@@ -296,18 +296,24 @@ class LeadSubmissionApiController extends Controller
                     : null;
             } elseif ($col === 'type') {
                 $row['type'] = $lead->relationLoaded('type') ? ($lead->type?->name ?? '-') : '-';
+                $row['service_type_id'] = $lead->service_type_id;
             } elseif ($col === 'category') {
                 $row['category'] = $lead->relationLoaded('category') ? ($lead->category?->name ?? '-') : '-';
+                $row['service_category_id'] = $lead->service_category_id;
             } elseif ($col === 'sales_agent') {
                 $row['sales_agent'] = $lead->relationLoaded('salesAgent') ? ($lead->salesAgent?->name ?? '-') : '-';
+                $row['sales_agent_id'] = $lead->sales_agent_id;
             } elseif ($col === 'team_leader') {
                 $row['team_leader'] = $lead->relationLoaded('teamLeader') ? ($lead->teamLeader?->name ?? '-') : '-';
+                $row['team_leader_id'] = $lead->team_leader_id;
             } elseif ($col === 'manager') {
                 $row['manager'] = $lead->relationLoaded('manager') ? ($lead->manager?->name ?? '-') : '-';
+                $row['manager_id'] = $lead->manager_id;
             } elseif ($col === 'executive') {
                 $row['executive'] = $lead->relationLoaded('executive') && $lead->executive
                     ? $lead->executive->name
                     : 'Unassigned';
+                $row['executive_id'] = $lead->executive_id;
             } elseif ($col === 'submission_type') {
                 $row['submission_type'] = match ($lead->submission_type) {
                     'resubmission' => 'Resubmission',
@@ -318,7 +324,9 @@ class LeadSubmissionApiController extends Controller
                 $row['sla_timer'] = $this->computeLeadSlaTimer($lead);
             } elseif ($col === 'created_by') {
                 $row['created_by'] = $lead->created_by;
-            } elseif (in_array($col, ['created_at', 'submitted_at', 'status_changed_at'], true)) {
+            } elseif (in_array($col, ['created_at', 'submitted_at', 'status_changed_at', 'updated_at'], true)) {
+                $row[$col] = $lead->$col ? $lead->$col->toIso8601String() : null;
+            } elseif (in_array($col, ['submission_date_from', 'completion_date'], true)) {
                 $row[$col] = $lead->$col ? $lead->$col->toIso8601String() : null;
             } elseif ($col === 'mrc_aed' && $lead->mrc_aed !== null) {
                 $row['mrc_aed'] = number_format((float) $lead->mrc_aed, 0);
@@ -383,7 +391,14 @@ class LeadSubmissionApiController extends Controller
         return response()->json([
             'categories' => $categories,
             'types' => $types,
-            'statuses' => array_map(fn ($s) => ['value' => $s, 'label' => ucfirst($s)], LeadSubmission::STATUSES),
+            'statuses' => [
+                ['value' => 'submitted', 'label' => 'Submitted'],
+                ['value' => 'rejected', 'label' => 'Rejected'],
+                ['value' => 'pending_for_ata', 'label' => 'Pending for ATA'],
+                ['value' => 'pending_for_finance', 'label' => 'Pending for Finance'],
+                ['value' => 'pending_from_sales', 'label' => 'pending for sales'],
+                ['value' => 'unassigned', 'label' => 'Unassigned'],
+            ],
             'products' => $products,
         ]);
     }
@@ -512,6 +527,117 @@ class LeadSubmissionApiController extends Controller
     }
 
     /**
+     * GET /api/lead-submissions/audit-log
+     * List all lead submission change records (all leads). Super admin only.
+     * Query: lead_submission_id (optional), page, per_page.
+     */
+    public function auditLog(Request $request): JsonResponse
+    {
+        if (! $request->user()->hasRole('superadmin')) {
+            abort(403, 'Only super admin can view the audit log.');
+        }
+
+        $leadSubmissionId = $request->query('lead_submission_id');
+        $perPage = min((int) $request->query('per_page', 20), 100);
+        $perPage = $perPage > 0 ? $perPage : 20;
+
+        $query = LeadSubmissionAudit::query()
+            ->with(['leadSubmission:id,company_name', 'user:id,name'])
+            ->orderByDesc('changed_at');
+
+        if ($leadSubmissionId !== null && $leadSubmissionId !== '') {
+            $query->where('lead_submission_id', (int) $leadSubmissionId);
+        }
+
+        $paginator = $query->paginate($perPage);
+
+        $items = $paginator->getCollection()->map(function (LeadSubmissionAudit $audit) {
+            return [
+                'id' => $audit->id,
+                'lead_submission_id' => $audit->lead_submission_id,
+                'company_name' => $audit->leadSubmission?->company_name ?? '—',
+                'field_name' => $audit->field_name,
+                'old_value' => $audit->old_value,
+                'new_value' => $audit->new_value,
+                'changed_at' => $audit->changed_at?->toIso8601String(),
+                'changed_by' => $audit->user?->name ?? '—',
+            ];
+        })->values()->all();
+
+        return response()->json([
+            'data' => $items,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ]);
+    }
+
+    /**
+     * GET /api/lead-submissions/{lead}/audits
+     * Change history for a lead submission: field, old value, new value, date/time, who.
+     */
+    public function audits(Request $request, LeadSubmission $lead): JsonResponse
+    {
+        $this->authorize('view', $lead);
+
+        $rows = LeadSubmissionAudit::query()
+            ->where('lead_submission_id', $lead->id)
+            ->with('user:id,name')
+            ->orderByDesc('changed_at')
+            ->orderByDesc('id')
+            ->limit(500)
+            ->get();
+
+        $data = $rows->map(function (LeadSubmissionAudit $audit) {
+            return [
+                'id' => $audit->id,
+                'field_name' => $audit->field_name,
+                'old_value' => $audit->old_value,
+                'new_value' => $audit->new_value,
+                'changed_at' => $audit->changed_at?->toIso8601String(),
+                'changed_by' => $audit->changed_by,
+                'changed_by_name' => $audit->user?->name ?? '—',
+            ];
+        });
+
+        return response()->json(['data' => $data]);
+    }
+
+    /**
+     * POST /api/lead-submissions/bulk-assign
+     * Assign one back office executive to multiple lead submissions. Only superadmin or back_office role.
+     */
+    public function bulkAssign(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user->hasRole('superadmin') && ! $user->hasRole('back_office')) {
+            abort(403, 'Only superadmin or back office can bulk assign.');
+        }
+
+        $data = $request->validate([
+            'lead_ids' => ['required', 'array', 'min:1'],
+            'lead_ids.*' => ['integer', 'exists:lead_submissions,id'],
+            'executive_id' => ['required', 'integer', 'exists:users,id'],
+        ]);
+
+        $leadIds = $data['lead_ids'];
+        $executiveId = $data['executive_id'];
+
+        $updated = LeadSubmission::query()
+            ->whereIn('id', $leadIds)
+            ->visibleTo($user)
+            ->update(['executive_id' => $executiveId]);
+
+        return response()->json([
+            'message' => "Assigned {$updated} submission(s) to back office executive.",
+            'updated_count' => $updated,
+        ]);
+    }
+
+    /**
      * PUT /api/lead-submissions/{lead}/back-office
      * Edit submission (back office form). Only superadmin or backoffice role.
      */
@@ -523,6 +649,7 @@ class LeadSubmissionApiController extends Controller
         }
 
         $data = $request->validate([
+            // Back office fields
             'executive_id' => ['nullable', 'integer', 'exists:users,id'],
             'status' => ['sometimes', 'nullable', 'string', Rule::in(LeadSubmission::STATUSES)],
             'call_verification' => ['nullable', 'string', 'max:50'],
@@ -537,6 +664,29 @@ class LeadSubmissionApiController extends Controller
             'completion_date' => ['nullable', 'date'],
             'du_remarks' => ['nullable', 'string', 'max:5000'],
             'additional_note' => ['nullable', 'string', 'max:5000'],
+            // Lead fields (all optional for full edit)
+            'account_number' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'company_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'authorized_signatory_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'contact_number_gsm' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'alternate_contact_number' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'email' => ['sometimes', 'nullable', 'string', 'email', 'max:255'],
+            'address' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'emirate' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'location_coordinates' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'service_category_id' => ['sometimes', 'nullable', 'integer', 'exists:service_categories,id'],
+            'service_type_id' => ['sometimes', 'nullable', 'integer', 'exists:service_types,id'],
+            'product' => ['sometimes', 'nullable', 'string', 'max:150'],
+            'offer' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'mrc_aed' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'quantity' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'ae_domain' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'gaid' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'remarks' => ['sometimes', 'nullable', 'string', 'max:5000'],
+            'submission_type' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'sales_agent_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'team_leader_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'manager_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
         ]);
 
         $lead->update($data);
@@ -545,5 +695,42 @@ class LeadSubmissionApiController extends Controller
             'id' => $lead->id,
             'message' => 'Submission updated.',
         ]);
+    }
+
+    /**
+     * DELETE /api/lead-submissions/{lead}/documents/{document}
+     * Remove a single document. Same permission as update (superadmin or back_office).
+     */
+    public function deleteDocument(Request $request, LeadSubmission $lead, int $document): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user->hasRole('superadmin') && ! $user->hasRole('back_office')) {
+            abort(403, 'Only superadmin or back office can remove documents.');
+        }
+
+        $this->leadSubmissionService->deleteDocument($lead, $document);
+
+        return response()->json(['message' => 'Document removed.']);
+    }
+
+    /**
+     * POST /api/lead-submissions/{lead}/documents
+     * Add documents (multipart: documents[]). Same permission as update.
+     */
+    public function uploadDocuments(Request $request, LeadSubmission $lead): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user->hasRole('superadmin') && ! $user->hasRole('back_office')) {
+            abort(403, 'Only superadmin or back office can add documents.');
+        }
+
+        $request->validate([
+            'documents' => ['required', 'array', 'min:1'],
+            'documents.*' => ['required', 'file', new AllowedDocumentFile()],
+        ]);
+
+        $this->leadSubmissionService->addDocumentsFromRequest($request, $lead);
+
+        return response()->json(['message' => 'Documents added.']);
     }
 }

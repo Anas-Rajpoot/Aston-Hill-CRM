@@ -122,6 +122,41 @@ class LeadSubmissionService
         }
     }
 
+    /**
+     * Delete a single document by id. Document must belong to the lead.
+     */
+    public function deleteDocument(LeadSubmission $leadSubmission, int $documentId): void
+    {
+        $doc = \App\Models\LeadSubmissionDocument::where('lead_submission_id', $leadSubmission->id)
+            ->where('id', $documentId)
+            ->firstOrFail();
+        $this->deleteLeadSubmissionDocument($doc);
+    }
+
+    /**
+     * Add documents from request (e.g. edit page "add document"). Accepts documents[] and optional document_labels[].
+     * Each file is stored with doc_key additional_{timestamp}_{index}.
+     */
+    public function addDocumentsFromRequest(Request $request, LeadSubmission $leadSubmission): void
+    {
+        $files = $request->file('documents');
+        if (! is_array($files)) {
+            $files = $files ? [$files] : [];
+        }
+        $labels = $request->input('document_labels', []);
+        $ts = (string) time();
+        foreach ($files as $i => $file) {
+            if ($file && $file->isValid()) {
+                $docKey = 'additional_' . $ts . '_' . $i;
+                $label = is_array($labels) && isset($labels[$i]) ? $labels[$i] : null;
+                if (is_string($label)) {
+                    $label = trim($label) ?: null;
+                }
+                $this->storeLeadSubmissionDocument($leadSubmission, $docKey, $file, $label);
+            }
+        }
+    }
+
     public function submit(LeadSubmission $leadSubmission): LeadSubmission
     {
         return $this->repo->submit($leadSubmission);

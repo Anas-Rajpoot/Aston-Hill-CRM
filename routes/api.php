@@ -56,14 +56,23 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
         ->whereNumber('fieldSubmission');
     Route::put('/field-submissions/{fieldSubmission}', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'update'])
         ->whereNumber('fieldSubmission');
+    Route::patch('/field-submissions/{fieldSubmission}', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'patch'])
+        ->whereNumber('fieldSubmission');
     Route::patch('/field-submissions/{fieldSubmission}/status', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'updateStatus'])
         ->whereNumber('fieldSubmission');
     Route::patch('/field-submissions/{fieldSubmission}/assign-field-technician', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'assignFieldTechnician'])
         ->whereNumber('fieldSubmission');
+    Route::get('/field-submissions/audit-log', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'auditLog']);
 
     // Customer support
     Route::get('/customer-support/team-options', [CustomerSupportController::class, 'teamOptions']);
     Route::post('/customer-support', [CustomerSupportController::class, 'store']);
+    Route::get('/customer-support', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'index']);
+    Route::get('/customer-support/filters', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'filters']);
+    Route::get('/customer-support/columns', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'columns']);
+    Route::post('/customer-support/columns', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'saveColumns']);
+    Route::patch('/customer-support/{customerSupportSubmission}', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'patch'])
+        ->whereNumber('customerSupportSubmission');
 
     // VAS requests
     Route::get('/vas-requests/team-options', [VasRequestController::class, 'teamOptions']);
@@ -72,6 +81,11 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::get('/vas-requests/{vasRequest}', [VasRequestController::class, 'show'])->whereNumber('vasRequest');
     Route::post('/vas-requests/{vasRequest}/step-2', [VasRequestController::class, 'storeStep2']);
     Route::post('/vas-requests/{vasRequest}/submit', [VasRequestController::class, 'submit']);
+    Route::get('/vas-requests', [\App\Http\Controllers\Api\VasRequestController::class, 'index']);
+    Route::post('/vas-requests/{vas}/submit', [\App\Http\Controllers\Api\VasRequestController::class, 'submit']);
+    Route::post('/vas-requests/{vas}/approve', [\App\Http\Controllers\Api\VasRequestController::class, 'approve']);
+    Route::post('/vas-requests/{vas}/reject', [\App\Http\Controllers\Api\VasRequestController::class, 'reject']);
+
 
     // Lead submissions (specific routes before {lead})
     Route::get('/lead-submissions', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'index']);
@@ -79,16 +93,23 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::get('/lead-submissions/columns', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'columns']);
     Route::post('/lead-submissions/columns', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'saveColumns']);
     Route::get('/lead-submissions/back-office-options', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'backOfficeOptions']);
+    Route::get('/lead-submissions/audit-log', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'auditLog']);
+    Route::post('/lead-submissions/bulk-assign', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'bulkAssign']);
     Route::patch('/lead-submissions/{lead}/status', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'updateStatus'])
         ->whereNumber('lead');
     Route::patch('/lead-submissions/{lead}/status-changed-at', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'updateStatusChangedAt'])
         ->whereNumber('lead');
     Route::put('/lead-submissions/{lead}/back-office', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'updateBackOffice'])
         ->whereNumber('lead');
+    Route::get('/lead-submissions/{lead}/audits', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'audits'])->whereNumber('lead');
     Route::get('/lead-submissions/{lead}/documents/bulk-download', [LeadSubmissionController::class, 'bulkDownloadDocuments'])
         ->whereNumber('lead');
     Route::get('/lead-submissions/{lead}/documents/{document}/download', [LeadSubmissionController::class, 'downloadDocument'])
         ->whereNumber('lead')->whereNumber('document');
+    Route::delete('/lead-submissions/{lead}/documents/{document}', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'deleteDocument'])
+        ->whereNumber('lead')->whereNumber('document');
+    Route::post('/lead-submissions/{lead}/documents', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'uploadDocuments'])
+        ->whereNumber('lead');
     Route::get('/lead-submissions/current-draft', [LeadSubmissionController::class, 'currentDraft']);
     Route::get('/lead-submissions/categories', [LeadSubmissionController::class, 'categories']);
     Route::get('/lead-submissions/service-types', [LeadSubmissionController::class, 'serviceTypes']);

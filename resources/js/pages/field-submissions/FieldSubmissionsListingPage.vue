@@ -2,7 +2,8 @@
 /**
  * Field Submissions Listing – same design and functionality as Lead Submissions.
  */
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
+import { useAuthStore } from '@/stores/auth'
 import fieldSubmissionsApi from '@/services/fieldSubmissionsApi'
 import FiltersBar from '@/components/field-submissions/FiltersBar.vue'
 import AdvancedFilters from '@/components/field-submissions/AdvancedFilters.vue'
@@ -12,6 +13,7 @@ import FieldTable from '@/components/field-submissions/FieldTable.vue'
 import Pagination from '@/components/Pagination.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 
+const auth = useAuthStore()
 const loading = ref(true)
 const filterOptions = ref({
   statuses: [],
@@ -20,21 +22,33 @@ const filterOptions = ref({
   managers: [],
   teamLeaders: [],
   salesAgents: [],
+  field_executives: [],
 })
 const submissions = ref([])
-const meta = ref({ current_page: 1, last_page: 1, per_page: 10, total: 0 })
+const meta = ref({ current_page: 1, last_page: 1, per_page: 15, total: 0 })
 const allColumns = ref([])
 const visibleColumns = ref([
-  'submitted_at', 'company_name', 'emirates', 'product', 'sales_agent', 'team_leader', 'manager',
-  'field_agent', 'field_status', 'target_date', 'sla_timer', 'sla_status', 'last_updated',
+  'id', 'submitted_at', 'company_name', 'contact_number', 'product', 'emirates', 'complete_address',
+  'sales_agent', 'team_leader', 'manager', 'field_agent', 'field_status', 'target_date', 'sla_timer', 'sla_status', 'last_updated', 'creator',
 ])
+const assignModalVisible = ref(false)
+const assignSubmission = ref(null)
+/** For bulk assign: submission IDs. When set, modal runs in bulk mode. */
+const assignBulkIds = ref([])
+const selectedSubmissionIds = ref([])
+const bulkAssignMessage = ref('')
+const canBulkAssign = (() => {
+  const roles = auth.user?.roles ?? []
+  if (!Array.isArray(roles)) return false
+  return roles.some((r) => {
+    const name = typeof r === 'string' ? r : r?.name
+    return name === 'superadmin' || name === 'back_office' || name === 'backoffice' || name === 'field_head'
+  })
+})()
 const sort = ref('created_at')
 const order = ref('desc')
 const advancedVisible = ref(false)
 const columnModalVisible = ref(false)
-const assignModalVisible = ref(false)
-const assignSubmission = ref(null)
-const fieldTechnicians = ref([])
 const exportLoading = ref(false)
 
 const filters = ref({
@@ -156,12 +170,14 @@ async function load() {
 
 async function loadFilters() {
   try {
-    const [filtersRes, teamRes] = await Promise.all([
+    const [filtersRes, teamRes, editOptionsRes] = await Promise.all([
       fieldSubmissionsApi.filters(),
       fieldSubmissionsApi.getTeamOptions().catch(() => ({ data: {} })),
+      fieldSubmissionsApi.getEditOptions().catch(() => ({})),
     ])
     const data = filtersRes
-    const team = teamRes?.data ?? {}
+    const team = teamRes?.data ?? teamRes ?? {}
+    const editOpt = editOptionsRes?.data ?? editOptionsRes ?? {}
     filterOptions.value = {
       statuses: data.statuses ?? [],
       products: data.products ?? [],
@@ -169,6 +185,8 @@ async function loadFilters() {
       managers: team.managers ?? [],
       teamLeaders: team.team_leaders ?? [],
       salesAgents: team.sales_agents ?? [],
+      field_executives: team.field_executives ?? [],
+      field_statuses: editOpt.field_statuses ?? [],
     }
   } catch {
     //
@@ -235,6 +253,57 @@ function formatDateForDisplay(d) {
   return `${day}-${months[date.getMonth()]}-${date.getFullYear()}`
 }
 
+/** Map display column name to API field name for updateSubmissionFields. */
+const COLUMN_TO_API_FIELD = {
+  manager: 'manager_id',
+  team_leader: 'team_leader_id',
+  sales_agent: 'sales_agent_id',
+  field_agent: 'field_executive_id',
+  target_date: 'meeting_date',
+}
+
+async function onUpdateCell(submissionId, field, value) {
+  const apiField = COLUMN_TO_API_FIELD[field] ?? field
+  const row = submissions.value.find((r) => r.id === submissionId)
+  const prev = row ? { ...row } : null
+  const payload = {}
+  if (apiField === 'meeting_date') {
+    payload.meeting_date = value || null
+    if (row) {
+      row.target_date = value ? new Date(value).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : null
+      row.meeting_date = value
+    }
+  } else {
+    payload[apiField] = value
+    if (row) {
+      if (field === 'manager') {
+        row.manager_id = value
+        row.manager = filterOptions.value.managers.find((m) => m.id === value)?.name ?? row.manager
+      } else if (field === 'team_leader') {
+        row.team_leader_id = value
+        row.team_leader = filterOptions.value.teamLeaders.find((t) => t.id === value)?.name ?? row.team_leader
+      } else if (field === 'sales_agent') {
+        row.sales_agent_id = value
+        row.sales_agent = filterOptions.value.salesAgents.find((s) => s.id === value)?.name ?? row.sales_agent
+      } else if (field === 'field_agent') {
+        row.field_executive_id = value
+        row.field_agent = value == null ? 'Unassigned' : (filterOptions.value.field_executives.find((e) => e.id === value)?.name ?? row.field_agent)
+      } else if (field === 'field_status') {
+        row.field_status = value
+      } else {
+        row[field] = value
+      }
+    }
+  }
+  try {
+    const res = await fieldSubmissionsApi.updateSubmissionFields(submissionId, payload)
+    if (res?.row && row) Object.assign(row, res.row)
+  } catch {
+    if (prev) Object.assign(row, prev)
+    load()
+  }
+}
+
 async function onUpdateStatus(id, newStatus) {
   const row = submissions.value.find((r) => r.id === id)
   const prevStatus = row?.status
@@ -263,6 +332,61 @@ function onPageChange(page) {
   load()
 }
 
+function openAssignModal(row) {
+  if (!row) return
+  assignSubmission.value = row
+  assignBulkIds.value = []
+  assignModalVisible.value = true
+}
+
+function openBulkAssign() {
+  bulkAssignMessage.value = ''
+  if (selectedSubmissionIds.value.length === 0) {
+    bulkAssignMessage.value = 'Please select at least one row.'
+    return
+  }
+  assignSubmission.value = null
+  assignBulkIds.value = [...selectedSubmissionIds.value]
+  assignModalVisible.value = true
+}
+
+async function onAssignFieldTechnician(payload) {
+  const techId = payload.fieldExecutiveId != null ? Number(payload.fieldExecutiveId) : null
+  if (!techId) return
+  const ids = payload.submissionIds ?? (payload.submissionId ? [payload.submissionId] : [])
+  try {
+    for (const id of ids) {
+      await fieldSubmissionsApi.assignFieldTechnician(id, techId)
+    }
+    onAssignModalSaved()
+  } catch (err) {
+    const msg = err.response?.data?.message || err.message || 'Failed to assign.'
+    alert(msg)
+  }
+}
+
+function onAssignModalSaved() {
+  assignModalVisible.value = false
+  assignSubmission.value = null
+  assignBulkIds.value = []
+  selectedSubmissionIds.value = []
+  load()
+}
+
+function onAssignModalClose() {
+  assignModalVisible.value = false
+  assignSubmission.value = null
+  assignBulkIds.value = []
+}
+
+function onOpenAssignTechnician(row) {
+  openAssignModal(row)
+}
+
+watch(selectedSubmissionIds, (ids) => {
+  if (ids && ids.length > 0) bulkAssignMessage.value = ''
+}, { deep: true })
+
 onMounted(() => {
   loadFilters()
   loadColumns()
@@ -271,15 +395,18 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] py-6 px-4 sm:px-6">
+  <div class="min-h-[calc(100vh-4rem)] bg-white py-6 px-4 sm:px-6">
     <div class="mx-auto max-w-7xl space-y-4">
+      <!-- Top: title (left), Bulk Assign + Export (right) -->
       <div class="flex flex-wrap items-center justify-between gap-4">
         <h1 class="text-xl font-semibold text-gray-900">Field Submissions</h1>
         <div class="flex flex-wrap items-center gap-2">
           <button
+            v-if="canBulkAssign"
             type="button"
             class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
             title="Bulk Assign"
+            @click="openBulkAssign"
           >
             <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -314,6 +441,13 @@ onMounted(() => {
             {{ exportLoading ? 'Exporting...' : 'Export' }}
           </button>
         </div>
+      </div>
+      <div
+        v-if="bulkAssignMessage"
+        class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"
+        role="alert"
+      >
+        {{ bulkAssignMessage }}
       </div>
       <Breadcrumbs />
 
@@ -374,28 +508,32 @@ onMounted(() => {
           :sort="sort"
           :order="order"
           :loading="loading"
+          :current-page="meta.current_page"
+          :per-page="meta.per_page"
+          :edit-options="filterOptions"
+          v-model:selected-ids="selectedSubmissionIds"
           @sort="onSort"
           @update-status="onUpdateStatus"
+          @update-cell="onUpdateCell"
           @assign-technician="onOpenAssignTechnician"
         />
         <div
-          class="flex flex-wrap items-center justify-between gap-4 border-t border-gray-200 bg-gray-100 px-4 py-3"
+          class="flex flex-wrap items-center gap-4 border-t border-black bg-white px-4 py-3"
+          :class="meta.last_page > 1 ? 'justify-between' : 'justify-start'"
         >
           <p class="text-sm text-gray-600">
             Showing {{ meta.total ? ((meta.current_page - 1) * meta.per_page) + 1 : 0 }} to {{ Math.min(meta.current_page * meta.per_page, meta.total) }} of {{ meta.total }} results
           </p>
-          <div v-if="meta.last_page > 1" class="flex items-center gap-2">
-            <span class="text-sm text-gray-600">Page {{ meta.current_page }} of {{ meta.last_page }}</span>
-            <Pagination
-              :meta="{
-                prev_page_url: meta.current_page > 1 ? '#' : null,
-                next_page_url: meta.current_page < meta.last_page ? '#' : null,
-                current_page: meta.current_page,
-                last_page: meta.last_page,
-              }"
-              @change="onPageChange"
-            />
-          </div>
+          <Pagination
+            v-if="meta.last_page > 1"
+            :meta="{
+              prev_page_url: meta.current_page > 1 ? '#' : null,
+              next_page_url: meta.current_page < meta.last_page ? '#' : null,
+              current_page: meta.current_page,
+              last_page: meta.last_page,
+            }"
+            @change="onPageChange"
+          />
         </div>
       </div>
     </div>
@@ -410,8 +548,9 @@ onMounted(() => {
     <AssignFieldTechnicianModal
       :visible="assignModalVisible"
       :submission="assignSubmission"
-      :field-technicians="fieldTechnicians"
-      @close="assignModalVisible = false; assignSubmission = null"
+      :bulk-submission-ids="assignBulkIds"
+      :field-technicians="filterOptions.field_executives"
+      @close="onAssignModalClose"
       @assign="onAssignFieldTechnician"
     />
   </div>

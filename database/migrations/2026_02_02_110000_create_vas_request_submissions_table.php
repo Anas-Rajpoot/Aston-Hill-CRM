@@ -10,20 +10,27 @@ return new class extends Migration
     {
         Schema::create('vas_request_submissions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('created_by')->constrained('users')->cascadeOnDelete();
+
+            $table->string('account_number')->nullable();
+            $table->string('company_name')->nullable();
             $table->string('request_type');
-            $table->string('account_number');
-            $table->string('contact_number');
-            $table->string('company_name');
-            $table->text('request_description');
-            $table->text('additional_notes')->nullable();
-            $table->foreignId('manager_id')->constrained('users')->cascadeOnDelete();
-            $table->foreignId('team_leader_id')->constrained('users')->cascadeOnDelete();
-            $table->foreignId('sales_agent_id')->constrained('users')->cascadeOnDelete();
-            $table->enum('status', ['draft', 'submitted'])->default('draft');
+            $table->text('description')->nullable();
+
+            $table->enum('status', ['draft', 'submitted', 'approved', 'rejected'])
+                  ->default('draft');
+
+            $table->foreignId('sales_agent_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('team_leader_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('manager_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('back_office_executive_id')->nullable()->constrained('users')->nullOnDelete();
+
+            $table->foreignId('created_by')->constrained('users')->cascadeOnDelete();
+
             $table->timestamp('submitted_at')->nullable();
+            $table->timestamp('approved_at')->nullable();
+            $table->timestamp('rejected_at')->nullable();
+
             $table->timestamps();
-            $table->index(['status', 'created_at']);
         });
     }
 

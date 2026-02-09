@@ -21,4 +21,7 @@ export default {
   submit(id) {
     return api.post(`/vas-requests/${id}/submit`)
   },
+  list(params) {
+    return api.get('/vas-requests', { params })
+  },
 }

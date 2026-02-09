@@ -53,6 +53,8 @@ const superAdminOnly = [
   { to: '/users', label: 'Users', show: () => userHasRole('superadmin') },
   { to: '/roles', label: 'Roles', show: () => userHasRole('superadmin') },
   { to: '/permissions', label: 'Permissions', show: () => userHasRole('superadmin') },
+  { to: '/lead-submissions/audit-log', label: 'Lead Submission Changes', show: () => userHasRole('superadmin') },
+  { to: '/field-submissions/audit-log', label: 'Field Submission Changes', show: () => userHasRole('superadmin') },
 ]
 
 const isActive = (to) => {

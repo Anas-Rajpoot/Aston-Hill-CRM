@@ -205,7 +205,7 @@ onMounted(() => {
 
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] p-0">
-    <div class="mx-auto max-w-4xl px-2 sm:px-4">
+    <div class="mx-auto max-w-7xl px-1 sm:px-2">
       <!-- Single white card: heading + border + form (same background, thin border between) -->
       <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
         <!-- Heading: same background as form -->
@@ -239,25 +239,15 @@ onMounted(() => {
                 class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
               />
             </div>
-            <div class="relative">
+            <div>
               <label class="block text-sm font-medium text-gray-700">Contact Number <span class="text-red-500">*</span></label>
               <input
                 v-model="form.contact_number"
                 type="text"
                 required
-                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 pr-9 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                autocomplete="off"
+                class="contact-number-input mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
               />
-              <button
-                v-if="form.contact_number"
-                type="button"
-                class="absolute right-2 top-8 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                aria-label="Clear"
-                @click="form.contact_number = ''"
-              >
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Complete Address <span class="text-red-500">*</span></label>
@@ -461,3 +451,13 @@ onMounted(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Remove browser's clear (X) button from Contact Number field */
+.contact-number-input::-ms-clear {
+  display: none;
+}
+.contact-number-input::-webkit-search-cancel-button {
+  display: none;
+}
+</style>

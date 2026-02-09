@@ -9,6 +9,7 @@ const emit = defineEmits(['change'])
 const icons = {
   lead: 'document',
   field: 'map-pin',
+  new: 'plus',
   support: 'headset',
   vas: 'heart',
 }
@@ -39,6 +40,10 @@ const icons = {
       <svg v-else-if="icons[tab.key] === 'headset'" class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 18v-6a9 9 0 0118 0v6" />
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z" />
+      </svg>
+      <!-- Plus / new (New Submission) -->
+      <svg v-else-if="icons[tab.key] === 'plus'" class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
       </svg>
       <!-- Heart icon (VAS Request) – custom VAS icon -->
       <svg v-else-if="icons[tab.key] === 'heart'" class="w-5 h-5 shrink-0" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">

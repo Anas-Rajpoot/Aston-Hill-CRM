@@ -22,7 +22,7 @@ const emit = defineEmits(['apply', 'reset'])
       class="min-w-[200px] rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
       :disabled="loading"
     >
-      <option value="">All Statuses</option>
+      <option value="">Status</option>
       <option v-for="s in filterOptions.statuses" :key="s.value" :value="s.value">
         {{ s.label }}
       </option>
@@ -34,7 +34,7 @@ const emit = defineEmits(['apply', 'reset'])
       class="min-w-[200px] rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
       :disabled="loading"
     >
-      <option value="">All Products</option>
+      <option value="">Product</option>
       <option v-for="p in filterOptions.products" :key="p" :value="p">{{ p }}</option>
     </select>
 

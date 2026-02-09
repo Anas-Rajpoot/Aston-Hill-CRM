@@ -21,6 +21,7 @@ const LeadSubmissionWizard = asyncForm(() => import('@/forms/LeadSubmissionForms
 const FieldSubmissionForm = asyncForm(() => import('@/forms/FieldSubmissionForm/step1.vue'))
 const CustomerSupportForm = asyncForm(() => import('@/forms/CustomerSupportForm/step1.vue'))
 const VasRequestWizard = asyncForm(() => import('@/forms/VASRequestForm/VasRequestWizard.vue'))
+const NewSubmissionForm = asyncForm(() => import('@/forms/NewSubmissionForm/NewSubmissionForm.vue'))
 
 const route = useRoute()
 const activeTab = ref('lead')
@@ -34,6 +35,7 @@ const tabs = [
   { key: 'field', label: 'Field Submissions' },
   { key: 'support', label: 'Customer Support' },
   { key: 'vas', label: 'VAS Requests' },
+  { key: 'new', label: 'New Submission' },
 ]
 
 onMounted(() => {
@@ -77,6 +79,7 @@ function onLeadNewSubmission() {
         <FieldSubmissionForm v-else-if="activeTab === 'field'" :key="`field-${formKey}`" />
         <CustomerSupportForm v-else-if="activeTab === 'support'" :key="`support-${formKey}`" />
         <VasRequestWizard v-else-if="activeTab === 'vas'" :key="`vas-${formKey}`" />
+        <NewSubmissionForm v-else-if="activeTab === 'new'" :key="`new-${formKey}`" />
       </div>
     </div>
   </div>

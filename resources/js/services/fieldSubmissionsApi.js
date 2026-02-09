@@ -31,6 +31,12 @@ export default {
     return data
   },
 
+  /** Partial update for listing inline edits. Payload: e.g. { company_name: 'x' }, { manager_id: 5 }. */
+  async updateSubmissionFields(fieldSubmissionId, payload) {
+    const { data } = await api.patch(`/field-submissions/${fieldSubmissionId}`, payload)
+    return data
+  },
+
   async assignFieldTechnician(fieldSubmissionId, fieldExecutiveId) {
     const { data } = await api.patch(
       `/field-submissions/${fieldSubmissionId}/assign-field-technician`,
@@ -70,6 +76,12 @@ export default {
       `/field-submissions/${submissionId}/documents/${documentId}/download`,
       { responseType: 'blob' }
     )
+    return data
+  },
+
+  /** Audit log (super admin only). Params: page, per_page, field_submission_id. */
+  async getAuditLog(params = {}) {
+    const { data } = await api.get('/field-submissions/audit-log', { params })
     return data
   },
 }

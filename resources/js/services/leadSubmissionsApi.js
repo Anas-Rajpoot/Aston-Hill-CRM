@@ -153,6 +153,27 @@ const leadSubmissionsApi = {
     return res
   },
 
+  /** Bulk assign: assign one executive to multiple lead submissions (superadmin / back_office only). */
+  async bulkAssign(leadIds, data) {
+    const { data: res } = await api.post('/lead-submissions/bulk-assign', {
+      lead_ids: leadIds,
+      executive_id: data.executive_id,
+    })
+    return res
+  },
+
+  /** Change history (audit log) for a single lead submission. */
+  async getAudits(leadId) {
+    const { data } = await api.get(`/lead-submissions/${leadId}/audits`)
+    return data
+  },
+
+  /** Global audit log (all lead submission changes). Super admin only. Params: page, per_page, lead_submission_id. */
+  async getAuditLog(params = {}) {
+    const { data } = await api.get('/lead-submissions/audit-log', { params })
+    return data
+  },
+
   /**
    * Download a single document. Returns blob; caller should trigger save (e.g. create object URL and click).
    */
@@ -172,6 +193,20 @@ const leadSubmissionsApi = {
       `/lead-submissions/${leadId}/documents/bulk-download`,
       { responseType: 'blob' }
     )
+    return data
+  },
+
+  /** Remove a single document (superadmin / back_office only). */
+  async deleteDocument(leadId, documentId) {
+    const { data } = await api.delete(`/lead-submissions/${leadId}/documents/${documentId}`)
+    return data
+  },
+
+  /** Add documents (FormData with documents[]). Returns { message }. */
+  async uploadDocuments(leadId, formData) {
+    const { data } = await api.post(`/lead-submissions/${leadId}/documents`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
     return data
   },
 }

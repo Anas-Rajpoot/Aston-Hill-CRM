@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\FieldSubmission;
+use App\Models\FieldSubmissionAudit;
+use App\Models\User;
 use App\Models\UserColumnPreference;
 use App\Traits\StoresFieldSubmissionDocuments;
 use App\Models\FieldSubmissionDocument;
@@ -245,13 +247,17 @@ class FieldSubmissionApiController extends Controller
                     : null;
             } elseif ($col === 'sales_agent') {
                 $out['sales_agent'] = $row->relationLoaded('salesAgent') ? ($row->salesAgent?->name ?? '-') : '-';
+                $out['sales_agent_id'] = $row->sales_agent_id;
             } elseif ($col === 'team_leader') {
                 $out['team_leader'] = $row->relationLoaded('teamLeader') ? ($row->teamLeader?->name ?? '-') : '-';
+                $out['team_leader_id'] = $row->team_leader_id;
             } elseif ($col === 'manager') {
                 $out['manager'] = $row->relationLoaded('manager') ? ($row->manager?->name ?? '-') : '-';
+                $out['manager_id'] = $row->manager_id;
             } elseif ($col === 'field_agent') {
                 $name = $row->relationLoaded('fieldExecutive') ? ($row->fieldExecutive?->name ?? null) : null;
                 $out['field_agent'] = $name ?: 'Unassigned';
+                $out['field_executive_id'] = $row->field_executive_id;
             } elseif ($col === 'target_date') {
                 $out['target_date'] = $row->meeting_date ? $row->meeting_date->format('d/M/Y H:i') : null;
             } elseif ($col === 'last_updated') {
@@ -397,10 +403,18 @@ class FieldSubmissionApiController extends Controller
             'status' => ['required', 'string', Rule::in(FieldSubmission::STATUSES)],
         ]);
 
+        $oldStatus = $fieldSubmission->status;
         $fieldSubmission->update([
             'status' => $data['status'],
             'submitted_at' => $data['status'] === 'submitted' ? now() : $fieldSubmission->submitted_at,
         ]);
+        $this->logFieldSubmissionChange(
+            $fieldSubmission->id,
+            'status',
+            $oldStatus,
+            $data['status'],
+            $request->user()?->id
+        );
 
         return response()->json([
             'id' => $fieldSubmission->id,
@@ -531,6 +545,144 @@ class FieldSubmissionApiController extends Controller
     }
 
     /**
+     * PATCH /api/field-submissions/{fieldSubmission}
+     * Partial update for listing inline edits. Only provided fields are validated and updated.
+     * Cascade: when manager_id is set, clear team_leader_id/sales_agent_id if they don't belong to that manager.
+     * When sales_agent_id is set, auto-set team_leader_id and manager_id from that user's hierarchy.
+     * When team_leader_id is set, auto-set manager_id and clear sales_agent_id if it doesn't belong to that TL.
+     */
+    public function patch(Request $request, FieldSubmission $fieldSubmission): JsonResponse
+    {
+        $this->authorize('update', $fieldSubmission);
+
+        $rules = [
+            'company_name' => ['sometimes', 'string', 'max:255'],
+            'contact_number' => ['sometimes', 'string', 'max:50'],
+            'complete_address' => ['sometimes', 'string', 'max:1000'],
+            'product' => ['sometimes', 'string', 'max:255'],
+            'emirates' => ['sometimes', 'string', 'max:100'],
+            'manager_id' => ['sometimes', 'nullable', 'exists:users,id'],
+            'team_leader_id' => ['sometimes', 'nullable', 'exists:users,id'],
+            'sales_agent_id' => ['sometimes', 'nullable', 'exists:users,id'],
+            'field_executive_id' => ['sometimes', 'nullable', 'exists:users,id'],
+            'meeting_date' => ['sometimes', 'nullable', 'date'],
+            'field_status' => ['sometimes', 'nullable', 'string', 'max:80', Rule::in(FieldSubmission::FIELD_STATUSES)],
+        ];
+
+        $data = $request->validate($rules);
+        if (! empty($data)) {
+            $this->applyHierarchyCascade($fieldSubmission, $data);
+            $oldValues = [];
+            foreach (array_keys($data) as $key) {
+                $val = $fieldSubmission->getAttribute($key);
+                $oldValues[$key] = $val === null || $val === '' ? null : (is_object($val) ? json_encode($val) : (string) $val);
+            }
+            $fieldSubmission->update($data);
+            $userId = $request->user()?->id;
+            foreach ($data as $key => $newVal) {
+                $newStr = $newVal === null || $newVal === '' ? null : (is_object($newVal) ? json_encode($newVal) : (string) $newVal);
+                if (($oldValues[$key] ?? null) !== $newStr) {
+                    $this->logFieldSubmissionChange($fieldSubmission->id, $key, $oldValues[$key] ?? null, $newStr, $userId);
+                }
+            }
+        }
+
+        $fieldSubmission->load(['manager:id,name', 'teamLeader:id,name', 'salesAgent:id,name', 'fieldExecutive:id,name', 'creator:id,name']);
+        $columns = array_merge(
+            ['id', 'company_name', 'contact_number', 'product', 'emirates', 'complete_address', 'status', 'field_status', 'manager', 'team_leader', 'sales_agent', 'field_agent', 'target_date', 'last_updated', 'creator'],
+            array_keys($data)
+        );
+        $columns = array_unique($columns);
+        $row = $this->formatRow($fieldSubmission, $columns);
+
+        return response()->json([
+            'id' => $fieldSubmission->id,
+            'message' => 'Updated.',
+            'row' => $row,
+        ]);
+    }
+
+    /**
+     * Apply hierarchy cascade to $data: when manager/team_leader/sales_agent is updated,
+     * set or clear related fields so they stay consistent.
+     */
+    private function applyHierarchyCascade(FieldSubmission $fieldSubmission, array &$data): void
+    {
+        // When sales_agent_id is set: auto-set team_leader_id and manager_id from that user.
+        if (array_key_exists('sales_agent_id', $data) && $data['sales_agent_id']) {
+            $user = User::with('teamLeader:id,manager_id')->find($data['sales_agent_id']);
+            if ($user) {
+                $data['team_leader_id'] = $user->team_leader_id;
+                $data['manager_id'] = $user->teamLeader?->manager_id ?? $user->manager_id;
+            }
+        }
+
+        // When team_leader_id is set: auto-set manager_id; clear sales_agent_id if it doesn't belong to this TL.
+        if (array_key_exists('team_leader_id', $data)) {
+            $newTlId = $data['team_leader_id'];
+            if ($newTlId) {
+                $tlUser = User::find($newTlId);
+                if ($tlUser) {
+                    $data['manager_id'] = $tlUser->manager_id;
+                }
+            }
+            $currentSaId = $fieldSubmission->sales_agent_id ?? $data['sales_agent_id'] ?? null;
+            if ($currentSaId) {
+                $saUser = User::find($currentSaId);
+                if ($saUser && (int) $saUser->team_leader_id !== (int) $newTlId) {
+                    $data['sales_agent_id'] = null;
+                }
+            }
+        }
+
+        // When manager_id is set: clear team_leader_id and sales_agent_id if they don't belong to this manager.
+        if (array_key_exists('manager_id', $data)) {
+            $newManagerId = $data['manager_id'];
+            if ($newManagerId) {
+                $currentTlId = $fieldSubmission->team_leader_id ?? $data['team_leader_id'] ?? null;
+                if ($currentTlId) {
+                    $tlUser = User::find($currentTlId);
+                    if ($tlUser && (int) $tlUser->manager_id !== (int) $newManagerId) {
+                        $data['team_leader_id'] = null;
+                        $data['sales_agent_id'] = null;
+                    }
+                }
+                $currentSaId = $fieldSubmission->sales_agent_id ?? $data['sales_agent_id'] ?? null;
+                if ($currentSaId && ! isset($data['team_leader_id'])) {
+                    $saUser = User::with('teamLeader:id,manager_id')->find($currentSaId);
+                    $effectiveManager = $saUser?->teamLeader?->manager_id ?? $saUser?->manager_id;
+                    if ($effectiveManager && (int) $effectiveManager !== (int) $newManagerId) {
+                        $data['sales_agent_id'] = null;
+                    }
+                }
+            } else {
+                $data['team_leader_id'] = null;
+                $data['sales_agent_id'] = null;
+            }
+        }
+    }
+
+    /**
+     * Record one field change for audit (who, which field, old value, new value, when).
+     */
+    private function logFieldSubmissionChange(
+        int $fieldSubmissionId,
+        string $fieldName,
+        ?string $oldValue,
+        ?string $newValue,
+        ?int $changedBy
+    ): void {
+        FieldSubmissionAudit::create([
+            'field_submission_id' => $fieldSubmissionId,
+            'field_name' => $fieldName,
+            'old_value' => $oldValue,
+            'new_value' => $newValue,
+            'changed_at' => now(),
+            'changed_by' => $changedBy,
+        ]);
+    }
+
+    /**
      * PATCH /api/field-submissions/{fieldSubmission}/assign-field-technician
      * Assign a field technician (field executive) to a submission. Body: field_executive_id.
      */
@@ -542,7 +694,15 @@ class FieldSubmissionApiController extends Controller
             'field_executive_id' => ['required', 'integer', 'exists:users,id'],
         ]);
 
+        $oldId = $fieldSubmission->field_executive_id;
         $fieldSubmission->update(['field_executive_id' => $data['field_executive_id']]);
+        $this->logFieldSubmissionChange(
+            $fieldSubmission->id,
+            'field_executive_id',
+            $oldId !== null ? (string) $oldId : null,
+            (string) $data['field_executive_id'],
+            $request->user()?->id
+        );
 
         return response()->json([
             'id' => $fieldSubmission->id,
@@ -597,6 +757,55 @@ class FieldSubmissionApiController extends Controller
         return response()->json([
             'emirates' => array_values($emirates),
             'field_statuses' => array_map(fn ($s) => ['value' => $s, 'label' => $s], FieldSubmission::FIELD_STATUSES),
+        ]);
+    }
+
+    /**
+     * GET /api/field-submissions/audit-log
+     * List all field submission change records. Super admin only.
+     * Query: field_submission_id (optional), page, per_page.
+     */
+    public function auditLog(Request $request): JsonResponse
+    {
+        if (! $request->user()->hasRole('superadmin')) {
+            abort(403, 'Only super admin can view the audit log.');
+        }
+
+        $fieldSubmissionId = $request->query('field_submission_id');
+        $perPage = min((int) $request->query('per_page', 20), 100);
+        $perPage = $perPage > 0 ? $perPage : 20;
+
+        $query = FieldSubmissionAudit::query()
+            ->with(['fieldSubmission:id,company_name', 'changedByUser:id,name'])
+            ->orderByDesc('changed_at');
+
+        if ($fieldSubmissionId !== null && $fieldSubmissionId !== '') {
+            $query->where('field_submission_id', (int) $fieldSubmissionId);
+        }
+
+        $paginator = $query->paginate($perPage);
+
+        $items = $paginator->getCollection()->map(function (FieldSubmissionAudit $audit) {
+            return [
+                'id' => $audit->id,
+                'field_submission_id' => $audit->field_submission_id,
+                'company_name' => $audit->fieldSubmission?->company_name ?? '—',
+                'field_name' => $audit->field_name,
+                'old_value' => $audit->old_value,
+                'new_value' => $audit->new_value,
+                'changed_at' => $audit->changed_at?->toIso8601String(),
+                'changed_by' => $audit->changedByUser?->name ?? '—',
+            ];
+        })->values()->all();
+
+        return response()->json([
+            'data' => $items,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
         ]);
     }
 }
