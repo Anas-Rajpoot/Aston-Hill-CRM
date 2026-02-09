@@ -164,8 +164,11 @@ onMounted(() => load())
       <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
         <!-- Heading + breadcrumbs: same white background -->
         <div class="px-4 py-4 sm:px-5">
-          <div class="mb-3 flex flex-wrap items-center justify-between gap-4">
-            <h1 class="text-xl font-semibold text-gray-900">Field Submission Details</h1>
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <div class="flex flex-wrap items-baseline gap-2">
+              <h1 class="text-xl font-semibold text-gray-900">Field Submission Details</h1>
+              <Breadcrumbs />
+            </div>
             <div class="flex items-center gap-2">
               <button
                 v-if="canEdit"
@@ -187,7 +190,6 @@ onMounted(() => load())
               </button>
             </div>
           </div>
-          <Breadcrumbs />
         </div>
 
         <!-- Thin border between heading area and detail part -->

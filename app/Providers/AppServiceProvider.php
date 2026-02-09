@@ -8,16 +8,19 @@ use App\Models\Account;
 use App\Models\CustomerSupportSubmission;
 use App\Models\FieldSubmission;
 use App\Models\LeadSubmission;
+use App\Models\VasRequestSubmission;
+use App\Models\EmailFollowUp;
 use App\Policies\AccountPolicy;
 use App\Policies\CustomerSupportSubmissionPolicy;
 use App\Policies\FieldSubmissionPolicy;
 use App\Policies\LeadSubmissionPolicy;
+use App\Policies\VasRequestPolicy;
+use App\Policies\EmailFollowUpPolicy;
 use App\Observers\LeadSubmissionObserver;
+use App\Observers\VasRequestSubmissionObserver;
+use App\Observers\CustomerSupportSubmissionObserver;
 use App\Repositories\Contracts\LeadSubmissionRepositoryInterface;
 use App\Repositories\Eloquent\LeadSubmissionRepository;
-use App\Models\VasRequestSubmission;
-use App\Policies\VasRequestPolicy;
-use App\Observers\VasRequestObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -40,11 +43,13 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         LeadSubmission::observe(LeadSubmissionObserver::class);
-        VasRequestSubmission::observe(VasRequestObserver::class);
+        VasRequestSubmission::observe(VasRequestSubmissionObserver::class);
+        CustomerSupportSubmission::observe(CustomerSupportSubmissionObserver::class);
         Gate::policy(LeadSubmission::class, LeadSubmissionPolicy::class);
         Gate::policy(FieldSubmission::class, FieldSubmissionPolicy::class);
         Gate::policy(CustomerSupportSubmission::class, CustomerSupportSubmissionPolicy::class);
         Gate::policy(VasRequestSubmission::class, VasRequestPolicy::class);
+        Gate::policy(EmailFollowUp::class, EmailFollowUpPolicy::class);
         Gate::before(function ($user, $ability) {
             return $user->hasRole('superadmin') ? true : null;
         });

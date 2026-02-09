@@ -1,0 +1,424 @@
+<script setup>
+/**
+ * Email Follow-Up – add form + listing on same page. Added By auto-filled from logged-in user.
+ */
+import { ref, onMounted } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+import emailFollowUpsApi from '@/services/emailFollowUpsApi'
+import FiltersBar from '@/components/email-followups/FiltersBar.vue'
+import AdvancedFilters from '@/components/email-followups/AdvancedFilters.vue'
+import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
+import EmailFollowUpTable from '@/components/email-followups/EmailFollowUpTable.vue'
+import Pagination from '@/components/Pagination.vue'
+import Breadcrumbs from '@/components/Breadcrumbs.vue'
+
+const auth = useAuthStore()
+const addedByName = ref('')
+const loading = ref(true)
+const submitLoading = ref(false)
+const exportLoading = ref(false)
+const filterOptions = ref({ statuses: [], categories: [] })
+const submissions = ref([])
+const meta = ref({ current_page: 1, last_page: 1, per_page: 15, total: 0 })
+const allColumns = ref([])
+const visibleColumns = ref(['id', 'email_date', 'subject', 'category', 'request_from', 'sent_to', 'creator', 'status'])
+const sort = ref('email_date')
+const order = ref('desc')
+const advancedVisible = ref(false)
+const columnModalVisible = ref(false)
+
+const form = ref({
+  email_date: '',
+  category: '',
+  category_other: '',
+  subject: '',
+  request_from: '',
+  sent_to: '',
+})
+
+const filters = ref({
+  q: '',
+  status: '',
+  category: '',
+  from: '',
+  to: '',
+})
+
+function buildParams() {
+  const f = filters.value
+  const p = {
+    page: meta.value.current_page,
+    per_page: meta.value.per_page,
+    sort: sort.value,
+    order: order.value,
+    columns: visibleColumns.value,
+  }
+  if (f.q) p.q = f.q
+  if (f.status) p.status = f.status
+  if (f.category) p.category = f.category
+  if (f.from) p.from = f.from
+  if (f.to) p.to = f.to
+  return p
+}
+
+async function load() {
+  window.scrollTo(0, 0)
+  loading.value = true
+  try {
+    const data = await emailFollowUpsApi.index(buildParams())
+    submissions.value = data.data ?? []
+    meta.value = data.meta ?? meta.value
+  } finally {
+    loading.value = false
+  }
+}
+
+async function loadFilters() {
+  try {
+    const data = await emailFollowUpsApi.filters()
+    filterOptions.value = {
+      statuses: data.statuses ?? [],
+      categories: data.categories ?? [],
+    }
+  } catch {
+    //
+  }
+}
+
+async function loadColumns() {
+  try {
+    const data = await emailFollowUpsApi.columns()
+    allColumns.value = data.all_columns ?? []
+    visibleColumns.value = data.visible_columns ?? visibleColumns.value
+  } catch {
+    //
+  }
+}
+
+function applyFilters() {
+  meta.value.current_page = 1
+  load()
+}
+
+function resetFilters() {
+  filters.value = { q: '', status: '', category: '', from: '', to: '' }
+  meta.value.current_page = 1
+  load()
+}
+
+function onSort({ sort: s, order: o }) {
+  sort.value = s
+  order.value = o
+  meta.value.current_page = 1
+  load()
+}
+
+async function onSaveColumns(cols) {
+  try {
+    await emailFollowUpsApi.saveColumns(cols)
+    visibleColumns.value = cols
+    meta.value.current_page = 1
+    load()
+  } catch {
+    //
+  }
+}
+
+async function onUpdateCell(id, field, value) {
+  const row = submissions.value.find((r) => r.id === id)
+  const prev = row ? { ...row } : null
+  if (row) row[field] = value
+  try {
+    const res = await emailFollowUpsApi.patch(id, { [field]: value })
+    if (res?.row && row) Object.assign(row, res.row)
+  } catch {
+    if (prev) Object.assign(row, prev)
+    load()
+  }
+}
+
+function onPageChange(page) {
+  meta.value.current_page = page
+  load()
+}
+
+function clearForm() {
+  form.value = {
+    email_date: '',
+    category: '',
+    category_other: '',
+    subject: '',
+    request_from: '',
+    sent_to: '',
+  }
+}
+
+function getCategoryToSend() {
+  const c = form.value.category
+  return c === '__other__' ? (form.value.category_other || '').trim() : c
+}
+
+async function submitForm() {
+  const category = getCategoryToSend()
+  if (!form.value.email_date || !category) return
+  submitLoading.value = true
+  try {
+    await emailFollowUpsApi.store({
+      email_date: form.value.email_date,
+      category,
+      subject: form.value.subject || null,
+      request_from: form.value.request_from || null,
+      sent_to: form.value.sent_to || null,
+    })
+    clearForm()
+    meta.value.current_page = 1
+    load()
+  } catch (e) {
+    const msg = e.response?.data?.message || e.message || 'Failed to add entry.'
+    alert(msg)
+  } finally {
+    submitLoading.value = false
+  }
+}
+
+const COLUMN_LABELS = {
+  id: 'ID',
+  email_date: 'Email Date',
+  subject: 'Subject',
+  category: 'Category',
+  request_from: 'Request From',
+  sent_to: 'Sent To',
+  creator: 'Added By',
+  status: 'Status',
+}
+
+function escapeCsv(val) {
+  if (val == null) return ''
+  const s = String(val)
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) return '"' + s.replace(/"/g, '""') + '"'
+  return s
+}
+
+async function onExport() {
+  const params = { ...buildParams(), page: 1, per_page: 500 }
+  exportLoading.value = true
+  try {
+    const data = await emailFollowUpsApi.index(params)
+    const rows = data.data ?? []
+    const cols = visibleColumns.value
+    const headers = cols.map((c) => COLUMN_LABELS[c] ?? c)
+    const csvRows = [headers.map(escapeCsv).join(',')]
+    for (const row of rows) {
+      csvRows.push(cols.map((c) => escapeCsv(row[c])).join(','))
+    }
+    const blob = new Blob([csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `email-follow-ups-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch {
+    //
+  } finally {
+    exportLoading.value = false
+  }
+}
+
+onMounted(() => {
+  addedByName.value = auth.user?.name ?? ''
+  loadFilters()
+  loadColumns()
+  load()
+})
+</script>
+
+<template>
+  <div class="min-h-[calc(100vh-4rem)] bg-white py-6 px-4 sm:px-6">
+    <div class="mx-auto max-w-7xl space-y-6">
+      <div class="flex flex-wrap items-baseline gap-2">
+        <h1 class="text-xl font-semibold text-gray-900 leading-tight">Email Follow-Up</h1>
+        <Breadcrumbs />
+      </div>
+      <p class="text-sm text-gray-600">Record outgoing follow-up emails and track communication history.</p>
+
+      <!-- Add Email Follow-Up Entry -->
+      <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <h2 class="mb-4 text-sm font-semibold text-gray-900">Add Email Follow-Up Entry</h2>
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Added By <span class="text-red-500">*</span></label>
+            <input
+              :value="addedByName"
+              type="text"
+              readonly
+              class="mt-1 block w-full rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Email Date <span class="text-red-500">*</span></label>
+            <input
+              v-model="form.email_date"
+              type="date"
+              required
+              class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Category <span class="text-red-500">*</span></label>
+            <select
+              v-model="form.category"
+              class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            >
+              <option value="">Select Category</option>
+              <option v-for="c in filterOptions.categories" :key="c" :value="c">{{ c }}</option>
+              <option value="__other__">Other</option>
+            </select>
+            <input
+              v-if="form.category === '__other__'"
+              v-model="form.category_other"
+              type="text"
+              placeholder="Enter category name"
+              class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            />
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-sm font-medium text-gray-700">Subject</label>
+            <input
+              v-model="form.subject"
+              type="text"
+              placeholder="Enter email subject"
+              class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Request From</label>
+            <input
+              v-model="form.request_from"
+              type="text"
+              placeholder="Company or person name"
+              class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Sent To</label>
+            <input
+              v-model="form.sent_to"
+              type="text"
+              placeholder="recipient@example.com"
+              class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            />
+          </div>
+        </div>
+        <div class="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            @click="clearForm"
+          >
+            Clear
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70"
+            :disabled="submitLoading || !form.email_date || !getCategoryToSend()"
+            @click="submitForm"
+          >
+            <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            {{ submitLoading ? 'Adding...' : 'Add Entry' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Listing -->
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <span class="text-sm text-gray-600">Listing</span>
+        <button
+          type="button"
+          class="inline-flex items-center rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70"
+          :disabled="loading || exportLoading"
+          @click="onExport"
+        >
+          {{ exportLoading ? 'Exporting...' : 'Export Report' }}
+        </button>
+      </div>
+
+      <FiltersBar
+        :filters="filters"
+        :filter-options="filterOptions"
+        :loading="loading"
+        @apply="applyFilters"
+        @reset="resetFilters"
+      >
+        <template #after-reset>
+          <button
+            type="button"
+            class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            @click="advancedVisible = !advancedVisible"
+          >
+            {{ advancedVisible ? 'Hide' : 'Show' }} Filters
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            @click="columnModalVisible = true"
+          >
+            Customize Columns
+          </button>
+        </template>
+      </FiltersBar>
+
+      <AdvancedFilters
+        :visible="advancedVisible"
+        :filters="filters"
+        :filter-options="filterOptions"
+        :loading="loading"
+        @apply="applyFilters"
+        @reset="resetFilters"
+      />
+
+      <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+        <EmailFollowUpTable
+          :columns="visibleColumns"
+          :data="submissions"
+          :sort="sort"
+          :order="order"
+          :loading="loading"
+          :current-page="meta.current_page"
+          :per-page="meta.per_page"
+          :edit-options="filterOptions"
+          @sort="onSort"
+          @update-cell="onUpdateCell"
+        />
+        <div
+          class="flex flex-wrap items-center gap-4 border-t border-gray-400 bg-white px-4 py-3"
+          :class="meta.last_page > 1 ? 'justify-between' : 'justify-start'"
+        >
+          <p class="text-sm text-gray-600">
+            Showing {{ meta.total ? ((meta.current_page - 1) * meta.per_page) + 1 : 0 }} to {{ Math.min(meta.current_page * meta.per_page, meta.total) }} of {{ meta.total }} results
+          </p>
+          <Pagination
+            v-if="meta.last_page > 1"
+            :meta="{
+              prev_page_url: meta.current_page > 1 ? '#' : null,
+              next_page_url: meta.current_page < meta.last_page ? '#' : null,
+              current_page: meta.current_page,
+              last_page: meta.last_page,
+            }"
+            @change="onPageChange"
+          />
+        </div>
+      </div>
+    </div>
+
+    <ColumnCustomizerModal
+      :visible="columnModalVisible"
+      :all-columns="allColumns"
+      :visible-columns="visibleColumns"
+      @update:visible="columnModalVisible = $event"
+      @save="onSaveColumns"
+    />
+  </div>
+</template>

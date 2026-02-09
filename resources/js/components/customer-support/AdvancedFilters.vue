@@ -1,8 +1,10 @@
 <script setup>
 /**
  * Advanced filters for Customer Support – search, dates, team, issue category, status.
+ * Date display: dd-mm-yyyy (placeholder and value).
  */
 import { computed } from 'vue'
+import { toDdMmYyyy, fromDdMmYyyy } from '@/lib/dateFormat'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -35,6 +37,23 @@ const activeCount = computed(() => {
   if (f.submitted_from || f.submitted_to) n++
   if (f.sales_agent_id || f.team_leader_id || f.manager_id) n++
   return n
+})
+
+const fromDisplay = computed({
+  get: () => toDdMmYyyy(props.filters.from),
+  set: (v) => { props.filters.from = fromDdMmYyyy(v) || '' },
+})
+const toDisplay = computed({
+  get: () => toDdMmYyyy(props.filters.to),
+  set: (v) => { props.filters.to = fromDdMmYyyy(v) || '' },
+})
+const submittedFromDisplay = computed({
+  get: () => toDdMmYyyy(props.filters.submitted_from),
+  set: (v) => { props.filters.submitted_from = fromDdMmYyyy(v) || '' },
+})
+const submittedToDisplay = computed({
+  get: () => toDdMmYyyy(props.filters.submitted_to),
+  set: (v) => { props.filters.submitted_to = fromDdMmYyyy(v) || '' },
 })
 </script>
 
@@ -121,9 +140,9 @@ const activeCount = computed(() => {
         <div>
           <label class="mb-0.5 block text-xs font-medium text-gray-600">Created From</label>
           <input
-            v-model="filters.from"
-            type="date"
-            placeholder="DD-MM-YYYY"
+            v-model="fromDisplay"
+            type="text"
+            placeholder="dd-mm-yyyy"
             class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           />
@@ -131,9 +150,9 @@ const activeCount = computed(() => {
         <div>
           <label class="mb-0.5 block text-xs font-medium text-gray-600">Created To</label>
           <input
-            v-model="filters.to"
-            type="date"
-            placeholder="DD-MM-YYYY"
+            v-model="toDisplay"
+            type="text"
+            placeholder="dd-mm-yyyy"
             class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           />
@@ -141,9 +160,9 @@ const activeCount = computed(() => {
         <div>
           <label class="mb-0.5 block text-xs font-medium text-gray-600">Submitted From</label>
           <input
-            v-model="filters.submitted_from"
-            type="date"
-            placeholder="DD-MM-YYYY"
+            v-model="submittedFromDisplay"
+            type="text"
+            placeholder="dd-mm-yyyy"
             class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           />
@@ -151,9 +170,9 @@ const activeCount = computed(() => {
         <div>
           <label class="mb-0.5 block text-xs font-medium text-gray-600">Submitted To</label>
           <input
-            v-model="filters.submitted_to"
-            type="date"
-            placeholder="DD-MM-YYYY"
+            v-model="submittedToDisplay"
+            type="text"
+            placeholder="dd-mm-yyyy"
             class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           />

@@ -210,8 +210,10 @@ onMounted(() => {
       <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
         <!-- Heading: same background as form -->
         <div class="px-4 py-4 sm:px-5">
-          <h1 class="text-xl font-semibold text-gray-900">Edit Field Submission</h1>
-          <Breadcrumbs />
+          <div class="flex flex-wrap items-baseline gap-2">
+            <h1 class="text-xl font-semibold text-gray-900">Edit Field Submission</h1>
+            <Breadcrumbs />
+          </div>
         </div>
         <div class="border-t border-gray-200" />
 

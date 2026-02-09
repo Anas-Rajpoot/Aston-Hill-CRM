@@ -161,7 +161,10 @@ onMounted(() => {
       <!-- Header + Breadcrumb: background and border like content section -->
       <div class="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
         <div class="flex flex-wrap items-center justify-between gap-4">
-          <h1 class="text-xl font-semibold text-gray-900">Submission Details</h1>
+          <div class="flex flex-wrap items-baseline gap-2">
+            <h1 class="text-xl font-semibold text-gray-900">Submission Details</h1>
+            <Breadcrumbs />
+          </div>
           <div class="flex items-center gap-2">
             <router-link
               to="/lead-submissions"
@@ -178,9 +181,6 @@ onMounted(() => {
               Edit Submission
             </button>
           </div>
-        </div>
-        <div class="mt-3 border-t border-gray-100 pt-3">
-          <Breadcrumbs />
         </div>
       </div>
 

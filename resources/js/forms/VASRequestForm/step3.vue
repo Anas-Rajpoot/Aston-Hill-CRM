@@ -138,7 +138,7 @@ async function submit() {
       <!-- Request Description -->
       <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
         <h4 class="mb-2 text-sm font-semibold text-gray-800">Request Description</h4>
-        <p class="whitespace-pre-wrap text-sm text-gray-700">{{ request.request_description || '—' }}</p>
+        <p class="whitespace-pre-wrap text-sm text-gray-700">{{ request.request_description || request.description || '—' }}</p>
       </div>
 
       <!-- Comment / Remarks -->
@@ -168,6 +168,25 @@ async function submit() {
                 <span v-if="doc.size != null" class="text-gray-500">({{ formatSize(doc.size) }})</span>
               </li>
             </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Team Information -->
+      <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <h4 class="mb-3 text-sm font-semibold text-gray-800">Team Information</h4>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <p class="text-xs text-gray-500">Manager</p>
+            <p class="text-sm font-medium text-gray-900">{{ request.manager_name || '—' }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">Team Leader</p>
+            <p class="text-sm font-medium text-gray-900">{{ request.team_leader_name || '—' }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">Sales Agent</p>
+            <p class="text-sm font-medium text-gray-900">{{ request.sales_agent_name || '—' }}</p>
           </div>
         </div>
       </div>

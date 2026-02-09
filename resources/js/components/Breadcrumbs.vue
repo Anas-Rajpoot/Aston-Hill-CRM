@@ -65,6 +65,7 @@ const breadcrumbs = computed(() => {
         const parent = segments[i - 1]
         if (parent === 'lead-submissions') label = 'Lead #' + seg
         else if (parent === 'field-submissions') label = 'Submission #' + seg
+        else if (parent === 'vas-requests') label = 'Request #' + seg
         else if (parent === 'users') label = 'User #' + seg
         else if (parent === 'roles') label = 'Role'
         else label = '#' + seg
@@ -84,8 +85,8 @@ const breadcrumbs = computed(() => {
 </script>
 
 <template>
-  <nav aria-label="Breadcrumb" class="mb-4">
-    <ol class="flex flex-wrap items-center gap-1.5 text-sm text-gray-600">
+  <nav aria-label="Breadcrumb" class="breadcrumb-nav">
+    <ol class="flex flex-wrap items-center gap-1.5 text-xs text-gray-600 leading-tight">
       <li
         v-for="(crumb, index) in breadcrumbs"
         :key="index"
@@ -112,3 +113,10 @@ const breadcrumbs = computed(() => {
     </ol>
   </nav>
 </template>
+
+<style scoped>
+/* When inside a flex row with heading, no bottom margin; otherwise keep spacing */
+.breadcrumb-nav {
+  margin-bottom: 0.25rem;
+}
+</style>

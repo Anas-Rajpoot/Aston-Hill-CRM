@@ -144,4 +144,41 @@ return [
         'default_sort' => ['submitted_at', 'desc'],
     ],
 
+    'vas_request_submissions' => [
+        'model' => \App\Models\VasRequestSubmission::class,
+        'columns' => [
+            'id' => ['label' => 'ID', 'filter' => null, 'sortable' => true],
+            'submitted_at' => ['label' => 'Submission Date', 'filter' => 'date', 'sortable' => true],
+            'created_at' => ['label' => 'Created', 'filter' => 'date', 'sortable' => true],
+            'request_type' => ['label' => 'Request Type', 'filter' => 'select', 'sortable' => true],
+            'account_number' => ['label' => 'Account Number', 'filter' => 'text', 'sortable' => true],
+            'company_name' => ['label' => 'Company Name', 'filter' => 'text', 'sortable' => true],
+            'description' => ['label' => 'Description', 'filter' => null, 'sortable' => false],
+            'manager' => ['label' => 'Manager', 'filter' => null, 'sortable' => true],
+            'team_leader' => ['label' => 'Team Leader', 'filter' => null, 'sortable' => true],
+            'sales_agent' => ['label' => 'Sales Agent', 'filter' => null, 'sortable' => true],
+            'executive' => ['label' => 'Back Office Executive', 'filter' => null, 'sortable' => true],
+            'status' => ['label' => 'Status', 'filter' => 'select', 'sortable' => true],
+            'creator' => ['label' => 'Created By', 'filter' => null, 'sortable' => false],
+        ],
+        'default_columns' => ['id', 'submitted_at', 'request_type', 'account_number', 'company_name', 'manager', 'team_leader', 'sales_agent', 'executive', 'status', 'creator'],
+        'default_sort' => ['submitted_at', 'desc'],
+    ],
+
+    'email_follow_ups' => [
+        'model' => \App\Models\EmailFollowUp::class,
+        'columns' => [
+            'id' => ['label' => 'ID', 'filter' => null, 'sortable' => true],
+            'email_date' => ['label' => 'Email Date', 'filter' => 'date', 'sortable' => true],
+            'subject' => ['label' => 'Subject', 'filter' => 'text', 'sortable' => true],
+            'category' => ['label' => 'Category', 'filter' => 'select', 'sortable' => true],
+            'request_from' => ['label' => 'Request From', 'filter' => 'text', 'sortable' => true],
+            'sent_to' => ['label' => 'Sent To', 'filter' => 'text', 'sortable' => true],
+            'creator' => ['label' => 'Added By', 'filter' => null, 'sortable' => true],
+            'status' => ['label' => 'Status', 'filter' => 'select', 'sortable' => true],
+        ],
+        'default_columns' => ['id', 'email_date', 'subject', 'category', 'request_from', 'sent_to', 'creator', 'status'],
+        'default_sort' => ['email_date', 'desc'],
+    ],
+
 ];

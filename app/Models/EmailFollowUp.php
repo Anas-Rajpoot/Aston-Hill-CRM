@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 class EmailFollowUp extends Model
 {
+    public const STATUSES = ['pending', 'followed_up'];
+
     protected $fillable = [
         'created_by',
         'email_date',
@@ -15,6 +18,7 @@ class EmailFollowUp extends Model
         'request_from',
         'sent_to',
         'comment',
+        'status',
     ];
 
     protected $casts = [
@@ -24,6 +28,14 @@ class EmailFollowUp extends Model
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function scopeVisibleTo(Builder $query, $user): Builder
+    {
+        if ($user && method_exists($user, 'hasRole') && $user->hasRole('superadmin')) {
+            return $query;
+        }
+        return $query->where('created_by', $user?->id);
     }
 
     public function scopeFilter(Builder $q, array $f): Builder

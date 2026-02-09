@@ -466,9 +466,12 @@ onMounted(() => {
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-white py-6 px-4 sm:px-6">
     <div class="mx-auto max-w-7xl space-y-4">
-      <!-- Top: title (left), Bulk Assign + Export (right) -->
+      <!-- Top: breadcrumbs + title (left), Bulk Assign + Export (right) -->
       <div class="flex flex-wrap items-center justify-between gap-4">
-        <h1 class="text-xl font-semibold text-gray-900">Lead Submissions</h1>
+        <div class="flex flex-wrap items-baseline gap-2">
+          <h1 class="text-xl font-semibold text-gray-900 leading-tight">Lead Submissions</h1>
+          <Breadcrumbs />
+        </div>
         <div class="flex flex-wrap items-center gap-2">
           <button
             v-if="canBulkAssign"
@@ -519,7 +522,6 @@ onMounted(() => {
       >
         {{ bulkAssignMessage }}
       </div>
-      <Breadcrumbs />
 
       <!-- Export in progress message -->
       <div
@@ -541,7 +543,27 @@ onMounted(() => {
         :loading="loading"
         @apply="applyFilters"
         @reset="resetFilters"
-      />
+      >
+        <template #after-reset>
+          <button
+            type="button"
+            class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            @click="advancedVisible = !advancedVisible"
+          >
+            {{ advancedVisible ? 'Hide' : 'Advanced' }} Filters
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            @click="columnModalVisible = true"
+          >
+            Customize Columns
+            <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+        </template>
+      </FiltersBar>
 
       <AdvancedFilters
         :visible="advancedVisible"
@@ -551,27 +573,6 @@ onMounted(() => {
         @apply="applyFilters"
         @reset="resetFilters"
       />
-
-      <!-- Above data table: Advanced Filters + Customize Columns -->
-      <div class="flex flex-wrap items-center justify-end gap-2">
-        <button
-          type="button"
-          class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-          @click="advancedVisible = !advancedVisible"
-        >
-          {{ advancedVisible ? 'Hide' : 'Advanced' }} Filters
-        </button>
-        <button
-          type="button"
-          class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-          @click="columnModalVisible = true"
-        >
-          Customize Columns
-          <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
-      </div>
 
       <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
         <LeadTable

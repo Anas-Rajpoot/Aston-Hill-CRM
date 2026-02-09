@@ -78,14 +78,19 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::get('/vas-requests/team-options', [VasRequestController::class, 'teamOptions']);
     Route::get('/vas-requests/document-schema', [VasRequestController::class, 'documentSchemaResponse']);
     Route::post('/vas-requests/step-1', [VasRequestController::class, 'storeStep1']);
+    Route::get('/vas-requests', [\App\Http\Controllers\Api\VasRequestApiController::class, 'index']);
+    Route::get('/vas-requests/filters', [\App\Http\Controllers\Api\VasRequestApiController::class, 'filters']);
+    Route::get('/vas-requests/columns', [\App\Http\Controllers\Api\VasRequestApiController::class, 'columns']);
+    Route::post('/vas-requests/columns', [\App\Http\Controllers\Api\VasRequestApiController::class, 'saveColumns']);
+    Route::get('/vas-requests/back-office-options', [\App\Http\Controllers\Api\VasRequestApiController::class, 'backOfficeOptions']);
+    Route::post('/vas-requests/bulk-assign', [\App\Http\Controllers\Api\VasRequestApiController::class, 'bulkAssign']);
     Route::get('/vas-requests/{vasRequest}', [VasRequestController::class, 'show'])->whereNumber('vasRequest');
+    Route::get('/vas-requests/{vasRequest}/documents/{document}/download', [VasRequestController::class, 'downloadDocument'])->whereNumber('vasRequest')->whereNumber('document');
+    Route::delete('/vas-requests/{vasRequest}/documents/{document}', [VasRequestController::class, 'deleteDocument'])->whereNumber('vasRequest')->whereNumber('document');
+    Route::put('/vas-requests/{vasRequest}', [VasRequestController::class, 'update'])->whereNumber('vasRequest');
+    Route::patch('/vas-requests/{vasRequest}', [\App\Http\Controllers\Api\VasRequestApiController::class, 'patch'])->whereNumber('vasRequest');
     Route::post('/vas-requests/{vasRequest}/step-2', [VasRequestController::class, 'storeStep2']);
     Route::post('/vas-requests/{vasRequest}/submit', [VasRequestController::class, 'submit']);
-    Route::get('/vas-requests', [\App\Http\Controllers\Api\VasRequestController::class, 'index']);
-    Route::post('/vas-requests/{vas}/submit', [\App\Http\Controllers\Api\VasRequestController::class, 'submit']);
-    Route::post('/vas-requests/{vas}/approve', [\App\Http\Controllers\Api\VasRequestController::class, 'approve']);
-    Route::post('/vas-requests/{vas}/reject', [\App\Http\Controllers\Api\VasRequestController::class, 'reject']);
-
 
     // Lead submissions (specific routes before {lead})
     Route::get('/lead-submissions', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'index']);
@@ -124,6 +129,15 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::post('/lead-submissions/{lead}/step-3', [LeadSubmissionController::class, 'storeStep4']); // Vue step 3 = documents
     Route::post('/lead-submissions/{lead}/step-4', [LeadSubmissionController::class, 'storeStep4']); // backward compatibility
     Route::post('/lead-submissions/{lead}/submit', [LeadSubmissionController::class, 'submit']);
+
+    // Email follow-ups (SPA: add + listing on same page)
+    Route::get('/email-follow-ups', [\App\Http\Controllers\Api\EmailFollowUpController::class, 'index']);
+    Route::get('/email-follow-ups/filters', [\App\Http\Controllers\Api\EmailFollowUpController::class, 'filters']);
+    Route::get('/email-follow-ups/columns', [\App\Http\Controllers\Api\EmailFollowUpController::class, 'columns']);
+    Route::post('/email-follow-ups/columns', [\App\Http\Controllers\Api\EmailFollowUpController::class, 'saveColumns']);
+    Route::post('/email-follow-ups', [\App\Http\Controllers\Api\EmailFollowUpController::class, 'store']);
+    Route::patch('/email-follow-ups/{emailFollowUp}', [\App\Http\Controllers\Api\EmailFollowUpController::class, 'patch'])->whereNumber('emailFollowUp');
+    Route::patch('/email-follow-ups/{emailFollowUp}/status', [\App\Http\Controllers\Api\EmailFollowUpController::class, 'updateStatus'])->whereNumber('emailFollowUp');
 
     // Column preferences
     Route::get('/modules/{module}/columns', [ColumnPreferenceController::class, 'show']);

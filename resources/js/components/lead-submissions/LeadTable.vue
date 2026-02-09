@@ -221,7 +221,7 @@ function saveStatusChangedAt(rowId) {
 }
 
 const columnLabels = {
-  id: 'No.',
+  id: '#',
   submitted_at: 'Lead Creation Date',
   updated_at: 'Updated',
   submission_type: 'Request Type',
@@ -400,9 +400,9 @@ function statusBadgeClass(status) {
       </div>
     </div>
 
-    <table class="min-w-full">
+    <table class="min-w-full border border-gray-400 border-collapse">
       <thead>
-        <tr class="border-b border-black bg-green-600">
+        <tr class="border-b border-gray-400 bg-green-600">
           <th class="w-10 px-3 py-3 text-left">
             <input
               type="checkbox"
@@ -445,7 +445,7 @@ function statusBadgeClass(status) {
         </tr>
       </thead>
       <tbody class="bg-white">
-        <tr v-if="!loading && !data.length" class="border-b-2 border-black bg-white">
+        <tr v-if="!loading && !data.length" class="border-b border-gray-400 bg-white">
           <td :colspan="effectiveColumns.length + 2" class="px-4 py-12 text-center text-gray-500">
             No leads found.
           </td>
@@ -453,7 +453,7 @@ function statusBadgeClass(status) {
         <tr
           v-for="(row, rowIndex) in data"
           :key="row.id"
-          class="border-b border-black bg-white hover:bg-gray-50/50"
+          class="border-b border-gray-400 bg-white hover:bg-gray-50/50"
         >
           <td class="w-10 px-3 py-3">
             <input
@@ -474,7 +474,7 @@ function statusBadgeClass(status) {
               <div class="flex flex-col gap-1.5">
                 <select
                   v-model="inlineEditValue"
-                  class="w-full min-w-[120px] max-w-[200px] rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full min-w-[160px] max-w-[220px] rounded border border-gray-300 bg-white px-3 py-1.5 pr-8 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
                   @keydown.enter="saveInlineEdit"
                   @keydown.esc="cancelInlineEdit"
                 >
@@ -492,7 +492,7 @@ function statusBadgeClass(status) {
                 <input
                   v-model="inlineEditValue"
                   :type="col === 'submission_date_from' || col === 'completion_date' ? 'date' : (col === 'email' ? 'email' : 'text')"
-                  class="w-full min-w-[100px] max-w-[220px] rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full min-w-[160px] max-w-[220px] rounded border border-gray-300 bg-white px-3 py-1.5 pr-8 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
                   @keydown.enter="saveInlineEdit"
                   @keydown.esc="cancelInlineEdit"
                   @blur="saveInlineEdit"
@@ -510,7 +510,7 @@ function statusBadgeClass(status) {
               <div class="flex flex-col gap-1.5">
                 <select
                   v-model="editStatusValue"
-                  class="w-full min-w-[100px] rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full min-w-[160px] rounded border border-gray-300 bg-white px-3 py-1.5 pr-8 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
                 >
                   <option v-for="opt in STATUS_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                 </select>

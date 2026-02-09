@@ -2,8 +2,10 @@
 /**
  * Advanced Filters – only filters not in the default bar (no Category, Type, Status).
  * Compact layout so no horizontal scroll is needed.
+ * Date display: dd-mm-yyyy (placeholder and value).
  */
 import { computed } from 'vue'
+import { toDdMmYyyy, fromDdMmYyyy } from '@/lib/dateFormat'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -11,10 +13,11 @@ const props = defineProps({
   filterOptions: {
     type: Object,
     default: () => ({
-      products: [],
+      request_types: [],
+      statuses: [],
       managers: [],
-      teamLeaders: [],
-      salesAgents: [],
+      team_leaders: [],
+      sales_agents: [],
     }),
   },
   loading: { type: Boolean, default: false },
@@ -28,14 +31,29 @@ const activeCount = computed(() => {
   if (f.q) n++
   if (f.account_number) n++
   if (f.company_name) n++
-  if (f.product) n++
+  // request_type only in FiltersBar, not here
+  if (f.status) n++
   if (f.from || f.to) n++
   if (f.submitted_from || f.submitted_to) n++
-  if (f.updated_from || f.updated_to) n++
-  if (f.mrc !== '' && f.mrc != null) n++
-  if (f.quantity !== '' && f.quantity != null) n++
   if (f.sales_agent_id || f.team_leader_id || f.manager_id) n++
   return n
+})
+
+const fromDisplay = computed({
+  get: () => toDdMmYyyy(props.filters.from),
+  set: (v) => { props.filters.from = fromDdMmYyyy(v) || '' },
+})
+const toDisplay = computed({
+  get: () => toDdMmYyyy(props.filters.to),
+  set: (v) => { props.filters.to = fromDdMmYyyy(v) || '' },
+})
+const submittedFromDisplay = computed({
+  get: () => toDdMmYyyy(props.filters.submitted_from),
+  set: (v) => { props.filters.submitted_from = fromDdMmYyyy(v) || '' },
+})
+const submittedToDisplay = computed({
+  get: () => toDdMmYyyy(props.filters.submitted_to),
+  set: (v) => { props.filters.submitted_to = fromDdMmYyyy(v) || '' },
 })
 </script>
 
@@ -89,22 +107,22 @@ const activeCount = computed(() => {
           />
         </div>
         <div>
-          <label class="mb-0.5 block text-xs font-medium text-gray-600">Product</label>
+          <label class="mb-0.5 block text-xs font-medium text-gray-600">Status</label>
           <select
-            v-model="filters.product"
+            v-model="filters.status"
             class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           >
-            <option value="">All Products</option>
-            <option v-for="p in filterOptions.products" :key="p" :value="p">{{ p }}</option>
+            <option value="">All</option>
+            <option v-for="s in filterOptions.statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
           </select>
         </div>
         <div>
           <label class="mb-0.5 block text-xs font-medium text-gray-600">Created From</label>
           <input
-            v-model="filters.from"
-            type="date"
-            placeholder="DD-MM-YYYY"
+            v-model="fromDisplay"
+            type="text"
+            placeholder="dd-mm-yyyy"
             class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           />
@@ -112,9 +130,9 @@ const activeCount = computed(() => {
         <div>
           <label class="mb-0.5 block text-xs font-medium text-gray-600">Created To</label>
           <input
-            v-model="filters.to"
-            type="date"
-            placeholder="DD-MM-YYYY"
+            v-model="toDisplay"
+            type="text"
+            placeholder="dd-mm-yyyy"
             class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           />
@@ -122,9 +140,9 @@ const activeCount = computed(() => {
         <div>
           <label class="mb-0.5 block text-xs font-medium text-gray-600">Submitted From</label>
           <input
-            v-model="filters.submitted_from"
-            type="date"
-            placeholder="DD-MM-YYYY"
+            v-model="submittedFromDisplay"
+            type="text"
+            placeholder="dd-mm-yyyy"
             class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           />
@@ -132,77 +150,12 @@ const activeCount = computed(() => {
         <div>
           <label class="mb-0.5 block text-xs font-medium text-gray-600">Submitted To</label>
           <input
-            v-model="filters.submitted_to"
-            type="date"
-            placeholder="DD-MM-YYYY"
+            v-model="submittedToDisplay"
+            type="text"
+            placeholder="dd-mm-yyyy"
             class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           />
-        </div>
-        <div>
-          <label class="mb-0.5 block text-xs font-medium text-gray-600">Updated From</label>
-          <input
-            v-model="filters.updated_from"
-            type="date"
-            placeholder="DD-MM-YYYY"
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            :disabled="loading"
-          />
-        </div>
-        <div>
-          <label class="mb-0.5 block text-xs font-medium text-gray-600">Updated To</label>
-          <input
-            v-model="filters.updated_to"
-            type="date"
-            placeholder="DD-MM-YYYY"
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            :disabled="loading"
-          />
-        </div>
-        <div>
-          <label class="mb-0.5 block text-xs font-medium text-gray-600">MRC</label>
-          <input
-            v-model="filters.mrc"
-            type="number"
-            min="0"
-            step="0.01"
-            placeholder="Enter MRC (AED)"
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            :disabled="loading"
-          />
-        </div>
-        <div>
-          <label class="mb-0.5 block text-xs font-medium text-gray-600">Quantity</label>
-          <input
-            v-model="filters.quantity"
-            type="number"
-            min="0"
-            placeholder="Enter quantity"
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            :disabled="loading"
-          />
-        </div>
-        <div>
-          <label class="mb-0.5 block text-xs font-medium text-gray-600">Sales Agent</label>
-          <select
-            v-model="filters.sales_agent_id"
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            :disabled="loading"
-          >
-            <option :value="null">All</option>
-            <option v-for="u in filterOptions.salesAgents" :key="u.id" :value="u.id">{{ u.name }}</option>
-          </select>
-        </div>
-        <div>
-          <label class="mb-0.5 block text-xs font-medium text-gray-600">Team Leader</label>
-          <select
-            v-model="filters.team_leader_id"
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            :disabled="loading"
-          >
-            <option :value="null">All</option>
-            <option v-for="u in filterOptions.teamLeaders" :key="u.id" :value="u.id">{{ u.name }}</option>
-          </select>
         </div>
         <div>
           <label class="mb-0.5 block text-xs font-medium text-gray-600">Manager</label>
@@ -213,6 +166,28 @@ const activeCount = computed(() => {
           >
             <option :value="null">All</option>
             <option v-for="u in filterOptions.managers" :key="u.id" :value="u.id">{{ u.name }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="mb-0.5 block text-xs font-medium text-gray-600">Team Leader</label>
+          <select
+            v-model="filters.team_leader_id"
+            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            :disabled="loading"
+          >
+            <option :value="null">All</option>
+            <option v-for="u in filterOptions.team_leaders" :key="u.id" :value="u.id">{{ u.name }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="mb-0.5 block text-xs font-medium text-gray-600">Sales Agent</label>
+          <select
+            v-model="filters.sales_agent_id"
+            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            :disabled="loading"
+          >
+            <option :value="null">All</option>
+            <option v-for="u in filterOptions.sales_agents" :key="u.id" :value="u.id">{{ u.name }}</option>
           </select>
         </div>
       </div>

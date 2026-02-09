@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 
 class VasRequestSubmission extends Model
@@ -24,7 +25,7 @@ class VasRequestSubmission extends Model
         'rejected_at',
     ];
 
-    const STATUSES = ['draft', 'submitted'];
+    const STATUSES = ['draft', 'submitted', 'approved', 'rejected'];
 
     protected $casts = [
         'submitted_at' => 'datetime',

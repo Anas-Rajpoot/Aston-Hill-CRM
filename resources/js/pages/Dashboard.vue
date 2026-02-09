@@ -4,7 +4,9 @@ import Breadcrumbs from '@/components/Breadcrumbs.vue'
 
 <template>
   <div>
-    <h1 class="text-xl font-semibold text-gray-900">Dashboard</h1>
-    <Breadcrumbs />
+    <div class="flex flex-wrap items-baseline gap-2">
+      <h1 class="text-xl font-semibold text-gray-900 leading-tight">Dashboard</h1>
+      <Breadcrumbs />
+    </div>
   </div>
 </template>

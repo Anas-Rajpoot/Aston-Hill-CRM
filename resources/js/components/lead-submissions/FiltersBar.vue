@@ -77,7 +77,7 @@ function onCategoryChange() {
       </option>
     </select>
 
-    <div class="ml-2 flex gap-2">
+    <div class="ml-2 flex flex-wrap items-center gap-2">
       <button
         type="button"
         class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 disabled:opacity-50"
@@ -97,6 +97,9 @@ function onCategoryChange() {
       >
         Reset
       </button>
+    </div>
+    <div class="ml-auto flex items-center gap-2">
+      <slot name="after-reset" />
     </div>
   </div>
 </template>

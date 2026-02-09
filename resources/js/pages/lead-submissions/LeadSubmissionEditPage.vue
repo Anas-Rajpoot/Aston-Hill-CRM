@@ -364,16 +364,16 @@ onMounted(() => {
       <!-- Header + Breadcrumb: background and border -->
       <div class="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
         <div class="flex flex-wrap items-center justify-between gap-4">
-          <h1 class="text-xl font-semibold text-gray-900">Edit Lead Submission #{{ leadId }}</h1>
+          <div class="flex flex-wrap items-baseline gap-2">
+            <h1 class="text-xl font-semibold text-gray-900">Edit Lead Submission #{{ leadId }}</h1>
+            <Breadcrumbs />
+          </div>
           <router-link
             :to="'/lead-submissions'"
             class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
             Back to List
           </router-link>
-        </div>
-        <div class="mt-3 border-t border-gray-100 pt-3">
-          <Breadcrumbs />
         </div>
       </div>
 

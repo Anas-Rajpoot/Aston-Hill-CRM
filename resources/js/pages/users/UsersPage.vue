@@ -231,10 +231,12 @@ watch(
 <template>
   <div class="space-y-6">
     <div>
-      <h1 class="text-2xl font-bold text-gray-900">Users</h1>
+      <div class="flex flex-wrap items-baseline gap-2">
+        <h1 class="text-2xl font-bold text-gray-900 leading-tight">Users</h1>
+        <Breadcrumbs />
+      </div>
       <p class="mt-1 text-sm text-gray-500">Manage system users, assign roles, and control access.</p>
     </div>
-    <Breadcrumbs />
 
     <!-- Success message -->
     <div

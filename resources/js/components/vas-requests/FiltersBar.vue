@@ -1,12 +1,12 @@
 <script setup>
 /**
- * Default filters for Customer Support: Status, Issue Category.
+ * Default filters for VAS Requests: Status, Request Type.
  */
 defineProps({
   filters: { type: Object, required: true },
   filterOptions: {
     type: Object,
-    default: () => ({ statuses: [], issue_categories: [] }),
+    default: () => ({ statuses: [], request_types: [] }),
   },
   loading: { type: Boolean, default: false },
 })
@@ -28,15 +28,15 @@ const emit = defineEmits(['apply', 'reset'])
       </option>
     </select>
 
-    <label class="sr-only">Issue Category</label>
+    <label class="sr-only">Request Type</label>
     <select
-      v-model="filters.issue_category"
+      v-model="filters.request_type"
       class="min-w-[220px] rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
       :disabled="loading"
     >
-      <option value="">Issue Category</option>
-      <option v-for="c in filterOptions.issue_categories" :key="c.value" :value="c.value">
-        {{ c.label }}
+      <option value="">Request Type</option>
+      <option v-for="t in filterOptions.request_types" :key="t.value" :value="t.value">
+        {{ t.label }}
       </option>
     </select>
 

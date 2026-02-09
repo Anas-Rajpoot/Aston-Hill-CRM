@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\VasRequestDocument;
 use App\Models\VasRequestSubmission;
 use App\Services\VasRequestService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class VasRequestController extends Controller
@@ -210,9 +212,10 @@ class VasRequestController extends Controller
         ], 200);
     }
 
-    public function show(VasRequestSubmission $vasRequest): JsonResponse
+    public function show(Request $request, VasRequestSubmission $vasRequest): JsonResponse
     {
-        $vasRequest->load(['documents', 'creator.roles']);
+        $this->authorize('view', $vasRequest);
+        $vasRequest->load(['documents', 'creator.roles', 'manager:id,name', 'teamLeader:id,name', 'salesAgent:id,name', 'backOfficeExecutive:id,name']);
         $creator = $vasRequest->creator;
         $creatorName = $creator ? $creator->name : null;
         $creatorRole = $creator && $creator->roles->isNotEmpty()
@@ -237,8 +240,74 @@ class VasRequestController extends Controller
         $data = $vasRequest->toArray();
         $data['creator_name'] = $creatorName;
         $data['creator_role'] = $creatorRole;
+        $data['manager_name'] = $vasRequest->manager?->name;
+        $data['team_leader_name'] = $vasRequest->teamLeader?->name;
+        $data['sales_agent_name'] = $vasRequest->salesAgent?->name;
+        $data['back_office_executive_name'] = $vasRequest->backOfficeExecutive?->name;
         $data['documents'] = $documents;
 
         return response()->json($data);
+    }
+
+    /**
+     * Update VAS request (edit page). Authorized by vas.edit.
+     */
+    public function update(Request $request, VasRequestSubmission $vasRequest): JsonResponse
+    {
+        $this->authorize('update', $vasRequest);
+
+        $types = self::requestTypes();
+        $data = $request->validate([
+            'request_type' => ['required', 'string', Rule::in($types)],
+            'account_number' => ['nullable', 'string', 'max:100'],
+            'company_name' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:5000'],
+            'manager_id' => ['required', 'exists:users,id'],
+            'team_leader_id' => ['required', 'exists:users,id'],
+            'sales_agent_id' => ['required', 'exists:users,id'],
+            'back_office_executive_id' => ['nullable', 'exists:users,id'],
+        ]);
+
+        $vasRequest->update($data);
+        return response()->json([
+            'message' => 'VAS request updated.',
+            'id' => $vasRequest->id,
+        ]);
+    }
+
+    /**
+     * GET /api/vas-requests/{vasRequest}/documents/{document}/download
+     */
+    public function downloadDocument(Request $request, VasRequestSubmission $vasRequest, int $document): JsonResponse|\Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        $this->authorize('view', $vasRequest);
+
+        $doc = VasRequestDocument::where('vas_request_submission_id', $vasRequest->id)
+            ->where('id', $document)
+            ->first();
+        if (! $doc || ! $doc->file_path) {
+            return response()->json(['message' => 'Document not found.'], 404);
+        }
+        $fullPath = Storage::disk('public')->path($doc->file_path);
+        if (! is_file($fullPath)) {
+            return response()->json(['message' => 'File not found.'], 404);
+        }
+        $filename = $doc->file_name ?: basename($doc->file_path);
+
+        return response()->file($fullPath, [
+            'Content-Disposition' => 'attachment; filename="' . addslashes($filename) . '"',
+        ]);
+    }
+
+    /**
+     * DELETE /api/vas-requests/{vasRequest}/documents/{document}
+     */
+    public function deleteDocument(Request $request, VasRequestSubmission $vasRequest, int $document): JsonResponse
+    {
+        $this->authorize('update', $vasRequest);
+
+        $this->vasRequestService->deleteDocument($vasRequest, $document);
+
+        return response()->json(['message' => 'Document removed.']);
     }
 }
