@@ -7,10 +7,10 @@ import Topbar from '@/components/Topbar.vue'
   <div class="flex min-h-screen bg-gray-100">
     <Sidebar />
 
-    <div class="flex flex-1 flex-col bg-gray-100">
+    <div class="flex min-h-0 flex-1 flex-col bg-gray-100">
       <Topbar />
 
-      <main class="flex-1 bg-gray-100 px-4 py-5">
+      <main class="min-h-0 flex-1 overflow-auto bg-gray-100 px-4 py-5">
         <router-view />
       </main>
     </div>

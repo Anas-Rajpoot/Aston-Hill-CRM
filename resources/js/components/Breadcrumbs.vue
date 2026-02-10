@@ -2,10 +2,12 @@
 /**
  * Breadcrumbs for all app pages. Shown in layout; builds from current route path + meta.
  */
-import { computed } from 'vue'
+import { computed, inject } from 'vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
+/** Optional override for the current page label (e.g. client name on profile page). */
+const breadcrumbLabelOverride = inject('breadcrumbLabel', null)
 
 /** Human-readable labels for path segments (first segment of path). */
 const SEGMENT_LABELS = {
@@ -20,6 +22,7 @@ const SEGMENT_LABELS = {
   clients: 'Clients',
   'gsm-tracker': 'GSM Tracker',
   employees: 'Employees',
+  'cisco-extensions': 'Cisco Extensions',
   'attendance-log': 'Attendance Log',
   reports: 'Reports',
   settings: 'Settings',
@@ -67,6 +70,7 @@ const breadcrumbs = computed(() => {
         else if (parent === 'field-submissions') label = 'Submission #' + seg
         else if (parent === 'vas-requests') label = 'Request #' + seg
         else if (parent === 'users') label = 'User #' + seg
+        else if (parent === 'employees') label = 'Employee #' + seg
         else if (parent === 'roles') label = 'Role'
         else label = '#' + seg
       } else {
@@ -74,8 +78,14 @@ const breadcrumbs = computed(() => {
       }
     }
     const isLast = i === segments.length - 1
+    const overrideVal = breadcrumbLabelOverride != null && typeof breadcrumbLabelOverride === 'object' && 'value' in breadcrumbLabelOverride
+      ? breadcrumbLabelOverride.value
+      : breadcrumbLabelOverride
+    const resolvedLabel = isLast && overrideVal != null && typeof overrideVal === 'string'
+      ? overrideVal
+      : label
     items.push({
-      label,
+      label: resolvedLabel,
       to: isLast ? null : fullPath,
       current: isLast,
     })

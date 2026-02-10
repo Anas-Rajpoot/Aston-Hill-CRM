@@ -5,6 +5,8 @@
         visible: Boolean,
         allColumns: Array,
         selectedColumns: Array,
+        /** Optional default column keys for "By Default" button. If omitted, uses all columns. */
+        defaultColumns: { type: Array, default: () => [] },
     })
 
     const emit = defineEmits(['update:visible','save'])
@@ -12,13 +14,26 @@
     const error = ref('')
 
     watch(() => [props.visible, props.selectedColumns], ([v, sel]) => {
-        if (v) localSelected.value = [...sel]
+        if (v) localSelected.value = [...(sel || [])]
     })
 
     const toggle = (col) => {
         const i = localSelected.value.indexOf(col.key)
         if (i >= 0) localSelected.value.splice(i,1)
         else localSelected.value.push(col.key)
+    }
+
+    const applyByDefault = () => {
+        error.value = ''
+        const defaultKeys = (props.defaultColumns && props.defaultColumns.length)
+            ? props.defaultColumns
+            : (props.allColumns || []).map((c) => c.key)
+        localSelected.value = [...defaultKeys]
+    }
+
+    const reset = () => {
+        error.value = ''
+        localSelected.value = [...(props.selectedColumns || [])]
     }
 
     const save = () => {
@@ -43,6 +58,10 @@
           </label>
         </div>
         <p v-if="error" class="text-red-500">{{ error }}</p>
+        <div class="mt-2 flex flex-wrap gap-2">
+          <button type="button" class="rounded border border-gray-300 px-2 py-1 text-sm hover:bg-gray-50" @click="applyByDefault">By Default</button>
+          <button type="button" class="rounded border border-gray-300 px-2 py-1 text-sm hover:bg-gray-50" @click="reset">Reset</button>
+        </div>
         <div class="mt-2 flex justify-end gap-2">
           <button @click="save" class="bg-green-600 text-white px-2 py-1 rounded">Save</button>
         </div>

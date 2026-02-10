@@ -33,9 +33,11 @@ const navItems = [
   { to: '/clients', label: 'Clients' },
   { to: '/gsm-tracker', label: 'GSM Tracker' },
   { to: '/employees', label: 'Employees' },
+  { to: '/cisco-extensions', label: 'Cisco Extensions' },
   { to: '/attendance-log', label: 'Attendance Log' },
   { to: '/expenses', label: 'Expense Tracker' },
   { to: '/personal-notes', label: 'Personal Notes' },
+  { to: '/email-followups', label: 'Email Follow Up' },
   { to: '/reports', label: 'Reports' },
 ]
 
@@ -45,7 +47,6 @@ const settingsItems = [
   { to: '/announcements', label: 'Announcements' },
   { to: '/notifications', label: 'Notifications' },
   { to: '/accounts', label: 'Accounts' },
-  { to: '/email-followups', label: 'Email Follow Up' },
   { to: '/login-logs', label: 'Login Logs' },
 ]
 

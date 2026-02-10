@@ -44,7 +44,7 @@ const columnLabels = {
   status_date: 'Status Date',
 }
 
-const SORTABLE_COLUMNS = ['email_date', 'subject', 'category', 'request_from', 'sent_to', 'creator', 'status']
+const SORTABLE_COLUMNS = ['email_date', 'subject', 'category', 'request_from', 'sent_to', 'creator', 'status', 'status_date']
 
 function label(col) {
   return columnLabels[col] ?? col
@@ -79,7 +79,7 @@ function fullValue(row, col) {
   return String(val)
 }
 
-const TRUNCATE_COLUMNS = ['subject', 'category', 'request_from', 'sent_to', 'creator', 'status', 'email_date']
+const TRUNCATE_COLUMNS = ['subject', 'category', 'request_from', 'sent_to', 'creator', 'status', 'email_date', 'status_date']
 function shouldTruncate(col) {
   return TRUNCATE_COLUMNS.includes(col)
 }
@@ -89,7 +89,7 @@ function cellTitle(row, col) {
 }
 
 const DROPDOWN_COLUMNS = ['status', 'category']
-const READ_ONLY_COLUMNS = ['id', 'email_date', 'creator']
+const READ_ONLY_COLUMNS = ['id', 'email_date', 'creator', 'status_date']
 
 function isDropdownColumn(col) {
   return DROPDOWN_COLUMNS.includes(col)
@@ -146,12 +146,15 @@ function isEditing(rowId, col) {
   return editingCell.value && editingCell.value.rowId === rowId && editingCell.value.col === col
 }
 
-const STATUS_BADGES = {
-  pending: 'bg-amber-100 text-amber-800',
-  followed_up: 'bg-green-100 text-green-700',
+/** Approved = followed_up; Not Approved = pending (for display and toggle). */
+const isApproved = (status) => status === 'followed_up'
+function statusLabel(status) {
+  return isApproved(status) ? 'Approved' : 'Not Approved'
 }
-function statusBadgeClass(status) {
-  return STATUS_BADGES[status] ?? 'bg-gray-100 text-gray-700'
+function onStatusToggle(row) {
+  if (!canInlineEdit.value || !row?.id) return
+  const next = isApproved(row.status) ? 'pending' : 'followed_up'
+  emit('updateCell', row.id, 'status', next)
 }
 </script>
 
@@ -172,19 +175,19 @@ function statusBadgeClass(status) {
       </div>
     </div>
 
-    <table class="min-w-full border border-gray-400 border-collapse">
+    <table class="min-w-full border border-gray-200 border-collapse bg-white">
       <thead>
-        <tr class="border-b border-gray-400 bg-green-600">
+        <tr class="border-b border-gray-200 bg-gray-50">
           <th
             v-for="col in columns"
             :key="col"
             scope="col"
-            class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold uppercase tracking-wider text-white"
+            class="whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-gray-900"
           >
             <button
               v-if="sortable(col)"
               type="button"
-              class="inline-flex items-center gap-1 font-bold text-white hover:text-white/90"
+              class="inline-flex items-center gap-1 font-semibold text-gray-900 hover:text-gray-700"
               @click="toggleSort(col)"
             >
               {{ label(col) }}
@@ -192,28 +195,74 @@ function statusBadgeClass(status) {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
               </svg>
             </button>
-            <span v-else class="font-bold text-white">{{ label(col) }}</span>
+            <span v-else class="font-semibold text-gray-900">{{ label(col) }}</span>
           </th>
         </tr>
       </thead>
       <tbody class="bg-white">
-        <tr v-if="!loading && !data.length" class="border-b border-gray-400 bg-white">
-          <td :colspan="columns.length" class="px-4 py-12 text-center text-gray-500">No email follow-up entries found.</td>
+        <tr v-if="!loading && !data.length" class="border-b border-gray-200 bg-white">
+          <td :colspan="columns.length" class="px-4 py-12 text-center text-sm text-gray-500">No email follow-up entries found.</td>
         </tr>
         <tr
           v-for="(row, rowIndex) in data"
           :key="row.id"
-          class="border-b border-gray-400 bg-white hover:bg-gray-50/50"
+          class="border-b border-gray-200 bg-white hover:bg-gray-50/30"
         >
           <td
             v-for="col in columns"
             :key="col"
-            class="whitespace-nowrap px-4 py-3 text-sm text-gray-900"
-            :class="{ 'cursor-pointer': canInlineEdit && isDropdownColumn(col) && !isEditing(row.id, col), 'cursor-text': canInlineEdit && isInputColumn(col) && !isEditing(row.id, col) }"
+            class="px-4 py-3 text-sm text-gray-900"
+            :class="[
+              { 'whitespace-nowrap': col !== 'subject' && col !== 'sent_to' },
+              { 'cursor-pointer': canInlineEdit && isDropdownColumn(col) && !isEditing(row.id, col) && col !== 'status' },
+              { 'cursor-text': canInlineEdit && isInputColumn(col) && !isEditing(row.id, col) },
+            ]"
             :title="cellTitle(row, col)"
           >
             <template v-if="col === 'id'">
               {{ rowNumber(rowIndex) }}
+            </template>
+            <template v-else-if="col === 'email_date' || col === 'status_date'">
+              {{ formatValue(row, col) }}
+            </template>
+            <template v-else-if="col === 'sent_to'">
+              <a
+                v-if="row.sent_to"
+                :href="'mailto:' + row.sent_to"
+                class="text-blue-600 underline hover:text-blue-800"
+              >{{ truncate(row.sent_to) }}</a>
+              <span v-else>—</span>
+            </template>
+            <template v-else-if="col === 'creator'">
+              <div class="flex flex-col">
+                <span class="font-semibold text-gray-900">{{ row.creator || '—' }}</span>
+                <span class="text-xs text-gray-500">{{ row.creator_role || '—' }}</span>
+              </div>
+            </template>
+            <template v-else-if="col === 'status'">
+              <div class="flex flex-col items-start gap-0.5">
+                <button
+                  type="button"
+                  :class="[
+                    'inline-flex h-6 w-11 shrink-0 rounded-full border-2 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1',
+                    canInlineEdit ? 'cursor-pointer' : 'cursor-default',
+                    isApproved(row.status)
+                      ? 'border-green-500 bg-green-500 focus:ring-green-400'
+                      : 'border-red-500 bg-red-500 focus:ring-red-400',
+                  ]"
+                  :disabled="!canInlineEdit"
+                  :aria-pressed="isApproved(row.status)"
+                  @click="onStatusToggle(row)"
+                >
+                  <span
+                    :class="[
+                      'inline-block h-5 w-5 rounded-full bg-white shadow transition-transform',
+                      isApproved(row.status) ? 'translate-x-5' : 'translate-x-0.5',
+                    ]"
+                  />
+                </button>
+                <span class="text-xs font-medium text-gray-900">{{ statusLabel(row.status) }}</span>
+              </div>
             </template>
             <template v-else-if="canInlineEdit && isEditing(row.id, col) && isDropdownColumn(col)">
               <div class="flex flex-col gap-1.5">
@@ -245,35 +294,6 @@ function statusBadgeClass(status) {
                   <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
                 </div>
               </div>
-            </template>
-            <template v-else-if="col === 'status' && canInlineEdit && isEditing(row.id, 'status')">
-              <div class="flex flex-col gap-1.5">
-                <select
-                  v-model="inlineEditValue"
-                  class="min-w-[160px] rounded border border-gray-300 bg-white px-3 py-1.5 pr-8 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-                  @keydown.enter="saveInlineEdit"
-                  @keydown.esc="cancelInlineEdit"
-                >
-                  <option v-for="s in (editOptions.statuses || [])" :key="s.value" :value="s.value">{{ s.label }}</option>
-                </select>
-                <div class="flex gap-1">
-                  <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
-                  <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
-                </div>
-              </div>
-            </template>
-            <template v-else-if="col === 'status' && canInlineEdit">
-              <span
-                :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium cursor-pointer hover:ring-2 hover:ring-green-400', statusBadgeClass(row.status)]"
-                @dblclick="openDropdownEdit(row, 'status')"
-              >
-                {{ row.status === 'followed_up' ? 'Followed Up' : (row.status ? row.status.charAt(0).toUpperCase() + row.status.slice(1) : '—') }}
-              </span>
-            </template>
-            <template v-else-if="col === 'status'">
-              <span :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', statusBadgeClass(row.status)]">
-                {{ row.status === 'followed_up' ? 'Followed Up' : (row.status ? row.status.charAt(0).toUpperCase() + row.status.slice(1) : '—') }}
-              </span>
             </template>
             <template v-else-if="canInlineEdit && isDropdownColumn(col)">
               <span

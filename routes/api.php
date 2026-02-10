@@ -74,6 +74,22 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::patch('/customer-support/{customerSupportSubmission}', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'patch'])
         ->whereNumber('customerSupportSubmission');
 
+    // Clients
+    Route::get('/clients', [\App\Http\Controllers\Api\ClientApiController::class, 'index']);
+    Route::get('/clients/filters', [\App\Http\Controllers\Api\ClientApiController::class, 'filters']);
+    Route::get('/clients/columns', [\App\Http\Controllers\Api\ClientApiController::class, 'columns']);
+    Route::post('/clients/columns', [\App\Http\Controllers\Api\ClientApiController::class, 'saveColumns']);
+    Route::get('/clients/{client}/products', [\App\Http\Controllers\Api\ClientApiController::class, 'products'])->whereNumber('client');
+    Route::get('/clients/{client}/vas-requests', [\App\Http\Controllers\Api\ClientApiController::class, 'vasRequests'])->whereNumber('client');
+    Route::get('/clients/{client}/customer-support', [\App\Http\Controllers\Api\ClientApiController::class, 'customerSupport'])->whereNumber('client');
+    Route::get('/clients/{client}/audits', [\App\Http\Controllers\Api\ClientApiController::class, 'audits'])->whereNumber('client');
+    Route::put('/clients/{client}', [\App\Http\Controllers\Api\ClientApiController::class, 'update'])->whereNumber('client');
+    Route::put('/clients/{client}/company-details', [\App\Http\Controllers\Api\ClientApiController::class, 'updateCompanyDetails'])->whereNumber('client');
+    Route::put('/clients/{client}/contacts', [\App\Http\Controllers\Api\ClientApiController::class, 'updateContacts'])->whereNumber('client');
+    Route::put('/clients/{client}/addresses', [\App\Http\Controllers\Api\ClientApiController::class, 'updateAddresses'])->whereNumber('client');
+    Route::get('/clients/{client}/alerts', [\App\Http\Controllers\Api\ClientApiController::class, 'alerts'])->whereNumber('client');
+    Route::get('/clients/{client}', [\App\Http\Controllers\Api\ClientApiController::class, 'show'])->whereNumber('client');
+
     // VAS requests
     Route::get('/vas-requests/team-options', [VasRequestController::class, 'teamOptions']);
     Route::get('/vas-requests/document-schema', [VasRequestController::class, 'documentSchemaResponse']);
@@ -149,6 +165,36 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::get('/employees/columns', [\App\Http\Controllers\Api\EmployeeApiController::class, 'columns']);
     Route::post('/employees/columns', [\App\Http\Controllers\Api\EmployeeApiController::class, 'saveColumns']);
     Route::post('/employees/bulk-import', [\App\Http\Controllers\Api\EmployeeApiController::class, 'bulkImport']);
+
+    // Cisco Extensions
+    Route::get('/cisco-extensions', [\App\Http\Controllers\Api\ExtensionsApiController::class, 'index']);
+    Route::get('/cisco-extensions/filters', [\App\Http\Controllers\Api\ExtensionsApiController::class, 'filters']);
+    Route::get('/cisco-extensions/columns', [\App\Http\Controllers\Api\ExtensionsApiController::class, 'columns']);
+    Route::post('/cisco-extensions/columns', [\App\Http\Controllers\Api\ExtensionsApiController::class, 'saveColumns']);
+    Route::get('/cisco-extensions/assignable-employees', [\App\Http\Controllers\Api\ExtensionsApiController::class, 'assignableEmployees']);
+    Route::get('/cisco-extensions/{ciscoExtension}', [\App\Http\Controllers\Api\ExtensionsApiController::class, 'show'])->whereNumber('ciscoExtension');
+    Route::get('/cisco-extensions/{ciscoExtension}/audit-log', [\App\Http\Controllers\Api\ExtensionsApiController::class, 'auditLog'])->whereNumber('ciscoExtension');
+    Route::post('/cisco-extensions', [\App\Http\Controllers\Api\ExtensionsApiController::class, 'store']);
+    Route::post('/cisco-extensions/bulk-import', [\App\Http\Controllers\Api\ExtensionsApiController::class, 'bulkImport']);
+    Route::put('/cisco-extensions/{ciscoExtension}', [\App\Http\Controllers\Api\ExtensionsApiController::class, 'update'])->whereNumber('ciscoExtension');
+    Route::patch('/cisco-extensions/{ciscoExtension}', [\App\Http\Controllers\Api\ExtensionsApiController::class, 'patch'])->whereNumber('ciscoExtension');
+    Route::delete('/cisco-extensions/{ciscoExtension}', [\App\Http\Controllers\Api\ExtensionsApiController::class, 'destroy'])->whereNumber('ciscoExtension');
+
+    // Attendance log (login logs for SPA)
+    Route::get('/attendance-log', [\App\Http\Controllers\Api\AttendanceLogApiController::class, 'index']);
+    Route::get('/attendance-log/filters', [\App\Http\Controllers\Api\AttendanceLogApiController::class, 'filters']);
+    Route::post('/attendance-log/force-logout/log/{userLoginLog}', [\App\Http\Controllers\Api\AttendanceLogApiController::class, 'forceLogoutLog'])->whereNumber('userLoginLog');
+    Route::post('/attendance-log/force-logout/user/{user}', [\App\Http\Controllers\Api\AttendanceLogApiController::class, 'forceLogoutUser'])->whereNumber('user');
+
+    // Expenses (Expense Tracker)
+    Route::get('/expenses', [\App\Http\Controllers\Api\ExpenseApiController::class, 'index']);
+    Route::post('/expenses', [\App\Http\Controllers\Api\ExpenseApiController::class, 'store']);
+    Route::get('/expenses/summary', [\App\Http\Controllers\Api\ExpenseApiController::class, 'summary']);
+    Route::get('/expenses/filters', [\App\Http\Controllers\Api\ExpenseApiController::class, 'filters']);
+    Route::get('/expenses/columns', [\App\Http\Controllers\Api\ExpenseApiController::class, 'columns']);
+    Route::post('/expenses/columns', [\App\Http\Controllers\Api\ExpenseApiController::class, 'saveColumns']);
+    Route::get('/expenses/{expense}', [\App\Http\Controllers\Api\ExpenseApiController::class, 'show'])->whereNumber('expense');
+    Route::delete('/expenses/{expense}', [\App\Http\Controllers\Api\ExpenseApiController::class, 'destroy'])->whereNumber('expense');
 
     // Users (list, show, update, delete, create – super admin / authorized)
     Route::get('/users', [UserController::class, 'index']);

@@ -51,3 +51,64 @@ export function fromDdMmYyyy(str) {
   if (Number.isNaN(date.getTime())) return ''
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
+
+const MONTHS_3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/**
+ * Format date for display: dd Mon yyyy (e.g. 15 Jan 2024, 10 Mar 2024).
+ * @param {string} ymd - Date in yyyy-mm-dd or empty
+ * @returns {string} dd Mon yyyy or ''
+ */
+export function toDdMonYyyy(ymd) {
+  if (!ymd || typeof ymd !== 'string') return ''
+  const parts = ymd.trim().split('-')
+  if (parts.length !== 3) return ''
+  const [y, m, d] = parts
+  const mInt = parseInt(m, 10)
+  const dInt = parseInt(d, 10)
+  if (Number.isNaN(mInt) || Number.isNaN(dInt) || mInt < 1 || mInt > 12) return ''
+  const monthLabel = MONTHS_3[mInt - 1]
+  return `${String(dInt).padStart(2, '0')} ${monthLabel} ${y}`
+}
+
+const MONTHS_3_LOWER = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+
+/**
+ * Format date for display: dd-mon-yyyy (e.g. 02-jan-2026).
+ * @param {string} ymd - Date in yyyy-mm-dd or empty
+ * @returns {string} dd-mon-yyyy or ''
+ */
+export function toDdMonYyyyLower(ymd) {
+  if (!ymd || typeof ymd !== 'string') return ''
+  const parts = ymd.trim().split('-')
+  if (parts.length !== 3) return ''
+  const [y, m, d] = parts
+  const mInt = parseInt(m, 10)
+  const dInt = parseInt(d, 10)
+  if (Number.isNaN(mInt) || Number.isNaN(dInt) || mInt < 1 || mInt > 12) return ''
+  const monthLabel = MONTHS_3_LOWER[mInt - 1]
+  return `${String(dInt).padStart(2, '0')}-${monthLabel}-${y}`
+}
+
+/**
+ * Parse dd-mon-yyyy (e.g. 02-jan-2026) to yyyy-mm-dd for API.
+ * @param {string} str - User input
+ * @returns {string} yyyy-mm-dd or ''
+ */
+export function fromDdMonYyyyLower(str) {
+  if (!str || typeof str !== 'string') return ''
+  const trimmed = str.trim().toLowerCase()
+  if (!trimmed) return ''
+  const parts = trimmed.split(/[-/]/)
+  if (parts.length !== 3) return ''
+  const [a, b, c] = parts
+  const monthIndex = MONTHS_3_LOWER.indexOf(b)
+  if (monthIndex === -1) return ''
+  const dInt = parseInt(a, 10)
+  const yInt = parseInt(c, 10)
+  if (Number.isNaN(dInt) || Number.isNaN(yInt)) return ''
+  const year = yInt < 100 ? yInt + 2000 : yInt
+  const date = new Date(year, monthIndex, dInt)
+  if (Number.isNaN(date.getTime()) || date.getMonth() !== monthIndex) return ''
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}

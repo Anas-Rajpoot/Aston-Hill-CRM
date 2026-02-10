@@ -286,8 +286,9 @@ return [
             'label' => 'Attendance Log',
             'icon' => 'attendance',
             'permissions' => [
-                ['key' => 'view_attendance_logs', 'label' => 'View Attendance Logs (Super Admin only)', 'priority' => 'high'],
+                ['key' => 'view_attendance_logs', 'label' => 'View Attendance Logs', 'priority' => 'high'],
                 ['key' => 'export_attendance_data', 'label' => 'Export Attendance Data', 'priority' => 'low'],
+                ['key' => 'force_logout', 'label' => 'Force Logout Users', 'priority' => 'medium'],
             ],
         ],
         'personal_notes' => [

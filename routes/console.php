@@ -13,3 +13,9 @@ Schedule::command('notifications:dispatch-due')
     ->withoutOverlapping()
     ->onOneServer();
 
+// Auto logout sessions inactive for 2 hours
+Schedule::command('sessions:logout-inactive', ['--hours' => 2])
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->onOneServer();
+

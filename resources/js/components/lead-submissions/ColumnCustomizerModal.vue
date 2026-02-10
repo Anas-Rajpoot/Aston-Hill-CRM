@@ -12,6 +12,8 @@ const props = defineProps({
   visible: { type: Boolean, default: false },
   allColumns: { type: Array, default: () => [] },
   visibleColumns: { type: Array, default: () => [] },
+  /** Optional default column keys for "By Default" button. If omitted, uses all columns. */
+  defaultColumns: { type: Array, default: () => [] },
 })
 
 const emit = defineEmits(['update:visible', 'save'])
@@ -47,6 +49,19 @@ function checkAll() {
 function uncheckAll() {
   errorMessage.value = ''
   localSelected.value = []
+}
+
+function applyByDefault() {
+  errorMessage.value = ''
+  const defaultKeys = props.defaultColumns?.length
+    ? props.defaultColumns
+    : props.allColumns.map((c) => c.key)
+  localSelected.value = [...defaultKeys]
+}
+
+function reset() {
+  errorMessage.value = ''
+  localSelected.value = [...(props.visibleColumns || [])]
 }
 
 function save() {
@@ -94,7 +109,7 @@ function close() {
             </button>
           </div>
           <div class="min-h-0 flex-1 overflow-y-auto p-4">
-            <div class="mb-4 flex gap-2">
+            <div class="mb-4 flex flex-wrap gap-2">
               <button
                 type="button"
                 class="rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50"
@@ -108,6 +123,20 @@ function close() {
                 @click="uncheckAll"
               >
                 Uncheck All
+              </button>
+              <button
+                type="button"
+                class="rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50"
+                @click="applyByDefault"
+              >
+                By Default
+              </button>
+              <button
+                type="button"
+                class="rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50"
+                @click="reset"
+              >
+                Reset
               </button>
             </div>
             <div class="space-y-2">

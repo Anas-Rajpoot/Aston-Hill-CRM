@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Expense extends Model
 {
+    public const STATUS_PENDING = 'pending';
+    public const STATUS_APPROVED = 'approved';
+    public const STATUSES = ['pending', 'approved'];
+
     protected $fillable = [
         'user_id',
         'expense_date',
@@ -17,6 +21,7 @@ class Expense extends Model
         'vat_amount',
         'amount_without_vat',
         'full_amount',
+        'status',
         'comment',
     ];
 
@@ -50,7 +55,10 @@ class Expense extends Model
         }
 
         if (!empty($filters['invoice'])) {
-            $q->where('invoice_number', 'like', '%' . $filters['invoice'] . '%');
+            $q->where('invoice_number', 'like', '%' . addcslashes($filters['invoice'], '%_\\') . '%');
+        }
+        if (!empty($filters['product_description'])) {
+            $q->where('product_description', 'like', '%' . addcslashes($filters['product_description'], '%_\\') . '%');
         }
 
         if (!empty($filters['from'])) {
@@ -59,6 +67,35 @@ class Expense extends Model
 
         if (!empty($filters['to'])) {
             $q->whereDate('expense_date', '<=', $filters['to']);
+        }
+
+        if (!empty($filters['created_from'])) {
+            $q->whereDate('created_at', '>=', $filters['created_from']);
+        }
+        if (!empty($filters['created_to'])) {
+            $q->whereDate('created_at', '<=', $filters['created_to']);
+        }
+        if (!empty($filters['added_by'])) {
+            $term = '%' . addcslashes($filters['added_by'], '%_\\') . '%';
+            $q->whereHas('user', fn ($q2) => $q2->where('name', 'like', $term));
+        }
+        if (isset($filters['amount_min']) && $filters['amount_min'] !== '' && $filters['amount_min'] !== null) {
+            $q->where('full_amount', '>=', (float) $filters['amount_min']);
+        }
+        if (isset($filters['amount_max']) && $filters['amount_max'] !== '' && $filters['amount_max'] !== null) {
+            $q->where('full_amount', '<=', (float) $filters['amount_max']);
+        }
+        if (!empty($filters['vat_applicable'])) {
+            if ($filters['vat_applicable'] === 'yes') {
+                $q->whereNotNull('vat_amount')->where('vat_amount', '>', 0);
+            } elseif ($filters['vat_applicable'] === 'no') {
+                $q->where(function ($q2) {
+                    $q2->whereNull('vat_amount')->orWhere('vat_amount', 0);
+                });
+            }
+        }
+        if (!empty($filters['status'])) {
+            $q->where('status', $filters['status']);
         }
 
         return $q;

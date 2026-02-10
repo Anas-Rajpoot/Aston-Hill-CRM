@@ -126,11 +126,11 @@ function rowNumber(index) {
 }
 
 function goToView(row) {
-  if (row?.id) router.push(`/users/${row.id}`)
+  if (row?.id) router.push(`/employees/${row.id}`)
 }
 
 function goToEdit(row) {
-  if (row?.id) router.push(`/users/${row.id}/edit`)
+  if (row?.id) router.push(`/employees/${row.id}/edit`)
 }
 
 function goToHistory(row) {
@@ -238,7 +238,7 @@ function onCheckboxCellClick(row) {
             </button>
             <span v-else class="font-bold text-white">{{ label(col) }}</span>
           </th>
-          <th scope="col" class="whitespace-nowrap px-4 py-3 text-right text-sm font-bold uppercase tracking-wider text-white">Actions</th>
+          <th scope="col" class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold uppercase tracking-wider text-white">Actions</th>
         </tr>
       </thead>
       <tbody class="bg-white">
@@ -311,11 +311,9 @@ function onCheckboxCellClick(row) {
               {{ formatValue(row, col) }}
             </template>
           </td>
-          <td
-            class="whitespace-nowrap px-4 py-3"
-            :class="canToggleActiveRow(row) ? 'text-right' : 'text-left'"
-          >
+          <td class="whitespace-nowrap px-4 py-3 text-left">
             <div class="inline-flex items-center gap-2">
+              <!-- View / Edit / History icons always at left; Activate/Deactivate or space to the right -->
               <button
                 type="button"
                 class="rounded-full p-1.5 text-blue-600 hover:bg-blue-50"

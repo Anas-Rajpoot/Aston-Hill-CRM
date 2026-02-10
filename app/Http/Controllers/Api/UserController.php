@@ -225,11 +225,14 @@ class UserController extends Controller
             'extension' => ['nullable', 'string', 'max:20'],
             'joining_date' => ['nullable', 'date'],
             'terminate_date' => ['nullable', 'date'],
+            'status' => ['nullable', 'string', 'in:approved,rejected,pending'],
         ]);
 
         $user->fill(collect($validated)->except(['password', 'roles', 'manager_id', 'team_leader_id'])->toArray());
 
         if (array_key_exists('roles', $validated) && !empty($validated['roles'])) {
+            $requestedStatus = $validated['status'] ?? null;
+            if ($requestedStatus !== 'rejected') {
             $request->validate(
                 ['roles' => ['required', 'array', 'min:1']],
                 ['roles.required' => 'Please select at least one role.']
@@ -265,6 +268,7 @@ class UserController extends Controller
             $user->rejected_at = null;
             $user->rejection_reason = null;
             $statusChanged = $user->getOriginal('status') !== 'approved';
+            }
         } else {
             $statusChanged = false;
         }
