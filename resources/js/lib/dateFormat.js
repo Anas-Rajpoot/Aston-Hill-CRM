@@ -42,9 +42,9 @@ export function fromDdMmYyyy(str) {
   } else {
     return ''
   }
-  const yInt = parseInt(y, 10)
-  let mInt = parseInt(m, 10)
-  let dInt = parseInt(d, 10)
+  let yInt = parseInt(y, 10)
+  const mInt = parseInt(m, 10)
+  const dInt = parseInt(d, 10)
   if (Number.isNaN(yInt) || Number.isNaN(mInt) || Number.isNaN(dInt)) return ''
   if (yInt < 100) yInt += 2000
   const date = new Date(yInt, mInt - 1, dInt)

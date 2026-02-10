@@ -176,9 +176,32 @@ return [
             'sent_to' => ['label' => 'Sent To', 'filter' => 'text', 'sortable' => true],
             'creator' => ['label' => 'Added By', 'filter' => null, 'sortable' => true],
             'status' => ['label' => 'Status', 'filter' => 'select', 'sortable' => true],
+            'status_date' => ['label' => 'Status Date', 'filter' => null, 'sortable' => true],
         ],
-        'default_columns' => ['id', 'email_date', 'subject', 'category', 'request_from', 'sent_to', 'creator', 'status'],
+        'default_columns' => ['id', 'email_date', 'subject', 'category', 'request_from', 'sent_to', 'creator', 'status', 'status_date'],
         'default_sort' => ['email_date', 'desc'],
+    ],
+
+    'employees' => [
+        'model' => \App\Models\User::class,
+        'columns' => [
+            'id' => ['label' => 'ID', 'filter' => null, 'sortable' => true],
+            'employee_number' => ['label' => 'Employee ID', 'filter' => 'text', 'sortable' => true],
+            'name' => ['label' => 'Employee Name', 'filter' => 'text', 'sortable' => true],
+            'roles' => ['label' => 'Role(s)', 'filter' => null, 'sortable' => false],
+            'team_leader' => ['label' => 'Team Leader', 'filter' => null, 'sortable' => true],
+            'manager' => ['label' => 'Manager', 'filter' => null, 'sortable' => true],
+            'department' => ['label' => 'Department', 'filter' => 'select', 'sortable' => true],
+            'email' => ['label' => 'Primary Email', 'filter' => 'text', 'sortable' => true],
+            'phone' => ['label' => 'Contact No', 'filter' => null, 'sortable' => true],
+            'cnic_number' => ['label' => 'GMIC No', 'filter' => null, 'sortable' => true],
+            'extension' => ['label' => 'Extension', 'filter' => null, 'sortable' => true],
+            'status' => ['label' => 'Status', 'filter' => 'select', 'sortable' => true],
+            'joining_date' => ['label' => 'Joining Date', 'filter' => 'date', 'sortable' => true],
+            'terminate_date' => ['label' => 'Terminate Date', 'filter' => 'date', 'sortable' => true],
+        ],
+        'default_columns' => ['id', 'employee_number', 'name', 'roles', 'team_leader', 'manager', 'department', 'email', 'phone', 'cnic_number', 'extension', 'status', 'joining_date', 'terminate_date'],
+        'default_sort' => ['name', 'asc'],
     ],
 
 ];

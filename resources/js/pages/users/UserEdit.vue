@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import usersApi from '@/services/usersApi'
 import api from '@/lib/axios'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import { toDdMmYyyy, fromDdMmYyyy } from '@/lib/dateFormat'
 
 const ROLE_DESCRIPTIONS = {
   superadmin: 'Full system access with all administrative privileges. Can manage users, roles, and system configurations.',
@@ -34,7 +35,12 @@ const form = ref({
   roles: [],
   manager_id: '',
   team_leader_id: '',
+  department: '',
+  extension: '',
+  joining_date: '',
+  terminate_date: '',
 })
+const employeeNumberDisplay = ref('')
 const roles = ref([])
 const countries = ref([])
 const managers = ref([])
@@ -127,6 +133,7 @@ onMounted(async () => {
     ])
     const d = userRes.data
     const user = d.user
+    employeeNumberDisplay.value = user.employee_number ?? ''
     form.value = {
       name: user.name ?? '',
       email: user.email ?? '',
@@ -140,6 +147,10 @@ onMounted(async () => {
       roles: (user.roles ?? []).map((r) => r.id),
       manager_id: user.manager_id ? String(user.manager_id) : '',
       team_leader_id: user.team_leader_id ? String(user.team_leader_id) : '',
+      department: user.department ?? '',
+      extension: user.extension ?? '',
+      joining_date: user.joining_date ? toDdMmYyyy(user.joining_date) : '',
+      terminate_date: user.terminate_date ? toDdMmYyyy(user.terminate_date) : '',
     }
     roles.value = d.roles ?? []
     managers.value = d.managers ?? []
@@ -156,6 +167,26 @@ onMounted(async () => {
   }
 })
 
+const statusLabel = (status) => {
+  if (status === 'approved') return 'Active'
+  if (status === 'rejected') return 'Inactive'
+  return 'Pending Approval'
+}
+const displayStatus = computed(() => statusLabel(user.value?.status))
+const formatRoleForDisplay = (name) => {
+  if (!name || typeof name !== 'string') return ''
+  return name
+    .split('_')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ')
+}
+const toggleRole = (roleId) => {
+  const ids = form.value.roles
+  const idx = ids.indexOf(roleId)
+  if (idx >= 0) ids.splice(idx, 1)
+  else ids.push(roleId)
+}
+
 const save = async (closeAfter = false) => {
   error.value = ''
   saving.value = true
@@ -170,6 +201,8 @@ const save = async (closeAfter = false) => {
     else payload.manager_id = null
     if (payload.team_leader_id) payload.team_leader_id = parseInt(payload.team_leader_id, 10)
     else payload.team_leader_id = null
+    payload.joining_date = fromDdMmYyyy(payload.joining_date) || null
+    payload.terminate_date = fromDdMmYyyy(payload.terminate_date) || null
     await usersApi.update(route.params.id, payload)
     if (closeAfter) {
       router.push({ path: '/users', query: { updated: form.value.name } })
@@ -196,11 +229,11 @@ const cancel = () => router.push(`/users/${route.params.id}`)
     </div>
 
     <form v-else @submit.prevent="save(true)" class="space-y-6">
-      <div>
-        <h1 class="text-2xl font-bold text-gray-900">Edit User</h1>
-        <p class="mt-1 text-sm text-gray-500">Update user account and roles.</p>
-      </div>
       <Breadcrumbs />
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">Edit Employee</h1>
+        <p class="mt-1 text-sm text-gray-500">Update employee record in the system.</p>
+      </div>
 
       <div v-if="error" class="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
         {{ error }}
@@ -215,184 +248,187 @@ const cancel = () => router.push(`/users/${route.params.id}`)
           <h2 class="text-base font-semibold text-gray-900">Basic Information</h2>
         </div>
         <div class="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div class="md:col-span-2">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Full Name <span class="text-red-500">*</span></label>
-            <input v-model="form.name" type="text" required class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Enter full name" />
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Employee Name <span class="text-red-500">*</span></label>
+            <input v-model="form.name" type="text" required class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Enter full name" />
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number <span class="text-red-500">*</span></label>
-            <input v-model="form.phone" type="text" required class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="+1 234 567 8900" />
+            <label class="block text-sm font-medium text-gray-700 mb-1">Employee ID <span class="text-red-500">*</span></label>
+            <input :value="employeeNumberDisplay" type="text" readonly class="w-full rounded-lg border border-gray-300 bg-gray-50 text-gray-600 cursor-not-allowed" placeholder="Enter unique employee ID" />
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Email <span class="text-red-500">*</span></label>
-            <input v-model="form.email" type="email" required class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="user@example.com" />
+            <label class="block text-sm font-medium text-gray-700 mb-1">Department <span class="text-red-500">*</span></label>
+            <input v-model="form.department" type="text" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Select department" />
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Country <span class="text-red-500">*</span></label>
-            <select v-model="form.country" required class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
-              <option value="">Select country</option>
-              <option v-for="c in countries" :key="c.id" :value="c.code || c.name">{{ c.name }}</option>
-            </select>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Employee Status <span class="text-red-500">*</span></label>
+            <input :value="displayStatus" type="text" readonly class="w-full rounded-lg border border-gray-300 bg-gray-50 text-gray-600 cursor-not-allowed" />
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">CNIC Number</label>
-            <input v-model="form.cnic_number" type="text" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="12345-1234567-1" />
+            <label class="block text-sm font-medium text-gray-700 mb-1">Joining Date <span class="text-red-500">*</span></label>
+            <input v-model="form.joining_date" type="text" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="DD-MM-YYYY" />
           </div>
-          <div class="md:col-span-2">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Additional Notes</label>
-            <textarea v-model="form.additional_notes" rows="4" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Any additional information about this user..." />
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Terminate Date</label>
+            <input v-model="form.terminate_date" type="text" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="DD-MM-YYYY" />
           </div>
         </div>
       </div>
 
-      <!-- Role Assignment -->
+      <!-- Role & Hierarchy -->
       <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
         <div class="px-6 py-4 border-b border-gray-200 flex items-center gap-2 bg-gray-50">
           <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
-          <h2 class="text-base font-semibold text-gray-900">Role Assignment</h2>
+          <h2 class="text-base font-semibold text-gray-900">Role & Hierarchy</h2>
         </div>
-        <div class="px-6 py-5">
-          <label class="block text-sm font-medium text-gray-700 mb-3">Assigned Role(s) <span class="text-red-500">*</span></label>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <label
-              v-for="r in assignableRoles"
-              :key="r.id"
-              class="flex items-start gap-3 p-4 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer"
-            >
-              <input
-                v-model="form.roles"
-                type="checkbox"
-                :value="r.id"
-                class="mt-1 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-              />
-              <div class="min-w-0 flex-1">
-                <span class="font-medium text-gray-900 block">{{ r.name.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()) }}</span>
-                <p v-if="(r.description || roleDescription(r))" class="mt-1 text-xs text-gray-500">{{ r.description || roleDescription(r) }}</p>
-              </div>
-            </label>
+        <div class="px-6 py-5 space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Role(s) <span class="text-red-500">*</span></label>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="r in assignableRoles"
+                :key="r.id"
+                type="button"
+                @click="toggleRole(r.id)"
+                :class="form.roles.includes(r.id) ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-gray-100 text-gray-700 border-gray-200'"
+                class="px-3 py-1.5 rounded-lg border text-sm font-medium hover:opacity-90"
+              >
+                {{ formatRoleForDisplay(r.name) }}
+              </button>
+            </div>
           </div>
-          <p class="mt-4 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-            Note: Multiple roles can be assigned. Role changes apply immediately after save.
-          </p>
-          <div v-show="showTeamLeaderDropdown" class="mt-4 space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Select {{ managerLabel }} <span class="text-red-500">*</span></label>
-              <select v-model="form.manager_id" :required="showManagerDropdown" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
-                <option value="">Select {{ managerLabel }}</option>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Manager Name</label>
+              <select v-model="form.manager_id" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                <option value="">Select manager</option>
                 <option v-for="m in managers" :key="m.id" :value="m.id">{{ m.name }}</option>
               </select>
-              <p class="mt-1 text-xs text-gray-500">Select manager first to filter team leaders</p>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Select {{ teamLeaderLabel }} <span class="text-red-500">*</span></label>
-              <select v-model="form.team_leader_id" :required="showTeamLeaderDropdown" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
-                <option value="">Select {{ teamLeaderLabel }}</option>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Team Leader Name</label>
+              <select v-model="form.team_leader_id" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                <option value="">Select team leader</option>
                 <option v-for="t in filteredTeamLeaders" :key="t.id" :value="t.id">{{ t.name }}</option>
               </select>
-              <p class="mt-1 text-xs text-gray-500">Manager is auto-filled when team leader is selected</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Extension</label>
+              <input v-model="form.extension" type="text" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Select extension" />
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Login Credentials -->
+      <!-- Contact Details -->
+      <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center gap-2 bg-gray-50">
+          <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+          <h2 class="text-base font-semibold text-gray-900">Contact Details</h2>
+        </div>
+        <div class="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Email ID</label>
+            <input v-model="form.email" type="email" required class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="employee@company.com" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Contact Number</label>
+            <input v-model="form.phone" type="text" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="+971-50-123-4567" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Country</label>
+            <select v-model="form.country" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500">
+              <option value="">Select country</option>
+              <option v-for="c in countries" :key="c.id" :value="c.code || c.name">{{ c.name }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">CNIC Number</label>
+            <input v-model="form.cnic_number" type="text" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="---------" />
+          </div>
+        </div>
+      </div>
+
+      <!-- System Access -->
       <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
         <div class="px-6 py-4 border-b border-gray-200 flex items-center gap-2 bg-gray-50">
           <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
           </svg>
-          <h2 class="text-base font-semibold text-gray-900">Login Credentials</h2>
+          <h2 class="text-base font-semibold text-gray-900">System Access</h2>
         </div>
         <div class="px-6 py-5 space-y-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Temporary Password</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">System Login Email <span class="text-red-500">*</span></label>
+            <input v-model="form.email" type="email" required class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="login@company.com" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">System Password</label>
             <div class="relative">
-              <input v-model="form.password" :type="showPassword ? 'text' : 'password'" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 pr-10" placeholder="Enter temporary password (leave blank to keep current)" />
+              <input v-model="form.password" :type="showPassword ? 'text' : 'password'" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 pr-10" placeholder="Enter secure password (leave blank to keep current)" />
               <button type="button" @click="showPassword = !showPassword" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                 <svg v-if="!showPassword" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                 <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
               </button>
             </div>
-            <p class="mt-1 text-xs text-gray-500">Password must be at least 8 characters long.</p>
+            <p class="mt-1 text-xs text-gray-500">Leave blank to keep current password. Min 8 characters if changing.</p>
           </div>
           <div v-if="form.password">
             <label class="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
-            <input v-model="form.password_confirmation" type="password" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Confirm new password" />
+            <input v-model="form.password_confirmation" type="password" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Confirm new password" />
           </div>
           <label class="flex items-center gap-2 cursor-pointer">
-            <input v-model="form.force_password_reset" type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+            <input v-model="form.force_password_reset" type="checkbox" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
             <span class="text-sm text-gray-700">Force password reset on first login</span>
           </label>
         </div>
       </div>
 
-      <!-- Access Notes -->
+      <!-- Internal Comment -->
       <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
         <div class="px-6 py-4 border-b border-gray-200 flex items-center gap-2 bg-gray-50">
           <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
           </svg>
-          <h2 class="text-base font-semibold text-gray-900">Access Notes</h2>
+          <h2 class="text-base font-semibold text-gray-900">Internal Comment</h2>
         </div>
         <div class="px-6 py-5">
-          <ul class="space-y-2 text-sm text-gray-600">
-            <li class="flex items-start gap-2">
-              <svg class="w-5 h-5 text-green-500 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
-              User access and permissions depend on assigned roles and system restrictions.
-            </li>
-            <li class="flex items-start gap-2">
-              <svg class="w-5 h-5 text-green-500 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
-              All changes are automatically logged in Audit Logs for accountability.
-            </li>
-            <li class="flex items-start gap-2">
-              <svg class="w-5 h-5 text-green-500 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
-              Role changes take effect immediately upon saving.
-            </li>
-            <li class="flex items-start gap-2">
-              <svg class="w-5 h-5 text-green-500 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
-              Users with Inactive status cannot log in to the system.
-            </li>
-          </ul>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Internal Comment</label>
+          <textarea v-model="form.additional_notes" rows="4" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Add any internal notes or comments about this employee..." />
         </div>
       </div>
 
-      <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-gray-200">
+      <div class="flex flex-wrap items-center justify-end gap-3 pt-4 border-t border-gray-200">
         <button
           type="button"
           @click="cancel"
-          class="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-900 hover:bg-gray-50"
+          class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
         >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
           Cancel
         </button>
-        <div class="flex items-center gap-3">
-          <button
-            type="button"
-            :disabled="saving"
-            @click="save(false)"
-            class="inline-flex items-center gap-2 rounded-xl border border-sky-400 bg-white px-5 py-2.5 text-sm font-medium text-sky-500 hover:bg-sky-50 disabled:opacity-50"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-            </svg>
-            {{ saving ? 'Saving...' : 'Save User' }}
-          </button>
-          <button
-            type="submit"
-            :disabled="saving"
-            class="inline-flex items-center gap-2 rounded-xl bg-lime-500 px-5 py-2.5 text-sm font-medium text-white hover:bg-lime-600 disabled:opacity-50"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-            </svg>
-            {{ saving ? 'Saving...' : 'Save & Close' }}
-          </button>
-        </div>
+        <button
+          type="button"
+          :disabled="saving"
+          @click="save(false)"
+          class="inline-flex items-center gap-2 rounded-lg border border-sky-400 bg-sky-50 px-5 py-2.5 text-sm font-medium text-sky-600 hover:bg-sky-100 disabled:opacity-50"
+        >
+          {{ saving ? 'Saving...' : 'Save & Close' }}
+        </button>
+        <button
+          type="submit"
+          :disabled="saving"
+          class="inline-flex items-center gap-2 rounded-lg border border-green-600 bg-green-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+          </svg>
+          {{ saving ? 'Saving...' : 'Save Employee' }}
+        </button>
       </div>
     </form>
   </div>

@@ -407,6 +407,7 @@ onMounted(() => load())
                       </svg>
                       Download
                     </button>
+                    <!-- Remove: opens confirmation popup with message (see Teleport modal below) -->
                     <button
                       type="button"
                       class="inline-flex items-center gap-1 rounded border border-red-200 bg-white px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50"
@@ -506,7 +507,7 @@ onMounted(() => load())
     </div>
   </div>
 
-  <!-- Remove document confirmation modal -->
+  <!-- Remove document confirmation popup (opened by Remove button in Documents section above) -->
   <Teleport to="body">
     <div
       v-if="documentToRemove"

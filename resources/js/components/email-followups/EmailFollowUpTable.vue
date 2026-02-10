@@ -41,6 +41,7 @@ const columnLabels = {
   sent_to: 'Sent To',
   creator: 'Added By',
   status: 'Status',
+  status_date: 'Status Date',
 }
 
 const SORTABLE_COLUMNS = ['email_date', 'subject', 'category', 'request_from', 'sent_to', 'creator', 'status']

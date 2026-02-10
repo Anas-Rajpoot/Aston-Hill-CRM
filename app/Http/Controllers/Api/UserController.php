@@ -97,6 +97,11 @@ class UserController extends Controller
             'roles' => ['nullable', 'array'],
             'roles.*' => ['exists:roles,id'],
             'status' => ['nullable', 'in:pending,approved,rejected'],
+            'employee_number' => ['nullable', 'string', 'max:50', 'unique:users,employee_number'],
+            'department' => ['nullable', 'string', 'max:100'],
+            'extension' => ['nullable', 'string', 'max:20'],
+            'joining_date' => ['nullable', 'date'],
+            'terminate_date' => ['nullable', 'date'],
         ]);
 
         if (($validated['status'] ?? '') === 'approved') {
@@ -110,6 +115,11 @@ class UserController extends Controller
             'phone' => $validated['phone'] ?? null,
             'country' => $validated['country'] ?? null,
             'status' => $validated['status'] ?? 'pending',
+            'employee_number' => $validated['employee_number'] ?? null,
+            'department' => $validated['department'] ?? null,
+            'extension' => $validated['extension'] ?? null,
+            'joining_date' => $validated['joining_date'] ?? null,
+            'terminate_date' => $validated['terminate_date'] ?? null,
         ]);
 
         if (!empty($validated['roles'])) {
@@ -148,15 +158,22 @@ class UserController extends Controller
     public function bulkDeactivate(Request $request): JsonResponse
     {
         $validated = $request->validate(['ids' => ['required', 'array'], 'ids.*' => ['integer', 'exists:users,id']]);
-        $count = User::whereIn('id', $validated['ids'])
+        $ids = collect($validated['ids']);
+        $superAdminIds = User::whereIn('id', $ids)->whereHas('roles', fn ($r) => $r->where('name', 'superadmin'))->pluck('id');
+        $idsToDeactivate = $ids->diff($superAdminIds)->values()->all();
+        $count = User::whereIn('id', $idsToDeactivate)
             ->update(['status' => 'rejected', 'rejected_by' => auth()->id(), 'rejected_at' => now()]);
-        User::whereIn('id', $validated['ids'])->each(fn ($u) => $u->syncRoles([]));
+        User::whereIn('id', $idsToDeactivate)->each(fn ($u) => $u->syncRoles([]));
         app(PermissionRegistrar::class)->forgetCachedPermissions();
         return response()->json(['message' => "{$count} user(s) deactivated.", 'count' => $count]);
     }
 
     public function show(User $user): JsonResponse
     {
+        if ($user->hasRole('superadmin') && request()->user()->id !== $user->id) {
+            return response()->json(['message' => 'Only the super admin can view this account.'], 403);
+        }
+
         $user->load('roles:id,name');
         $lastLog = UserLoginLog::where('user_id', $user->id)->orderByDesc('login_at')->first();
         $user->last_login_at = $lastLog?->login_at ? (is_object($lastLog->login_at) ? $lastLog->login_at->format('c') : (string) $lastLog->login_at) : null;
@@ -187,6 +204,10 @@ class UserController extends Controller
 
     public function update(Request $request, User $user): JsonResponse
     {
+        if ($user->hasRole('superadmin') && $request->user()->id !== $user->id) {
+            return response()->json(['message' => 'Only the super admin can edit their own account.'], 403);
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,' . $user->id],
@@ -199,6 +220,11 @@ class UserController extends Controller
             'roles.*' => ['exists:roles,id'],
             'manager_id' => ['nullable', 'integer', 'exists:users,id'],
             'team_leader_id' => ['nullable', 'integer', 'exists:users,id'],
+            'employee_number' => ['nullable', 'string', 'max:50', 'unique:users,employee_number,' . $user->id],
+            'department' => ['nullable', 'string', 'max:100'],
+            'extension' => ['nullable', 'string', 'max:20'],
+            'joining_date' => ['nullable', 'date'],
+            'terminate_date' => ['nullable', 'date'],
         ]);
 
         $user->fill(collect($validated)->except(['password', 'roles', 'manager_id', 'team_leader_id'])->toArray());

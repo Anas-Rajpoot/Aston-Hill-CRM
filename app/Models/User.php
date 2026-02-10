@@ -25,6 +25,7 @@ class User extends Authenticatable
         'approved_at','rejected_by','rejected_at','rejection_reason',
         'two_factor_enabled', 'two_factor_secret',
         'manager_id', 'team_leader_id',
+        'employee_number', 'department', 'extension', 'joining_date', 'terminate_date',
     ];
 
     /**
@@ -50,6 +51,8 @@ class User extends Authenticatable
             'two_factor_secret' => 'encrypted',
             'two_factor_enabled' => 'boolean',
             'two_factor_confirmed_at' => 'datetime',
+            'joining_date' => 'date',
+            'terminate_date' => 'date',
         ];
     }
 

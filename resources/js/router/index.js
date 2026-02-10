@@ -3,6 +3,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import AppLayout from '@/layouts/AppLayout.vue'
 import Dashboard from '@/pages/Dashboard.vue'
 import PlaceholderPage from '@/pages/PlaceholderPage.vue'
+import UserShow from '@/pages/users/UserShow.vue'
+import UserEdit from '@/pages/users/UserEdit.vue'
 import { useAuthStore } from '@/stores/auth'
 
 // Lazy-load heavy pages so initial HTML + JS parse stays fast (DOMContentLoaded < 3s).
@@ -33,8 +35,8 @@ const routes = [
       { path: 'lead-submissions/:id', component: () => import('@/pages/lead-submissions/LeadSubmissionDetailPage.vue'), name: 'lead-submission-detail' },
       { path: 'users', component: () => import('@/pages/users/UsersPage.vue') },
       { path: 'users/create', component: () => import('@/pages/users/UserCreate.vue') },
-      { path: 'users/:id', component: () => import('@/pages/users/UserShow.vue') },
-      { path: 'users/:id/edit', component: () => import('@/pages/users/UserEdit.vue') },
+      { path: 'users/:id', component: UserShow },
+      { path: 'users/:id/edit', component: UserEdit },
       { path: 'back-office', ...ph('Back Office') },
       { path: 'field-submissions', component: () => import('@/pages/field-submissions/FieldSubmissionsListingPage.vue') },
       { path: 'field-submissions/audit-log', component: () => import('@/pages/field-submissions/FieldSubmissionAuditLogPage.vue'), name: 'field-submission-audit-log' },
@@ -48,7 +50,7 @@ const routes = [
       { path: 'vas-requests/:id', component: () => import('@/pages/vas-requests/VasRequestDetailPage.vue'), name: 'vas-request-detail' },
       { path: 'clients', ...ph('Clients') },
       { path: 'gsm-tracker', ...ph('GSM Tracker') },
-      { path: 'employees', ...ph('Employees') },
+      { path: 'employees', component: () => import('@/pages/employees/EmployeesListingPage.vue') },
       { path: 'attendance-log', ...ph('Attendance Log') },
       { path: 'reports', ...ph('Reports') },
       { path: 'settings', ...ph('Settings') },

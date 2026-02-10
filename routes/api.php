@@ -143,6 +143,13 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::get('/modules/{module}/columns', [ColumnPreferenceController::class, 'show']);
     Route::post('/modules/{module}/columns', [ColumnPreferenceController::class, 'store']);
 
+    // Employees (listing with columns/filters – uses User model)
+    Route::get('/employees', [\App\Http\Controllers\Api\EmployeeApiController::class, 'index']);
+    Route::get('/employees/filters', [\App\Http\Controllers\Api\EmployeeApiController::class, 'filters']);
+    Route::get('/employees/columns', [\App\Http\Controllers\Api\EmployeeApiController::class, 'columns']);
+    Route::post('/employees/columns', [\App\Http\Controllers\Api\EmployeeApiController::class, 'saveColumns']);
+    Route::post('/employees/bulk-import', [\App\Http\Controllers\Api\EmployeeApiController::class, 'bulkImport']);
+
     // Users (list, show, update, delete, create – super admin / authorized)
     Route::get('/users', [UserController::class, 'index']);
     Route::post('/users', [UserController::class, 'store']);

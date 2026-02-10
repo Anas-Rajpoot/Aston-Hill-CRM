@@ -16,7 +16,7 @@ class EmailFollowUpController extends Controller
 
     private const ALLOWED_COLUMNS = [
         'id', 'created_by', 'email_date', 'subject', 'category', 'request_from',
-        'sent_to', 'comment', 'status',
+        'sent_to', 'comment', 'status', 'status_date',
     ];
 
     private const BASE_COLUMNS = ['id', 'status'];
@@ -64,7 +64,7 @@ class EmailFollowUpController extends Controller
 
         $eagerLoad = [];
         if (in_array('creator', $columns, true)) {
-            $eagerLoad['creator'] = fn ($q) => $q->select('id', 'name', 'email');
+            $eagerLoad['creator'] = fn ($q) => $q->select('id', 'name', 'email')->with('roles:id,name');
         }
         if (! empty($eagerLoad)) {
             $dataQuery->with($eagerLoad);
@@ -142,6 +142,10 @@ class EmailFollowUpController extends Controller
                 ->orderBy('creator_users.name', $direction);
             return;
         }
+        if ($sort === 'status_date') {
+            $query->orderBy('email_follow_ups.updated_at', $direction);
+            return;
+        }
         $query->orderBy('email_follow_ups.' . $sort, $direction);
     }
 
@@ -158,6 +162,7 @@ class EmailFollowUpController extends Controller
             'request_from' => "{$t}.request_from",
             'sent_to' => "{$t}.sent_to",
             'comment' => "{$t}.comment",
+            'status_date' => "{$t}.updated_at",
         ];
         foreach ($columns as $col) {
             if ($col === 'id' || $col === 'status') {
@@ -181,10 +186,16 @@ class EmailFollowUpController extends Controller
         foreach ($columns as $col) {
             if ($col === 'creator') {
                 $out['creator'] = $row->creator?->name ?? null;
+                $firstRole = $row->creator?->roles?->first();
+                $out['creator_role'] = $firstRole ? str_replace('_', ' ', ucwords($firstRole->name, '_')) : null;
                 continue;
             }
             if ($col === 'email_date') {
                 $out[$col] = $row->email_date ? $row->email_date->format('d-M-Y') : null;
+                continue;
+            }
+            if ($col === 'status_date') {
+                $out[$col] = $row->updated_at ? $row->updated_at->format('d-M-Y') : null;
                 continue;
             }
             $out[$col] = $row->$col ?? null;
