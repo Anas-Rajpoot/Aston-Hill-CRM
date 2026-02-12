@@ -7,6 +7,7 @@
 import { ref, computed, onMounted } from 'vue'
 import attendanceLogApi from '@/services/attendanceLogApi'
 import { useAuthStore } from '@/stores/auth'
+import { toDdMmYyyy, fromDdMmYyyy, formatDateDdMmYyyy } from '@/lib/dateFormat'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Pagination from '@/components/Pagination.vue'
 import FiltersBar from '@/components/attendance/FiltersBar.vue'
@@ -46,6 +47,12 @@ const loadError = ref(null)
 const logs = ref([])
 const meta = ref({ current_page: 1, last_page: 1, per_page: 10, total: 0 })
 const filterOptions = ref({ users: [], roles: [] })
+const summary = ref({
+  total_users: 0,
+  logged_in: 0,
+  logged_out: 0,
+  missing_logout: 0,
+})
 const filters = ref({
   user_id: '',
   role: '',
@@ -62,6 +69,7 @@ const visibleColumns = ref(ATTENDANCE_COLUMNS.map((c) => c.key))
 const allColumns = ref([...ATTENDANCE_COLUMNS])
 const forceLogoutLoading = ref(null)
 const exportLoading = ref(false)
+const forceLogoutConfirmRow = ref(null)
 
 function buildParams() {
   const p = {
@@ -103,6 +111,23 @@ async function loadFilters() {
     }
   } catch {
     filterOptions.value = { users: [], roles: [] }
+  }
+}
+
+async function loadSummary() {
+  if (!canView.value) return
+  try {
+    const { data } = await attendanceLogApi.summary()
+    // Support both flat response and nested data (e.g. { data: { total_users, ... } })
+    const raw = data?.data ?? data
+    summary.value = {
+      total_users: raw?.total_users ?? 0,
+      logged_in: raw?.logged_in ?? 0,
+      logged_out: raw?.logged_out ?? 0,
+      missing_logout: raw?.missing_logout ?? 0,
+    }
+  } catch {
+    // Keep previous summary on error so numbers don't disappear
   }
 }
 
@@ -156,13 +181,41 @@ function columnLabel(key) {
   return ATTENDANCE_COLUMNS.find((c) => c.key === key)?.label ?? key
 }
 
-async function forceLogoutLog(row) {
+/** Display API login_date (e.g. "06 Feb 2025") as dd-mm-yyyy */
+function formatLoginDateDisplay(str) {
+  if (!str) return '—'
+  const d = new Date(str)
+  if (Number.isNaN(d.getTime())) return str
+  return formatDateDdMmYyyy(d)
+}
+
+const fromDisplay = computed({
+  get: () => toDdMmYyyy(filters.value.from),
+  set: (v) => { filters.value.from = fromDdMmYyyy(v) || '' },
+})
+const toDisplay = computed({
+  get: () => toDdMmYyyy(filters.value.to),
+  set: (v) => { filters.value.to = fromDdMmYyyy(v) || '' },
+})
+
+function openForceLogoutConfirm(row) {
   if (!canForceLogout.value || !row?.id) return
-  if (!confirm('Force logout this session?')) return
+  forceLogoutConfirmRow.value = row
+}
+
+function closeForceLogoutConfirm() {
+  forceLogoutConfirmRow.value = null
+}
+
+async function confirmForceLogout() {
+  const row = forceLogoutConfirmRow.value
+  if (!row?.id) return
   forceLogoutLoading.value = row.id
   try {
     await attendanceLogApi.forceLogoutLog(row.id)
-    load()
+    closeForceLogoutConfirm()
+    await loadSummary()
+    await load()
   } catch {
     //
   } finally {
@@ -205,7 +258,7 @@ async function onExport() {
         r.employee_id,
         r.role,
         r.department,
-        r.login_date,
+        formatLoginDateDisplay(r.login_date),
         r.login_time,
         r.logout_time || 'Not logged out',
         r.duration_text,
@@ -229,6 +282,7 @@ async function onExport() {
 onMounted(() => {
   if (canView.value) {
     loadFilters()
+    loadSummary()
     load()
   }
 })
@@ -271,6 +325,54 @@ onMounted(() => {
           {{ loadError }}
         </div>
 
+        <!-- Summary cards: Total Users, Logged In, Logged Out, Missing Logout -->
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-gray-500 leading-tight">Total Users</p>
+              <p class="mt-0.5 min-h-[2rem] text-2xl font-bold tabular-nums leading-tight text-gray-900">{{ summary.total_users }}</p>
+            </div>
+            <div class="ml-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-600">
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16" />
+              </svg>
+            </div>
+          </div>
+          <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-gray-500 leading-tight">Logged In</p>
+              <p class="mt-0.5 min-h-[2rem] text-2xl font-bold tabular-nums leading-tight text-blue-600">{{ summary.logged_in }}</p>
+            </div>
+            <div class="ml-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+              </svg>
+            </div>
+          </div>
+          <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-gray-500 leading-tight">Logged Out</p>
+              <p class="mt-0.5 min-h-[2rem] text-2xl font-bold tabular-nums leading-tight text-gray-900">{{ summary.logged_out }}</p>
+            </div>
+            <div class="ml-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-600">
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </div>
+          </div>
+          <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-gray-500 leading-tight">Missing Logout</p>
+              <p class="mt-0.5 min-h-[2rem] text-2xl font-bold tabular-nums leading-tight text-red-600">{{ summary.missing_logout }}</p>
+            </div>
+            <div class="ml-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
         <FiltersBar
           :filters="filters"
           :filter-options="filterOptions"
@@ -300,7 +402,58 @@ onMounted(() => {
         </FiltersBar>
 
         <div v-show="advancedVisible" class="rounded-lg border border-gray-200 bg-gray-50/50 p-4">
-          <p class="text-sm text-gray-600">Use the date range (From / To) and Status filters above to narrow results.</p>
+          <h3 class="mb-3 text-sm font-medium text-gray-700">Advanced Filters</h3>
+          <div class="flex flex-wrap items-end gap-4">
+            <div>
+              <label class="block text-xs font-medium text-gray-600">From</label>
+              <input
+                v-model="fromDisplay"
+                type="text"
+                placeholder="dd-mm-yyyy"
+                class="mt-0.5 min-w-[120px] rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                :disabled="loading"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600">To</label>
+              <input
+                v-model="toDisplay"
+                type="text"
+                placeholder="dd-mm-yyyy"
+                class="mt-0.5 min-w-[120px] rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                :disabled="loading"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600">Status</label>
+              <select
+                v-model="filters.status"
+                class="mt-0.5 min-w-[140px] rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                :disabled="loading"
+              >
+                <option value="">All</option>
+                <option value="logged_in">Logged In</option>
+                <option value="logged_out">Logged Out</option>
+                <option value="missing_logout">Missing Logout</option>
+              </select>
+            </div>
+            <button
+              type="button"
+              class="rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+              :disabled="loading"
+              @click="applyFilters"
+            >
+              Apply
+            </button>
+            <button
+              type="button"
+              class="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              :disabled="loading"
+              @click="resetFilters"
+            >
+              Reset
+            </button>
+          </div>
         </div>
 
         <!-- Table: green header, white body, borders like other tables -->
@@ -350,7 +503,10 @@ onMounted(() => {
                   :class="rowClass(row)"
                 >
                   <td v-for="col in visibleColumns" :key="col" class="whitespace-nowrap border-gray-400 px-4 py-3 text-sm text-gray-900">
-                    <template v-if="col === 'logout_time'">
+                    <template v-if="col === 'login_date'">
+                      {{ formatLoginDateDisplay(row.login_date) }}
+                    </template>
+                    <template v-else-if="col === 'logout_time'">
                       <span v-if="row.logout_time">{{ row.logout_time }}</span>
                       <span v-else class="italic text-gray-500">Not logged out</span>
                     </template>
@@ -377,7 +533,7 @@ onMounted(() => {
                       type="button"
                       class="rounded bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
                       :disabled="forceLogoutLoading === row.id"
-                      @click="forceLogoutLog(row)"
+                      @click="openForceLogoutConfirm(row)"
                     >
                       {{ forceLogoutLoading === row.id ? '...' : 'Force Logout' }}
                     </button>
@@ -426,5 +582,67 @@ onMounted(() => {
       @update:visible="columnModalVisible = $event"
       @save="onSaveColumns"
     />
+
+    <!-- Force Logout confirmation modal -->
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition ease-out duration-200"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition ease-in duration-150"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
+        <div
+          v-if="forceLogoutConfirmRow"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-gray-500/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="force-logout-title"
+          @click.self="closeForceLogoutConfirm"
+        >
+          <div class="w-full max-w-md rounded-xl bg-white shadow-xl">
+            <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <h2 id="force-logout-title" class="text-lg font-semibold text-gray-900">Force logout session</h2>
+              <button
+                type="button"
+                class="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                aria-label="Close"
+                @click="closeForceLogoutConfirm"
+              >
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div class="px-6 py-4">
+              <p class="text-sm text-gray-600">
+                This will end the session for
+                <span class="font-medium text-gray-900">{{ forceLogoutConfirmRow?.employee_name ?? 'this user' }}</span>.
+                They will need to log in again to access the system.
+              </p>
+              <p class="mt-2 text-sm text-gray-600">Do you want to continue?</p>
+            </div>
+            <div class="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
+              <button
+                type="button"
+                class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                @click="closeForceLogoutConfirm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                :disabled="forceLogoutLoading === forceLogoutConfirmRow?.id"
+                @click="confirmForceLogout"
+              >
+                {{ forceLogoutLoading === forceLogoutConfirmRow?.id ? 'Logging out...' : 'Force Logout' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>

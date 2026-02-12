@@ -22,7 +22,7 @@ const icons = {
       :key="tab.key"
       type="button"
       @click="emit('change', tab.key)"
-      class="px-5 py-2.5 rounded-full text-sm font-medium transition flex items-center gap-2.5"
+      class="flex flex-1 min-w-0 items-center justify-center gap-2.5 rounded-full px-4 py-2.5 text-sm font-medium transition"
       :class="active === tab.key
         ? 'bg-[#6cc04a] text-white shadow-sm ring-1 ring-white/30'
         : 'text-white hover:bg-white/10'"
@@ -41,7 +41,7 @@ const icons = {
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 18v-6a9 9 0 0118 0v6" />
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z" />
       </svg>
-      <!-- Plus / new (New Submission) -->
+      <!-- Plus / new (Special Request) -->
       <svg v-else-if="icons[tab.key] === 'plus'" class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
       </svg>

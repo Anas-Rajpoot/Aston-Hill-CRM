@@ -7,6 +7,7 @@ import { useRoute, useRouter } from 'vue-router'
 import leadSubmissionsApi from '@/services/leadSubmissionsApi'
 import { useAuthStore } from '@/stores/auth'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import { toDdMmYyyy } from '@/lib/dateFormat'
 
 const route = useRoute()
 const router = useRouter()
@@ -37,11 +38,18 @@ function displayVal(val) {
 
 function formatDate(d) {
   if (!d) return '—'
+  const str = typeof d === 'string' ? d.trim().slice(0, 10) : (d instanceof Date ? d.toISOString().slice(0, 10) : '')
+  if (!str) return '—'
+  return toDdMmYyyy(str) || '—'
+}
+
+function formatDateTime(d) {
+  if (!d) return '—'
   const date = new Date(d)
   if (Number.isNaN(date.getTime())) return '—'
-  const day = String(date.getDate()).padStart(2, '0')
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  return `${day}-${months[date.getMonth()]}-${date.getFullYear()}`
+  const dateStr = date.toISOString().slice(0, 10)
+  const timeStr = date.toTimeString().slice(0, 5)
+  return `${toDdMmYyyy(dateStr) || ''} ${timeStr}`.trim() || '—'
 }
 
 function submissionDateDisplay(l) {
@@ -157,7 +165,7 @@ onMounted(() => {
 
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] p-0">
-    <div class="mx-auto max-w-5xl px-2 sm:px-4">
+    <div class="w-full">
       <!-- Header + Breadcrumb: background and border like content section -->
       <div class="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
         <div class="flex flex-wrap items-center justify-between gap-4">

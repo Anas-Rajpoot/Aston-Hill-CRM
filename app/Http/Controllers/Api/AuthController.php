@@ -34,8 +34,11 @@ class AuthController extends Controller
 
         if ($user->status !== 'approved') {
             Auth::logout();
+            $message = $user->status === 'rejected'
+                ? 'Your account has been deactivated. Contact the administrator.'
+                : 'Your registration is completed. Please wait for super admin approval.';
             throw ValidationException::withMessages([
-                'email' => ['Your registration is completed. Please wait for super admin approval.'],
+                'email' => [$message],
             ]);
         }
 

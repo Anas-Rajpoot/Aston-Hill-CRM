@@ -44,6 +44,7 @@ const submitting = ref(false)
 const successMessage = ref('')
 const fileInput1 = ref(null)
 const fileInput2 = ref(null)
+const errorSummaryRef = ref(null)
 /** Public URL for submit icon (in public/images/) – use bound :src so Vite does not try to import */
 const submitRequestIconUrl = '/images/submit-request-icon.png'
 
@@ -131,6 +132,9 @@ onMounted(async () => {
 
 function buildPayload() {
   const f = form.value
+  const mid = f.manager_id && Number(f.manager_id) >= 1 ? Number(f.manager_id) : null
+  const tlid = f.team_leader_id && Number(f.team_leader_id) >= 1 ? Number(f.team_leader_id) : null
+  const said = f.sales_agent_id && Number(f.sales_agent_id) >= 1 ? Number(f.sales_agent_id) : null
   return {
     issue_category: f.issue_category?.trim() ?? '',
     company_name: f.company_name?.trim() ?? '',
@@ -139,10 +143,17 @@ function buildPayload() {
     issue_description: f.issue_description?.trim() ?? '',
     attachment_1: f.attachment_1 instanceof File ? f.attachment_1 : null,
     attachment_2: f.attachment_2 instanceof File ? f.attachment_2 : null,
-    manager_id: f.manager_id ? Number(f.manager_id) : null,
-    team_leader_id: f.team_leader_id ? Number(f.team_leader_id) : null,
-    sales_agent_id: f.sales_agent_id ? Number(f.sales_agent_id) : null,
+    manager_id: mid,
+    team_leader_id: tlid,
+    sales_agent_id: said,
   }
+}
+
+/** Returns true if value is missing or invalid for a required user select (empty, "0", or 0). */
+function isEmptyUserSelect(val) {
+  if (val == null || val === '') return true
+  const n = Number(val)
+  return Number.isNaN(n) || n < 1
 }
 
 function validateForm() {
@@ -151,9 +162,9 @@ function validateForm() {
   if (!form.value.company_name?.trim()) err.company_name = ['Company name is required.']
   if (!form.value.contact_number?.trim()) err.contact_number = ['Contact number is required.']
   if (!form.value.issue_description?.trim()) err.issue_description = ['Issue description is required.']
-  if (!form.value.manager_id) err.manager_id = [`${formatTeamLabel(teamLabels.value.manager || 'manager')} is required.`]
-  if (!form.value.team_leader_id) err.team_leader_id = [`${formatTeamLabel(teamLabels.value.team_leader || 'team_leader')} is required.`]
-  if (!form.value.sales_agent_id) err.sales_agent_id = [`${formatTeamLabel(teamLabels.value.sales_agent || 'sales_agent')} is required.`]
+  if (isEmptyUserSelect(form.value.manager_id)) err.manager_id = [`${formatTeamLabel(teamLabels.value.manager || 'manager')} is required.`]
+  if (isEmptyUserSelect(form.value.team_leader_id)) err.team_leader_id = [`${formatTeamLabel(teamLabels.value.team_leader || 'team_leader')} is required.`]
+  if (isEmptyUserSelect(form.value.sales_agent_id)) err.sales_agent_id = [`${formatTeamLabel(teamLabels.value.sales_agent || 'sales_agent')} is required.`]
   return Object.keys(err).length ? err : null
 }
 
@@ -163,12 +174,25 @@ async function submit() {
   if (frontendErrors) {
     errors.value = frontendErrors
     generalMessage.value = 'Please correct the errors below.'
+    nextTick(() => {
+      errorSummaryRef.value?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+    })
     return
   }
   successMessage.value = ''
   submitting.value = true
   try {
     const payload = buildPayload()
+    if (isEmptyUserSelect(payload.manager_id) || isEmptyUserSelect(payload.team_leader_id) || isEmptyUserSelect(payload.sales_agent_id)) {
+      errors.value = {
+        ...(isEmptyUserSelect(payload.manager_id) && { manager_id: [`${formatTeamLabel(teamLabels.value.manager || 'manager')} is required.`] }),
+        ...(isEmptyUserSelect(payload.team_leader_id) && { team_leader_id: [`${formatTeamLabel(teamLabels.value.team_leader || 'team_leader')} is required.`] }),
+        ...(isEmptyUserSelect(payload.sales_agent_id) && { sales_agent_id: [`${formatTeamLabel(teamLabels.value.sales_agent || 'sales_agent')} is required.`] }),
+      }
+      generalMessage.value = 'Please correct the errors below.'
+      nextTick(() => errorSummaryRef.value?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }))
+      return
+    }
     await api.store(payload, true)
     successMessage.value = 'Request submitted successfully.'
     nextTick(() => {
@@ -192,6 +216,9 @@ async function submit() {
     if (fileInput2.value) fileInput2.value.value = ''
   } catch (e) {
     setErrors(e)
+    nextTick(() => {
+      errorSummaryRef.value?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+    })
   } finally {
     submitting.value = false
   }
@@ -258,6 +285,7 @@ const selectClass = (field) =>
 
     <form v-if="!successMessage" @submit.prevent="submit" class="space-y-8">
       <div
+        ref="errorSummaryRef"
         v-if="generalMessage || Object.keys(errors).length"
         class="rounded-lg border border-red-200 bg-red-50 p-4"
       >
@@ -422,14 +450,14 @@ const selectClass = (field) =>
         <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
             <label class="mb-1 block text-sm font-medium text-gray-700">
-              {{ formatTeamLabel(teamLabels.manager || 'manager') }} Name <span class="text-red-500">*</span>
+              {{ formatTeamLabel(teamLabels.manager || 'manager') || 'Manager' }} Name <span class="text-red-500">*</span>
             </label>
             <select
               v-model="form.manager_id"
               :class="selectClass('manager_id')"
               @change="clearFieldError('manager_id')"
             >
-              <option value="">Select {{ formatTeamLabel(teamLabels.manager || 'manager') }}</option>
+              <option value="">Select {{ formatTeamLabel(teamLabels.manager || 'manager') || 'Manager' }}</option>
               <option v-for="u in managers" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
             </select>
             <p v-if="getError('manager_id')" class="mt-1 text-sm text-red-600">{{ getError('manager_id') }}</p>

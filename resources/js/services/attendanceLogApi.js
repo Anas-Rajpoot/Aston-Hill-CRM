@@ -5,6 +5,10 @@ export default {
     return api.get('/attendance-log', { params })
   },
 
+  summary() {
+    return api.get('/attendance-log/summary')
+  },
+
   filters() {
     return api.get('/attendance-log/filters')
   },

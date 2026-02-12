@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import api, { invalidateCurrentDraftCache } from '@/services/leadSubmissionsApi'
 import { useFormErrors } from '@/composables/useFormErrors'
 import { formatTeamLabel } from '@/composables/useTeamLabel'
+import { toDdMmYyyy } from '@/lib/dateFormat'
 
 const EMIRATES_OPTIONS = [
   'Abu Dhabi',
@@ -69,17 +70,14 @@ const { errors, generalMessage, setErrors, clearErrors, clearFieldError, getErro
 
 const isResumingDraft = computed(() => !!draftId.value)
 
-// Format date for display
+// Format date for display (dd-mm-yyyy, time)
 const formatDate = (dateStr) => {
   if (!dateStr) return ''
   const d = new Date(dateStr)
-  return d.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  if (Number.isNaN(d.getTime())) return ''
+  const datePart = d.toISOString().slice(0, 10)
+  const timePart = d.toTimeString().slice(0, 5)
+  return `${toDdMmYyyy(datePart)} ${timePart}`.trim()
 }
 
 // Populate form from draft/lead data. Set skipTeamWatchers=true when loading from API so watchers don't clear team dropdowns.

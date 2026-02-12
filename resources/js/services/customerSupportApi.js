@@ -9,8 +9,21 @@ export default {
     const { data } = await api.get('/customer-support', { params })
     return data
   },
+
+  async getSubmission(id) {
+    const { data } = await api.get(`/customer-support/${id}`)
+    return data
+  },
   async filters() {
     const { data } = await api.get('/customer-support/filters')
+    return data
+  },
+  async getEditOptions() {
+    const { data } = await api.get('/customer-support/edit-options')
+    return data
+  },
+  async getAudits(submissionId) {
+    const { data } = await api.get(`/customer-support/${submissionId}/audits`)
     return data
   },
   async columns() {
@@ -23,9 +36,27 @@ export default {
     })
     return data
   },
-  /** Partial update for listing inline edits. */
-  async updateSubmissionFields(submissionId, payload) {
+  /** Partial update for listing inline edits or full edit form. */
+  async updateSubmission(submissionId, payload) {
     const { data } = await api.patch(`/customer-support/${submissionId}`, payload)
+    return data
+  },
+  /** Alias for listing inline edits. */
+  async updateSubmissionFields(submissionId, payload) {
+    return this.updateSubmission(submissionId, payload)
+  },
+
+  /** Upload additional attachments (append) for a submission. FormData with files. */
+  async uploadAttachments(submissionId, files) {
+    const formData = new FormData()
+    if (Array.isArray(files)) {
+      files.forEach((f, i) => formData.append(`document_${i + 1}`, f))
+    } else {
+      formData.append('document_1', files)
+    }
+    const { data } = await api.post(`/customer-support/${submissionId}/attachments`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
     return data
   },
 
@@ -42,7 +73,8 @@ export default {
       'sales_agent_id',
     ]
     keys.forEach((k) => {
-      if (data[k] != null && data[k] !== '') formData.append(k, data[k])
+      const v = data[k]
+      if (v != null && v !== '' && (typeof v !== 'number' || (v >= 1 && Number.isInteger(v)))) formData.append(k, v)
     })
     formData.append('submit', submit ? '1' : '0')
     if (data.attachment_1 instanceof File) formData.append('attachment_1', data.attachment_1)

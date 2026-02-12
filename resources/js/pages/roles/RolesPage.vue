@@ -9,6 +9,7 @@ import api from '@/lib/axios'
 import SkeletonStatsCards from '@/components/skeletons/SkeletonStatsCards.vue'
 import SkeletonTable from '@/components/skeletons/SkeletonTable.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import { toDdMmYyyy } from '@/lib/dateFormat'
 
 const router = useRouter()
 const roles = ref([])
@@ -33,7 +34,9 @@ const load = async () => {
 
 const formatDate = (d) => {
   if (!d) return '—'
-  return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+  const str = typeof d === 'string' ? d.trim().slice(0, 10) : ''
+  if (!str) return '—'
+  return toDdMmYyyy(str) || '—'
 }
 
 const goToCreate = () => router.push('/roles/create')

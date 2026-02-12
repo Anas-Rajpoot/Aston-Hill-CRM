@@ -1,0 +1,252 @@
+<script setup>
+/**
+ * Customer Support Request Details – read-only view of all form fields and CSR/submitted data.
+ */
+import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import customerSupportApi from '@/services/customerSupportApi'
+import api from '@/lib/axios'
+import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import { toDdMmYyyy } from '@/lib/dateFormat'
+
+const route = useRoute()
+const router = useRouter()
+
+const loading = ref(true)
+const submission = ref(null)
+
+const id = computed(() => {
+  const p = route.params.id
+  return p != null ? Number(p) : null
+})
+
+function displayVal(val) {
+  return val != null && val !== '' ? String(val) : '—'
+}
+
+function formatDateTime(d) {
+  if (!d) return '—'
+  const date = new Date(d)
+  if (Number.isNaN(date.getTime())) return '—'
+  const dateStr = date.toISOString().slice(0, 10)
+  const h = String(date.getHours()).padStart(2, '0')
+  const m = String(date.getMinutes()).padStart(2, '0')
+  return `${toDdMmYyyy(dateStr) || ''} ${h}:${m}`.trim() || '—'
+}
+
+function formatStatus(status) {
+  if (status == null || status === '') return '—'
+  return String(status).charAt(0).toUpperCase() + String(status).slice(1).toLowerCase()
+}
+
+function attachmentDisplayName(att) {
+  return att?.file_name ?? att?.original_name ?? 'Attachment'
+}
+
+async function downloadAttachment(index) {
+  if (!submission.value?.id) return
+  const att = submission.value.attachments?.[index]
+  const name = attachmentDisplayName(att) || 'attachment'
+  try {
+    const { data } = await api.get(`/customer-support/${submission.value.id}/attachments/${index}/download`, { responseType: 'blob' })
+    const url = URL.createObjectURL(data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = name
+    a.rel = 'noopener'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  } catch {
+    // 404 or network – user may open in new tab as fallback
+    window.open(`/api/customer-support/${submission.value.id}/attachments/${index}/download`, '_blank', 'noopener')
+  }
+}
+
+async function load() {
+  if (!id.value) return
+  loading.value = true
+  submission.value = null
+  try {
+    const data = await customerSupportApi.getSubmission(id.value)
+    submission.value = data
+  } catch {
+    submission.value = null
+  } finally {
+    loading.value = false
+  }
+}
+
+function goBack() {
+  router.push('/customer-support')
+}
+
+function goToEdit() {
+  if (submission.value?.id) router.push(`/customer-support/${submission.value.id}/edit`)
+}
+
+onMounted(() => {
+  load()
+})
+</script>
+
+<template>
+  <div class="min-h-[calc(100vh-4rem)] bg-white p-0">
+    <div class="w-full">
+      <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
+        <!-- Heading + breadcrumbs + Edit button -->
+        <div class="px-4 py-4 sm:px-5">
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <div class="flex flex-wrap items-baseline gap-2">
+              <h1 class="text-xl font-semibold text-gray-900">Customer Support Request Details</h1>
+              <Breadcrumbs />
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                class="rounded bg-green-500 px-4 py-2 text-sm font-medium text-white hover:bg-green-600"
+                :disabled="!submission?.id"
+                @click="goToEdit"
+              >
+                Edit Customer Support Request
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="border-t border-gray-200" />
+
+        <div v-if="loading" class="flex justify-center px-4 py-16 sm:px-5">
+          <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        </div>
+
+        <div v-else-if="!submission" class="px-4 py-8 text-center text-gray-500 sm:px-5">
+          Unable to load request. You may not have permission to view it.
+        </div>
+
+        <div v-else class="px-4 py-5 sm:px-5">
+          <!-- Request information (from form) -->
+          <section class="mb-6">
+            <h2 class="mb-3 text-sm font-semibold text-gray-900">Request Information</h2>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div>
+                <label class="block text-xs font-medium text-gray-500">Submission Date</label>
+                <div class="mt-1 text-sm font-medium text-gray-800">{{ formatDateTime(submission.submitted_at) }}</div>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-500">Status</label>
+                <div class="mt-1 text-sm font-medium text-gray-800">{{ formatStatus(submission.status) }}</div>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-500">Issue Category</label>
+                <div class="mt-1 text-sm font-medium text-gray-800">{{ displayVal(submission.issue_category) }}</div>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-500">Company Name</label>
+                <div class="mt-1 text-sm font-medium text-gray-800">{{ displayVal(submission.company_name) }}</div>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-500">Account Number</label>
+                <div class="mt-1 text-sm font-medium text-gray-800">{{ displayVal(submission.account_number) }}</div>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-500">Contact Number</label>
+                <div class="mt-1 text-sm font-medium text-gray-800">{{ displayVal(submission.contact_number) }}</div>
+              </div>
+            </div>
+
+            <!-- Issue Description (professional card) -->
+            <div class="mt-5">
+              <label class="block text-xs font-medium uppercase tracking-wide text-gray-500">Issue Description</label>
+              <div class="mt-2 rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm">
+                <p class="text-sm leading-relaxed text-gray-800 whitespace-pre-wrap">{{ displayVal(submission.issue_description) }}</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- Attachments (card layout with download) -->
+          <section v-if="submission.attachments?.length" class="mb-6">
+            <h2 class="mb-2 text-base font-semibold text-gray-900">Attachments</h2>
+            <div class="border-b border-gray-200 pb-3" />
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div
+                v-for="(att, idx) in submission.attachments"
+                :key="idx"
+                class="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+              >
+                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-red-50 text-red-600">
+                  <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-sm font-medium text-gray-900">{{ attachmentDisplayName(att) }}</p>
+                  <p v-if="att.file_size" class="mt-0.5 text-xs text-gray-500">{{ att.file_size }}</p>
+                </div>
+                <button
+                  type="button"
+                  class="shrink-0 rounded p-2 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                  :title="'Download ' + attachmentDisplayName(att)"
+                  @click="downloadAttachment(idx)"
+                >
+                  <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <!-- Team assignment (Manager, Team Leader, Sales Agent) -->
+          <section class="mb-6">
+            <h2 class="mb-3 text-sm font-semibold text-gray-900">Team Assignment</h2>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div>
+                <label class="block text-xs font-medium text-gray-500">Manager</label>
+                <div class="mt-1 text-sm font-medium text-gray-800">{{ displayVal(submission.manager_name) }}</div>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-500">Team Leader</label>
+                <div class="mt-1 text-sm font-medium text-gray-800">{{ displayVal(submission.team_leader_name) }}</div>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-500">Sales Agent</label>
+                <div class="mt-1 text-sm font-medium text-gray-800">{{ displayVal(submission.sales_agent_name) }}</div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Created by (CSR / submitted by) -->
+          <section class="mb-6">
+            <h2 class="mb-3 text-sm font-semibold text-gray-900">Created By</h2>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div>
+                <label class="block text-xs font-medium text-gray-500">Created By</label>
+                <div class="mt-1 text-sm font-medium text-gray-800">{{ displayVal(submission.creator_name) }}</div>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-500">Created At</label>
+                <div class="mt-1 text-sm font-medium text-gray-800">{{ formatDateTime(submission.created_at) }}</div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Back button at bottom -->
+          <div class="flex w-full justify-end border-t border-gray-200 pt-4">
+            <button
+              type="button"
+              class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+              @click="goBack"
+            >
+              Back
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>

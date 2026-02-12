@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 class CustomerSupportApiController extends Controller
 {
@@ -107,6 +108,30 @@ class CustomerSupportApiController extends Controller
                 'total' => $total,
             ],
         ]);
+    }
+
+    public function show(CustomerSupportSubmission $customerSupportSubmission): JsonResponse
+    {
+        $this->authorize('view', $customerSupportSubmission);
+
+        $customerSupportSubmission->load(['manager:id,name', 'teamLeader:id,name', 'salesAgent:id,name', 'creator:id,name', 'creator.roles:id,name']);
+        $row = $customerSupportSubmission->toArray();
+        $row['manager_id'] = $customerSupportSubmission->manager_id;
+        $row['team_leader_id'] = $customerSupportSubmission->team_leader_id;
+        $row['sales_agent_id'] = $customerSupportSubmission->sales_agent_id;
+        $row['manager_name'] = $customerSupportSubmission->manager?->name;
+        $row['team_leader_name'] = $customerSupportSubmission->teamLeader?->name;
+        $row['sales_agent_name'] = $customerSupportSubmission->salesAgent?->name;
+        $row['creator_name'] = $customerSupportSubmission->creator?->name;
+        $firstRole = $customerSupportSubmission->creator?->roles->first();
+        $row['creator_role'] = $firstRole
+            ? ucfirst(str_replace('_', ' ', $firstRole->name))
+            : 'Customer Support Representative';
+        $row['submitted_at'] = $customerSupportSubmission->submitted_at?->toIso8601String();
+        $row['created_at'] = $customerSupportSubmission->created_at?->toIso8601String();
+        $row['completion_date'] = $customerSupportSubmission->completion_date?->format('Y-m-d');
+
+        return response()->json($row);
     }
 
     private function resolveColumns($user, ?array $requestColumns): array
@@ -342,32 +367,51 @@ class CustomerSupportApiController extends Controller
 
         $categories = CustomerSupportController::issueCategories();
         $rules = [
-            'issue_category' => ['sometimes', 'string', Rule::in($categories)],
-            'company_name' => ['sometimes', 'string', 'max:255'],
+            'issue_category' => ['required', 'string', Rule::in($categories)],
+            'company_name' => ['required', 'string', 'max:255'],
             'account_number' => ['sometimes', 'nullable', 'string', 'max:100'],
-            'contact_number' => ['sometimes', 'string', 'max:50'],
-            'issue_description' => ['sometimes', 'string', 'max:5000'],
-            'manager_id' => ['sometimes', 'nullable', 'exists:users,id'],
-            'team_leader_id' => ['sometimes', 'nullable', 'exists:users,id'],
-            'sales_agent_id' => ['sometimes', 'nullable', 'exists:users,id'],
+            'contact_number' => ['required', 'string', 'max:50'],
+            'issue_description' => ['required', 'string', 'max:5000'],
+            'manager_id' => ['required', 'integer', 'min:1', 'exists:users,id'],
+            'team_leader_id' => ['required', 'integer', 'min:1', 'exists:users,id'],
+            'sales_agent_id' => ['required', 'integer', 'min:1', 'exists:users,id'],
             'status' => ['sometimes', 'string', Rule::in(CustomerSupportSubmission::STATUSES)],
+            'ticket_number' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'csr_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'workflow_status' => ['sometimes', 'nullable', 'string', Rule::in(CustomerSupportSubmission::WORKFLOW_STATUSES)],
+            'completion_date' => ['sometimes', 'nullable', 'date'],
+            'trouble_ticket' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'activity' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'pending' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'resolution_remarks' => ['sometimes', 'nullable', 'string', 'max:5000'],
+            'internal_remarks' => ['sometimes', 'nullable', 'string', 'max:5000'],
+        ];
+        $messages = [
+            'issue_category.required' => 'Please select an issue category.',
+            'company_name.required' => 'Company name is required.',
+            'contact_number.required' => 'Contact number is required.',
+            'issue_description.required' => 'Issue description is required.',
+            'manager_id.required' => 'Please select a manager.',
+            'manager_id.min' => 'Please select a manager.',
+            'team_leader_id.required' => 'Please select a team leader.',
+            'team_leader_id.min' => 'Please select a team leader.',
+            'sales_agent_id.required' => 'Please select a sales agent.',
+            'sales_agent_id.min' => 'Please select a sales agent.',
         ];
 
-        $data = $request->validate($rules);
+        $data = $request->validate($rules, $messages);
         if (! empty($data)) {
-            $oldValues = [];
-            foreach (array_keys($data) as $key) {
-                $val = $customerSupportSubmission->getAttribute($key);
-                $oldValues[$key] = $val === null || $val === '' ? null : (is_object($val) ? json_encode($val) : (string) $val);
+            if (isset($data['status']) && $data['status'] === 'submitted' && ! $customerSupportSubmission->submitted_at) {
+                $data['submitted_at'] = now();
             }
-            $customerSupportSubmission->update($data);
-            $userId = $request->user()?->id;
-            foreach ($data as $key => $newVal) {
-                $newStr = $newVal === null || $newVal === '' ? null : (is_object($newVal) ? json_encode($newVal) : (string) $newVal);
-                if (($oldValues[$key] ?? null) !== $newStr) {
-                    $this->logChange($customerSupportSubmission->id, $key, $oldValues[$key] ?? null, $newStr, $userId);
+            // Do not set manager_id, team_leader_id, sales_agent_id to null (columns are NOT NULL)
+            foreach (['manager_id', 'team_leader_id', 'sales_agent_id'] as $key) {
+                if (array_key_exists($key, $data) && $data[$key] === null) {
+                    unset($data[$key]);
                 }
             }
+            $customerSupportSubmission->update($data);
+            // Update history is tracked by CustomerSupportSubmissionObserver -> customer_support_submission_audits
         }
 
         $customerSupportSubmission->load(['manager:id,name', 'teamLeader:id,name', 'salesAgent:id,name', 'creator:id,name']);
@@ -382,6 +426,116 @@ class CustomerSupportApiController extends Controller
             'id' => $customerSupportSubmission->id,
             'message' => 'Updated.',
             'row' => $row,
+        ]);
+    }
+
+    /**
+     * GET edit form options: issue categories, workflow statuses, pending options.
+     */
+    public function editOptions(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', CustomerSupportSubmission::class);
+
+        return response()->json([
+            'issue_categories' => CustomerSupportController::issueCategories(),
+            'workflow_statuses' => array_map(fn ($v) => ['value' => $v, 'label' => ucfirst(str_replace('_', ' ', $v))], CustomerSupportSubmission::WORKFLOW_STATUSES),
+            'pending_options' => array_map(fn ($v) => ['value' => $v, 'label' => $v], CustomerSupportSubmission::PENDING_OPTIONS),
+        ]);
+    }
+
+    /**
+     * GET change history for a customer support submission.
+     */
+    public function audits(Request $request, CustomerSupportSubmission $customerSupportSubmission): JsonResponse
+    {
+        $this->authorize('view', $customerSupportSubmission);
+
+        $rows = CustomerSupportSubmissionAudit::query()
+            ->where('customer_support_submission_id', $customerSupportSubmission->id)
+            ->with('changedByUser:id,name')
+            ->orderByDesc('changed_at')
+            ->orderByDesc('id')
+            ->limit(500)
+            ->get();
+
+        $data = $rows->map(function (CustomerSupportSubmissionAudit $audit) {
+            return [
+                'id' => $audit->id,
+                'field_name' => $audit->field_name,
+                'old_value' => $audit->old_value,
+                'new_value' => $audit->new_value,
+                'changed_at' => $audit->changed_at?->toIso8601String(),
+                'changed_by' => $audit->changed_by,
+                'changed_by_name' => $audit->changedByUser?->name ?? '—',
+            ];
+        });
+
+        return response()->json(['data' => $data]);
+    }
+
+    /**
+     * POST add attachments to an existing submission. Accepts multipart with files (documents[] or document_1, document_2, ...).
+     */
+    public function addAttachments(Request $request, CustomerSupportSubmission $customerSupportSubmission): JsonResponse
+    {
+        $this->authorize('update', $customerSupportSubmission);
+
+        $files = $request->allFiles();
+        $newEntries = [];
+        $dir = 'customer-support/' . $customerSupportSubmission->id;
+
+        foreach ($files as $key => $uploaded) {
+            if (is_array($uploaded)) {
+                foreach ($uploaded as $f) {
+                    if ($f && $f->isValid()) {
+                        $path = $f->store($dir, 'public');
+                        $newEntries[] = ['path' => $path, 'file_name' => $f->getClientOriginalName()];
+                    }
+                }
+            } elseif ($uploaded && $uploaded->isValid()) {
+                $path = $uploaded->store($dir, 'public');
+                $newEntries[] = ['path' => $path, 'file_name' => $uploaded->getClientOriginalName()];
+            }
+        }
+
+        if (count($newEntries) > 0) {
+            $current = $customerSupportSubmission->attachments ?? [];
+            $customerSupportSubmission->update(['attachments' => array_merge($current, $newEntries)]);
+        }
+
+        return response()->json([
+            'message' => count($newEntries) . ' file(s) added.',
+            'attachments' => $customerSupportSubmission->fresh()->attachments,
+        ]);
+    }
+
+    /**
+     * Download an attachment by index (0 or 1). Returns file stream or 404.
+     */
+    public function downloadAttachment(CustomerSupportSubmission $customerSupportSubmission, int $index): Response|JsonResponse
+    {
+        $this->authorize('view', $customerSupportSubmission);
+
+        $attachments = $customerSupportSubmission->attachments;
+        if (! is_array($attachments) || ! isset($attachments[$index])) {
+            return response()->json(['message' => 'Attachment not found.'], 404);
+        }
+
+        $att = $attachments[$index];
+        $path = $att['path'] ?? null;
+        if (! $path || ! is_string($path)) {
+            return response()->json(['message' => 'Attachment file not found.'], 404);
+        }
+
+        $fullPath = Storage::disk('public')->path($path);
+        if (! is_file($fullPath)) {
+            return response()->json(['message' => 'File not found on disk.'], 404);
+        }
+
+        $filename = $att['file_name'] ?? $att['original_name'] ?? basename($path);
+
+        return response()->file($fullPath, [
+            'Content-Disposition' => 'attachment; filename="' . addslashes($filename) . '"',
         ]);
     }
 }

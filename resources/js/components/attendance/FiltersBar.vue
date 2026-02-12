@@ -1,6 +1,7 @@
 <script setup>
 /**
- * Attendance Log filters bar – Employee, Role, Date range, Status, Apply, Reset; slot for Advanced Filters + Customize Columns.
+ * Attendance Log filters bar – Employee, Role only; Apply, Reset; slot for Advanced Filters + Customize Columns.
+ * From, To, Status are in Advanced Filters (see AttendanceLogPage).
  */
 defineProps({
   filters: { type: Object, required: true },
@@ -36,37 +37,6 @@ const emit = defineEmits(['apply', 'reset'])
       >
         <option value="">All</option>
         <option v-for="r in filterOptions.roles" :key="r.value" :value="r.value">{{ r.label }}</option>
-      </select>
-    </div>
-    <div>
-      <label class="block text-xs font-medium text-gray-600">From</label>
-      <input
-        v-model="filters.from"
-        type="date"
-        class="mt-0.5 rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-        :disabled="loading"
-      />
-    </div>
-    <div>
-      <label class="block text-xs font-medium text-gray-600">To</label>
-      <input
-        v-model="filters.to"
-        type="date"
-        class="mt-0.5 rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-        :disabled="loading"
-      />
-    </div>
-    <div>
-      <label class="block text-xs font-medium text-gray-600">Status</label>
-      <select
-        v-model="filters.status"
-        class="mt-0.5 min-w-[140px] rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
-        :disabled="loading"
-      >
-        <option value="">All</option>
-        <option value="logged_in">Logged In</option>
-        <option value="logged_out">Logged Out</option>
-        <option value="missing_logout">Missing Logout</option>
       </select>
     </div>
     <div class="flex flex-wrap items-center gap-2">

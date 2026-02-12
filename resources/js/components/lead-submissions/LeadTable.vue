@@ -495,7 +495,6 @@ function statusBadgeClass(status) {
                   class="w-full min-w-[160px] max-w-[220px] rounded border border-gray-300 bg-white px-3 py-1.5 pr-8 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
                   @keydown.enter="saveInlineEdit"
                   @keydown.esc="cancelInlineEdit"
-                  @blur="saveInlineEdit"
                 />
                 <div class="flex gap-1">
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>

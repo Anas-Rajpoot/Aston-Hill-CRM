@@ -64,6 +64,8 @@ Route::get('/field-submissions', $spa);
 Route::get('/field-submissions/{id}/edit', $spa)->whereNumber('id');
 Route::get('/field-submissions/{id}', $spa)->whereNumber('id');
 Route::get('/customer-support', $spa);
+Route::get('/customer-support/{id}/edit', $spa)->whereNumber('id');
+Route::get('/customer-support/{id}', $spa)->whereNumber('id');
 Route::get('/vas-requests', $spa);
 Route::get('/vas-requests/{id}/edit', $spa)->whereNumber('id');
 Route::get('/vas-requests/{id}', $spa)->whereNumber('id');

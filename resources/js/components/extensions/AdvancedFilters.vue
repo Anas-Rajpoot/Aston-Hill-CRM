@@ -1,8 +1,7 @@
 <script setup>
 /**
- * Advanced filters for Cisco Extensions: Extension, Landline, Gateway, Assigned To,
- * Status (dropdown), Usage (dropdown), Created Date From/To. No title bar – visibility toggled by parent "Advanced Filters" button.
- * Dates: dd-mm-yyyy.
+ * Advanced filters for Cisco Extensions: Extension, Landline Number, Gateway, User Name, Assigned To,
+ * Manager, Team Leader, Status, Usage, Created Date From/To. Dates: dd-mm-yyyy.
  */
 import { computed } from 'vue'
 import { toDdMmYyyy, fromDdMmYyyy } from '@/lib/dateFormat'
@@ -43,6 +42,10 @@ const createdToDisplay = computed({
     leave-to-class="opacity-0 -translate-y-2"
   >
     <div v-show="visible" class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div class="border-b border-gray-100 bg-gray-50 px-4 py-2">
+        <p class="text-xs font-medium text-gray-600">All filters</p>
+        <p class="text-xs text-gray-500">Extension, Landline Number, Gateway, User Name, Assigned To, Manager, Team Leader, Status, Usage, Created Date From/To</p>
+      </div>
       <div class="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Extension</label>
@@ -76,6 +79,16 @@ const createdToDisplay = computed({
           </select>
         </div>
         <div>
+          <label class="mb-1 block text-xs font-medium text-gray-600">User Name</label>
+          <input
+            v-model="filters.username"
+            type="text"
+            placeholder="Search user name..."
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            :disabled="loading"
+          />
+        </div>
+        <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Assigned To</label>
           <input
             v-model="filters.assigned_to_q"
@@ -85,9 +98,26 @@ const createdToDisplay = computed({
             :disabled="loading"
           />
         </div>
-      </div>
-
-      <div class="grid grid-cols-1 gap-4 border-t border-gray-100 px-4 pb-4 pt-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <label class="mb-1 block text-xs font-medium text-gray-600">Manager</label>
+          <input
+            v-model="filters.manager_q"
+            type="text"
+            placeholder="Search manager..."
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            :disabled="loading"
+          />
+        </div>
+        <div>
+          <label class="mb-1 block text-xs font-medium text-gray-600">Team Leader</label>
+          <input
+            v-model="filters.team_leader_q"
+            type="text"
+            placeholder="Search team leader..."
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            :disabled="loading"
+          />
+        </div>
         <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Status</label>
           <select
@@ -99,6 +129,9 @@ const createdToDisplay = computed({
             <option v-for="s in filterOptions.statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
           </select>
         </div>
+      </div>
+
+      <div class="grid grid-cols-1 gap-4 border-t border-gray-100 px-4 pb-4 pt-2 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Usage</label>
           <select

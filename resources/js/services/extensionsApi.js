@@ -9,6 +9,10 @@ export default {
     return api.get('/cisco-extensions/filters')
   },
 
+  summary() {
+    return api.get('/cisco-extensions/summary')
+  },
+
   columns() {
     return api.get('/cisco-extensions/columns')
   },

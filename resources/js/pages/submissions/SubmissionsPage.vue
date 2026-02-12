@@ -35,7 +35,7 @@ const tabs = [
   { key: 'field', label: 'Field Submissions' },
   { key: 'support', label: 'Customer Support' },
   { key: 'vas', label: 'VAS Requests' },
-  { key: 'new', label: 'New Submission' },
+  { key: 'new', label: 'Special Request' },
 ]
 
 onMounted(() => {
@@ -57,8 +57,8 @@ function onLeadNewSubmission() {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] py-6 px-4 sm:px-6">
-    <div class="max-w-6xl mx-auto space-y-6">
+  <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] py-6">
+    <div class="w-full space-y-6">
       <div class="flex flex-wrap items-baseline gap-2">
         <h1 class="text-xl font-semibold text-gray-900 leading-tight">Submissions</h1>
         <Breadcrumbs />

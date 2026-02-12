@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import usersApi from '@/services/usersApi'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import { toDdMmYyyy } from '@/lib/dateFormat'
 
 const router = useRouter()
 const route = useRoute()
@@ -50,18 +51,18 @@ const statusBadgeClass = (status) => {
 
 const formatDate = (d) => {
   if (!d) return '-'
-  return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  const str = typeof d === 'string' ? d.trim().slice(0, 10) : ''
+  if (!str) return '-'
+  return toDdMmYyyy(str) || '-'
 }
 
 const formatDateTime = (d) => {
   if (!d) return '-'
-  return new Date(d).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  const date = new Date(d)
+  if (Number.isNaN(date.getTime())) return '-'
+  const dateStr = date.toISOString().slice(0, 10)
+  const timeStr = date.toTimeString().slice(0, 5)
+  return `${toDdMmYyyy(dateStr) || ''} ${timeStr}`.trim() || '-'
 }
 
 const getInitials = (name) => {

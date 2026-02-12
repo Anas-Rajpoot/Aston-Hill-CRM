@@ -360,7 +360,7 @@ onMounted(() => {
 
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] p-0">
-    <div class="mx-auto max-w-5xl px-2 sm:px-4">
+    <div class="w-full">
       <!-- Header + Breadcrumb: background and border -->
       <div class="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
         <div class="flex flex-wrap items-center justify-between gap-4">

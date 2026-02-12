@@ -19,7 +19,7 @@ class ExtensionsApiController extends Controller
 
     private const ALLOWED_COLUMNS = [
         'id', 'extension', 'landline_number', 'gateway', 'username', 'password',
-        'status', 'team_leader', 'manager', 'usage', 'assigned_to_name', 'updated_at',
+        'status', 'team_leader', 'manager', 'usage', 'assigned_to_name', 'comment', 'updated_at',
     ];
 
     public function __construct()
@@ -41,7 +41,10 @@ class ExtensionsApiController extends Controller
             'extension' => ['sometimes', 'nullable', 'string', 'max:100'],
             'landline_number' => ['sometimes', 'nullable', 'string', 'max:100'],
             'gateway' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'username' => ['sometimes', 'nullable', 'string', 'max:100'],
             'assigned_to_q' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'manager_q' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'team_leader_q' => ['sometimes', 'nullable', 'string', 'max:200'],
             'status' => ['sometimes', 'nullable', 'array'],
             'status.*' => ['string', Rule::in(CiscoExtension::STATUSES)],
             'usage' => ['sometimes', 'nullable', 'array'],
@@ -57,7 +60,12 @@ class ExtensionsApiController extends Controller
         $sort = $validated['sort'] ?? config('modules.cisco_extensions.default_sort.0', 'extension');
         $order = $validated['order'] ?? config('modules.cisco_extensions.default_sort.1', 'asc');
 
-        $query = CiscoExtension::query()->with(['assignedToUser:id,name', 'teamLeader:id,name', 'manager:id,name']);
+        $query = CiscoExtension::query()->with([
+            'assignedToUser:id,name,team_leader_id,manager_id',
+            'assignedToUser.teamLeader:id,name',
+            'assignedToUser.manager:id,name',
+            'assignedToUser.roles',
+        ]);
         $this->applyFilters($query, $validated);
         $total = $query->count();
 
@@ -107,9 +115,21 @@ class ExtensionsApiController extends Controller
         if (! empty($validated['gateway'])) {
             $query->where('gateway', $validated['gateway']);
         }
+        if (! empty($validated['username'])) {
+            $term = '%' . addcslashes($validated['username'], '%_\\') . '%';
+            $query->where('username', 'like', $term);
+        }
         if (! empty($validated['assigned_to_q'])) {
             $term = '%' . addcslashes($validated['assigned_to_q'], '%_\\') . '%';
             $query->whereHas('assignedToUser', fn ($q) => $q->where('name', 'like', $term));
+        }
+        if (! empty($validated['manager_q'])) {
+            $term = '%' . addcslashes($validated['manager_q'], '%_\\') . '%';
+            $query->whereHas('assignedToUser.manager', fn ($q) => $q->where('name', 'like', $term));
+        }
+        if (! empty($validated['team_leader_q'])) {
+            $term = '%' . addcslashes($validated['team_leader_q'], '%_\\') . '%';
+            $query->whereHas('assignedToUser.teamLeader', fn ($q) => $q->where('name', 'like', $term));
         }
         if (! empty($validated['status']) && is_array($validated['status'])) {
             $query->whereIn('status', $validated['status']);
@@ -135,10 +155,11 @@ class ExtensionsApiController extends Controller
     {
         $direction = strtolower($order) === 'asc' ? 'asc' : 'desc';
         if (in_array($sort, ['team_leader', 'manager'], true)) {
-            $col = $sort === 'manager' ? 'manager_id' : 'team_leader_id';
-            $alias = $sort . '_u';
-            $query->leftJoin("users as {$alias}", 'cisco_extensions.' . $col, '=', "{$alias}.id")
-                ->orderBy("{$alias}.name", $direction)
+            $assignedAlias = 'ext_assigned_u';
+            $relAlias = $sort === 'manager' ? 'ext_mgr_u' : 'ext_tl_u';
+            $query->leftJoin("users as {$assignedAlias}", 'cisco_extensions.assigned_to', '=', "{$assignedAlias}.id")
+                ->leftJoin('users as ' . $relAlias, $assignedAlias . '.' . ($sort === 'manager' ? 'manager_id' : 'team_leader_id'), '=', $relAlias . '.id')
+                ->orderBy($relAlias . '.name', $direction)
                 ->select('cisco_extensions.*');
             return;
         }
@@ -147,6 +168,22 @@ class ExtensionsApiController extends Controller
 
     private function formatRow(CiscoExtension $row, array $columns): array
     {
+        $assigned = $row->assignedToUser;
+        $teamLeaderName = null;
+        $managerName = null;
+        if ($assigned) {
+            if ($assigned->hasRole('manager')) {
+                $teamLeaderName = null;
+                $managerName = null;
+            } elseif ($assigned->hasRole('team_leader')) {
+                $teamLeaderName = null;
+                $managerName = $assigned->manager?->name;
+            } else {
+                $teamLeaderName = $assigned->teamLeader?->name;
+                $managerName = $assigned->manager?->name;
+            }
+        }
+
         $out = [
             'id' => $row->id,
             'extension' => $row->extension,
@@ -155,16 +192,36 @@ class ExtensionsApiController extends Controller
             'username' => $row->username,
             'password' => $row->password ? '********' : null,
             'status' => $row->status,
-            'team_leader' => $row->teamLeader?->name ?? null,
-            'manager' => $row->manager?->name ?? null,
+            'team_leader' => $teamLeaderName,
+            'manager' => $managerName,
             'usage' => $row->assigned_to ? 'assigned' : 'unassigned',
-            'assigned_to_name' => $row->assignedToUser?->name ?? null,
+            'assigned_to_name' => $assigned?->name ?? null,
             'assigned_to' => $row->assigned_to,
             'comment' => $row->comment,
             'updated_at' => $row->updated_at?->format('d-m-Y'),
         ];
         $allowed = array_flip(array_merge($columns, ['id', 'assigned_to']));
         return array_intersect_key($out, $allowed);
+    }
+
+    /**
+     * Summary counts for dashboard cards: total_extensions, assigned, unassigned, active_status.
+     */
+    public function summary(): JsonResponse
+    {
+        $this->authorize('viewAny', CiscoExtension::class);
+
+        $total = CiscoExtension::query()->count();
+        $assigned = CiscoExtension::query()->whereNotNull('assigned_to')->count();
+        $unassigned = CiscoExtension::query()->whereNull('assigned_to')->count();
+        $activeStatus = CiscoExtension::query()->where('status', CiscoExtension::STATUS_ACTIVE)->count();
+
+        return response()->json([
+            'total_extensions' => $total,
+            'assigned' => $assigned,
+            'unassigned' => $unassigned,
+            'active_status' => $activeStatus,
+        ]);
     }
 
     public function filters(): JsonResponse
@@ -404,6 +461,7 @@ class ExtensionsApiController extends Controller
         $this->authorize('update', $ciscoExtension);
 
         $data = $request->validate([
+            'extension' => ['sometimes', 'string', 'max:50', Rule::unique('cisco_extensions', 'extension')->ignore($ciscoExtension->id)],
             'landline_number' => ['sometimes', 'nullable', 'string', 'max:50'],
             'gateway' => ['sometimes', 'nullable', 'string', 'max:100'],
             'username' => ['sometimes', 'nullable', 'string', 'max:100'],
@@ -415,8 +473,9 @@ class ExtensionsApiController extends Controller
             'comment' => ['sometimes', 'nullable', 'string', 'max:2000'],
         ]);
 
+        $relationsForFormat = ['assignedToUser.teamLeader', 'assignedToUser.manager', 'assignedToUser.roles'];
         if (empty($data)) {
-            return response()->json(['message' => 'No changes.', 'data' => $this->formatRow($ciscoExtension->fresh(['assignedToUser', 'teamLeader', 'manager']), self::ALLOWED_COLUMNS)]);
+            return response()->json(['message' => 'No changes.', 'data' => $this->formatRow($ciscoExtension->fresh($relationsForFormat), self::ALLOWED_COLUMNS)]);
         }
 
         $old = $ciscoExtension->only(array_keys($data));
@@ -429,7 +488,7 @@ class ExtensionsApiController extends Controller
         $ciscoExtension->update($data);
         $this->writeAuditLog($ciscoExtension, 'updated', $old, $ciscoExtension->fresh()->only(array_keys($data)));
 
-        return response()->json(['message' => 'Updated.', 'data' => $this->formatRow($ciscoExtension->fresh(['assignedToUser', 'teamLeader', 'manager']), self::ALLOWED_COLUMNS)]);
+        return response()->json(['message' => 'Updated.', 'data' => $this->formatRow($ciscoExtension->fresh($relationsForFormat), self::ALLOWED_COLUMNS)]);
     }
 
     private function writeAuditLog(CiscoExtension $ext, string $action, ?array $oldValues, ?array $newValues): void

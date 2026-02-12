@@ -1,6 +1,6 @@
 <script setup>
 /**
- * Edit Extension modal – design per image: Extension (read-only), Landline, Gateway, Username, Password, Status, Assign To Employee (optional), Comment. Cancel + Update Extension (teal).
+ * Edit Extension modal – same as Add form: Extension, Landline, Gateway, Username, Password, Status, Assign To Employee (optional), Comment. Cancel + Update Extension.
  */
 import { ref, computed, watch } from 'vue'
 import extensionsApi from '@/services/extensionsApi'
@@ -65,15 +65,20 @@ async function loadExtension(id) {
     const ext = data.data
     if (ext) {
       const assignedTo = ext.assigned_to
+      const gateway = String(ext.gateway ?? '')
       form.value = {
         extension: String(ext.extension ?? ''),
         landline_number: String(ext.landline_number ?? ''),
-        gateway: String(ext.gateway ?? ''),
+        gateway,
         username: String(ext.username ?? ''),
         password: '', // never pre-fill; user enters to change
         status: ext.status === 'inactive' ? 'inactive' : (ext.status ?? 'active'),
         assigned_to: assignedTo != null && assignedTo !== '' ? Number(assignedTo) : null,
         comment: String(ext.comment ?? ''),
+      }
+      // Ensure current gateway appears in dropdown
+      if (gateway && !gatewaysList.value.some((g) => g.value === gateway)) {
+        gatewaysList.value = [...gatewaysList.value, { value: gateway, label: gateway }]
       }
     }
   } catch {
@@ -194,8 +199,8 @@ async function submit() {
                 id="edit-ext-extension"
                 v-model="form.extension"
                 type="text"
-                readonly
-                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder="e.g., 1001"
               />
             </div>
 
@@ -207,7 +212,7 @@ async function submit() {
                 id="edit-ext-landline"
                 v-model="form.landline_number"
                 type="text"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
                 placeholder="e.g., +971-4-123-1001"
               />
             </div>
@@ -219,7 +224,7 @@ async function submit() {
               <select
                 id="edit-ext-gateway"
                 v-model="form.gateway"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
               >
                 <option value="">Select Gateway</option>
                 <option v-for="opt in gatewaysList" :key="opt.value" :value="opt.value">
@@ -237,7 +242,7 @@ async function submit() {
                 v-model="form.username"
                 type="text"
                 autocomplete="off"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
                 placeholder="e.g., ext1001"
               />
             </div>
@@ -251,7 +256,7 @@ async function submit() {
                 v-model="form.password"
                 type="password"
                 autocomplete="new-password"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
                 placeholder="Leave blank to keep current"
               />
             </div>
@@ -263,7 +268,7 @@ async function submit() {
               <select
                 id="edit-ext-status"
                 v-model="form.status"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
               >
                 <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">
                   {{ opt.label }}
@@ -278,7 +283,7 @@ async function submit() {
               <select
                 id="edit-ext-assigned"
                 v-model="form.assigned_to"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
               >
                 <option :value="null">Not Assigned</option>
                 <option v-for="emp in assignableEmployees" :key="emp.id" :value="emp.id">
@@ -296,7 +301,7 @@ async function submit() {
                 id="edit-ext-comment"
                 v-model="form.comment"
                 rows="3"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
                 placeholder="Add any notes or comments..."
               />
             </div>
@@ -311,7 +316,7 @@ async function submit() {
               </button>
               <button
                 type="submit"
-                class="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50"
+                class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
                 :disabled="submitting"
               >
                 {{ submitting ? 'Updating...' : 'Update Extension' }}
@@ -320,7 +325,7 @@ async function submit() {
           </form>
 
           <div v-else class="flex items-center justify-center px-6 py-12">
-            <svg class="h-8 w-8 animate-spin text-teal-600" fill="none" viewBox="0 0 24 24">
+            <svg class="h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>

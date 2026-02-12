@@ -8,6 +8,7 @@ import { useRoute, useRouter } from 'vue-router'
 import clientsApi from '@/services/clientsApi'
 import { useAuthStore } from '@/stores/auth'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import { toDdMmYyyy } from '@/lib/dateFormat'
 import ClientTable from '@/components/clients/ClientTable.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import Pagination from '@/components/Pagination.vue'
@@ -81,9 +82,10 @@ function displayVal(val) {
 
 function formatDate(d) {
   if (!d) return '—'
-  const date = new Date(d)
-  if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+  const str = typeof d === 'string' ? d.trim().slice(0, 10) : ''
+  if (!str) return '—'
+  const out = toDdMmYyyy(str)
+  return out || '—'
 }
 
 function statusBadgeClass(status) {

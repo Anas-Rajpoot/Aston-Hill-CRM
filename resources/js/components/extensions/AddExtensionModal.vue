@@ -13,6 +13,20 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'created'])
 
+/** Dummy gateway options when none provided from API/parent */
+const DEFAULT_GATEWAY_OPTIONS = [
+  { value: 'gateway_1', label: 'Gateway 1' },
+  { value: 'gateway_2', label: 'Gateway 2' },
+  { value: 'gateway_3', label: 'Gateway 3' },
+  { value: 'primary_gateway', label: 'Primary Gateway' },
+  { value: 'backup_gateway', label: 'Backup Gateway' },
+]
+
+const gatewayOptions = computed(() => {
+  const list = props.gateways?.length ? props.gateways : []
+  return list.length > 0 ? list : DEFAULT_GATEWAY_OPTIONS
+})
+
 // Only Active and Inactive in dropdown; exclude "Not Created"
 const statusOptions = computed(() => {
   const list = props.statuses?.length ? props.statuses : [
@@ -195,7 +209,7 @@ async function submit() {
                 class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
               >
                 <option value="">Select Gateway</option>
-                <option v-for="opt in gateways" :key="opt.value" :value="opt.value">
+                <option v-for="opt in gatewayOptions" :key="opt.value" :value="opt.value">
                   {{ opt.label }}
                 </option>
               </select>

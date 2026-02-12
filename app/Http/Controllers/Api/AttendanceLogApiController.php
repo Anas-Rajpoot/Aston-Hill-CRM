@@ -104,6 +104,40 @@ class AttendanceLogApiController extends Controller
     }
 
     /**
+     * Summary stats for dashboard cards: total_users, logged_in, logged_out, missing_logout.
+     */
+    public function summary(Request $request): JsonResponse
+    {
+        $this->authorizeView();
+
+        $todayStart = now()->startOfDay();
+
+        $totalUsers = User::query()->where('status', 'approved')->count();
+
+        $loggedIn = UserLoginLog::query()
+            ->whereNull('logout_at')
+            ->where('login_at', '>=', $todayStart)
+            ->count();
+
+        $loggedOut = UserLoginLog::query()
+            ->whereNotNull('logout_at')
+            ->where('login_at', '>=', $todayStart)
+            ->count();
+
+        $missingLogout = UserLoginLog::query()
+            ->whereNull('logout_at')
+            ->where('login_at', '<', $todayStart)
+            ->count();
+
+        return response()->json([
+            'total_users' => $totalUsers,
+            'logged_in' => $loggedIn,
+            'logged_out' => $loggedOut,
+            'missing_logout' => $missingLogout,
+        ]);
+    }
+
+    /**
      * Filters for dropdowns: users, roles.
      */
     public function filters(Request $request): JsonResponse

@@ -23,6 +23,20 @@ export default {
     return data
   },
 
+  async importCsv(file) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const { data } = await api.post('/clients/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return data
+  },
+
+  async store(payload) {
+    const { data } = await api.post('/clients', payload)
+    return data
+  },
+
   async show(id) {
     const { data } = await api.get(`/clients/${id}`)
     return data

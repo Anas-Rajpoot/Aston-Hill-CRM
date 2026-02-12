@@ -395,8 +395,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-white py-6 px-4 sm:px-6">
-    <div class="mx-auto max-w-7xl space-y-4">
+  <div class="min-h-[calc(100vh-4rem)] bg-white py-3">
+    <div class="w-full space-y-3">
       <!-- Top: breadcrumbs + title (left), Bulk Assign + Export (right) -->
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div class="flex flex-wrap items-baseline gap-2">
@@ -520,7 +520,7 @@ onMounted(() => {
           @assign-technician="onOpenAssignTechnician"
         />
         <div
-          class="flex flex-wrap items-center gap-4 border-t border-black bg-white px-4 py-3"
+          class="flex flex-wrap items-center gap-3 border-t border-black bg-white px-3 py-2"
           :class="meta.last_page > 1 ? 'justify-between' : 'justify-start'"
         >
           <p class="text-sm text-gray-600">

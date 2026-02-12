@@ -163,7 +163,7 @@ class UserController extends Controller
         $idsToDeactivate = $ids->diff($superAdminIds)->values()->all();
         $count = User::whereIn('id', $idsToDeactivate)
             ->update(['status' => 'rejected', 'rejected_by' => auth()->id(), 'rejected_at' => now()]);
-        User::whereIn('id', $idsToDeactivate)->each(fn ($u) => $u->syncRoles([]));
+        // Roles are preserved on deactivation; only super admin / authorized user can change roles explicitly.
         app(PermissionRegistrar::class)->forgetCachedPermissions();
         return response()->json(['message' => "{$count} user(s) deactivated.", 'count' => $count]);
     }

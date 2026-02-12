@@ -13,6 +13,7 @@ use App\Models\UserColumnPreference;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
@@ -325,6 +326,257 @@ class ClientApiController extends Controller
         Cache::forget("col_pref_{$request->user()->id}_" . self::MODULE);
 
         return response()->json(['success' => true]);
+    }
+
+    public function importCsv(Request $request): JsonResponse
+    {
+        $this->authorize('create', Client::class);
+
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:csv,txt', 'max:10240'],
+        ]);
+
+        $file = $request->file('file');
+        $handle = fopen($file->getRealPath(), 'r');
+        if ($handle === false) {
+            return response()->json(['message' => 'Could not read file.'], 422);
+        }
+
+        $header = fgetcsv($handle);
+        if ($header === false || empty($header)) {
+            fclose($handle);
+            return response()->json(['message' => 'CSV file is empty or invalid.'], 422);
+        }
+
+        $header = array_map('trim', $header);
+        $map = array_flip($header);
+        $created = 0;
+        $errors = [];
+
+        while (($row = fgetcsv($handle)) !== false) {
+            if (count($row) !== count($header)) {
+                $row = array_pad($row, count($header), '');
+            }
+            $data = array_combine($header, $row);
+            if ($data === false) {
+                continue;
+            }
+            $companyName = trim($data['company_name'] ?? $data['Company Name'] ?? '');
+            if ($companyName === '') {
+                continue;
+            }
+            $payload = [
+                'company_name' => $companyName,
+                'account_number' => trim($data['account_number'] ?? $data['Account Number'] ?? ''),
+                'status' => in_array(trim($data['status'] ?? ''), Client::STATUSES, true)
+                    ? trim($data['status'])
+                    : 'pending',
+            ];
+            $payload['created_by'] = $request->user()->id;
+            $payload['submitted_at'] = now();
+            try {
+                Client::create($payload);
+                $created++;
+            } catch (\Throwable $e) {
+                $errors[] = "Row {$companyName}: " . $e->getMessage();
+            }
+        }
+        fclose($handle);
+
+        return response()->json([
+            'message' => "Imported {$created} client(s).",
+            'created' => $created,
+            'errors' => array_slice($errors, 0, 10),
+        ]);
+    }
+
+    /**
+     * Create a new client with company detail, contacts, and addresses.
+     */
+    public function store(Request $request): JsonResponse
+    {
+        $this->authorize('create', Client::class);
+
+        $validated = $request->validate([
+            'company_name' => ['required', 'string', 'max:200'],
+            'account_number' => ['nullable', 'string', 'max:100', Rule::unique('clients', 'account_number')],
+            'submitted_at' => ['sometimes', 'nullable', 'date'],
+            'manager_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'team_leader_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'sales_agent_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'status' => ['sometimes', 'string', Rule::in(Client::STATUSES)],
+            'service_type' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'product_type' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'address' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'product_name' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'mrc' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'quantity' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'other' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'migration_numbers' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'fiber' => ['sometimes', 'nullable', 'string', 'max:20'],
+            'order_number' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'wo_number' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'completion_date' => ['sometimes', 'nullable', 'date'],
+            'payment_connection' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'contract_type' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'contract_end_date' => ['sometimes', 'nullable', 'date'],
+            'renewal_alert' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'additional_notes' => ['sometimes', 'nullable', 'string'],
+            'csr_name_1' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'csr_name_2' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'csr_name_3' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'company_detail' => ['sometimes', 'array'],
+            'company_detail.trade_license_issuing_authority' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'company_detail.company_category' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'company_detail.trade_license_number' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'company_detail.trade_license_expiry_date' => ['sometimes', 'nullable', 'date'],
+            'company_detail.establishment_card_number' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'company_detail.establishment_card_expiry_date' => ['sometimes', 'nullable', 'date'],
+            'company_detail.account_taken_from' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'company_detail.account_mapping_date' => ['sometimes', 'nullable', 'date'],
+            'company_detail.account_transfer_given_to' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'company_detail.account_transfer_given_date' => ['sometimes', 'nullable', 'date'],
+            'company_detail.account_manager_name' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'company_detail.csr_name_1' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'company_detail.csr_name_2' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'company_detail.csr_name_3' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'company_detail.first_bill' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'company_detail.second_bill' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'company_detail.third_bill' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'company_detail.fourth_bill' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'company_detail.additional_comment_1' => ['sometimes', 'nullable', 'string'],
+            'company_detail.additional_comment_2' => ['sometimes', 'nullable', 'string'],
+            'contacts' => ['sometimes', 'array', 'max:10'],
+            'contacts.*.name' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'contacts.*.designation' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'contacts.*.contact_number' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'contacts.*.alternate_number' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'contacts.*.email' => ['sometimes', 'nullable', 'email', 'max:255'],
+            'contacts.*.as_updated_or_not' => ['sometimes', 'nullable', 'string', 'max:20'],
+            'contacts.*.as_expiry_date' => ['sometimes', 'nullable', 'date'],
+            'contacts.*.additional_note' => ['sometimes', 'nullable', 'string'],
+            'addresses' => ['sometimes', 'array', 'max:5'],
+            'addresses.*.full_address' => ['sometimes', 'nullable', 'string'],
+            'addresses.*.unit' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'addresses.*.building' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'addresses.*.area' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'addresses.*.emirates' => ['sometimes', 'nullable', 'string', 'max:100'],
+        ]);
+
+        $user = $request->user();
+
+        $clientData = [
+            'company_name' => $validated['company_name'],
+            'account_number' => ! empty(trim((string) ($validated['account_number'] ?? ''))) ? trim($validated['account_number']) : null,
+            'submitted_at' => isset($validated['submitted_at']) ? $validated['submitted_at'] : now(),
+            'manager_id' => $validated['manager_id'] ?? null,
+            'team_leader_id' => $validated['team_leader_id'] ?? null,
+            'sales_agent_id' => $validated['sales_agent_id'] ?? null,
+            'status' => $validated['status'] ?? 'pending',
+            'created_by' => $user->id,
+        ];
+        $clientFields = ['service_type', 'product_type', 'address', 'product_name', 'mrc', 'quantity', 'other', 'migration_numbers', 'fiber', 'order_number', 'wo_number', 'completion_date', 'payment_connection', 'contract_type', 'contract_end_date', 'renewal_alert', 'additional_notes', 'csr_name_1', 'csr_name_2', 'csr_name_3'];
+        foreach ($clientFields as $key) {
+            if (array_key_exists($key, $validated)) {
+                $clientData[$key] = $validated[$key];
+            }
+        }
+
+        $client = DB::transaction(function () use ($validated, $clientData, $user) {
+            $client = Client::create($clientData);
+
+            if (! empty($validated['company_detail'])) {
+                $cd = array_merge($validated['company_detail'], ['client_id' => $client->id]);
+                ClientCompanyDetail::create($cd);
+            }
+
+            foreach ($validated['contacts'] ?? [] as $i => $row) {
+                $contactData = collect($row)->filter(fn ($v) => $v !== null && $v !== '')->all();
+                if (empty($contactData)) {
+                    continue;
+                }
+                $contactData['client_id'] = $client->id;
+                $contactData['sort_order'] = $i;
+                ClientContact::create($contactData);
+            }
+
+            foreach ($validated['addresses'] ?? [] as $i => $row) {
+                $addrData = collect($row)->filter(fn ($v) => $v !== null && $v !== '')->all();
+                if (empty($addrData)) {
+                    continue;
+                }
+                $addrData['client_id'] = $client->id;
+                $addrData['sort_order'] = $i;
+                ClientAddress::create($addrData);
+            }
+
+            return $client;
+        });
+
+        $client->load(['manager:id,name', 'teamLeader:id,name', 'salesAgent:id,name', 'companyDetail', 'contacts', 'addresses']);
+
+        return response()->json($this->showPayload($client), 201);
+    }
+
+    private function showPayload(Client $client): array
+    {
+        $companyDetail = $client->companyDetail;
+        return [
+            'id' => $client->id,
+            'company_name' => $client->company_name,
+            'account_number' => $client->account_number,
+            'submitted_at' => $client->submitted_at?->toIso8601String(),
+            'manager_id' => $client->manager_id,
+            'manager' => $client->manager?->name,
+            'team_leader_id' => $client->team_leader_id,
+            'team_leader' => $client->teamLeader?->name,
+            'sales_agent_id' => $client->sales_agent_id,
+            'sales_agent' => $client->salesAgent?->name,
+            'status' => $client->status,
+            'company_detail' => $companyDetail ? [
+                'trade_license_issuing_authority' => $companyDetail->trade_license_issuing_authority,
+                'company_category' => $companyDetail->company_category,
+                'trade_license_number' => $companyDetail->trade_license_number,
+                'trade_license_expiry_date' => $companyDetail->trade_license_expiry_date?->format('Y-m-d'),
+                'establishment_card_number' => $companyDetail->establishment_card_number,
+                'establishment_card_expiry_date' => $companyDetail->establishment_card_expiry_date?->format('Y-m-d'),
+                'account_taken_from' => $companyDetail->account_taken_from,
+                'account_mapping_date' => $companyDetail->account_mapping_date?->format('Y-m-d'),
+                'account_transfer_given_to' => $companyDetail->account_transfer_given_to,
+                'account_transfer_given_date' => $companyDetail->account_transfer_given_date?->format('Y-m-d'),
+                'account_manager_name' => $companyDetail->account_manager_name,
+                'csr_name_1' => $companyDetail->csr_name_1,
+                'csr_name_2' => $companyDetail->csr_name_2,
+                'csr_name_3' => $companyDetail->csr_name_3,
+                'first_bill' => $companyDetail->first_bill,
+                'second_bill' => $companyDetail->second_bill,
+                'third_bill' => $companyDetail->third_bill,
+                'fourth_bill' => $companyDetail->fourth_bill,
+                'additional_comment_1' => $companyDetail->additional_comment_1,
+                'additional_comment_2' => $companyDetail->additional_comment_2,
+            ] : null,
+            'contacts' => $client->contacts->map(fn ($c) => [
+                'id' => $c->id,
+                'sort_order' => $c->sort_order,
+                'name' => $c->name,
+                'designation' => $c->designation,
+                'contact_number' => $c->contact_number,
+                'alternate_number' => $c->alternate_number,
+                'email' => $c->email,
+                'as_updated_or_not' => $c->as_updated_or_not,
+                'as_expiry_date' => $c->as_expiry_date?->format('Y-m-d'),
+                'additional_note' => $c->additional_note,
+            ])->values()->all(),
+            'addresses' => $client->addresses->map(fn ($a) => [
+                'id' => $a->id,
+                'sort_order' => $a->sort_order,
+                'full_address' => $a->full_address,
+                'unit' => $a->unit,
+                'building' => $a->building,
+                'area' => $a->area,
+                'emirates' => $a->emirates,
+            ])->values()->all(),
+        ];
     }
 
     public function show(Client $client): JsonResponse

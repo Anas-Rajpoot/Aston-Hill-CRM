@@ -260,8 +260,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-white py-6 px-4 sm:px-6">
-    <div class="mx-auto max-w-7xl space-y-4">
+  <div class="min-h-[calc(100vh-4rem)] bg-white pt-4">
+    <div class="w-full space-y-4">
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div class="flex flex-wrap items-baseline gap-2">
           <h1 class="text-xl font-semibold text-gray-900 leading-tight">Customer Support Requests</h1>

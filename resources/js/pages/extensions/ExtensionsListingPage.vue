@@ -2,17 +2,21 @@
 /**
  * Cisco Extensions listing – Advanced Filters, sortable table, Import/Export, Add Extension (modal), Customize Columns, Delete.
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import extensionsApi from '@/services/extensionsApi'
 import { useAuthStore } from '@/stores/auth'
 import FiltersBar from '@/components/extensions/AdvancedFilters.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import AddExtensionModal from '@/components/extensions/AddExtensionModal.vue'
 import EditExtensionModal from '@/components/extensions/EditExtensionModal.vue'
+import ViewExtensionModal from '@/components/extensions/ViewExtensionModal.vue'
 import ExtensionsTable from '@/components/extensions/ExtensionsTable.vue'
 import Pagination from '@/components/Pagination.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 
+const route = useRoute()
+const router = useRouter()
 const auth = useAuthStore()
 const permissions = computed(() => auth.user?.permissions ?? [])
 const isSuperAdmin = computed(() => {
@@ -33,7 +37,7 @@ const meta = ref({ current_page: 1, last_page: 1, per_page: 15, total: 0 })
 const allColumns = ref([])
 const visibleColumns = ref([
   'id', 'extension', 'landline_number', 'gateway', 'username', 'password',
-  'status', 'team_leader', 'manager', 'usage', 'assigned_to_name', 'updated_at',
+  'status', 'team_leader', 'manager', 'usage', 'assigned_to_name', 'comment', 'updated_at',
 ])
 const sort = ref('extension')
 const order = ref('asc')
@@ -48,16 +52,27 @@ const deleting = ref(false)
 const addModalVisible = ref(false)
 const editModalVisible = ref(false)
 const editModalExtensionId = ref(null)
+const viewModalVisible = ref(false)
+const viewModalExtensionId = ref(null)
 const assignableEmployees = ref([])
 const historyModalExtension = ref(null)
 const historyAuditLog = ref([])
 const historyLoading = ref(false)
+const summary = ref({
+  total_extensions: 0,
+  assigned: 0,
+  unassigned: 0,
+  active_status: 0,
+})
 
 const filters = ref({
   extension: '',
   landline_number: '',
   gateway: '',
+  username: '',
   assigned_to_q: '',
+  manager_q: '',
+  team_leader_q: '',
   status: '',
   usage: '',
   created_from: '',
@@ -76,7 +91,10 @@ function buildParams() {
   if (f.extension) p.extension = f.extension
   if (f.landline_number) p.landline_number = f.landline_number
   if (f.gateway) p.gateway = f.gateway
+  if (f.username) p.username = f.username
   if (f.assigned_to_q) p.assigned_to_q = f.assigned_to_q
+  if (f.manager_q) p.manager_q = f.manager_q
+  if (f.team_leader_q) p.team_leader_q = f.team_leader_q
   if (f.status) p.status = [f.status]
   if (f.usage) p.usage = [f.usage]
   if (f.created_from) p.created_from = f.created_from
@@ -112,6 +130,21 @@ async function loadFilters() {
   }
 }
 
+async function loadSummary() {
+  try {
+    const { data } = await extensionsApi.summary()
+    const raw = data?.data ?? data
+    summary.value = {
+      total_extensions: raw?.total_extensions ?? 0,
+      assigned: raw?.assigned ?? 0,
+      unassigned: raw?.unassigned ?? 0,
+      active_status: raw?.active_status ?? 0,
+    }
+  } catch {
+    // keep previous summary
+  }
+}
+
 async function loadColumns() {
   try {
     const { data } = await extensionsApi.columns()
@@ -131,7 +164,10 @@ function resetFilters() {
   filters.value.extension = ''
   filters.value.landline_number = ''
   filters.value.gateway = ''
+  filters.value.username = ''
   filters.value.assigned_to_q = ''
+  filters.value.manager_q = ''
+  filters.value.team_leader_q = ''
   filters.value.status = ''
   filters.value.usage = ''
   filters.value.created_from = ''
@@ -212,6 +248,7 @@ async function confirmDelete() {
   try {
     await extensionsApi.destroy(row.id)
     closeDeleteConfirm()
+    loadSummary()
     load()
   } catch {
     //
@@ -234,6 +271,9 @@ async function onUpdateCell(rowId, field, value) {
     const payload = {}
     if (field === 'assigned_to_name') {
       payload.assigned_to = value === '' || value == null ? null : Number(value)
+    } else if (field === 'password') {
+      // Only send password when user entered one; leave blank to keep current
+      if (value !== '' && value != null) payload.password = value
     } else {
       payload[field] = value === '' ? null : value
     }
@@ -246,6 +286,26 @@ async function onUpdateCell(rowId, field, value) {
   } catch {
     load()
   }
+}
+
+function openViewModal(row) {
+  if (row?.id) {
+    viewModalExtensionId.value = row.id
+    viewModalVisible.value = true
+  }
+}
+
+function onViewModalEdit() {
+  const id = viewModalExtensionId.value
+  viewModalVisible.value = false
+  nextTick(() => {
+    if (id) {
+      editModalExtensionId.value = id
+      editModalVisible.value = true
+    }
+    load()
+    loadSummary()
+  })
 }
 
 function openEditModal(row) {
@@ -262,6 +322,7 @@ function closeEditModal() {
 
 function onEditUpdated() {
   closeEditModal()
+  loadSummary()
   load()
 }
 
@@ -288,11 +349,19 @@ async function fetchAuditLog(id) {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   loadFilters()
   loadColumns()
   loadAssignableEmployees()
-  load()
+  loadSummary()
+  await load()
+  const editId = route.query.edit
+  if (editId) {
+    editModalExtensionId.value = Number(editId) || editId
+    editModalVisible.value = true
+    await nextTick()
+    router.replace({ path: '/cisco-extensions', query: {} })
+  }
 })
 </script>
 
@@ -317,7 +386,7 @@ onMounted(() => {
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
             <svg v-else class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
             </svg>
             {{ importLoading ? 'Importing...' : 'Bulk Import' }}
           </button>
@@ -339,7 +408,7 @@ onMounted(() => {
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
             <svg v-else class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
             </svg>
             {{ exportLoading ? 'Exporting...' : 'Export' }}
           </button>
@@ -357,6 +426,54 @@ onMounted(() => {
         </div>
       </div>
 
+      <!-- Summary cards -->
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-gray-500 leading-tight">Total Extensions</p>
+            <p class="mt-0.5 min-h-[2rem] text-2xl font-bold tabular-nums leading-tight text-gray-900">{{ summary.total_extensions }}</p>
+          </div>
+          <div class="ml-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-teal-100 text-teal-600">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+            </svg>
+          </div>
+        </div>
+        <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-gray-500 leading-tight">Assigned</p>
+            <p class="mt-0.5 min-h-[2rem] text-2xl font-bold tabular-nums leading-tight text-green-600">{{ summary.assigned }}</p>
+          </div>
+          <div class="ml-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-100 text-green-600">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+          </div>
+        </div>
+        <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-gray-500 leading-tight">Unassigned</p>
+            <p class="mt-0.5 min-h-[2rem] text-2xl font-bold tabular-nums leading-tight text-orange-600">{{ summary.unassigned }}</p>
+          </div>
+          <div class="ml-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-orange-100 text-orange-600">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+            </svg>
+          </div>
+        </div>
+        <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-gray-500 leading-tight">Active Status</p>
+            <p class="mt-0.5 min-h-[2rem] text-2xl font-bold tabular-nums leading-tight text-blue-600">{{ summary.active_status }}</p>
+          </div>
+          <div class="ml-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+        </div>
+      </div>
+
       <div
         v-if="loadError"
         class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
@@ -371,6 +488,75 @@ onMounted(() => {
         </span>
       </div>
 
+      <!-- Quick filters: Status, Landline Number + Apply / Reset -->
+      <div class="flex flex-wrap items-end gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
+        <div>
+          <label class="block text-xs font-medium text-gray-600">Status</label>
+          <select
+            v-model="filters.status"
+            class="mt-0.5 min-w-[140px] rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            :disabled="loading"
+          >
+            <option value="">All Statuses</option>
+            <option v-for="s in filterOptions.statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600">Landline Number</label>
+          <input
+            v-model="filters.landline_number"
+            type="text"
+            placeholder="Search landline..."
+            class="mt-0.5 min-w-[160px] rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            :disabled="loading"
+          />
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+            :disabled="loading"
+            @click="applyFilters"
+          >
+            <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            Apply
+          </button>
+          <button
+            type="button"
+            class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            :disabled="loading"
+            @click="resetFilters"
+          >
+            Reset
+          </button>
+        </div>
+        <div class="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            @click="advancedVisible = !advancedVisible"
+          >
+            Advanced Filters
+            <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            @click="columnModalVisible = true"
+          >
+            Customize Columns
+            <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Advanced Filters (all filters) -->
       <FiltersBar
         :visible="advancedVisible"
         :filters="filters"
@@ -379,29 +565,6 @@ onMounted(() => {
         @apply="applyFilters"
         @reset="resetFilters"
       />
-
-      <div class="flex justify-end gap-2">
-        <button
-          type="button"
-          class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-          @click="advancedVisible = !advancedVisible"
-        >
-          Advanced Filters
-          <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-          @click="columnModalVisible = true"
-        >
-          Customize Columns
-          <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
-      </div>
 
       <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
         <ExtensionsTable
@@ -418,6 +581,7 @@ onMounted(() => {
           @delete="openDeleteConfirm"
           @update-cell="onUpdateCell"
           @open-history="openHistoryModal"
+          @view="openViewModal"
           @edit="openEditModal"
         />
         <div
@@ -446,7 +610,16 @@ onMounted(() => {
       :gateways="filterOptions.gateways"
       :statuses="filterOptions.statuses"
       @close="addModalVisible = false"
-      @created="load()"
+      @created="() => { loadSummary(); load() }"
+    />
+
+    <ViewExtensionModal
+      :visible="viewModalVisible"
+      :extension-id="viewModalExtensionId"
+      :gateways="filterOptions.gateways"
+      :statuses="filterOptions.statuses"
+      @close="viewModalVisible = false"
+      @edit="onViewModalEdit"
     />
 
     <EditExtensionModal

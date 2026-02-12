@@ -42,9 +42,9 @@ class CustomerSupportController extends Controller
             'account_number' => ['nullable', 'string', 'max:100'],
             'contact_number' => ['required', 'string', 'max:50'],
             'issue_description' => ['required', 'string', 'max:5000'],
-            'manager_id' => ['required', 'exists:users,id'],
-            'team_leader_id' => ['required', 'exists:users,id'],
-            'sales_agent_id' => ['required', 'exists:users,id'],
+            'manager_id' => ['required', 'integer', 'min:1', 'exists:users,id'],
+            'team_leader_id' => ['required', 'integer', 'min:1', 'exists:users,id'],
+            'sales_agent_id' => ['required', 'integer', 'min:1', 'exists:users,id'],
         ];
         $messages = [
             'issue_category.required' => 'Please select an issue category.',
@@ -53,8 +53,17 @@ class CustomerSupportController extends Controller
             'contact_number.required' => 'Contact number is required.',
             'issue_description.required' => 'Issue description is required.',
             'manager_id.required' => 'Please select a manager.',
+            'manager_id.integer' => 'Please select a valid manager.',
+            'manager_id.min' => 'Please select a manager.',
+            'manager_id.exists' => 'Please select a valid manager.',
             'team_leader_id.required' => 'Please select a team leader.',
+            'team_leader_id.integer' => 'Please select a valid team leader.',
+            'team_leader_id.min' => 'Please select a team leader.',
+            'team_leader_id.exists' => 'Please select a valid team leader.',
             'sales_agent_id.required' => 'Please select a sales agent.',
+            'sales_agent_id.integer' => 'Please select a valid sales agent.',
+            'sales_agent_id.min' => 'Please select a sales agent.',
+            'sales_agent_id.exists' => 'Please select a valid sales agent.',
         ];
         foreach (['attachment_1', 'attachment_2'] as $key) {
             $rules[$key] = ['nullable', 'file', 'max:10240']; // 10MB

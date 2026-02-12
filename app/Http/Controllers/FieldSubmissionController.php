@@ -105,7 +105,7 @@ class FieldSubmissionController extends Controller
                         ->orderBy('name')
                         ->get(['id', 'name', 'email', 'manager_id', 'team_leader_id']);
 
-                    $labels[$slotKey] = $mappings[$slotKey]['label'] ?? ucfirst(str_replace('_', ' ', $slotKey));
+                    $labels[$slotKey] = $mappings[$slotKey]['label'] ?? implode(' ', array_map('ucfirst', explode('_', $slotKey)));
 
                     if ($slotKey === 'manager') {
                         $managers = $users;

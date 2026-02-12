@@ -123,18 +123,18 @@ function displayVal(val) {
           <div class="space-y-4 px-6 py-4">
             <div v-if="!isBulk" class="rounded-lg border border-gray-200 bg-gray-50/80 p-4">
               <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Request Details</p>
-              <dl class="space-y-2">
-                <div class="flex flex-wrap items-baseline gap-2">
-                  <dt class="text-xs font-medium text-gray-500">Account</dt>
-                  <dd class="text-sm font-medium text-gray-900">{{ displayVal(vas?.account_number) }}</dd>
+              <dl class="space-y-3">
+                <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <dt class="shrink-0 text-xs font-medium text-gray-500">Account:</dt>
+                  <dd class="text-sm font-semibold text-gray-900">{{ displayVal(vas?.account_number) }}</dd>
                 </div>
-                <div class="flex flex-wrap items-baseline gap-2">
-                  <dt class="text-xs font-medium text-gray-500">Company</dt>
-                  <dd class="text-sm font-medium text-gray-900">{{ displayVal(vas?.company_name) }}</dd>
+                <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <dt class="shrink-0 text-xs font-medium text-gray-500">Company:</dt>
+                  <dd class="text-sm font-semibold text-gray-900">{{ displayVal(vas?.company_name) }}</dd>
                 </div>
-                <div class="flex flex-wrap items-baseline gap-2">
-                  <dt class="text-xs font-medium text-gray-500">Request Type</dt>
-                  <dd class="text-sm font-medium text-gray-900">{{ displayVal(vas?.request_type) }}</dd>
+                <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <dt class="shrink-0 text-xs font-medium text-gray-500">Request Type:</dt>
+                  <dd class="text-sm font-semibold text-gray-900">{{ displayVal(vas?.request_type) }}</dd>
                 </div>
               </dl>
             </div>

@@ -21,13 +21,32 @@ class CustomerSupportSubmission extends Model
         'sales_agent_id',
         'status',
         'submitted_at',
+        'ticket_number',
+        'csr_name',
+        'workflow_status',
+        'completion_date',
+        'trouble_ticket',
+        'activity',
+        'pending',
+        'resolution_remarks',
+        'internal_remarks',
     ];
 
     const STATUSES = ['draft', 'submitted'];
 
+    const WORKFLOW_STATUSES = ['open', 'in_progress', 'pending', 'resolved', 'closed'];
+
+    const PENDING_OPTIONS = [
+        'Pending with Sales',
+        'Pending with CSR',
+        'Pending with Customer',
+        'Pending with Back Office',
+    ];
+
     protected $casts = [
         'attachments' => 'array',
         'submitted_at' => 'datetime',
+        'completion_date' => 'date',
     ];
 
     public function submit(): void

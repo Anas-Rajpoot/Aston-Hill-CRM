@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import api from '@/services/leadSubmissionsApi'
 import { useFormErrors } from '@/composables/useFormErrors'
+import { toDdMmYyyy } from '@/lib/dateFormat'
 
 const props = defineProps({
   leadId: { type: Number, required: true },
@@ -45,8 +46,9 @@ function formatSize(bytes) {
 
 function formatDate(dateStr) {
   if (!dateStr) return '—'
-  const d = new Date(dateStr)
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const str = typeof dateStr === 'string' ? dateStr.trim().slice(0, 10) : ''
+  if (!str) return '—'
+  return toDdMmYyyy(str) || '—'
 }
 
 /** Truncate string to maxLen characters and append "..." if longer. */

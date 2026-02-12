@@ -19,6 +19,7 @@ use App\Policies\LeadSubmissionPolicy;
 use App\Policies\VasRequestPolicy;
 use App\Policies\EmailFollowUpPolicy;
 use App\Observers\ClientObserver;
+use App\Observers\FieldSubmissionObserver;
 use App\Observers\LeadSubmissionObserver;
 use App\Observers\VasRequestSubmissionObserver;
 use App\Observers\CustomerSupportSubmissionObserver;
@@ -46,6 +47,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         LeadSubmission::observe(LeadSubmissionObserver::class);
+        FieldSubmission::observe(FieldSubmissionObserver::class);
         VasRequestSubmission::observe(VasRequestSubmissionObserver::class);
         CustomerSupportSubmission::observe(CustomerSupportSubmissionObserver::class);
         Client::observe(ClientObserver::class);

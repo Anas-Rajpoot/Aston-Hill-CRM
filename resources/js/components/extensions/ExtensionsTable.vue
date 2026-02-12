@@ -3,10 +3,8 @@
  * Cisco Extensions table – sortable columns, inline editable columns, View / Edit / History / Delete actions.
  */
 import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
-const router = useRouter()
 const auth = useAuthStore()
 
 const props = defineProps({
@@ -21,7 +19,7 @@ const props = defineProps({
   assignableEmployees: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['sort', 'delete', 'updateCell', 'openHistory', 'edit'])
+const emit = defineEmits(['sort', 'delete', 'updateCell', 'openHistory', 'edit', 'view'])
 
 const editingCell = ref(null)
 const inlineEditValue = ref('')
@@ -36,7 +34,8 @@ const canEdit = computed(() => isSuperAdmin.value || permissions.value.includes(
 const canDelete = computed(() => isSuperAdmin.value || permissions.value.includes('extensions.edit'))
 const canInlineEdit = computed(() => canEdit.value)
 
-const EDITABLE_COLUMNS = ['landline_number', 'gateway', 'username', 'status', 'assigned_to_name']
+// All editable except id, password (special), team_leader, manager, usage, updated_at (derived/read-only)
+const EDITABLE_COLUMNS = ['extension', 'landline_number', 'gateway', 'username', 'password', 'status', 'assigned_to_name', 'comment']
 const DROPDOWN_COLUMNS = ['gateway', 'status', 'assigned_to_name']
 
 function isEditableColumn(col) {
@@ -49,6 +48,7 @@ function isDropdownColumn(col) {
 
 function getCellValueForEdit(row, col) {
   if (col === 'assigned_to_name') return row.assigned_to != null ? String(row.assigned_to) : ''
+  if (col === 'password') return '' // never show current password; leave blank to keep
   return row[col] != null ? String(row[col]) : ''
 }
 
@@ -103,13 +103,14 @@ const COLUMN_LABELS = {
   extension: 'Extension',
   landline_number: 'Landline Number',
   gateway: 'Gateway',
-  username: 'Username',
+  username: 'User Name',
   password: 'Password',
   status: 'Status',
   team_leader: 'Team Leader',
   manager: 'Manager',
   usage: 'Usage',
   assigned_to_name: 'Assigned To',
+  comment: 'Comment',
   updated_at: 'Last Updated',
 }
 
@@ -149,7 +150,7 @@ function usageLabel(usage) {
 }
 
 function goToView(row) {
-  if (row?.id && canView.value) router.push(`/cisco-extensions/${row.id}`)
+  if (row?.id && canView.value) emit('view', row)
 }
 
 function goToEdit(row) {
@@ -204,7 +205,7 @@ function onDelete(row) {
             </button>
             <span v-else class="font-semibold text-gray-900">{{ label(col) }}</span>
           </th>
-          <th scope="col" class="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold text-gray-900">Actions</th>
+          <th scope="col" class="whitespace-nowrap px-4 py-3 text-center text-sm font-semibold text-gray-900">Actions</th>
         </tr>
       </thead>
       <tbody class="bg-white">
@@ -228,61 +229,75 @@ function onDelete(row) {
               {{ row.id }}
             </template>
             <template v-else-if="col === 'extension'">
-              <router-link
-                v-if="canView && row.extension"
-                :to="`/cisco-extensions/${row.id}`"
-                class="text-blue-600 hover:text-blue-800 hover:underline"
+              <span
+                v-if="isEditableColumn(col)"
+                class="cursor-pointer text-blue-600 hover:text-blue-800 hover:underline"
+                title="Click to edit"
+                @click="openInputEdit(row, col)"
+              >{{ row.extension || '—' }}</span>
+              <button
+                v-else-if="canView && row.extension"
+                type="button"
+                class="text-left text-blue-600 hover:text-blue-800 hover:underline bg-transparent border-none cursor-pointer p-0"
+                @click="goToView(row)"
               >
                 {{ row.extension }}
-              </router-link>
+              </button>
               <span v-else>{{ row.extension || '—' }}</span>
             </template>
             <template v-else-if="col === 'password'">
-              <span v-if="row.password" class="text-gray-500">••••••••</span>
+              <span
+                v-if="isEditableColumn(col)"
+                class="cursor-pointer text-blue-600 hover:text-blue-800 hover:underline"
+                @click="openInputEdit(row, col)"
+              >{{ row.password ? '••••••••' : '—' }}</span>
+              <span v-else-if="row.password" class="text-gray-500">••••••••</span>
               <span v-else>—</span>
             </template>
             <template v-else-if="isEditing(row.id, col)">
               <template v-if="isDropdownColumn(col)">
-                <select
-                  v-if="col === 'gateway'"
-                  v-model="inlineEditValue"
-                  class="w-full min-w-[120px] rounded border border-gray-300 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-                  @change="saveInlineEdit"
-                >
-                  <option value="">—</option>
-                  <option v-for="opt in getGatewayOptions()" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-                </select>
-                <select
-                  v-else-if="col === 'status'"
-                  v-model="inlineEditValue"
-                  class="w-full min-w-[120px] rounded border border-gray-300 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-                  @change="saveInlineEdit"
-                >
-                  <option v-for="opt in getStatusOptions()" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-                </select>
-                <select
-                  v-else-if="col === 'assigned_to_name'"
-                  v-model="inlineEditValue"
-                  class="w-full min-w-[140px] rounded border border-gray-300 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-                  @change="saveInlineEdit"
-                >
-                  <option v-for="opt in getAssignedOptions()" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-                </select>
+                <span class="inline-flex flex-wrap items-center gap-2">
+                  <select
+                    v-if="col === 'gateway'"
+                    v-model="inlineEditValue"
+                    class="min-w-[120px] rounded border border-gray-300 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  >
+                    <option value="">—</option>
+                    <option v-for="opt in getGatewayOptions()" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                  </select>
+                  <select
+                    v-else-if="col === 'status'"
+                    v-model="inlineEditValue"
+                    class="min-w-[120px] rounded border border-gray-300 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  >
+                    <option v-for="opt in getStatusOptions()" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                  </select>
+                  <select
+                    v-else-if="col === 'assigned_to_name'"
+                    v-model="inlineEditValue"
+                    class="min-w-[140px] rounded border border-gray-300 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  >
+                    <option v-for="opt in getAssignedOptions()" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                  </select>
+                  <span class="inline-flex items-center gap-1 shrink-0">
+                    <button type="button" class="rounded bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
+                    <button type="button" class="rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
+                  </span>
+                </span>
               </template>
-              <span v-else class="inline-flex items-center gap-1">
+              <span v-else class="inline-flex flex-wrap items-center gap-2">
                 <input
                   v-model="inlineEditValue"
-                  type="text"
+                  :type="editingCell?.col === 'password' ? 'password' : 'text'"
+                  :placeholder="editingCell?.col === 'password' ? 'Leave blank to keep current' : undefined"
                   class="min-w-[100px] rounded border border-gray-300 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
                   @keydown.enter="saveInlineEdit"
                   @keydown.escape="cancelInlineEdit"
                 />
-                <button type="button" class="rounded p-0.5 text-green-600 hover:bg-green-50" title="Save" @click="saveInlineEdit">
-                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                </button>
-                <button type="button" class="rounded p-0.5 text-gray-500 hover:bg-gray-100" title="Cancel" @click="cancelInlineEdit">
-                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
+                <span class="inline-flex items-center gap-1 shrink-0">
+                  <button type="button" class="rounded bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
+                  <button type="button" class="rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
+                </span>
               </span>
             </template>
             <template v-else-if="col === 'status'">
@@ -313,15 +328,15 @@ function onDelete(row) {
             <template v-else-if="col === 'gateway' && isEditableColumn(col)">
               <span @click="openDropdownEdit(row, col)">{{ formatValue(row, col) }}</span>
             </template>
-            <template v-else-if="(col === 'landline_number' || col === 'username') && isEditableColumn(col)">
-              <span @click="openInputEdit(row, col)">{{ formatValue(row, col) }}</span>
+            <template v-else-if="(col === 'landline_number' || col === 'username' || col === 'comment') && isEditableColumn(col)">
+              <span class="cursor-pointer" @click="openInputEdit(row, col)">{{ formatValue(row, col) }}</span>
             </template>
             <template v-else>
               {{ formatValue(row, col) }}
             </template>
           </td>
-          <td class="whitespace-nowrap px-4 py-3 text-right">
-            <div class="inline-flex items-center gap-2">
+          <td class="whitespace-nowrap px-4 py-3 text-center">
+            <div class="inline-flex items-center justify-center gap-2">
               <button
                 v-if="canView"
                 type="button"

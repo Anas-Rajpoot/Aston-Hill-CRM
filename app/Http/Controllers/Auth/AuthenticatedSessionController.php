@@ -58,12 +58,15 @@ class AuthenticatedSessionController extends Controller
 
         if ($user->status !== 'approved') {
             Auth::logout();
+            $message = $user->status === 'rejected'
+                ? 'Your account has been deactivated. Contact the administrator.'
+                : 'Your registration is completed. Please wait for super admin approval.';
             if ($request->expectsJson()) {
                 throw ValidationException::withMessages([
-                    'email' => ['Your registration is completed. Please wait for super admin approval.'],
+                    'email' => [$message],
                 ]);
             }
-            return redirect()->route('login')->with('status', 'Your registration is completed. Please wait for super admin approval.');
+            return redirect()->route('login')->with('status', $message);
         }
 
         if ($user->two_factor_enabled) {

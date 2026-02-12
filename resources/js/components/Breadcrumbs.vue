@@ -69,6 +69,7 @@ const breadcrumbs = computed(() => {
         if (parent === 'lead-submissions') label = 'Lead #' + seg
         else if (parent === 'field-submissions') label = 'Submission #' + seg
         else if (parent === 'vas-requests') label = 'Request #' + seg
+        else if (parent === 'customer-support') label = 'Request #' + seg
         else if (parent === 'users') label = 'User #' + seg
         else if (parent === 'employees') label = 'Employee #' + seg
         else if (parent === 'roles') label = 'Role'

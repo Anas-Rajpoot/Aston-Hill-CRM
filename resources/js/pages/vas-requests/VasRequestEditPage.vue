@@ -24,6 +24,7 @@ const teamOptions = ref({
   team_leaders: [],
   sales_agents: [],
 })
+const executives = ref([])
 const requestTypes = ref([])
 const docSchema = ref([])
 const newDocFiles = ref({})
@@ -32,6 +33,8 @@ const uploadSaving = ref(false)
 const docUploadError = ref('')
 const removingDocId = ref(null)
 const documentToRemove = ref(null)
+const showAddDocs = ref(false)
+const addDocsSectionRef = ref(null)
 
 const form = ref({
   request_type: '',
@@ -66,11 +69,12 @@ async function load() {
   loading.value = true
   request.value = null
   try {
-    const [reqRes, teamRes, filtersRes, schemaRes] = await Promise.all([
+    const [reqRes, teamRes, filtersRes, schemaRes, boRes] = await Promise.all([
       vasRequestsApi.getRequest(id.value),
       vasRequestsApi.getTeamOptions().then((r) => r?.data ?? r).catch(() => ({})),
       vasRequestsApi.filters().catch(() => ({})),
       vasRequestsApi.getDocumentSchema().then((r) => r?.data ?? r).catch(() => ({ documents: [] })),
+      vasRequestsApi.getBackOfficeOptions().catch(() => ({ executives: [] })),
     ])
     const data = reqRes?.data ?? reqRes
     request.value = data
@@ -79,6 +83,7 @@ async function load() {
       team_leaders: teamRes.team_leaders ?? [],
       sales_agents: teamRes.sales_agents ?? [],
     }
+    executives.value = boRes?.executives ?? []
     requestTypes.value = (filtersRes.request_types ?? []).map((t) => (typeof t === 'string' ? t : t?.value ?? t))
     docSchema.value = schemaRes.documents ?? []
     docSchema.value.forEach((d) => {
@@ -89,10 +94,10 @@ async function load() {
       account_number: data.account_number ?? '',
       company_name: data.company_name ?? '',
       description: data.description ?? '',
-      manager_id: data.manager_id ?? null,
-      team_leader_id: data.team_leader_id ?? null,
-      sales_agent_id: data.sales_agent_id ?? null,
-      back_office_executive_id: data.back_office_executive_id ?? null,
+      manager_id: data.manager_id != null ? data.manager_id : null,
+      team_leader_id: data.team_leader_id != null ? data.team_leader_id : null,
+      sales_agent_id: data.sales_agent_id != null ? data.sales_agent_id : null,
+      back_office_executive_id: data.back_office_executive_id != null ? data.back_office_executive_id : null,
     }
   } catch {
     request.value = null
@@ -106,6 +111,22 @@ const documents = computed(() => request.value?.documents ?? [])
 
 function docDisplayName(doc) {
   return doc?.file_name || doc?.label || doc?.doc_key || 'Document'
+}
+
+function formatFileSize(bytes) {
+  if (bytes == null || bytes === '') return ''
+  const n = Number(bytes)
+  if (Number.isNaN(n) || n < 0) return ''
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function formatSubmissionDate(d) {
+  if (!d) return '—'
+  const date = new Date(d)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 async function downloadDoc(doc) {
@@ -247,6 +268,11 @@ function goBack() {
   router.push('/vas-requests')
 }
 
+function addDocTrigger() {
+  showAddDocs.value = true
+  setTimeout(() => addDocsSectionRef.value?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }), 100)
+}
+
 async function submitForm() {
   if (!id.value) return
   saving.value = true
@@ -274,8 +300,8 @@ onMounted(() => load())
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] p-0">
-    <div class="mx-auto max-w-7xl px-1 sm:px-2">
+  <div class="min-h-[calc(100vh-4rem)] bg-white p-0">
+    <div class="mx-auto max-w-7xl bg-white px-4 sm:px-5">
       <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
         <div class="px-4 py-4 sm:px-5">
           <div class="flex flex-wrap items-baseline gap-2">
@@ -296,26 +322,16 @@ onMounted(() => load())
           Unable to load request. You may not have permission to view it.
         </div>
 
-        <form v-else class="px-4 py-5 sm:px-5" @submit.prevent="submitForm">
-          <h2 class="mb-4 text-sm font-semibold text-gray-900">Request Information</h2>
-          <div class="grid gap-4 sm:grid-cols-3">
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Company Name <span class="text-red-500">*</span></label>
-              <input
-                v-model="form.company_name"
-                type="text"
-                required
-                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-              />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Account Number</label>
-              <input
-                v-model="form.account_number"
-                type="text"
-                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-              />
-            </div>
+        <form v-else class="px-4 py-4 sm:px-5" @submit.prevent="submitForm">
+          <!-- Back Office Verification banner -->
+          <div class="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+            <h3 class="text-sm font-semibold text-blue-900">Back Office Verification</h3>
+            <p class="mt-1 text-sm text-blue-800">Review all information and documents carefully. Make necessary corrections before updating the status.</p>
+          </div>
+
+          <!-- Primary Information: 2 columns, labels above inputs -->
+          <h2 class="mb-3 border-b border-gray-200 pb-2 text-base font-semibold text-gray-900">Primary Information</h2>
+          <div class="grid gap-4 sm:grid-cols-2 lg:gap-6">
             <div>
               <label class="block text-sm font-medium text-gray-700">Request Type <span class="text-red-500">*</span></label>
               <select
@@ -327,18 +343,32 @@ onMounted(() => load())
                 <option v-for="t in requestTypes" :key="t" :value="t">{{ t }}</option>
               </select>
             </div>
-            <div class="sm:col-span-3">
-              <label class="block text-sm font-medium text-gray-700">Description</label>
-              <textarea
-                v-model="form.description"
-                rows="4"
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Account Number</label>
+              <input
+                v-model="form.account_number"
+                type="text"
                 class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
               />
             </div>
-          </div>
-
-          <h2 class="mb-4 mt-8 text-sm font-semibold text-gray-900">Team</h2>
-          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Company Name <span class="text-red-500">*</span></label>
+              <input
+                v-model="form.company_name"
+                type="text"
+                required
+                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              />
+            </div>
+            <div class="sm:col-span-2">
+              <label class="block text-sm font-medium text-gray-700">Request Description</label>
+              <textarea
+                v-model="form.description"
+                rows="3"
+                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder="Enter request description"
+              />
+            </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Manager <span class="text-red-500">*</span></label>
               <select
@@ -372,117 +402,151 @@ onMounted(() => load())
                 <option v-for="u in filteredSalesAgents" :key="u.id" :value="u.id">{{ u.name }}</option>
               </select>
             </div>
+          </div>
+
+          <!-- Additional Fields For Back Office -->
+          <h2 class="mb-3 mt-8 border-b border-gray-200 pb-2 text-base font-semibold text-gray-900">Additional Fields For Back Office</h2>
+          <div class="grid gap-4 sm:grid-cols-2 lg:gap-6">
             <div>
-              <label class="block text-sm font-medium text-gray-700">Back Office Executive</label>
+              <label class="block text-sm font-medium text-gray-700">Executive Name</label>
               <select
                 v-model="form.back_office_executive_id"
                 class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
               >
                 <option :value="null">Select</option>
-                <option v-for="u in teamOptions.sales_agents" :key="u.id" :value="u.id">{{ u.name }}</option>
+                <option v-for="ex in executives" :key="ex.id" :value="ex.id">{{ ex.name }}</option>
               </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Status</label>
+              <div class="mt-1 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-800 capitalize">
+                {{ request.status || '—' }}
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Submission Date</label>
+              <div class="mt-1 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">
+                {{ formatSubmissionDate(request.submitted_at) }}
+              </div>
             </div>
           </div>
 
-          <!-- Documents: existing (view, download, remove) + add new -->
-          <h2 class="mb-3 mt-8 text-sm font-semibold text-gray-900">Documents</h2>
-          <div class="space-y-4 rounded-lg border border-gray-200 bg-gray-50/50 p-4">
-            <div v-if="documents.length > 0">
-              <p class="mb-2 text-xs font-medium text-gray-600">Uploaded documents</p>
-              <ul class="space-y-2">
-                <li
-                  v-for="doc in documents"
-                  :key="doc.id"
-                  class="flex flex-wrap items-center justify-between gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm"
-                >
-                  <span class="min-w-0 truncate font-medium text-gray-800" :title="docDisplayName(doc)">{{ docDisplayName(doc) }}</span>
-                  <div class="flex shrink-0 items-center gap-2">
-                    <button
-                      type="button"
-                      class="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                      @click="downloadDoc(doc)"
-                    >
-                      <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                      Download
-                    </button>
-                    <!-- Remove: opens confirmation popup with message (see Teleport modal below) -->
-                    <button
-                      type="button"
-                      class="inline-flex items-center gap-1 rounded border border-red-200 bg-white px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50"
-                      :disabled="removingDocId === doc.id"
-                      @click="openRemoveConfirm(doc)"
-                    >
-                      <span v-if="removingDocId === doc.id">Removing...</span>
-                      <span v-else>Remove</span>
-                    </button>
+          <!-- Document Attachments: cards with icon, filename, size, download, remove; + Add Document -->
+          <h2 class="mb-3 mt-8 border-b border-gray-200 pb-2 text-base font-semibold text-gray-900">Document Attachment</h2>
+          <div class="flex flex-wrap items-start gap-4">
+            <template v-for="doc in documents" :key="doc.id">
+              <div class="flex w-48 flex-col rounded-lg border border-gray-200 bg-white p-3 shadow-sm sm:w-56">
+                <div class="flex items-start gap-2">
+                  <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-red-50 text-red-600">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
                   </div>
-                </li>
-              </ul>
-            </div>
-            <p v-else class="text-sm text-gray-500">No documents uploaded yet.</p>
-
-            <div class="border-t border-gray-200 pt-4">
-              <p class="mb-3 text-xs font-medium text-gray-600">Add new documents</p>
-              <p class="mb-2 text-xs text-gray-500">Max {{ MAX_FILE_MB }} MB per file, {{ MAX_TOTAL_MB }} MB total. Allowed: {{ ALLOWED_EXT.join(', ') }}</p>
-              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div
-                  v-for="doc in docSchema"
-                  :key="doc.key"
-                  class="flex min-w-0 items-center gap-2 rounded border border-gray-300 bg-white px-3 py-2"
-                >
                   <div class="min-w-0 flex-1">
-                    <p class="truncate text-sm font-medium text-gray-900">{{ doc.label }}</p>
-                    <p v-if="newDocFiles[doc.key]" class="truncate text-xs text-gray-600">{{ newDocFiles[doc.key].name }}</p>
+                    <p class="truncate text-sm font-medium text-gray-900" :title="docDisplayName(doc)">{{ docDisplayName(doc) }}</p>
+                    <p v-if="doc.size != null" class="mt-0.5 text-xs text-gray-500">{{ formatFileSize(doc.size) }}</p>
                   </div>
-                  <label class="shrink-0 cursor-pointer">
-                    <input type="file" class="hidden" :accept="ALLOWED_EXT.join(',')" @change="onNewSchemaFileChange(doc.key, $event)" />
-                    <span class="inline-flex items-center gap-1 rounded bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700">Upload</span>
-                  </label>
+                  <button
+                    type="button"
+                    class="shrink-0 rounded p-1 text-red-500 hover:bg-red-50"
+                    :title="'Remove ' + docDisplayName(doc)"
+                    :disabled="removingDocId === doc.id"
+                    @click="openRemoveConfirm(doc)"
+                  >
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
-              </div>
-              <div class="mt-3">
                 <button
                   type="button"
-                  class="text-sm font-medium text-green-600 hover:text-green-700 disabled:opacity-50"
-                  :disabled="newAdditionalDocs.length >= 3"
-                  @click="addAdditionalDocSlot"
+                  class="mt-2 flex items-center justify-center gap-1 rounded border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50"
+                  @click="downloadDoc(doc)"
                 >
-                  + Add additional document
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download
                 </button>
-                <div v-if="newAdditionalDocs.length > 0" class="mt-2 space-y-2">
-                  <div
-                    v-for="(ad, index) in newAdditionalDocs"
-                    :key="ad.key"
-                    class="flex flex-wrap items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2"
-                  >
-                    <input
-                      v-model="ad.label"
-                      type="text"
-                      placeholder="Label"
-                      class="min-w-0 flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
-                    />
-                    <label class="shrink-0 cursor-pointer">
-                      <input type="file" class="hidden" :accept="ALLOWED_EXT.join(',')" @change="onAdditionalFileChange(index, $event)" />
-                      <span class="inline-flex rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">Choose file</span>
-                    </label>
-                    <span v-if="ad.file" class="truncate text-xs text-gray-600">{{ ad.file.name }}</span>
-                    <button type="button" class="text-xs text-red-600 hover:underline" @click="removeAdditionalSlot(index)">Remove</button>
-                  </div>
-                </div>
               </div>
-              <div v-if="docUploadError" class="mt-2 text-sm text-red-600">{{ docUploadError }}</div>
+            </template>
+            <!-- + Add Document -->
+            <div class="flex w-48 flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50/50 p-4 sm:w-56">
+              <p class="mb-2 text-xs font-medium text-gray-500">{{ documents.length }} selected</p>
               <button
                 type="button"
-                class="mt-3 inline-flex items-center gap-1 rounded bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
-                :disabled="!hasNewFilesToUpload || uploadSaving"
-                @click.prevent="uploadNewDocuments"
+                class="flex h-12 w-12 items-center justify-center rounded-full border-2 border-green-500 bg-green-50 text-green-600 hover:bg-green-100"
+                aria-label="Add document"
+                @click="addDocTrigger"
               >
-                <span v-if="uploadSaving">Uploading...</span>
-                <span v-else>Upload selected files</span>
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
               </button>
+              <span class="mt-2 text-xs font-medium text-gray-600">Add Document</span>
             </div>
+          </div>
+
+          <!-- Add new documents panel (shown when user clicks Add Document) -->
+          <div ref="addDocsSectionRef" v-if="showAddDocs" class="mt-6 rounded-lg border border-gray-200 bg-gray-50/50 p-4">
+            <p class="mb-3 text-sm font-medium text-gray-700">Add new documents</p>
+            <p class="mb-2 text-xs text-gray-500">Max {{ MAX_FILE_MB }} MB per file, {{ MAX_TOTAL_MB }} MB total. Allowed: {{ ALLOWED_EXT.join(', ') }}</p>
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div
+                v-for="doc in docSchema"
+                :key="doc.key"
+                class="flex min-w-0 items-center gap-2 rounded border border-gray-300 bg-white px-3 py-2"
+              >
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-sm font-medium text-gray-900">{{ doc.label }}</p>
+                  <p v-if="newDocFiles[doc.key]" class="truncate text-xs text-gray-600">{{ newDocFiles[doc.key].name }}</p>
+                </div>
+                <label class="shrink-0 cursor-pointer">
+                  <input type="file" class="hidden" :accept="ALLOWED_EXT.join(',')" @change="onNewSchemaFileChange(doc.key, $event)" />
+                  <span class="inline-flex items-center gap-1 rounded bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700">Upload</span>
+                </label>
+              </div>
+            </div>
+            <div class="mt-3">
+              <button
+                type="button"
+                class="text-sm font-medium text-green-600 hover:text-green-700 disabled:opacity-50"
+                :disabled="newAdditionalDocs.length >= 3"
+                @click="addAdditionalDocSlot"
+              >
+                + Add additional document
+              </button>
+              <div v-if="newAdditionalDocs.length > 0" class="mt-2 space-y-2">
+                <div
+                  v-for="(ad, index) in newAdditionalDocs"
+                  :key="ad.key"
+                  class="flex flex-wrap items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2"
+                >
+                  <input
+                    v-model="ad.label"
+                    type="text"
+                    placeholder="Label"
+                    class="min-w-0 flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
+                  />
+                  <label class="shrink-0 cursor-pointer">
+                    <input type="file" class="hidden" :accept="ALLOWED_EXT.join(',')" @change="onAdditionalFileChange(index, $event)" />
+                    <span class="inline-flex rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">Choose file</span>
+                  </label>
+                  <span v-if="ad.file" class="truncate text-xs text-gray-600">{{ ad.file.name }}</span>
+                  <button type="button" class="text-xs text-red-600 hover:underline" @click="removeAdditionalSlot(index)">Remove</button>
+                </div>
+              </div>
+            </div>
+            <div v-if="docUploadError" class="mt-2 text-sm text-red-600">{{ docUploadError }}</div>
+            <button
+              type="button"
+              class="mt-3 inline-flex items-center gap-1 rounded bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+              :disabled="!hasNewFilesToUpload || uploadSaving"
+              @click.prevent="uploadNewDocuments"
+            >
+              <span v-if="uploadSaving">Uploading...</span>
+              <span v-else>Upload selected files</span>
+            </button>
           </div>
 
           <div class="mt-8 flex flex-wrap items-center justify-end gap-3 border-t border-gray-200 pt-4">
@@ -496,10 +560,10 @@ onMounted(() => load())
             <button
               type="submit"
               :disabled="saving"
-              class="inline-flex items-center gap-2 rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70"
+              class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70"
             >
               <span v-if="saving">Saving...</span>
-              <span v-else>Update VAS Request</span>
+              <span v-else>Save Changes</span>
             </button>
           </div>
         </form>

@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import usersApi from '@/services/usersApi'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
-import { toDdMonYyyy } from '@/lib/dateFormat'
+import { toDdMmYyyy } from '@/lib/dateFormat'
 
 const route = useRoute()
 const router = useRouter()
@@ -69,22 +69,22 @@ const formatRoleForDisplay = (name) => {
     .join(' ')
 }
 
-// Date display: dd-Mon-yyyy (e.g. 31-Jan-2026) as used across the app
-function formatDateDdMonYyyy(d) {
+// Date display: dd-mm-yyyy
+function formatDateDdMmYyyy(d) {
   if (!d) return '—'
-  const str = typeof d === 'string' ? d.slice(0, 10) : (d instanceof Date ? d.toISOString().slice(0, 10) : '')
-  const formatted = toDdMonYyyy(str)
-  return formatted ? formatted.replace(/\s+/g, '-') : '—'
+  const str = typeof d === 'string' ? d.trim().slice(0, 10) : (d instanceof Date ? d.toISOString().slice(0, 10) : '')
+  if (!str) return '—'
+  return toDdMmYyyy(str) || '—'
 }
 
 // Joining date: use joining_date if set, else created_at (date when user was added to system)
 const joiningDateDisplay = computed(() => {
   const d = user.value?.joining_date || user.value?.created_at
-  return formatDateDdMonYyyy(d)
+  return formatDateDdMmYyyy(d)
 })
 
 const terminateDateDisplay = computed(() => {
-  return formatDateDdMonYyyy(user.value?.terminate_date)
+  return formatDateDdMmYyyy(user.value?.terminate_date)
 })
 
 const lastActivityDisplay = computed(() => {
@@ -93,7 +93,7 @@ const lastActivityDisplay = computed(() => {
   try {
     const date = new Date(d)
     if (Number.isNaN(date.getTime())) return '—'
-    return formatDateDdMonYyyy(date.toISOString().slice(0, 10))
+    return formatDateDdMmYyyy(date.toISOString().slice(0, 10))
   } catch {
     return '—'
   }

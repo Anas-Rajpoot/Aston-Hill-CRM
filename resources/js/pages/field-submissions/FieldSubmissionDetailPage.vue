@@ -7,6 +7,7 @@ import { useRoute, useRouter } from 'vue-router'
 import fieldSubmissionsApi from '@/services/fieldSubmissionsApi'
 import { useAuthStore } from '@/stores/auth'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import { toDdMmYyyy } from '@/lib/dateFormat'
 
 const route = useRoute()
 const router = useRouter()
@@ -30,12 +31,10 @@ function formatDateTime(d) {
   if (!d) return '—'
   const date = new Date(d)
   if (Number.isNaN(date.getTime())) return '—'
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const year = date.getFullYear()
+  const dateStr = date.toISOString().slice(0, 10)
   const h = String(date.getHours()).padStart(2, '0')
   const m = String(date.getMinutes()).padStart(2, '0')
-  return `${year}-${month}-${day} ${h}:${m}`
+  return `${toDdMmYyyy(dateStr) || ''} ${h}:${m}`.trim() || '—'
 }
 
 function submissionId(s) {
@@ -159,7 +158,7 @@ onMounted(() => load())
 
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] p-0">
-    <div class="mx-auto max-w-7xl px-1 sm:px-2">
+    <div class="w-full">
       <!-- Single white card: heading + breadcrumbs + detail (same background, thin border between) -->
       <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
         <!-- Heading + breadcrumbs: same white background -->
@@ -171,22 +170,12 @@ onMounted(() => load())
             </div>
             <div class="flex items-center gap-2">
               <button
-                v-if="canEdit"
                 type="button"
                 class="rounded bg-green-500 px-4 py-2 text-sm font-medium text-white hover:bg-green-600"
+                :disabled="!submission?.id"
                 @click="goToEdit"
               >
-                Edit Submission
-              </button>
-              <button
-                type="button"
-                class="rounded p-2 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-                aria-label="Close"
-                @click="goBack"
-              >
-                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                Edit Field Submission
               </button>
             </div>
           </div>

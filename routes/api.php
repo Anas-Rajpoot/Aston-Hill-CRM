@@ -70,15 +70,26 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::get('/customer-support', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'index']);
     Route::get('/customer-support/filters', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'filters']);
     Route::get('/customer-support/columns', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'columns']);
+    Route::get('/customer-support/edit-options', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'editOptions']);
     Route::post('/customer-support/columns', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'saveColumns']);
+    Route::get('/customer-support/{customerSupportSubmission}', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'show'])
+        ->whereNumber('customerSupportSubmission');
+    Route::get('/customer-support/{customerSupportSubmission}/audits', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'audits'])
+        ->whereNumber('customerSupportSubmission');
+    Route::post('/customer-support/{customerSupportSubmission}/attachments', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'addAttachments'])
+        ->whereNumber('customerSupportSubmission');
+    Route::get('/customer-support/{customerSupportSubmission}/attachments/{index}/download', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'downloadAttachment'])
+        ->whereNumber(['customerSupportSubmission', 'index']);
     Route::patch('/customer-support/{customerSupportSubmission}', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'patch'])
         ->whereNumber('customerSupportSubmission');
 
     // Clients
     Route::get('/clients', [\App\Http\Controllers\Api\ClientApiController::class, 'index']);
+    Route::post('/clients', [\App\Http\Controllers\Api\ClientApiController::class, 'store']);
     Route::get('/clients/filters', [\App\Http\Controllers\Api\ClientApiController::class, 'filters']);
     Route::get('/clients/columns', [\App\Http\Controllers\Api\ClientApiController::class, 'columns']);
     Route::post('/clients/columns', [\App\Http\Controllers\Api\ClientApiController::class, 'saveColumns']);
+    Route::post('/clients/import', [\App\Http\Controllers\Api\ClientApiController::class, 'importCsv']);
     Route::get('/clients/{client}/products', [\App\Http\Controllers\Api\ClientApiController::class, 'products'])->whereNumber('client');
     Route::get('/clients/{client}/vas-requests', [\App\Http\Controllers\Api\ClientApiController::class, 'vasRequests'])->whereNumber('client');
     Route::get('/clients/{client}/customer-support', [\App\Http\Controllers\Api\ClientApiController::class, 'customerSupport'])->whereNumber('client');
@@ -168,6 +179,7 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
 
     // Cisco Extensions
     Route::get('/cisco-extensions', [\App\Http\Controllers\Api\ExtensionsApiController::class, 'index']);
+    Route::get('/cisco-extensions/summary', [\App\Http\Controllers\Api\ExtensionsApiController::class, 'summary']);
     Route::get('/cisco-extensions/filters', [\App\Http\Controllers\Api\ExtensionsApiController::class, 'filters']);
     Route::get('/cisco-extensions/columns', [\App\Http\Controllers\Api\ExtensionsApiController::class, 'columns']);
     Route::post('/cisco-extensions/columns', [\App\Http\Controllers\Api\ExtensionsApiController::class, 'saveColumns']);
@@ -182,6 +194,7 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
 
     // Attendance log (login logs for SPA)
     Route::get('/attendance-log', [\App\Http\Controllers\Api\AttendanceLogApiController::class, 'index']);
+    Route::get('/attendance-log/summary', [\App\Http\Controllers\Api\AttendanceLogApiController::class, 'summary']);
     Route::get('/attendance-log/filters', [\App\Http\Controllers\Api\AttendanceLogApiController::class, 'filters']);
     Route::post('/attendance-log/force-logout/log/{userLoginLog}', [\App\Http\Controllers\Api\AttendanceLogApiController::class, 'forceLogoutLog'])->whereNumber('userLoginLog');
     Route::post('/attendance-log/force-logout/user/{user}', [\App\Http\Controllers\Api\AttendanceLogApiController::class, 'forceLogoutUser'])->whereNumber('user');

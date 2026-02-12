@@ -3,19 +3,41 @@
  */
 
 /**
- * Convert yyyy-mm-dd to dd-mm-yyyy for display.
- * @param {string} ymd - Date in yyyy-mm-dd or empty
+ * Convert yyyy-mm-dd or ISO date string to dd-mm-yyyy for display.
+ * @param {string} ymd - Date in yyyy-mm-dd, or ISO (e.g. 2024-01-15T00:00:00.000Z), or empty
  * @returns {string} dd-mm-yyyy or ''
  */
 export function toDdMmYyyy(ymd) {
   if (!ymd || typeof ymd !== 'string') return ''
-  const parts = ymd.trim().split('-')
+  const s = ymd.trim()
+  const ymdOnly = s.slice(0, 10)
+  const parts = ymdOnly.split('-')
   if (parts.length !== 3) return ''
   const [y, m, d] = parts
   if (y.length === 4 && m.length <= 2 && d.length <= 2) {
     return `${d.padStart(2, '0')}-${m.padStart(2, '0')}-${y}`
   }
   return ''
+}
+
+/**
+ * Format any date value for display as dd-mm-yyyy (handles Date, ISO string, yyyy-mm-dd).
+ * @param {string|Date} date - Date value
+ * @returns {string} dd-mm-yyyy or '' or '—' for invalid
+ */
+export function formatDateDdMmYyyy(date) {
+  if (date == null) return '—'
+  if (date instanceof Date) {
+    if (Number.isNaN(date.getTime())) return '—'
+    const y = date.getFullYear()
+    const m = String(date.getMonth() + 1).padStart(2, '0')
+    const d = String(date.getDate()).padStart(2, '0')
+    return `${d}-${m}-${y}`
+  }
+  const str = typeof date === 'string' ? date.trim().slice(0, 10) : ''
+  if (!str) return '—'
+  const out = toDdMmYyyy(str)
+  return out || '—'
 }
 
 /**

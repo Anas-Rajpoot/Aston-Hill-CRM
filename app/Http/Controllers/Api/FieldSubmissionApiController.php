@@ -403,18 +403,10 @@ class FieldSubmissionApiController extends Controller
             'status' => ['required', 'string', Rule::in(FieldSubmission::STATUSES)],
         ]);
 
-        $oldStatus = $fieldSubmission->status;
         $fieldSubmission->update([
             'status' => $data['status'],
             'submitted_at' => $data['status'] === 'submitted' ? now() : $fieldSubmission->submitted_at,
         ]);
-        $this->logFieldSubmissionChange(
-            $fieldSubmission->id,
-            'status',
-            $oldStatus,
-            $data['status'],
-            $request->user()?->id
-        );
 
         return response()->json([
             'id' => $fieldSubmission->id,
@@ -572,19 +564,7 @@ class FieldSubmissionApiController extends Controller
         $data = $request->validate($rules);
         if (! empty($data)) {
             $this->applyHierarchyCascade($fieldSubmission, $data);
-            $oldValues = [];
-            foreach (array_keys($data) as $key) {
-                $val = $fieldSubmission->getAttribute($key);
-                $oldValues[$key] = $val === null || $val === '' ? null : (is_object($val) ? json_encode($val) : (string) $val);
-            }
             $fieldSubmission->update($data);
-            $userId = $request->user()?->id;
-            foreach ($data as $key => $newVal) {
-                $newStr = $newVal === null || $newVal === '' ? null : (is_object($newVal) ? json_encode($newVal) : (string) $newVal);
-                if (($oldValues[$key] ?? null) !== $newStr) {
-                    $this->logFieldSubmissionChange($fieldSubmission->id, $key, $oldValues[$key] ?? null, $newStr, $userId);
-                }
-            }
         }
 
         $fieldSubmission->load(['manager:id,name', 'teamLeader:id,name', 'salesAgent:id,name', 'fieldExecutive:id,name', 'creator:id,name']);
@@ -663,26 +643,6 @@ class FieldSubmissionApiController extends Controller
     }
 
     /**
-     * Record one field change for audit (who, which field, old value, new value, when).
-     */
-    private function logFieldSubmissionChange(
-        int $fieldSubmissionId,
-        string $fieldName,
-        ?string $oldValue,
-        ?string $newValue,
-        ?int $changedBy
-    ): void {
-        FieldSubmissionAudit::create([
-            'field_submission_id' => $fieldSubmissionId,
-            'field_name' => $fieldName,
-            'old_value' => $oldValue,
-            'new_value' => $newValue,
-            'changed_at' => now(),
-            'changed_by' => $changedBy,
-        ]);
-    }
-
-    /**
      * PATCH /api/field-submissions/{fieldSubmission}/assign-field-technician
      * Assign a field technician (field executive) to a submission. Body: field_executive_id.
      */
@@ -694,15 +654,7 @@ class FieldSubmissionApiController extends Controller
             'field_executive_id' => ['required', 'integer', 'exists:users,id'],
         ]);
 
-        $oldId = $fieldSubmission->field_executive_id;
         $fieldSubmission->update(['field_executive_id' => $data['field_executive_id']]);
-        $this->logFieldSubmissionChange(
-            $fieldSubmission->id,
-            'field_executive_id',
-            $oldId !== null ? (string) $oldId : null,
-            (string) $data['field_executive_id'],
-            $request->user()?->id
-        );
 
         return response()->json([
             'id' => $fieldSubmission->id,

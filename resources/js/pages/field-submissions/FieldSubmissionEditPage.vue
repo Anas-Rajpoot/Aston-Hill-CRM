@@ -204,8 +204,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] p-0">
-    <div class="mx-auto max-w-7xl px-1 sm:px-2">
+  <div class="min-h-[calc(100vh-4rem)] bg-white p-0">
+    <div class="w-full">
       <!-- Single white card: heading + border + form (same background, thin border between) -->
       <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
         <!-- Heading: same background as form -->

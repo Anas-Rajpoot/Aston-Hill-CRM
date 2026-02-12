@@ -38,18 +38,36 @@ function formatDateTime(d) {
   return `${year}-${month}-${day} ${h}:${m}`
 }
 
-const STATUS_BADGES = {
-  draft: 'bg-gray-100 text-gray-700',
-  submitted: 'bg-blue-100 text-blue-700',
-  approved: 'bg-green-100 text-green-700',
-  rejected: 'bg-red-100 text-red-700',
-}
-function statusBadgeClass(status) {
-  return STATUS_BADGES[status] ?? 'bg-gray-100 text-gray-700'
-}
-
 function docDisplayName(doc) {
   return doc?.label || doc?.file_name || doc?.doc_key || 'Document'
+}
+
+function formatFileSize(bytes) {
+  if (bytes == null || bytes === '') return ''
+  const n = Number(bytes)
+  if (Number.isNaN(n) || n < 0) return ''
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`
+}
+
+async function downloadDocument(doc) {
+  if (!request.value?.id || !doc?.id) return
+  const name = docDisplayName(doc) || 'document'
+  try {
+    const blob = await vasRequestsApi.downloadDocument(request.value.id, doc.id)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = name
+    a.rel = 'noopener'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  } catch {
+    window.open(`/api/vas-requests/${request.value.id}/documents/${doc.id}/download`, '_blank', 'noopener')
+  }
 }
 
 async function load() {
@@ -80,35 +98,21 @@ onMounted(() => load())
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] p-0">
-    <div class="mx-auto max-w-7xl px-1 sm:px-2">
+  <div class="min-h-[calc(100vh-4rem)] bg-white p-0">
+    <div class="mx-auto max-w-7xl bg-white px-4 sm:px-5">
       <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
         <div class="px-4 py-4 sm:px-5">
-          <div class="flex flex-wrap items-center justify-between gap-4">
-            <div class="flex flex-wrap items-baseline gap-2">
-              <h1 class="text-xl font-semibold text-gray-900">VAS Request Details</h1>
-              <Breadcrumbs />
-            </div>
-            <div class="flex items-center gap-2">
-              <button
-                v-if="canEdit"
-                type="button"
-                class="rounded bg-green-500 px-4 py-2 text-sm font-medium text-white hover:bg-green-600"
-                @click="goToEdit"
-              >
-                Edit Request
-              </button>
-              <button
-                type="button"
-                class="rounded p-2 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-                aria-label="Close"
-                @click="goBack"
-              >
-                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+          <div class="flex flex-wrap items-center gap-3">
+            <button
+              v-if="canEdit"
+              type="button"
+              class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+              @click="goToEdit"
+            >
+              Edit VAS Request
+            </button>
+            <h1 class="text-xl font-semibold text-gray-900">VAS Request Details</h1>
+            <Breadcrumbs />
           </div>
         </div>
 
@@ -126,109 +130,116 @@ onMounted(() => load())
         </div>
 
         <div v-else class="px-4 py-5 sm:px-5">
-          <!-- Basic Information: compact grid, label + value on same row. Row 1: ID, Submission Date, Company. Row 2: Request Type, Account Number, Created. -->
-          <section class="mb-5">
-            <h2 class="mb-3 text-sm font-semibold text-gray-900">Basic Information</h2>
+          <!-- Basic Information: label: value with colon and spacing -->
+          <section class="mb-6">
+            <h2 class="mb-3 border-b border-gray-200 pb-2 text-base font-semibold text-gray-900">Basic Information</h2>
             <div class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
-              <div class="flex items-baseline gap-2">
-                <span class="shrink-0 text-xs font-medium text-gray-500">Request ID</span>
-                <span class="text-sm font-medium text-gray-800">{{ request.id }}</span>
+              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span class="shrink-0 text-sm font-medium text-gray-500">Request ID:</span>
+                <span class="text-sm font-medium text-gray-900">{{ request.id }}</span>
               </div>
-              <div class="flex items-baseline gap-2">
-                <span class="shrink-0 text-xs font-medium text-gray-500">Submission Date</span>
-                <span class="text-sm font-medium text-gray-800">{{ formatDateTime(request.submitted_at) }}</span>
+              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span class="shrink-0 text-sm font-medium text-gray-500">Submission Date:</span>
+                <span class="text-sm font-medium text-gray-900">{{ formatDateTime(request.submitted_at) }}</span>
               </div>
-              <div class="flex items-baseline gap-2">
-                <span class="shrink-0 text-xs font-medium text-gray-500">Company Name</span>
-                <span class="text-sm font-medium text-gray-800">{{ displayVal(request.company_name) }}</span>
+              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span class="shrink-0 text-sm font-medium text-gray-500">Company Name:</span>
+                <span class="text-sm font-medium text-gray-900">{{ displayVal(request.company_name) }}</span>
               </div>
-              <div class="flex items-baseline gap-2">
-                <span class="shrink-0 text-xs font-medium text-gray-500">Request Type</span>
-                <span class="text-sm font-medium text-gray-800">{{ displayVal(request.request_type) }}</span>
+              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span class="shrink-0 text-sm font-medium text-gray-500">Request Type:</span>
+                <span class="text-sm font-medium text-gray-900">{{ displayVal(request.request_type) }}</span>
               </div>
-              <div class="flex items-baseline gap-2">
-                <span class="shrink-0 text-xs font-medium text-gray-500">Account Number</span>
-                <span class="text-sm font-medium text-gray-800">{{ displayVal(request.account_number) }}</span>
+              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span class="shrink-0 text-sm font-medium text-gray-500">Account Number:</span>
+                <span class="text-sm font-medium text-gray-900">{{ displayVal(request.account_number) }}</span>
               </div>
-              <div class="flex items-baseline gap-2">
-                <span class="shrink-0 text-xs font-medium text-gray-500">Created</span>
-                <span class="text-sm font-medium text-gray-800">{{ formatDateTime(request.created_at) }}</span>
+              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span class="shrink-0 text-sm font-medium text-gray-500">Created:</span>
+                <span class="text-sm font-medium text-gray-900">{{ formatDateTime(request.created_at) }}</span>
               </div>
             </div>
           </section>
 
-          <!-- Description (no "Request" heading) -->
-          <section class="mb-5">
-            <div class="flex items-start gap-2">
-              <span class="shrink-0 text-xs font-medium text-gray-500">Description</span>
-              <span class="min-w-0 flex-1 text-sm font-medium text-gray-800 whitespace-pre-wrap">{{ displayVal(request.description) }}</span>
+          <!-- Description -->
+          <section class="mb-6">
+            <div class="flex flex-wrap items-start gap-x-3 gap-y-1">
+              <span class="shrink-0 text-sm font-medium text-gray-500">Description:</span>
+              <span class="min-w-0 flex-1 text-sm font-medium text-gray-900 whitespace-pre-wrap">{{ displayVal(request.description) }}</span>
             </div>
           </section>
 
-          <!-- Team: label + value on same row, 4 columns -->
-          <section class="mb-5">
-            <h2 class="mb-3 text-sm font-semibold text-gray-900">Team</h2>
+          <!-- Team -->
+          <section class="mb-6">
+            <h2 class="mb-3 border-b border-gray-200 pb-2 text-base font-semibold text-gray-900">Team</h2>
             <div class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div class="flex items-baseline gap-2">
-                <span class="shrink-0 text-xs font-medium text-gray-500">Sales Agent</span>
-                <span class="text-sm font-medium text-gray-800">{{ displayVal(request.sales_agent_name) }}</span>
+              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span class="shrink-0 text-sm font-medium text-gray-500">Sales Agent:</span>
+                <span class="text-sm font-medium text-gray-900">{{ displayVal(request.sales_agent_name) }}</span>
               </div>
-              <div class="flex items-baseline gap-2">
-                <span class="shrink-0 text-xs font-medium text-gray-500">Team Leader</span>
-                <span class="text-sm font-medium text-gray-800">{{ displayVal(request.team_leader_name) }}</span>
+              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span class="shrink-0 text-sm font-medium text-gray-500">Team Leader:</span>
+                <span class="text-sm font-medium text-gray-900">{{ displayVal(request.team_leader_name) }}</span>
               </div>
-              <div class="flex items-baseline gap-2">
-                <span class="shrink-0 text-xs font-medium text-gray-500">Manager</span>
-                <span class="text-sm font-medium text-gray-800">{{ displayVal(request.manager_name) }}</span>
+              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span class="shrink-0 text-sm font-medium text-gray-500">Manager:</span>
+                <span class="text-sm font-medium text-gray-900">{{ displayVal(request.manager_name) }}</span>
               </div>
-              <div class="flex items-baseline gap-2">
-                <span class="shrink-0 text-xs font-medium text-gray-500">Back Office Executive</span>
-                <span class="text-sm font-medium text-gray-800">{{ displayVal(request.back_office_executive_name) }}</span>
+              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span class="shrink-0 text-sm font-medium text-gray-500">Back Office Executive:</span>
+                <span class="text-sm font-medium text-gray-900">{{ displayVal(request.back_office_executive_name) }}</span>
               </div>
             </div>
           </section>
 
-          <!-- Status & Documents: one row, compact -->
-          <section class="mb-5">
-            <h2 class="mb-3 text-sm font-semibold text-gray-900">Status & Documents</h2>
-            <div class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-              <div class="flex items-baseline gap-2">
-                <span class="shrink-0 text-xs font-medium text-gray-500">Status</span>
-                <span
-                  v-if="request.status"
-                  :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize', statusBadgeClass(request.status)]"
+          <!-- Documents -->
+          <section class="mb-6">
+            <h2 class="mb-3 border-b border-gray-200 pb-2 text-base font-semibold text-gray-900">Documents</h2>
+            <div v-if="request.documents?.length">
+              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div
+                  v-for="doc in request.documents"
+                  :key="doc.id"
+                  class="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
                 >
-                  {{ request.status }}
-                </span>
-                <span v-else class="text-sm text-gray-500">—</span>
-              </div>
-              <div class="flex items-start gap-2">
-                <span class="shrink-0 text-xs font-medium text-gray-500">Documents</span>
-                <div class="min-w-0 flex-1">
-                  <template v-if="request.documents?.length">
-                    <ul class="list-inside list-disc text-sm text-gray-800">
-                      <li v-for="doc in request.documents" :key="doc.id" class="truncate max-w-md" :title="docDisplayName(doc)">
-                        {{ docDisplayName(doc) }}
-                      </li>
-                    </ul>
-                  </template>
-                  <span v-else class="text-sm text-gray-500">No documents</span>
+                  <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-red-50 text-red-600">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-sm font-medium text-gray-900">{{ docDisplayName(doc) }}</p>
+                    <p v-if="doc.size != null" class="mt-0.5 text-xs text-gray-500">{{ formatFileSize(doc.size) }}</p>
+                  </div>
+                  <button
+                    type="button"
+                    class="shrink-0 rounded p-2 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                    :title="'Download ' + docDisplayName(doc)"
+                    @click="downloadDocument(doc)"
+                  >
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                  </button>
                 </div>
               </div>
             </div>
+            <div v-else>
+              <span class="text-sm text-gray-500">No documents</span>
+            </div>
           </section>
 
-          <!-- Created By: one row -->
+          <!-- Created By -->
           <section class="mb-2">
-            <h2 class="mb-3 text-sm font-semibold text-gray-900">Created By</h2>
+            <h2 class="mb-3 border-b border-gray-200 pb-2 text-base font-semibold text-gray-900">Created By</h2>
             <div class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-              <div class="flex items-baseline gap-2">
-                <span class="shrink-0 text-xs font-medium text-gray-500">Creator</span>
-                <span class="text-sm font-medium text-gray-800">{{ displayVal(request.creator_name) }}</span>
+              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span class="shrink-0 text-sm font-medium text-gray-500">Creator:</span>
+                <span class="text-sm font-medium text-gray-900">{{ displayVal(request.creator_name) }}</span>
               </div>
-              <div class="flex items-baseline gap-2">
-                <span class="shrink-0 text-xs font-medium text-gray-500">Role</span>
-                <span class="text-sm font-medium text-gray-800">{{ displayVal(request.creator_role) }}</span>
+              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span class="shrink-0 text-sm font-medium text-gray-500">Role:</span>
+                <span class="text-sm font-medium text-gray-900">{{ displayVal(request.creator_role) }}</span>
               </div>
             </div>
           </section>
