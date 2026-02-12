@@ -1,17 +1,18 @@
 <script setup>
 /**
- * Expense Tracker – subtitle, Export + Add Expense (no Hide Filters), summary cards above filters,
- * Advanced Filters + Customize Columns buttons, filters panel 4 per row with Apply/Reset, table with View/Edit/Delete.
+ * Expense Tracker – Filters + Advanced Filters (DD-MM-YYYY), sortable editable datatable, delete with confirmation.
  */
 import { ref, computed, onMounted } from 'vue'
+import { toDdMmYyyy, fromDdMmYyyy } from '@/lib/dateFormat'
 import expensesApi from '@/services/expensesApi'
 import { useAuthStore } from '@/stores/auth'
 import AdvancedFilters from '@/components/expenses/AdvancedFilters.vue'
 import AddExpenseModal from '@/components/expenses/AddExpenseModal.vue'
+import EditExpenseModal from '@/components/expenses/EditExpenseModal.vue'
 import ExpenseDetailModal from '@/components/expenses/ExpenseDetailModal.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import ExpenseTable from '@/components/expenses/ExpenseTable.vue'
-import Pagination from '@/components/Pagination.vue'
+import ExpenseEditHistoryModal from '@/components/expenses/ExpenseEditHistoryModal.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 
 const auth = useAuthStore()
@@ -22,6 +23,8 @@ const isSuperAdmin = computed(() => {
 })
 const canCreate = computed(() => isSuperAdmin.value || permissions.value.includes('expense_tracker.create'))
 const canExport = computed(() => isSuperAdmin.value || permissions.value.includes('expense_tracker.export_expenses') || permissions.value.includes('expense_tracker.export'))
+const canEdit = computed(() => isSuperAdmin.value || permissions.value.includes('expense_tracker.edit') || permissions.value.includes('expense_tracker.update'))
+const canDelete = computed(() => isSuperAdmin.value || permissions.value.includes('expense_tracker.delete'))
 
 const loading = ref(true)
 const loadError = ref(null)
@@ -42,7 +45,7 @@ const expenses = ref([])
 const meta = ref({ current_page: 1, last_page: 1, per_page: 15, total: 0 })
 const allColumns = ref([])
 const visibleColumns = ref([
-  'expense_date', 'product_category', 'product_description', 'invoice_number', 'vat_amount',
+  'status', 'expense_date', 'product_category', 'product_description', 'invoice_number', 'vat_amount',
   'amount_without_vat', 'vat_amount_currency', 'full_amount', 'added_by', 'created_at',
 ])
 const sort = ref('expense_date')
@@ -53,8 +56,15 @@ const exportLoading = ref(false)
 const expenseToDelete = ref(null)
 const deleting = ref(false)
 const addModalVisible = ref(false)
+const editModalVisible = ref(false)
+const expenseIdForEdit = ref(null)
 const detailModalVisible = ref(false)
 const selectedExpenseId = ref(null)
+const historyModalVisible = ref(false)
+const historyExpenseId = ref(null)
+const historyExpenseRef = ref('')
+const savingRowId = ref(null)
+const savingCell = ref({ rowId: null, col: null })
 
 const filters = ref({
   expense_date_from: '',
@@ -63,6 +73,7 @@ const filters = ref({
   created_to: '',
   product_category: '',
   added_by: '',
+  added_by_user_id: '',
   amount_min: '',
   amount_max: '',
   vat_applicable: 'all',
@@ -86,6 +97,7 @@ function buildParams() {
   if (f.created_to) p.created_to = f.created_to
   if (f.product_category) p.product_category = f.product_category
   if (f.added_by) p.added_by = f.added_by
+  if (f.added_by_user_id) p.added_by_user_id = f.added_by_user_id
   if (f.amount_min !== '' && f.amount_min != null) p.amount_min = f.amount_min
   if (f.amount_max !== '' && f.amount_max != null) p.amount_max = f.amount_max
   if (f.vat_applicable && f.vat_applicable !== 'all') p.vat_applicable = f.vat_applicable
@@ -152,6 +164,7 @@ function resetFilters() {
     created_to: '',
     product_category: '',
     added_by: '',
+    added_by_user_id: '',
     amount_min: '',
     amount_max: '',
     vat_applicable: 'all',
@@ -169,10 +182,55 @@ function onSort({ sort: s, order: o }) {
   load()
 }
 
+const quickDateFromDisplay = computed({
+  get: () => toDdMmYyyy(filters.value.expense_date_from),
+  set: (v) => { filters.value.expense_date_from = fromDdMmYyyy(v) || '' },
+})
+const quickDateToDisplay = computed({
+  get: () => toDdMmYyyy(filters.value.expense_date_to),
+  set: (v) => { filters.value.expense_date_to = fromDdMmYyyy(v) || '' },
+})
+
+async function onInlineEdit({ row, payload, field, value, isStatusToggle, col }) {
+  if (!row?.id) return
+  if (isStatusToggle) savingRowId.value = row.id
+  else if (col != null) savingCell.value = { rowId: row.id, col }
+  const data = payload ?? (() => {
+    const p = {}
+    if (field === 'vat_amount') p.vat_percent = value
+    else if (field === 'expense_date') p.expense_date = value
+    else p[field] = value
+    return p
+  })()
+  try {
+    await expensesApi.update(row.id, data)
+    load()
+  } catch {
+    load()
+  } finally {
+    savingRowId.value = null
+    savingCell.value = { rowId: null, col: null }
+  }
+}
+
 function onPageChange(page) {
   meta.value.current_page = page
   load()
 }
+
+const perPageOptions = [10, 20, 50]
+function onPerPageChange(ev) {
+  const val = parseInt(ev.target?.value, 10)
+  if (val > 0) {
+    meta.value.per_page = val
+    meta.value.current_page = 1
+    load()
+  }
+}
+const pageNumbers = computed(() => {
+  const n = meta.value.last_page || 1
+  return Array.from({ length: n }, (_, i) => i + 1)
+})
 
 async function onSaveColumns(cols) {
   try {
@@ -243,6 +301,32 @@ function closeDetailModal() {
   selectedExpenseId.value = null
 }
 
+function openEditModal(row) {
+  if (row?.id) {
+    expenseIdForEdit.value = row.id
+    editModalVisible.value = true
+  }
+}
+
+function closeEditModal() {
+  editModalVisible.value = false
+  expenseIdForEdit.value = null
+}
+
+const openHistoryModal = (row) => {
+  if (row?.id) {
+    historyExpenseId.value = row.id
+    historyExpenseRef.value = row.expense_id || ''
+    historyModalVisible.value = true
+  }
+}
+
+const closeHistoryModal = () => {
+  historyModalVisible.value = false
+  historyExpenseId.value = null
+  historyExpenseRef.value = ''
+}
+
 function openDeleteConfirm(row) {
   expenseToDelete.value = row
 }
@@ -281,9 +365,11 @@ onMounted(() => {
     <div class="mx-auto max-w-7xl space-y-4">
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 class="text-xl font-semibold text-gray-900 leading-tight">Expense Tracker</h1>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="text-xl font-semibold text-gray-900 leading-tight">Expense Tracker</h1>
+            <Breadcrumbs />
+          </div>
           <p class="mt-0.5 text-sm text-gray-500">Track and manage operational expenses with detailed financial records.</p>
-          <Breadcrumbs class="mt-1" />
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <button
@@ -302,16 +388,17 @@ onMounted(() => {
             </svg>
             {{ exportLoading ? 'Exporting...' : 'Export Expenses' }}
           </button>
-          <router-link
+          <button
             v-if="canCreate"
-            to="/expenses/create"
-            class="inline-flex items-center rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+            type="button"
+            class="inline-flex items-center rounded bg-[#6BC100] px-3 py-2 text-sm font-medium text-white hover:bg-[#5da800]"
+            @click="addModalVisible = true"
           >
             <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
             Add Expense
-          </router-link>
+          </button>
         </div>
       </div>
 
@@ -367,28 +454,72 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Advanced Filters + Customize Columns buttons (like previous modules) -->
-      <div class="flex justify-end gap-2">
-        <button
-          type="button"
-          class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-          @click="advancedVisible = !advancedVisible"
-        >
-          Advanced Filters
-          <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-          @click="columnModalVisible = true"
-        >
-          Customize Columns
-          <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
+      <!-- Filters: Status, Product Category, Apply/Reset, Advanced Filters, Customize Columns -->
+      <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <div class="flex flex-wrap items-end gap-4">
+          <div class="min-w-[140px] max-w-[180px]">
+            <label class="mb-1 block text-xs font-medium text-gray-600">Status</label>
+            <select
+              v-model="filters.status"
+              class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              :disabled="loading"
+            >
+              <option value="">All</option>
+              <option v-for="o in filterOptions.status_options" :key="o.value" :value="o.value">{{ o.label }}</option>
+            </select>
+          </div>
+          <div class="min-w-[140px] max-w-[200px]">
+            <label class="mb-1 block text-xs font-medium text-gray-600">Product Category</label>
+            <select
+              v-model="filters.product_category"
+              class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              :disabled="loading"
+            >
+              <option value="">All Categories</option>
+              <option v-for="c in filterOptions.categories" :key="c.value" :value="c.value">{{ c.label }}</option>
+            </select>
+          </div>
+          <div class="flex gap-2">
+            <button
+              type="button"
+              class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+              :disabled="loading"
+              @click="applyFilters"
+            >
+              Apply Filters
+            </button>
+            <button
+              type="button"
+              class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              :disabled="loading"
+              @click="resetFilters"
+            >
+              Reset
+            </button>
+          </div>
+          <div class="flex gap-2 ml-auto">
+            <button
+              type="button"
+              class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              @click="advancedVisible = !advancedVisible"
+            >
+              Advanced Filters
+              <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              @click="columnModalVisible = true"
+            >
+              Customize Columns
+              <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
 
       <AdvancedFilters
@@ -407,29 +538,64 @@ onMounted(() => {
           :sort="sort"
           :order="order"
           :loading="loading"
+          :saving-row-id="savingRowId"
+          :saving-cell="savingCell"
           :current-page="meta.current_page"
           :per-page="meta.per_page"
+          :filter-options="filterOptions"
+          :can-edit="canEdit"
+          :can-delete="canDelete"
           @sort="onSort"
           @view="openDetailModal"
+          @open-edit="openEditModal"
+          @edit="onInlineEdit"
+          @view-history="openHistoryModal"
           @delete="openDeleteConfirm"
         />
-        <div
-          class="flex flex-wrap items-center gap-4 border-t border-gray-200 bg-white px-4 py-3"
-          :class="meta.last_page > 1 ? 'justify-between' : 'justify-start'"
-        >
+        <div class="flex flex-wrap items-center gap-4 border-t border-gray-200 bg-white px-4 py-3">
           <p class="text-sm text-gray-600">
             Showing {{ meta.total ? (meta.current_page - 1) * meta.per_page + 1 : 0 }} to {{ Math.min(meta.current_page * meta.per_page, meta.total) }} of {{ meta.total }} entries
           </p>
-          <Pagination
-            v-if="meta.last_page > 1"
-            :meta="{
-              prev_page_url: meta.current_page > 1 ? '#' : null,
-              next_page_url: meta.current_page < meta.last_page ? '#' : null,
-              current_page: meta.current_page,
-              last_page: meta.last_page,
-            }"
-            @change="onPageChange"
-          />
+          <div class="flex items-center gap-2">
+            <label for="expense-per-page" class="text-sm text-gray-600">Number of pages</label>
+            <select
+              id="expense-per-page"
+              :value="meta.per_page"
+              class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700"
+              @change="onPerPageChange"
+            >
+              <option v-for="n in perPageOptions" :key="n" :value="n">{{ n }}</option>
+            </select>
+          </div>
+          <div v-if="meta.last_page > 1" class="ml-auto flex items-center gap-1">
+            <button
+              type="button"
+              class="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="meta.current_page <= 1"
+              @click="onPageChange(meta.current_page - 1)"
+            >
+              Previous
+            </button>
+            <button
+              v-for="p in pageNumbers"
+              :key="p"
+              type="button"
+              class="min-w-[2rem] rounded border px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+              :class="p === meta.current_page ? 'border-green-600 bg-green-600 text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'"
+              :disabled="p === meta.current_page"
+              @click="onPageChange(p)"
+            >
+              {{ p }}
+            </button>
+            <button
+              type="button"
+              class="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="meta.current_page >= meta.last_page"
+              @click="onPageChange(meta.current_page + 1)"
+            >
+              Next
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -444,10 +610,27 @@ onMounted(() => {
       @created="load()"
     />
 
+    <EditExpenseModal
+      :visible="editModalVisible"
+      :expense-id="expenseIdForEdit"
+      :categories="filterOptions.categories"
+      :vat-percent-options="filterOptions.vat_percent_options"
+      :added-by-users="filterOptions.added_by_users"
+      @close="closeEditModal"
+      @updated="load(); closeEditModal()"
+    />
+
     <ExpenseDetailModal
       :visible="detailModalVisible"
       :expense-id="selectedExpenseId"
       @close="closeDetailModal"
+    />
+
+    <ExpenseEditHistoryModal
+      :visible="historyModalVisible"
+      :expense-id="historyExpenseId"
+      :expense-ref="historyExpenseRef"
+      @close="closeHistoryModal"
     />
 
     <ColumnCustomizerModal

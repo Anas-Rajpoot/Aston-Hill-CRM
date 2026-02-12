@@ -1,12 +1,14 @@
 <script setup>
 /**
- * Expense Details modal – compact layout, Expense Information (dense grid),
- * Financial Summary (one row), Attachments section. Permissions: view required; Edit if canEdit.
+ * Expense Details modal – design per image: Expense Information (ID, Status, Product Category,
+ * Product Description, Invoice Number, Added By, Expense Date, Created Date), Financial Summary,
+ * Attachments (all uploaded images + documents with download). Product Description after Category; Added By after Invoice.
  */
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import expensesApi from '@/services/expensesApi'
+import api from '@/lib/axios'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -21,6 +23,7 @@ const auth = useAuthStore()
 const expense = ref(null)
 const loading = ref(false)
 const loadError = ref(null)
+const imageBlobUrls = ref({})
 
 const permissions = computed(() => auth.user?.permissions ?? [])
 const isSuperAdmin = computed(() => {
@@ -46,10 +49,44 @@ function goToEdit() {
   }
 }
 
+/** Build download URL (for links). For img src we use blob URL when available. */
+function attachmentUrl(att) {
+  return att?.url ?? ''
+}
+
+/** Get image src: use blob URL if fetched (for token auth), else direct url (for cookie auth) */
+function imageSrc(att) {
+  if (!att) return ''
+  const id = att.id
+  if (imageBlobUrls.value[id]) return imageBlobUrls.value[id]
+  return att.url || ''
+}
+
+async function loadImageBlobUrls(attachments) {
+  const images = (attachments ?? []).filter((a) => a.is_image)
+  Object.values(imageBlobUrls.value).forEach((url) => URL.revokeObjectURL(url))
+  imageBlobUrls.value = {}
+  for (const att of images) {
+    if (!att.url) continue
+    try {
+      const reqUrl = att.url.startsWith('http') ? att.url : (api.defaults.baseURL || '') + (att.url.startsWith('/') ? '' : '/') + att.url
+      const { data } = await api.get(reqUrl, { responseType: 'blob' })
+      imageBlobUrls.value[att.id] = URL.createObjectURL(data)
+    } catch {
+      imageBlobUrls.value[att.id] = att.url
+    }
+  }
+}
+
+const imageAttachments = computed(() => (expense.value?.attachments ?? []).filter((a) => a.is_image))
+const documentAttachments = computed(() => (expense.value?.attachments ?? []).filter((a) => !a.is_image))
+
 watch(
   () => [props.visible, props.expenseId],
   async ([visible, id]) => {
     if (!visible || !id) {
+      Object.values(imageBlobUrls.value).forEach((url) => URL.revokeObjectURL(url))
+      imageBlobUrls.value = {}
       expense.value = null
       loadError.value = null
       return
@@ -59,6 +96,9 @@ watch(
     try {
       const { data } = await expensesApi.show(id)
       expense.value = data.data ?? null
+      if (expense.value?.attachments?.length) {
+        loadImageBlobUrls(expense.value.attachments)
+      }
     } catch (e) {
       loadError.value = e?.response?.data?.message || 'Failed to load expense.'
       expense.value = null
@@ -68,23 +108,9 @@ watch(
   }
 )
 
-const infoRows = computed(() => {
-  const e = expense.value
-  if (!e) return []
-  return [
-    { label: 'Expense ID', value: e.expense_id ?? `EXP-${e.id}`, highlight: true },
-    { label: 'Product Category', value: e.product_category ?? '—' },
-    { label: 'Added By', value: e.added_by ?? '—' },
-    { label: 'Status', value: e.status, isStatus: true },
-    { label: 'Invoice Number', value: e.invoice_number ?? '—' },
-    { label: 'Expense Date', value: e.expense_date ?? '—' },
-    { label: 'Created Date', value: e.created_at ?? '—' },
-    { label: 'Product Description', value: e.product_description ?? '—', span: true },
-    ...(e.comment ? [{ label: 'Comment / Remarks', value: e.comment, span: true }] : []),
-  ]
+onBeforeUnmount(() => {
+  Object.values(imageBlobUrls.value).forEach((url) => URL.revokeObjectURL(url))
 })
-
-const attachments = computed(() => expense.value?.attachments ?? [])
 </script>
 
 <template>
@@ -105,13 +131,13 @@ const attachments = computed(() => expense.value?.attachments ?? [])
         aria-labelledby="expense-detail-title"
         @click.self="close"
       >
-        <div class="my-8 w-full max-w-3xl max-h-[90vh] flex flex-col rounded-xl bg-white shadow-xl overflow-hidden">
+        <div class="my-8 w-full max-w-3xl max-h-[90vh] flex flex-col rounded-xl bg-white shadow-xl overflow-hidden border border-gray-200">
           <!-- Header -->
           <div class="flex flex-shrink-0 items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
-            <h2 id="expense-detail-title" class="text-lg font-semibold text-gray-900">Expense Details</h2>
+            <h2 id="expense-detail-title" class="text-lg font-bold text-gray-900">Expense Details</h2>
             <button
               type="button"
-              class="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+              class="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
               aria-label="Close"
               @click="close"
             >
@@ -122,7 +148,7 @@ const attachments = computed(() => expense.value?.attachments ?? [])
           </div>
 
           <!-- Body -->
-          <div class="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-5">
+          <div class="flex-1 min-h-0 overflow-y-auto bg-gray-50/30 px-6 py-5 space-y-5">
             <div v-if="loading" class="flex items-center justify-center py-12">
               <svg class="h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
@@ -136,99 +162,145 @@ const attachments = computed(() => expense.value?.attachments ?? [])
             </div>
 
             <template v-else-if="expense">
-              <!-- Expense Information – dense 3-column grid -->
-              <section>
-                <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-700">Expense Information</h3>
-                <dl class="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
-                  <template v-for="(row, i) in infoRows" :key="i">
-                    <div
-                      v-if="!row.span"
-                      class="flex flex-col gap-0.5"
-                    >
-                      <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">{{ row.label }}</dt>
-                      <dd class="text-sm text-gray-900">
-                        <span
-                          v-if="row.isStatus"
-                          class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium"
-                          :class="row.value === 'approved' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'"
-                        >
-                          {{ statusLabel(row.value) }}
-                        </span>
-                        <span v-else :class="row.highlight ? 'font-semibold text-gray-900' : ''">{{ row.value || '—' }}</span>
-                      </dd>
-                    </div>
-                    <div
-                      v-else
-                      class="col-span-2 flex flex-col gap-0.5 sm:col-span-3"
-                    >
-                      <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">{{ row.label }}</dt>
-                      <dd class="text-sm text-gray-900 leading-snug">{{ row.value || '—' }}</dd>
-                    </div>
-                  </template>
+              <!-- Expense Information – labels muted, values bold for readability -->
+              <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                <h3 class="mb-4 text-sm font-bold text-gray-900">Expense Information</h3>
+                <dl class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+                  <div>
+                    <dt class="text-sm text-gray-500">Expense ID</dt>
+                    <dd class="mt-0.5 text-sm font-bold text-gray-900">{{ expense.expense_id ?? '—' }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-sm text-gray-500">Status</dt>
+                    <dd class="mt-0.5">
+                      <span
+                        class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                        :class="expense.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'"
+                      >
+                        {{ statusLabel(expense.status) }}
+                      </span>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt class="text-sm text-gray-500">Product Category</dt>
+                    <dd class="mt-0.5 text-sm font-bold text-gray-900">{{ expense.product_category ?? '—' }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-sm text-gray-500">Invoice Number</dt>
+                    <dd class="mt-0.5 text-sm font-bold text-gray-900">{{ expense.invoice_number ?? '—' }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-sm text-gray-500">Added By</dt>
+                    <dd class="mt-0.5 text-sm font-bold text-gray-900">{{ expense.added_by ?? '—' }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-sm text-gray-500">Expense Date</dt>
+                    <dd class="mt-0.5 text-sm font-bold text-gray-900">{{ expense.expense_date ?? '—' }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-sm text-gray-500">Created Date</dt>
+                    <dd class="mt-0.5 text-sm font-bold text-gray-900">{{ expense.created_at ?? '—' }}</dd>
+                  </div>
+                  <div class="sm:col-span-2">
+                    <dt class="text-sm text-gray-500">Product Description</dt>
+                    <dd class="mt-0.5 text-sm font-bold text-gray-900 leading-snug">{{ expense.product_description ?? '—' }}</dd>
+                  </div>
+                  <div v-if="expense.comment" class="sm:col-span-2">
+                    <dt class="text-sm text-gray-500">Comment / Remarks</dt>
+                    <dd class="mt-0.5 text-sm font-bold text-gray-900 leading-snug">{{ expense.comment }}</dd>
+                  </div>
                 </dl>
               </section>
 
-              <!-- Financial Summary – one row -->
-              <section class="rounded-lg border border-gray-200 bg-gray-50/80 px-4 py-4">
-                <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-700">Financial Summary</h3>
-                <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                  <div class="flex flex-col gap-0.5">
-                    <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">VAT %</span>
-                    <span class="text-sm font-medium text-gray-900">
-                      {{ expense.vat_percent != null ? expense.vat_percent + '%' : '—' }}
+              <!-- Financial Summary – two-column layout, one row per item; Total Amount bold green -->
+              <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                <h3 class="mb-4 text-sm font-bold text-gray-900">Financial Summary</h3>
+                <div class="space-y-0">
+                  <div class="flex items-center justify-between py-2">
+                    <span class="text-sm text-gray-600">VAT Percentage</span>
+                    <span class="text-sm font-bold text-gray-900">{{ expense.vat_percent != null ? expense.vat_percent + '%' : '—' }}</span>
+                  </div>
+                  <div class="flex items-center justify-between py-2">
+                    <span class="text-sm text-gray-600">Amount (Without VAT)</span>
+                    <span class="text-sm font-bold text-gray-900">
+                      {{ expense.amount_without_vat != null ? 'AED ' + Number(expense.amount_without_vat).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—' }}
                     </span>
                   </div>
-                  <div class="flex flex-col gap-0.5">
-                    <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Amount (Without VAT)</span>
-                    <span class="text-sm font-medium text-gray-900">
-                      AED {{ expense.amount_without_vat != null ? Number(expense.amount_without_vat).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—' }}
+                  <div class="flex items-center justify-between py-2">
+                    <span class="text-sm text-gray-600">VAT Amount</span>
+                    <span class="text-sm font-bold text-gray-900">
+                      {{ expense.vat_amount_currency != null ? 'AED ' + Number(expense.vat_amount_currency).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—' }}
                     </span>
                   </div>
-                  <div class="flex flex-col gap-0.5">
-                    <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">VAT Amount</span>
-                    <span class="text-sm font-medium text-gray-900">
-                      AED {{ expense.vat_amount_currency != null ? Number(expense.vat_amount_currency).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—' }}
-                    </span>
-                  </div>
-                  <div class="flex flex-col gap-0.5">
-                    <span class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Total Amount</span>
-                    <span class="text-base font-semibold text-green-700">
-                      AED {{ expense.full_amount != null ? Number(expense.full_amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—' }}
+                  <div class="border-t border-gray-200 my-2" />
+                  <div class="flex items-center justify-between py-2">
+                    <span class="text-sm font-bold text-gray-900">Total Amount</span>
+                    <span class="text-base font-bold text-green-600">
+                      {{ expense.full_amount != null ? 'AED ' + Number(expense.full_amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—' }}
                     </span>
                   </div>
                 </div>
               </section>
 
-              <!-- Attachments -->
-              <section>
-                <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-700">Attachments</h3>
-                <div v-if="attachments.length" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div
-                    v-for="(att, idx) in attachments"
-                    :key="idx"
-                    class="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm"
-                  >
-                    <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-green-50 text-green-600">
-                      <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
+              <!-- Attachments: images as gallery, documents as cards with download -->
+              <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                <h3 class="mb-3 text-sm font-bold text-gray-900">Attachments</h3>
+                <div v-if="expense.attachments?.length" class="space-y-4">
+                  <!-- Image attachments – show all as thumbnails -->
+                  <div v-if="imageAttachments.length" class="space-y-2">
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Images</p>
+                    <div class="flex flex-wrap gap-3">
+                      <a
+                        v-for="(att, idx) in imageAttachments"
+                        :key="'img-' + idx"
+                        :href="attachmentUrl(att)"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="block overflow-hidden rounded-lg border border-gray-200 bg-gray-50 hover:border-green-400 transition-colors"
+                      >
+                        <img
+                          :src="imageSrc(att)"
+                          :alt="att.original_name || 'Image'"
+                          class="h-24 w-24 object-cover"
+                          loading="lazy"
+                          @error="($e) => ($e.target.style.display = 'none')"
+                        />
+                        <p class="max-w-[6rem] truncate px-1 py-0.5 text-center text-xs text-gray-600">{{ att.original_name }}</p>
+                      </a>
                     </div>
-                    <div class="min-w-0 flex-1">
-                      <p class="truncate text-sm font-medium text-gray-900">{{ att.name || att.filename || 'Document' }}</p>
-                      <p class="text-xs text-gray-500">{{ att.type || 'Document' }}</p>
+                  </div>
+                  <!-- Document attachments (PDF, etc.) – cards with download -->
+                  <div v-if="documentAttachments.length" class="space-y-2">
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Documents</p>
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div
+                        v-for="(att, idx) in documentAttachments"
+                        :key="'doc-' + idx"
+                        class="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3"
+                      >
+                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-50 text-green-600">
+                          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                          <p class="truncate text-sm font-medium text-gray-900">{{ att.original_name || att.name || 'Document' }}</p>
+                          <p class="text-xs text-gray-500">{{ att.type || 'Document' }}</p>
+                        </div>
+                        <a
+                          :href="attachmentUrl(att)"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          download
+                          class="flex-shrink-0 rounded p-1.5 text-gray-500 hover:bg-gray-200 hover:text-gray-700"
+                          title="Download"
+                        >
+                          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                        </a>
+                      </div>
                     </div>
-                    <a
-                      v-if="att.url"
-                      :href="att.url"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      class="flex-shrink-0 rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                      title="Download"
-                    >
-                      <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                    </a>
                   </div>
                 </div>
                 <div v-else class="rounded-lg border border-dashed border-gray-200 bg-gray-50/50 px-4 py-6 text-center text-sm text-gray-500">
@@ -243,14 +315,14 @@ const attachments = computed(() => expense.value?.attachments ?? [])
             <button
               v-if="expense && canEdit"
               type="button"
-              class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
               @click="goToEdit"
             >
               Edit Expense
             </button>
             <button
               type="button"
-              class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors"
+              class="rounded bg-[#6BC100] px-4 py-2 text-sm font-medium text-white hover:bg-[#5da800] transition-colors"
               @click="close"
             >
               Close

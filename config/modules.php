@@ -275,7 +275,7 @@ return [
             'created_at' => ['label' => 'Created Date', 'filter' => 'date', 'sortable' => true],
             'status' => ['label' => 'Status', 'filter' => 'select', 'sortable' => true],
         ],
-        'default_columns' => ['expense_date', 'product_category', 'product_description', 'invoice_number', 'vat_amount', 'amount_without_vat', 'vat_amount_currency', 'full_amount', 'added_by', 'created_at'],
+        'default_columns' => ['status', 'expense_date', 'product_category', 'product_description', 'invoice_number', 'vat_amount', 'amount_without_vat', 'vat_amount_currency', 'full_amount', 'added_by', 'created_at'],
         'default_sort' => ['expense_date', 'desc'],
     ],
 

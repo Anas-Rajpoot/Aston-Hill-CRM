@@ -73,6 +73,7 @@ Route::get('/clients', $spa);
 Route::get('/clients/create', $spa);
 Route::get('/clients/{id}', $spa)->whereNumber('id');
 Route::get('/clients/{id}/edit', $spa)->whereNumber('id');
+Route::get('/dsp-tracker', $spa);
 Route::get('/gsm-tracker', $spa);
 Route::get('/employees', $spa);
 Route::get('/employees/{id}', $spa)->whereNumber('id');

@@ -206,21 +206,22 @@ class ExtensionsApiController extends Controller
 
     /**
      * Summary counts for dashboard cards: total_extensions, assigned, unassigned, active_status.
+     * Single query to avoid N+1 and reduce round-trips.
      */
     public function summary(): JsonResponse
     {
         $this->authorize('viewAny', CiscoExtension::class);
 
-        $total = CiscoExtension::query()->count();
-        $assigned = CiscoExtension::query()->whereNotNull('assigned_to')->count();
-        $unassigned = CiscoExtension::query()->whereNull('assigned_to')->count();
-        $activeStatus = CiscoExtension::query()->where('status', CiscoExtension::STATUS_ACTIVE)->count();
+        $row = CiscoExtension::query()->selectRaw(
+            'COUNT(*) as total, SUM(CASE WHEN assigned_to IS NOT NULL THEN 1 ELSE 0 END) as assigned, SUM(CASE WHEN assigned_to IS NULL THEN 1 ELSE 0 END) as unassigned, SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as active_status',
+            [CiscoExtension::STATUS_ACTIVE]
+        )->first();
 
         return response()->json([
-            'total_extensions' => $total,
-            'assigned' => $assigned,
-            'unassigned' => $unassigned,
-            'active_status' => $activeStatus,
+            'total_extensions' => (int) ($row->total ?? 0),
+            'assigned' => (int) ($row->assigned ?? 0),
+            'unassigned' => (int) ($row->unassigned ?? 0),
+            'active_status' => (int) ($row->active_status ?? 0),
         ]);
     }
 
@@ -228,30 +229,34 @@ class ExtensionsApiController extends Controller
     {
         $this->authorize('viewAny', CiscoExtension::class);
 
-        $gateways = CiscoExtension::query()
-            ->whereNotNull('gateway')
-            ->where('gateway', '!=', '')
-            ->distinct()
-            ->pluck('gateway')
-            ->sort()
-            ->values()
-            ->map(fn ($g) => ['value' => $g, 'label' => $g])
-            ->all();
+        $data = Cache::remember('cisco_extensions_filters', 600, function () {
+            $gateways = CiscoExtension::query()
+                ->whereNotNull('gateway')
+                ->where('gateway', '!=', '')
+                ->distinct()
+                ->pluck('gateway')
+                ->sort()
+                ->values()
+                ->map(fn ($g) => ['value' => $g, 'label' => $g])
+                ->all();
 
-        $statuses = [
-            ['value' => 'active', 'label' => 'Active'],
-            ['value' => 'inactive', 'label' => 'InActive'],
-            ['value' => 'not_created', 'label' => 'Not Created'],
-        ];
+            $statuses = [
+                ['value' => 'active', 'label' => 'Active'],
+                ['value' => 'inactive', 'label' => 'InActive'],
+                ['value' => 'not_created', 'label' => 'Not Created'],
+            ];
 
-        return response()->json([
-            'gateways' => $gateways,
-            'statuses' => $statuses,
-            'usage_options' => [
-                ['value' => 'assigned', 'label' => 'Assigned'],
-                ['value' => 'unassigned', 'label' => 'UnAssigned'],
-            ],
-        ]);
+            return [
+                'gateways' => $gateways,
+                'statuses' => $statuses,
+                'usage_options' => [
+                    ['value' => 'assigned', 'label' => 'Assigned'],
+                    ['value' => 'unassigned', 'label' => 'UnAssigned'],
+                ],
+            ];
+        });
+
+        return response()->json($data);
     }
 
     public function columns(Request $request): JsonResponse

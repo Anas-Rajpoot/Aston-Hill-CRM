@@ -179,32 +179,37 @@ class EmployeeApiController extends Controller
     public function filters(Request $request): JsonResponse
     {
         $user = $request->user();
-        $baseQuery = User::query()
-            ->when(! $user->hasRole('superadmin'), fn ($q) => $q->whereDoesntHave('roles', fn ($r) => $r->where('name', 'superadmin')));
+        $cacheKey = 'employee_filters_' . $user->id;
+        $data = Cache::remember($cacheKey, 600, function () use ($user) {
+            $baseQuery = User::query()
+                ->when(! $user->hasRole('superadmin'), fn ($q) => $q->whereDoesntHave('roles', fn ($r) => $r->where('name', 'superadmin')));
 
-        $departments = (clone $baseQuery)->whereNotNull('department')->distinct()->pluck('department')->map(fn ($d) => ['value' => $d, 'label' => $d])->values()->all();
-        $roles = Role::orderBy('name')->get(['id', 'name'])->unique('name')->values()->map(fn ($r) => [
-            'value' => $r->name,
-            'label' => self::formatRoleNameForDisplay($r->name),
-        ])->all();
-        $managers = (clone $baseQuery)->where('status', 'approved')->whereNotNull('manager_id')->with('manager:id,name')->get()->pluck('manager')->filter()->unique('id')->values()->map(fn ($m) => ['id' => $m->id, 'name' => $m->name])->all();
-        $teamLeaders = (clone $baseQuery)->where('status', 'approved')->whereNotNull('team_leader_id')->with('teamLeader:id,name')->get()->pluck('teamLeader')->filter()->unique('id')->values()->map(fn ($t) => ['id' => $t->id, 'name' => $t->name])->all();
+            $departments = (clone $baseQuery)->whereNotNull('department')->distinct()->pluck('department')->map(fn ($d) => ['value' => $d, 'label' => $d])->values()->all();
+            $roles = Role::orderBy('name')->get(['id', 'name'])->unique('name')->values()->map(fn ($r) => [
+                'value' => $r->name,
+                'label' => self::formatRoleNameForDisplay($r->name),
+            ])->all();
 
-        // Also include all approved users as potential managers/team leaders for filter dropdown
-        $allManagers = User::where('status', 'approved')->when(! $user->hasRole('superadmin'), fn ($q) => $q->whereDoesntHave('roles', fn ($r) => $r->where('name', 'superadmin')))->orderBy('name')->get(['id', 'name']);
-        $allTeamLeaders = $allManagers;
+            $allManagers = User::query()
+                ->where('status', 'approved')
+                ->when(! $user->hasRole('superadmin'), fn ($q) => $q->whereDoesntHave('roles', fn ($r) => $r->where('name', 'superadmin')))
+                ->orderBy('name')
+                ->get(['id', 'name']);
 
-        return response()->json([
-            'statuses' => [
-                ['value' => 'approved', 'label' => 'Active'],
-                ['value' => 'rejected', 'label' => 'Inactive'],
-                ['value' => 'pending', 'label' => 'Pending Approval'],
-            ],
-            'departments' => $departments,
-            'roles' => $roles,
-            'managers' => $allManagers->map(fn ($m) => ['id' => $m->id, 'name' => $m->name])->all(),
-            'team_leaders' => $allTeamLeaders->map(fn ($t) => ['id' => $t->id, 'name' => $t->name])->all(),
-        ]);
+            return [
+                'statuses' => [
+                    ['value' => 'approved', 'label' => 'Active'],
+                    ['value' => 'rejected', 'label' => 'Inactive'],
+                    ['value' => 'pending', 'label' => 'Pending Approval'],
+                ],
+                'departments' => $departments,
+                'roles' => $roles,
+                'managers' => $allManagers->map(fn ($m) => ['id' => $m->id, 'name' => $m->name])->all(),
+                'team_leaders' => $allManagers->map(fn ($t) => ['id' => $t->id, 'name' => $t->name])->all(),
+            ];
+        });
+
+        return response()->json($data);
     }
 
     public function columns(Request $request): JsonResponse

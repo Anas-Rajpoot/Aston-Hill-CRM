@@ -26,10 +26,31 @@ export default {
   },
 
   create(payload) {
+    if (payload instanceof FormData) {
+      return api.post('/expenses', payload)
+    }
     return api.post('/expenses', payload)
   },
 
   show(id) {
     return api.get(`/expenses/${id}`)
+  },
+
+  update(id, payload) {
+    return api.put(`/expenses/${id}`, payload)
+  },
+
+  getAuditLog(id) {
+    return api.get(`/expenses/${id}/audit-log`)
+  },
+
+  deleteAttachment(expenseId, attachmentId) {
+    return api.delete(`/expenses/${expenseId}/attachments/${attachmentId}`)
+  },
+
+  addAttachments(expenseId, formData) {
+    return api.post(`/expenses/${expenseId}/attachments`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
   },
 }

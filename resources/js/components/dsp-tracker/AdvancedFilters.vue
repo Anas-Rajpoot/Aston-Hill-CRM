@@ -1,7 +1,8 @@
 <script setup>
 /**
- * Advanced filters for Expense Tracker. No section headings, 4 filters per row. Dates: dd-mm-yyyy.
- * Apply and Reset buttons at bottom.
+ * Advanced filters for DSP Tracker: Activity Number, Company Name, Account Number, Request Type,
+ * Appointment Date From/To, Product, SO Number, Request Status, Rejection Reason, Verifier Name.
+ * Dates: dd-mm-yyyy.
  */
 import { computed } from 'vue'
 import { toDdMmYyyy, fromDdMmYyyy } from '@/lib/dateFormat'
@@ -12,9 +13,7 @@ const props = defineProps({
   filterOptions: {
     type: Object,
     default: () => ({
-      categories: [],
-      vat_options: [],
-      status_options: [],
+      request_status_options: [],
     }),
   },
   loading: { type: Boolean, default: false },
@@ -22,21 +21,13 @@ const props = defineProps({
 
 const emit = defineEmits(['apply', 'reset'])
 
-const expenseDateFromDisplay = computed({
-  get: () => toDdMmYyyy(props.filters.expense_date_from),
-  set: (v) => { props.filters.expense_date_from = fromDdMmYyyy(v) || '' },
+const appointmentDateFromDisplay = computed({
+  get: () => toDdMmYyyy(props.filters.appointment_date_from),
+  set: (v) => { props.filters.appointment_date_from = fromDdMmYyyy(v) || '' },
 })
-const expenseDateToDisplay = computed({
-  get: () => toDdMmYyyy(props.filters.expense_date_to),
-  set: (v) => { props.filters.expense_date_to = fromDdMmYyyy(v) || '' },
-})
-const createdFromDisplay = computed({
-  get: () => toDdMmYyyy(props.filters.created_from),
-  set: (v) => { props.filters.created_from = fromDdMmYyyy(v) || '' },
-})
-const createdToDisplay = computed({
-  get: () => toDdMmYyyy(props.filters.created_to),
-  set: (v) => { props.filters.created_to = fromDdMmYyyy(v) || '' },
+const appointmentDateToDisplay = computed({
+  get: () => toDdMmYyyy(props.filters.appointment_date_to),
+  set: (v) => { props.filters.appointment_date_to = fromDdMmYyyy(v) || '' },
 })
 </script>
 
@@ -50,11 +41,55 @@ const createdToDisplay = computed({
     leave-to-class="opacity-0 -translate-y-2"
   >
     <div v-show="visible" class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div class="border-b border-gray-100 bg-gray-50 px-4 py-2">
+        <p class="text-xs font-medium text-gray-600">All filters</p>
+        <p class="text-xs text-gray-500">Activity Number, Company Name, Account Number, Request Type, Appointment Date, Product, SO Number, Request Status, Rejection Reason, Verifier Name</p>
+      </div>
       <div class="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <label class="mb-1 block text-xs font-medium text-gray-600">Expense Date From</label>
+          <label class="mb-1 block text-xs font-medium text-gray-600">Activity Number</label>
           <input
-            v-model="expenseDateFromDisplay"
+            v-model="filters.activity_number"
+            type="text"
+            placeholder="Search activity number..."
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            :disabled="loading"
+          />
+        </div>
+        <div>
+          <label class="mb-1 block text-xs font-medium text-gray-600">Company Name</label>
+          <input
+            v-model="filters.company_name"
+            type="text"
+            placeholder="Search company..."
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            :disabled="loading"
+          />
+        </div>
+        <div>
+          <label class="mb-1 block text-xs font-medium text-gray-600">Account Number</label>
+          <input
+            v-model="filters.account_number"
+            type="text"
+            placeholder="Search account..."
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            :disabled="loading"
+          />
+        </div>
+        <div>
+          <label class="mb-1 block text-xs font-medium text-gray-600">Request Type</label>
+          <input
+            v-model="filters.request_type"
+            type="text"
+            placeholder="Search request type..."
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            :disabled="loading"
+          />
+        </div>
+        <div>
+          <label class="mb-1 block text-xs font-medium text-gray-600">Appointment Date From</label>
+          <input
+            v-model="appointmentDateFromDisplay"
             type="text"
             placeholder="DD-MM-YYYY"
             class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
@@ -62,9 +97,9 @@ const createdToDisplay = computed({
           />
         </div>
         <div>
-          <label class="mb-1 block text-xs font-medium text-gray-600">Expense Date To</label>
+          <label class="mb-1 block text-xs font-medium text-gray-600">Appointment Date To</label>
           <input
-            v-model="expenseDateToDisplay"
+            v-model="appointmentDateToDisplay"
             type="text"
             placeholder="DD-MM-YYYY"
             class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
@@ -72,108 +107,52 @@ const createdToDisplay = computed({
           />
         </div>
         <div>
-          <label class="mb-1 block text-xs font-medium text-gray-600">Created Date From</label>
+          <label class="mb-1 block text-xs font-medium text-gray-600">Product</label>
           <input
-            v-model="createdFromDisplay"
+            v-model="filters.product"
             type="text"
-            placeholder="DD-MM-YYYY"
+            placeholder="Search product..."
             class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           />
         </div>
         <div>
-          <label class="mb-1 block text-xs font-medium text-gray-600">Created Date To</label>
+          <label class="mb-1 block text-xs font-medium text-gray-600">SO Number</label>
           <input
-            v-model="createdToDisplay"
+            v-model="filters.so_number"
             type="text"
-            placeholder="DD-MM-YYYY"
+            placeholder="Search SO number..."
             class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           />
         </div>
         <div>
-          <label class="mb-1 block text-xs font-medium text-gray-600">Product Category</label>
+          <label class="mb-1 block text-xs font-medium text-gray-600">Request Status</label>
           <select
-            v-model="filters.product_category"
+            v-model="filters.request_status"
             class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           >
-            <option value="">All Categories</option>
-            <option v-for="c in filterOptions.categories" :key="c.value" :value="c.value">{{ c.label }}</option>
+            <option value="">All Statuses</option>
+            <option v-for="o in filterOptions.request_status_options" :key="o.value" :value="o.value">{{ o.label }}</option>
           </select>
         </div>
         <div>
-          <label class="mb-1 block text-xs font-medium text-gray-600">Added By</label>
-          <select
-            v-if="filterOptions.added_by_users?.length"
-            v-model="filters.added_by_user_id"
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            :disabled="loading"
-            @change="filters.added_by = ''"
-          >
-            <option value="">All Users</option>
-            <option v-for="u in filterOptions.added_by_users" :key="u.value" :value="u.value">{{ u.label }}</option>
-          </select>
+          <label class="mb-1 block text-xs font-medium text-gray-600">Rejection Reason</label>
           <input
-            v-else
-            v-model="filters.added_by"
+            v-model="filters.rejection_reason"
             type="text"
-            placeholder="Enter name"
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            :disabled="loading"
-            @input="filters.added_by_user_id = ''"
-          />
-        </div>
-        <div>
-          <label class="mb-1 block text-xs font-medium text-gray-600">Amount Min (AED)</label>
-          <input
-            v-model.number="filters.amount_min"
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="0.00"
+            placeholder="Search rejection reason..."
             class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           />
         </div>
         <div>
-          <label class="mb-1 block text-xs font-medium text-gray-600">Amount Max (AED)</label>
+          <label class="mb-1 block text-xs font-medium text-gray-600">Verifier Name</label>
           <input
-            v-model.number="filters.amount_max"
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="0.00"
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            :disabled="loading"
-          />
-        </div>
-        <div>
-          <label class="mb-1 block text-xs font-medium text-gray-600">VAT Applicable</label>
-          <select
-            v-model="filters.vat_applicable"
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            :disabled="loading"
-          >
-            <option v-for="o in filterOptions.vat_options" :key="o.value" :value="o.value">{{ o.label }}</option>
-          </select>
-        </div>
-        <div>
-          <label class="mb-1 block text-xs font-medium text-gray-600">Product Description</label>
-          <input
-            v-model="filters.product_description"
+            v-model="filters.verifier_name"
             type="text"
-            placeholder="Search description"
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            :disabled="loading"
-          />
-        </div>
-        <div>
-          <label class="mb-1 block text-xs font-medium text-gray-600">Invoice Number</label>
-          <input
-            v-model="filters.invoice_number"
-            type="text"
-            placeholder="Enter invoice number"
+            placeholder="Search verifier..."
             class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           />
@@ -195,7 +174,7 @@ const createdToDisplay = computed({
           :disabled="loading"
           @click="$emit('reset')"
         >
-          Reset Filters
+          Clear Filters
         </button>
       </div>
     </div>

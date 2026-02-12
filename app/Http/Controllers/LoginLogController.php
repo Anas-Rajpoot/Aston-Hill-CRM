@@ -158,38 +158,43 @@ class LoginLogController extends Controller
     {
         $fileName = 'login_logs_'.now()->format('Ymd_His').'.csv';
 
-        $query = UserLoginLog::query()->with('user');
-
-        if ($request->filled('user_id')) $query->where('user_id', $request->user_id);
-        if ($request->filled('from')) $query->where('login_at', '>=', $request->from.' 00:00:00');
-        if ($request->filled('to')) $query->where('login_at', '<=', $request->to.' 23:59:59');
-
-        $logs = $query->latest('login_at')->limit(5000)->get();
-
         $headers = [
-            "Content-type" => "text/csv",
-            "Content-Disposition" => "attachment; filename={$fileName}",
+            'Content-type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename={$fileName}",
         ];
 
         $columns = ['User', 'Email', 'Login At', 'Logout At', 'Duration Seconds', 'IP', 'Country', 'Suspicious', 'Reason'];
 
-        $callback = function () use ($logs, $columns) {
+        $callback = function () use ($request, $columns) {
             $file = fopen('php://output', 'w');
             fputcsv($file, $columns);
 
-            foreach ($logs as $log) {
-                fputcsv($file, [
-                    optional($log->user)->name,
-                    optional($log->user)->email,
-                    Format::dt($log->login_at, $log->user?->timezone),
-                    Format::dt($log->logout_at, $log->user?->timezone),
-                    $log->active_seconds,
-                    $log->ip_address,
-                    $log->country,
-                    $log->is_suspicious ? 'YES' : 'NO',
-                    $log->suspicious_reason,
-                ]);
+            $query = UserLoginLog::query()->with('user:id,name,email,timezone')->orderByDesc('login_at');
+            if ($request->filled('user_id')) {
+                $query->where('user_id', $request->user_id);
             }
+            if ($request->filled('from')) {
+                $query->where('login_at', '>=', $request->from.' 00:00:00');
+            }
+            if ($request->filled('to')) {
+                $query->where('login_at', '<=', $request->to.' 23:59:59');
+            }
+
+            $query->chunk(500, function ($logs) use ($file) {
+                foreach ($logs as $log) {
+                    fputcsv($file, [
+                        optional($log->user)->name,
+                        optional($log->user)->email,
+                        Format::dt($log->login_at, $log->user?->timezone),
+                        Format::dt($log->logout_at, $log->user?->timezone),
+                        $log->active_seconds,
+                        $log->ip_address,
+                        $log->country,
+                        $log->is_suspicious ? 'YES' : 'NO',
+                        $log->suspicious_reason,
+                    ]);
+                }
+            });
 
             fclose($file);
         };

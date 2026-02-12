@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\UserLoginLog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class AttendanceLogApiController extends Controller
@@ -105,6 +106,7 @@ class AttendanceLogApiController extends Controller
 
     /**
      * Summary stats for dashboard cards: total_users, logged_in, logged_out, missing_logout.
+     * Uses single query for login log counts to reduce round-trips.
      */
     public function summary(Request $request): JsonResponse
     {
@@ -114,55 +116,46 @@ class AttendanceLogApiController extends Controller
 
         $totalUsers = User::query()->where('status', 'approved')->count();
 
-        $loggedIn = UserLoginLog::query()
-            ->whereNull('logout_at')
-            ->where('login_at', '>=', $todayStart)
-            ->count();
-
-        $loggedOut = UserLoginLog::query()
-            ->whereNotNull('logout_at')
-            ->where('login_at', '>=', $todayStart)
-            ->count();
-
-        $missingLogout = UserLoginLog::query()
-            ->whereNull('logout_at')
-            ->where('login_at', '<', $todayStart)
-            ->count();
+        $logRow = UserLoginLog::query()->selectRaw(
+            'SUM(CASE WHEN logout_at IS NULL AND login_at >= ? THEN 1 ELSE 0 END) as logged_in, SUM(CASE WHEN logout_at IS NOT NULL AND login_at >= ? THEN 1 ELSE 0 END) as logged_out, SUM(CASE WHEN logout_at IS NULL AND login_at < ? THEN 1 ELSE 0 END) as missing_logout',
+            [$todayStart, $todayStart, $todayStart]
+        )->first();
 
         return response()->json([
             'total_users' => $totalUsers,
-            'logged_in' => $loggedIn,
-            'logged_out' => $loggedOut,
-            'missing_logout' => $missingLogout,
+            'logged_in' => (int) ($logRow->logged_in ?? 0),
+            'logged_out' => (int) ($logRow->logged_out ?? 0),
+            'missing_logout' => (int) ($logRow->missing_logout ?? 0),
         ]);
     }
 
     /**
-     * Filters for dropdowns: users, roles.
+     * Filters for dropdowns: users, roles. Cached 10 min.
      */
     public function filters(Request $request): JsonResponse
     {
         $this->authorizeView();
 
-        $users = User::query()
-            ->where('status', 'approved')
-            ->orderBy('name')
-            ->get(['id', 'name', 'employee_number'])
-            ->map(fn ($u) => [
-                'id' => $u->id,
-                'name' => $u->name,
-                'employee_id' => $u->employee_number ? 'EMP-' . str_pad((string) ($u->employee_number ?: $u->id), 3, '0', STR_PAD_LEFT) : 'EMP-' . str_pad((string) $u->id, 3, '0', STR_PAD_LEFT),
-            ]);
+        $data = Cache::remember('attendance_log_filters', 600, function () {
+            $users = User::query()
+                ->where('status', 'approved')
+                ->orderBy('name')
+                ->get(['id', 'name', 'employee_number'])
+                ->map(fn ($u) => [
+                    'id' => $u->id,
+                    'name' => $u->name,
+                    'employee_id' => $u->employee_number ? 'EMP-' . str_pad((string) ($u->employee_number ?: $u->id), 3, '0', STR_PAD_LEFT) : 'EMP-' . str_pad((string) $u->id, 3, '0', STR_PAD_LEFT),
+                ]);
 
-        $roles = DB::table('roles')->orderBy('name')->pluck('name')->map(fn ($name) => [
-            'value' => $name,
-            'label' => str_replace('_', ' ', ucwords($name, '_')),
-        ])->values()->all();
+            $roles = DB::table('roles')->orderBy('name')->pluck('name')->map(fn ($name) => [
+                'value' => $name,
+                'label' => str_replace('_', ' ', ucwords($name, '_')),
+            ])->values()->all();
 
-        return response()->json([
-            'users' => $users,
-            'roles' => $roles,
-        ]);
+            return ['users' => $users, 'roles' => $roles];
+        });
+
+        return response()->json($data);
     }
 
     /**

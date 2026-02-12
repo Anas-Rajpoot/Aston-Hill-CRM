@@ -30,8 +30,10 @@ use Illuminate\Support\Facades\Route;
 | - Token: Bearer token in Authorization header (e.g. separate frontend deploy)
 */
 
-// ----- Public -----
-Route::get('/countries', fn () => Country::where('is_active', true)->orderBy('name')->get(['id', 'name', 'code', 'timezone']));
+// ----- Public (cached 1h to reduce DB load) -----
+Route::get('/countries', function () {
+    return Cache::remember('api_countries', 3600, fn () => Country::where('is_active', true)->orderBy('name')->get(['id', 'name', 'code', 'timezone']));
+});
 
 // ----- Auth (guest) – login needs session for same-origin SPA -----
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('web');
@@ -207,6 +209,11 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::get('/expenses/columns', [\App\Http\Controllers\Api\ExpenseApiController::class, 'columns']);
     Route::post('/expenses/columns', [\App\Http\Controllers\Api\ExpenseApiController::class, 'saveColumns']);
     Route::get('/expenses/{expense}', [\App\Http\Controllers\Api\ExpenseApiController::class, 'show'])->whereNumber('expense');
+    Route::get('/expenses/{expense}/attachments/{attachment}/download', [\App\Http\Controllers\Api\ExpenseApiController::class, 'downloadAttachment'])->whereNumber(['expense', 'attachment'])->name('api.expenses.attachments.download');
+    Route::delete('/expenses/{expense}/attachments/{attachment}', [\App\Http\Controllers\Api\ExpenseApiController::class, 'destroyAttachment'])->whereNumber(['expense', 'attachment']);
+    Route::post('/expenses/{expense}/attachments', [\App\Http\Controllers\Api\ExpenseApiController::class, 'addAttachments'])->whereNumber('expense');
+    Route::get('/expenses/{expense}/audit-log', [\App\Http\Controllers\Api\ExpenseApiController::class, 'auditLog'])->whereNumber('expense');
+    Route::put('/expenses/{expense}', [\App\Http\Controllers\Api\ExpenseApiController::class, 'update'])->whereNumber('expense');
     Route::delete('/expenses/{expense}', [\App\Http\Controllers\Api\ExpenseApiController::class, 'destroy'])->whereNumber('expense');
 
     // Users (list, show, update, delete, create – super admin / authorized)
