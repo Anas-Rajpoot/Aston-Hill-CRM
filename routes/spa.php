@@ -84,6 +84,10 @@ Route::get('/cisco-extensions/{id}', $spa)->whereNumber('id');
 Route::get('/cisco-extensions/{id}/edit', $spa)->whereNumber('id');
 Route::get('/attendance-log', $spa);
 Route::get('/reports', $spa);
+Route::get('/reports/lead', $spa);
+Route::get('/reports/field-operations', $spa);
+Route::get('/reports/vas', $spa);
+Route::get('/reports/sla', $spa);
 Route::get('/settings', $spa);
 Route::get('/settings/team-hierarchy', $spa);
 

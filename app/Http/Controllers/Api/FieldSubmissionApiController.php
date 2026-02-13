@@ -68,6 +68,7 @@ class FieldSubmissionApiController extends Controller
             'sales_agent_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'team_leader_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'manager_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'field_executive_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
         ]);
 
         $user = $request->user();
@@ -180,6 +181,9 @@ class FieldSubmissionApiController extends Controller
         }
         if (!empty($validated['manager_id'])) {
             $query->where('manager_id', $validated['manager_id']);
+        }
+        if (!empty($validated['field_executive_id'])) {
+            $query->where('field_executive_id', $validated['field_executive_id']);
         }
         if (!empty($validated['q'])) {
             $term = '%' . addcslashes($validated['q'], '%_\\') . '%';

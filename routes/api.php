@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\MeController;
+use App\Http\Controllers\Api\ReportsApiController;
 use App\Http\Controllers\ColumnPreferenceController;
 use App\Http\Controllers\DataTableController;
 use App\Http\Controllers\ExpenseController;
@@ -256,6 +257,11 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
         Route::put('/roles/{role}/permissions', [RoleApiController::class, 'updateRolePermissions']);
         Route::apiResource('roles', RoleApiController::class);
     });
+
+    // Reports (stats for Lead and Field Operations report pages)
+    Route::get('/reports/lead-stats', [ReportsApiController::class, 'leadStats']);
+    Route::get('/reports/field-stats', [ReportsApiController::class, 'fieldStats']);
+    Route::get('/reports/vas-stats', [ReportsApiController::class, 'vasStats']);
 
     // Datatable
     Route::get('/datatable/{module}', [DataTableController::class, 'index']);
