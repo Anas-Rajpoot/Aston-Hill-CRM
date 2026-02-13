@@ -91,6 +91,14 @@ Route::get('/reports/vas', $spa);
 Route::get('/reports/sla', $spa);
 Route::get('/settings', $spa);
 Route::get('/settings/team-hierarchy', $spa);
+Route::get('/settings/system-preferences', $spa);
+Route::get('/settings/sla', $spa);
+Route::get('/settings/notifications-email', $spa);
+Route::get('/settings/announcement-center', $spa);
+Route::get('/settings/library', $spa);
+Route::get('/settings/data-import-export', $spa);
+Route::get('/settings/security-session', $spa);
+Route::get('/settings/audit-logs', $spa);
 
 Route::get('/roles', $spa);
 Route::get('/roles/create', $spa);

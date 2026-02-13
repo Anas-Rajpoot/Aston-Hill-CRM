@@ -67,14 +67,14 @@ const isActive = (to) => {
 </script>
 
 <template>
-  <aside class="w-64 min-h-screen flex flex-col bg-gray-900 text-gray-200">
+  <aside class="w-64 h-screen flex flex-col flex-shrink-0 overflow-hidden bg-gray-900 text-gray-200">
     <!-- Logo / Title -->
     <div class="h-16 flex items-center px-4 border-b border-gray-700">
       <span class="text-lg font-semibold text-white truncate">CRM Pro Operations Hub</span>
     </div>
 
-    <!-- Main nav -->
-    <nav class="flex-1 p-3 space-y-0.5 overflow-y-auto">
+    <!-- Main nav: custom scrollbar for dark theme -->
+    <nav class="sidebar-nav flex-1 min-h-0 p-3 space-y-0.5 overflow-y-auto overflow-x-hidden">
       <SidebarLink
         v-for="item in navItems"
         :key="item.to"
@@ -150,3 +150,33 @@ const isActive = (to) => {
     </div>
   </aside>
 </template>
+
+<style scoped>
+/* Custom scrollbar for left menu – dark theme, thin and professional */
+.sidebar-nav {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(75 85 99) rgb(31 41 55);
+}
+
+.sidebar-nav::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+  background: rgb(31 41 55);
+  border-radius: 3px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgb(75 85 99);
+  border-radius: 3px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: rgb(107 114 128);
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:active {
+  background: rgb(156 163 175);
+}
+</style>

@@ -7,6 +7,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/lib/axios'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import Toast from '@/components/Toast.vue'
 import { toDdMonYyyy } from '@/lib/dateFormat'
 
 const auth = useAuthStore()
@@ -93,14 +94,33 @@ const addSaving = ref(false)
 const addError = ref('')
 
 function openAddModal() {
-  addForm.value = { verifier_name: '', verifier_number: '', remarks: '' }
-  addError.value = ''
+  resetAddForm()
   showAddModal.value = true
 }
 
+// Toast state for add verifier
+const showToast = ref(false)
+const toastType = ref('success')
+const toastMessage = ref('')
+let addSuccessCloseTimer = null
+
 function closeAddModal() {
   if (addSaving.value) return
+  if (addSuccessCloseTimer) {
+    clearTimeout(addSuccessCloseTimer)
+    addSuccessCloseTimer = null
+  }
   showAddModal.value = false
+  resetAddForm()
+}
+
+function resetAddForm() {
+  addForm.value = { verifier_name: '', verifier_number: '', remarks: '' }
+  addError.value = ''
+}
+
+function dismissToast() {
+  showToast.value = false
 }
 
 async function submitAdd() {
@@ -117,17 +137,35 @@ async function submitAdd() {
   addSaving.value = true
   addError.value = ''
   try {
-    await api.post('/verifiers', {
+    const res = await api.post('/verifiers', {
       verifier_name: name,
       verifier_number: number || null,
       remarks: (addForm.value.remarks || '').trim() || null,
     })
-    closeAddModal()
-    await load()
-    successMessage.value = 'Verifier added.'
-    setTimeout(() => { successMessage.value = '' }, 3000)
+    // Success (201 or success: true)
+    const ok = res?.status === 201 || res?.data?.success === true || res?.data?.message != null
+    if (ok) {
+      toastType.value = 'success'
+      toastMessage.value = 'Verifier added successfully!'
+      showToast.value = true
+      await load()
+      addSuccessCloseTimer = setTimeout(() => {
+        addSuccessCloseTimer = null
+        showAddModal.value = false
+        resetAddForm()
+        showToast.value = false
+      }, 3000)
+    } else {
+      toastType.value = 'error'
+      toastMessage.value = res?.data?.message || 'Failed to add verifier.'
+      showToast.value = true
+    }
   } catch (e) {
-    addError.value = e?.response?.data?.message || 'Failed to add verifier.'
+    const msg = e?.response?.data?.message || e?.response?.data?.errors ? Object.values(e.response.data.errors).flat().join(' ') : 'Failed to add verifier.'
+    addError.value = msg
+    toastType.value = 'error'
+    toastMessage.value = msg
+    showToast.value = true
   } finally {
     addSaving.value = false
   }
@@ -377,6 +415,14 @@ onMounted(() => load())
 
 <template>
   <div class="space-y-6">
+    <Toast
+      :show="showToast"
+      :type="toastType"
+      :message="toastMessage"
+      :duration="toastType === 'error' ? 5000 : 3000"
+      @dismiss="dismissToast"
+    />
+
     <div class="flex flex-wrap items-center justify-between gap-4">
       <div>
         <div class="flex flex-wrap items-baseline gap-2">
@@ -464,9 +510,6 @@ onMounted(() => load())
 
     <!-- Table -->
     <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-      <div class="px-4 py-2 border-b border-gray-200 bg-gray-50 text-sm text-gray-600">
-        Showing {{ fromEntry }} to {{ toEntry }} of {{ meta.total }} results
-      </div>
       <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
@@ -600,7 +643,7 @@ onMounted(() => load())
         <div class="flex flex-wrap items-center gap-2">
           <select
             v-model.number="perPage"
-            class="rounded border border-gray-300 text-sm py-1.5 px-2"
+            class="rounded border border-gray-300 text-sm py-1.5 pl-3 pr-8 min-w-[4.5rem]"
             @change="load(1)"
           >
             <option :value="10">10</option>
