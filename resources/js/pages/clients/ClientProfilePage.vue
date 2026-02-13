@@ -45,6 +45,17 @@ const tabs = [
 
 // Company Details
 const companyDetail = computed(() => client.value?.company_detail ?? null)
+const csrNamesList = computed(() => {
+  const c = client.value
+  const cd = companyDetail.value
+  let list = []
+  if (c?.csrs?.length) {
+    list = c.csrs.map((csr) => csr?.user ?? csr?.user_id ?? '—')
+  } else {
+    list = [cd?.csr_name_1, cd?.csr_name_2, cd?.csr_name_3].filter((n) => n != null && n !== '')
+  }
+  return list.filter((n) => n != null && n !== '' && n !== '—')
+})
 const auditModalVisible = ref(false)
 const audits = ref([])
 const auditsMeta = ref({})
@@ -62,7 +73,12 @@ const productsLoading = ref(false)
 const productsSort = ref('submitted_at')
 const productsOrder = ref('desc')
 const allColumns = ref([])
-const visibleColumns = ref(['company_name', 'submitted_at', 'manager', 'team_leader', 'sales_agent', 'status', 'service_type', 'product_type', 'address', 'product_name', 'mrc', 'quantity', 'other', 'migration_numbers', 'order_number', 'wo_number', 'completion_date', 'additional_notes'])
+const visibleColumns = ref([
+  'id', 'company_name', 'account_number', 'submitted_at', 'manager', 'team_leader', 'sales_agent', 'status',
+  'service_type', 'product_type', 'address', 'product_name', 'mrc', 'quantity', 'other', 'migration_numbers',
+  'fiber', 'order_number', 'wo_number', 'completion_date', 'payment_connection', 'contract_type', 'contract_end_date',
+  'renewal_alert', 'additional_notes',
+])
 const columnModalVisible = ref(false)
 
 // VAS / Customer Support / Alerts
@@ -81,11 +97,11 @@ function displayVal(val) {
 }
 
 function formatDate(d) {
-  if (!d) return '—'
+  if (d == null || d === '') return '—'
   const str = typeof d === 'string' ? d.trim().slice(0, 10) : ''
-  if (!str) return '—'
+  if (!str || str.length < 10) return '—'
   const out = toDdMmYyyy(str)
-  return out || '—'
+  return out || str
 }
 
 function statusBadgeClass(status) {
@@ -302,10 +318,12 @@ onMounted(() => {
             </svg>
             Back to Clients
           </router-link>
-          <h1 class="mt-1 text-xl font-semibold text-gray-900">
-            Client Profile – {{ client?.company_name ?? '…' }}
-          </h1>
-          <Breadcrumbs />
+          <div class="mt-1 flex flex-wrap items-baseline gap-2">
+            <h1 class="text-xl font-semibold text-gray-900">
+              Client Profile – {{ client?.company_name ?? '…' }}
+            </h1>
+            <Breadcrumbs />
+          </div>
         </div>
       </div>
 
@@ -336,17 +354,9 @@ onMounted(() => {
                 {{ client.status ? (client.status.replace('_', ' ')) : '—' }}
               </span>
             </div>
-            <div>
-              <p class="text-xs font-medium text-gray-500">CSR Name</p>
-              <p class="text-sm text-gray-900">{{ displayVal(client.csr_name_1) }}</p>
-            </div>
-            <div>
-              <p class="text-xs font-medium text-gray-500">CSR Name</p>
-              <p class="text-sm text-gray-900">{{ displayVal(client.csr_name_2) }}</p>
-            </div>
-            <div>
-              <p class="text-xs font-medium text-gray-500">CSR Name</p>
-              <p class="text-sm text-gray-900">{{ displayVal(client.csr_name_3) }}</p>
+            <div v-for="(csrName, csrIdx) in csrNamesList" :key="'csr-' + csrIdx">
+              <p class="text-xs font-medium text-gray-500">CSR Name{{ csrNamesList.length > 1 ? ' ' + (csrIdx + 1) : '' }}</p>
+              <p class="text-sm text-gray-900">{{ displayVal(csrName) }}</p>
             </div>
             <div>
               <p class="text-xs font-medium text-gray-500">Revenue</p>
@@ -380,7 +390,7 @@ onMounted(() => {
                 <div class="flex items-center gap-2">
                   <button
                     type="button"
-                    class="rounded border border-gray-300 bg-white p-2 text-gray-600 hover:bg-gray-50"
+                    class="rounded border border-gray-300 bg-white p-2 text-orange-500 hover:bg-orange-50"
                     title="View History"
                     @click="openAuditModal"
                   >
@@ -400,74 +410,86 @@ onMounted(() => {
                   </router-link>
                 </div>
               </div>
-              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div>
                   <p class="text-xs font-medium text-gray-500">Company Name</p>
-                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm text-gray-900">{{ displayVal(client.company_name) }}</p>
+                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm font-medium text-gray-900">{{ displayVal(client.company_name) }}</p>
                 </div>
                 <div>
                   <p class="text-xs font-medium text-gray-500">Account Number</p>
-                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm text-gray-900">{{ displayVal(client.account_number) }}</p>
+                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm font-medium text-gray-900">{{ displayVal(client.account_number) }}</p>
                 </div>
                 <div>
                   <p class="text-xs font-medium text-gray-500">Trade License Issuing Authority</p>
-                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm text-gray-900">{{ displayVal(companyDetail?.trade_license_issuing_authority) }}</p>
+                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm font-medium text-gray-900">{{ displayVal(companyDetail?.trade_license_issuing_authority) }}</p>
                 </div>
                 <div>
                   <p class="text-xs font-medium text-gray-500">Company Category</p>
-                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm text-gray-900">{{ displayVal(companyDetail?.company_category) }}</p>
+                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm font-medium text-gray-900">{{ displayVal(companyDetail?.company_category) }}</p>
                 </div>
                 <div>
                   <p class="text-xs font-medium text-gray-500">Trade License Number</p>
-                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm text-gray-900">{{ displayVal(companyDetail?.trade_license_number) }}</p>
+                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm font-medium text-gray-900">{{ displayVal(companyDetail?.trade_license_number) }}</p>
                 </div>
                 <div>
                   <p class="text-xs font-medium text-gray-500">Trade License Expiry Date</p>
-                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm text-gray-900">{{ formatDate(companyDetail?.trade_license_expiry_date) }}</p>
+                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm font-medium text-gray-900">{{ formatDate(companyDetail?.trade_license_expiry_date) }}</p>
                 </div>
                 <div>
                   <p class="text-xs font-medium text-gray-500">Establishment Card Number</p>
-                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm text-gray-900">{{ displayVal(companyDetail?.establishment_card_number) }}</p>
+                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm font-medium text-gray-900">{{ displayVal(companyDetail?.establishment_card_number) }}</p>
                 </div>
                 <div>
                   <p class="text-xs font-medium text-gray-500">Establishment Card Expiry Date</p>
-                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm text-gray-900">{{ formatDate(companyDetail?.establishment_card_expiry_date) }}</p>
+                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm font-medium text-gray-900">{{ formatDate(companyDetail?.establishment_card_expiry_date) }}</p>
                 </div>
                 <div>
                   <p class="text-xs font-medium text-gray-500">Account Taken From</p>
-                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm text-gray-900">{{ displayVal(companyDetail?.account_taken_from) }}</p>
+                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm font-medium text-gray-900">{{ displayVal(companyDetail?.account_taken_from) }}</p>
                 </div>
                 <div>
                   <p class="text-xs font-medium text-gray-500">Account Mapping Date</p>
-                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm text-gray-900">{{ formatDate(companyDetail?.account_mapping_date) }}</p>
+                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm font-medium text-gray-900">{{ formatDate(companyDetail?.account_mapping_date) }}</p>
                 </div>
                 <div>
                   <p class="text-xs font-medium text-gray-500">Account Transfer Given To</p>
-                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm text-gray-900">{{ displayVal(companyDetail?.account_transfer_given_to) }}</p>
+                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm font-medium text-gray-900">{{ displayVal(companyDetail?.account_transfer_given_to) }}</p>
                 </div>
                 <div>
                   <p class="text-xs font-medium text-gray-500">Account Transfer Given Date</p>
-                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm text-gray-900">{{ formatDate(companyDetail?.account_transfer_given_date) }}</p>
+                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm font-medium text-gray-900">{{ formatDate(companyDetail?.account_transfer_given_date) }}</p>
                 </div>
                 <div>
                   <p class="text-xs font-medium text-gray-500">Account Manager Name</p>
-                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm text-gray-900">{{ displayVal(companyDetail?.account_manager_name) }}</p>
+                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm font-medium text-gray-900">{{ displayVal(companyDetail?.account_manager_name) }}</p>
                 </div>
-                <div>
-                  <p class="text-xs font-medium text-gray-500">CSR Name</p>
-                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm text-gray-900">{{ displayVal(companyDetail?.csr_name_1) }}</p>
+                <div v-for="(csrName, csrIdx) in csrNamesList" :key="csrIdx">
+                  <p class="text-xs font-medium text-gray-500">CSR Name {{ csrIdx + 1 }}</p>
+                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm font-medium text-gray-900">{{ displayVal(csrName) }}</p>
                 </div>
                 <div>
                   <p class="text-xs font-medium text-gray-500">First Bill</p>
-                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm text-gray-900">{{ displayVal(companyDetail?.first_bill) }}</p>
+                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm font-medium text-gray-900">{{ displayVal(companyDetail?.first_bill) }}</p>
                 </div>
                 <div>
+                  <p class="text-xs font-medium text-gray-500">Second Bill</p>
+                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm font-medium text-gray-900">{{ displayVal(companyDetail?.second_bill) }}</p>
+                </div>
+                <div>
+                  <p class="text-xs font-medium text-gray-500">Third Bill</p>
+                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm font-medium text-gray-900">{{ displayVal(companyDetail?.third_bill) }}</p>
+                </div>
+                <div>
+                  <p class="text-xs font-medium text-gray-500">Fourth Bill</p>
+                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm font-medium text-gray-900">{{ displayVal(companyDetail?.fourth_bill) }}</p>
+                </div>
+                <div class="sm:col-span-2 lg:col-span-4">
                   <p class="text-xs font-medium text-gray-500">Additional Comment 1</p>
-                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm text-gray-900">{{ displayVal(companyDetail?.additional_comment_1) }}</p>
+                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm font-medium text-gray-900">{{ displayVal(companyDetail?.additional_comment_1) }}</p>
                 </div>
-                <div>
+                <div class="sm:col-span-2 lg:col-span-4">
                   <p class="text-xs font-medium text-gray-500">Additional Comment 2</p>
-                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm text-gray-900">{{ displayVal(companyDetail?.additional_comment_2) }}</p>
+                  <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm font-medium text-gray-900">{{ displayVal(companyDetail?.additional_comment_2) }}</p>
                 </div>
               </div>
             </div>

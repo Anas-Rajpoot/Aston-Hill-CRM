@@ -11,6 +11,7 @@ use App\Models\FieldSubmission;
 use App\Models\LeadSubmission;
 use App\Models\VasRequestSubmission;
 use App\Models\EmailFollowUp;
+use App\Models\User;
 use App\Policies\AccountPolicy;
 use App\Policies\ClientPolicy;
 use App\Policies\CustomerSupportSubmissionPolicy;
@@ -23,6 +24,7 @@ use App\Observers\FieldSubmissionObserver;
 use App\Observers\LeadSubmissionObserver;
 use App\Observers\VasRequestSubmissionObserver;
 use App\Observers\CustomerSupportSubmissionObserver;
+use App\Observers\UserObserver;
 use App\Repositories\Contracts\LeadSubmissionRepositoryInterface;
 use App\Repositories\Eloquent\LeadSubmissionRepository;
 
@@ -51,6 +53,7 @@ class AppServiceProvider extends ServiceProvider
         VasRequestSubmission::observe(VasRequestSubmissionObserver::class);
         CustomerSupportSubmission::observe(CustomerSupportSubmissionObserver::class);
         Client::observe(ClientObserver::class);
+        User::observe(UserObserver::class);
         Gate::policy(LeadSubmission::class, LeadSubmissionPolicy::class);
         Gate::policy(Client::class, ClientPolicy::class);
         Gate::policy(FieldSubmission::class, FieldSubmissionPolicy::class);

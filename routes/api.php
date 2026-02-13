@@ -168,6 +168,13 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::patch('/email-follow-ups/{emailFollowUp}', [\App\Http\Controllers\Api\EmailFollowUpController::class, 'patch'])->whereNumber('emailFollowUp');
     Route::patch('/email-follow-ups/{emailFollowUp}/status', [\App\Http\Controllers\Api\EmailFollowUpController::class, 'updateStatus'])->whereNumber('emailFollowUp');
 
+    // Personal notes
+    Route::get('/personal-notes', [\App\Http\Controllers\Api\PersonalNoteApiController::class, 'index']);
+    Route::post('/personal-notes', [\App\Http\Controllers\Api\PersonalNoteApiController::class, 'store']);
+    Route::get('/personal-notes/{personal_note}', [\App\Http\Controllers\Api\PersonalNoteApiController::class, 'show'])->whereNumber('personal_note');
+    Route::put('/personal-notes/{personal_note}', [\App\Http\Controllers\Api\PersonalNoteApiController::class, 'update'])->whereNumber('personal_note');
+    Route::delete('/personal-notes/{personal_note}', [\App\Http\Controllers\Api\PersonalNoteApiController::class, 'destroy'])->whereNumber('personal_note');
+
     // Column preferences
     Route::get('/modules/{module}/columns', [ColumnPreferenceController::class, 'show']);
     Route::post('/modules/{module}/columns', [ColumnPreferenceController::class, 'store']);
@@ -216,13 +223,24 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::put('/expenses/{expense}', [\App\Http\Controllers\Api\ExpenseApiController::class, 'update'])->whereNumber('expense');
     Route::delete('/expenses/{expense}', [\App\Http\Controllers\Api\ExpenseApiController::class, 'destroy'])->whereNumber('expense');
 
+    // DSP Tracker (CSV import stored in DB; delete last batch)
+    Route::get('/dsp-tracker', [\App\Http\Controllers\Api\DspTrackerApiController::class, 'index']);
+    Route::post('/dsp-tracker/import', [\App\Http\Controllers\Api\DspTrackerApiController::class, 'import']);
+    Route::delete('/dsp-tracker/batch/{batchId}', [\App\Http\Controllers\Api\DspTrackerApiController::class, 'destroyBatch'])->where('batchId', '[a-f0-9\-]{36}');
+
     // Users (list, show, update, delete, create – super admin / authorized)
     Route::get('/users', [UserController::class, 'index']);
+    Route::get('/users/filters', [UserController::class, 'filters']);
+    Route::get('/users/columns', [UserController::class, 'columns']);
+    Route::post('/users/columns', [UserController::class, 'saveColumns']);
     Route::post('/users', [UserController::class, 'store']);
     Route::post('/users/bulk-activate', [UserController::class, 'bulkActivate']);
     Route::post('/users/bulk-deactivate', [UserController::class, 'bulkDeactivate']);
     Route::get('/users/{user}', [UserController::class, 'show'])->whereNumber('user');
     Route::put('/users/{user}', [UserController::class, 'update'])->whereNumber('user');
+    Route::patch('/users/{user}', [UserController::class, 'patch'])->whereNumber('user');
+    Route::get('/users/{user}/audit-log', [UserController::class, 'auditLog'])->whereNumber('user');
+    Route::post('/users/{user}/send-password-reset', [UserController::class, 'sendPasswordReset'])->whereNumber('user');
     Route::delete('/users/{user}', [UserController::class, 'destroy'])->whereNumber('user');
 
     // Datatable

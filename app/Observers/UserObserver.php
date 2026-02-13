@@ -1,0 +1,84 @@
+<?php
+
+namespace App\Observers;
+
+use App\Models\User;
+use App\Models\UserAudit;
+use Illuminate\Support\Facades\Auth;
+
+class UserObserver
+{
+    protected static array $oldValues = [];
+
+    /** Fields we never store in audit (sensitive or internal). */
+    protected const SKIP_FIELDS = [
+        'password', 'remember_token', 'two_factor_secret',
+        'updated_at', 'two_factor_confirmed_at',
+    ];
+
+    public function updating(User $user): void
+    {
+        if (! $user->exists) {
+            return;
+        }
+        $dirty = $user->getDirty();
+        if (empty($dirty)) {
+            return;
+        }
+        $original = $user->getOriginal();
+        self::$oldValues[$user->id] = array_intersect_key($original, array_flip(array_keys($dirty)));
+    }
+
+    public function updated(User $user): void
+    {
+        if (! $user->exists) {
+            return;
+        }
+        $changes = $user->getChanges();
+        $oldSnapshot = self::$oldValues[$user->id] ?? [];
+        unset(self::$oldValues[$user->id]);
+
+        $changedBy = Auth::id();
+        $changedAt = now();
+
+        foreach ($changes as $field => $newValue) {
+            if (in_array($field, self::SKIP_FIELDS, true)) {
+                continue;
+            }
+            $oldValue = array_key_exists($field, $oldSnapshot) ? $oldSnapshot[$field] : null;
+            $this->auditRow($user->id, $field, $oldValue, $newValue, $changedAt, $changedBy);
+        }
+    }
+
+    protected function auditRow(
+        int $userId,
+        string $fieldName,
+        mixed $oldValue,
+        mixed $newValue,
+        $changedAt,
+        ?int $changedBy
+    ): void {
+        UserAudit::create([
+            'user_id' => $userId,
+            'field_name' => $fieldName,
+            'old_value' => $this->serializeValue($oldValue),
+            'new_value' => $this->serializeValue($newValue),
+            'changed_at' => $changedAt,
+            'changed_by' => $changedBy,
+        ]);
+    }
+
+    protected function serializeValue(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        if (is_array($value) || is_object($value)) {
+            return json_encode($value);
+        }
+        if ($value instanceof \Carbon\CarbonInterface) {
+            return $value->toIso8601String();
+        }
+        return (string) $value;
+    }
+}

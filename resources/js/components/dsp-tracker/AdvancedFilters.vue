@@ -1,7 +1,8 @@
 <script setup>
 /**
- * Advanced filters for DSP Tracker: Activity Number, Company Name, Account Number, Request Type,
- * Appointment Date From/To, Product, SO Number, Request Status, Rejection Reason, Verifier Name.
+ * Advanced filters for DSP Tracker: Activity Number, Account Number, Request Type,
+ * Appointment Date From/To, Product, SO Number, Rejection Reason, Verifier Name.
+ * (Request Status and Company Name are in general filters.)
  * Dates: dd-mm-yyyy.
  */
 import { computed } from 'vue'
@@ -10,12 +11,6 @@ import { toDdMmYyyy, fromDdMmYyyy } from '@/lib/dateFormat'
 const props = defineProps({
   visible: { type: Boolean, default: false },
   filters: { type: Object, required: true },
-  filterOptions: {
-    type: Object,
-    default: () => ({
-      request_status_options: [],
-    }),
-  },
   loading: { type: Boolean, default: false },
 })
 
@@ -125,17 +120,6 @@ const appointmentDateToDisplay = computed({
             class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           />
-        </div>
-        <div>
-          <label class="mb-1 block text-xs font-medium text-gray-600">Request Status</label>
-          <select
-            v-model="filters.request_status"
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            :disabled="loading"
-          >
-            <option value="">All Statuses</option>
-            <option v-for="o in filterOptions.request_status_options" :key="o.value" :value="o.value">{{ o.label }}</option>
-          </select>
         </div>
         <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Rejection Reason</label>

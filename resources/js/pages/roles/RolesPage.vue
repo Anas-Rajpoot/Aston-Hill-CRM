@@ -9,7 +9,7 @@ import api from '@/lib/axios'
 import SkeletonStatsCards from '@/components/skeletons/SkeletonStatsCards.vue'
 import SkeletonTable from '@/components/skeletons/SkeletonTable.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
-import { toDdMmYyyy } from '@/lib/dateFormat'
+import { toDdMonYyyyLower } from '@/lib/dateFormat'
 
 const router = useRouter()
 const roles = ref([])
@@ -36,7 +36,16 @@ const formatDate = (d) => {
   if (!d) return '—'
   const str = typeof d === 'string' ? d.trim().slice(0, 10) : ''
   if (!str) return '—'
-  return toDdMmYyyy(str) || '—'
+  return toDdMonYyyyLower(str) || '—'
+}
+
+const DESCRIPTION_MAX = 50
+const truncateDescription = (text) => {
+  if (!text || typeof text !== 'string') return { short: '—', full: '' }
+  const t = text.trim()
+  if (!t) return { short: '—', full: '' }
+  if (t.length <= DESCRIPTION_MAX) return { short: t, full: t }
+  return { short: t.slice(0, DESCRIPTION_MAX) + '...', full: t }
 }
 
 const goToCreate = () => router.push('/roles/create')
@@ -96,7 +105,10 @@ onUnmounted(() => {
     <!-- Header -->
     <div class="flex flex-wrap items-center justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900">Roles</h1>
+        <div class="flex flex-wrap items-baseline gap-2">
+          <Breadcrumbs />
+          <h1 class="text-2xl font-bold text-gray-900 leading-tight">Roles</h1>
+        </div>
         <p class="mt-1 text-sm text-gray-500">Define and manage system roles and permissions.</p>
       </div>
       <button
@@ -110,7 +122,6 @@ onUnmounted(() => {
         Add New Role
       </button>
     </div>
-    <Breadcrumbs />
 
     <div v-if="successMessage" class="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700 flex items-center justify-between">
       <span>{{ successMessage }}</span>
@@ -187,7 +198,12 @@ onUnmounted(() => {
                 </div>
               </td>
               <td class="px-4 py-3 text-sm text-gray-600 max-w-xs">
-                {{ role.description || '—' }}
+                <span
+                  :title="(role.description || '').trim().length > DESCRIPTION_MAX ? (role.description || '').trim() : null"
+                  class="cursor-default"
+                >
+                  {{ truncateDescription(role.description).short }}
+                </span>
               </td>
               <td class="px-4 py-3 whitespace-nowrap">
                 <span class="text-sm text-indigo-600 underline cursor-pointer hover:text-indigo-800">{{ role.users_count ?? 0 }}</span>

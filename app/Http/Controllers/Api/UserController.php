@@ -5,60 +5,68 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\TeamRoleMapping;
 use App\Models\User;
+use App\Models\UserAudit;
+use App\Models\UserColumnPreference;
 use App\Models\UserLoginLog;
 use App\Notifications\UserApprovalStatusNotification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
 class UserController extends Controller
 {
+    private const MODULE = 'users';
+
+    private const ALLOWED_COLUMNS = [
+        'id', 'name', 'email', 'phone', 'country', 'roles', 'status', 'last_login_at',
+        'created_at', 'employee_number', 'department', 'extension', 'joining_date', 'terminate_date',
+        'manager', 'team_leader',
+    ];
+
     public function index(Request $request): JsonResponse
     {
-        $name = $request->get('name');
-        $email = $request->get('email');
-        $role = $request->get('role');
-        $status = $request->get('status'); // single or comma-separated: approved,pending,rejected
-        $createdFrom = $request->get('created_from');
-        $createdTo = $request->get('created_to');
-        $q = $request->get('q'); // legacy: search both name and email
+        $validated = $request->validate([
+            'page' => ['sometimes', 'integer', 'min:1'],
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
+            'sort' => ['sometimes', 'string', Rule::in(array_merge(self::ALLOWED_COLUMNS, ['manager_id', 'team_leader_id']))],
+            'order' => ['sometimes', 'string', Rule::in(['asc', 'desc'])],
+            'columns' => ['sometimes', 'array'],
+            'columns.*' => ['string', Rule::in(self::ALLOWED_COLUMNS)],
+            'name' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'email' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'role' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'status' => ['sometimes', 'nullable', 'string'], // comma-separated or single
+            'country' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'created_from' => ['sometimes', 'nullable', 'date'],
+            'created_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:created_from'],
+            'q' => ['sometimes', 'nullable', 'string', 'max:200'],
+        ]);
+
+        $requestUser = $request->user();
+        $columns = $this->resolveColumns($requestUser, $validated['columns'] ?? null);
+        $perPage = (int) ($validated['per_page'] ?? 10);
+        $page = (int) ($validated['page'] ?? 1);
+        $sort = $validated['sort'] ?? config('modules.users.default_sort.0', 'name');
+        $order = strtolower($validated['order'] ?? config('modules.users.default_sort.1', 'asc')) === 'desc' ? 'desc' : 'asc';
 
         $query = User::query()
-            ->with(['roles:id,name'])
-            ->when(!$request->user()->hasRole('superadmin'), fn ($qq) => $qq->whereDoesntHave('roles', fn ($r) => $r->where('name', 'superadmin')))
-            ->when($name, fn ($qq) => $qq->where('name', 'like', "%{$name}%"))
-            ->when($email, fn ($qq) => $qq->where('email', 'like', "%{$email}%"))
-            ->when($q && !$name && !$email, fn ($qq) => $qq->where(function ($w) use ($q) {
-                $w->where('name', 'like', "%{$q}%")->orWhere('email', 'like', "%{$q}%");
-            }))
-            ->when($status, function ($qq) use ($status) {
-                $statuses = is_array($status) ? $status : array_map('trim', explode(',', $status));
-                $qq->whereIn('status', $statuses);
-            })
-            ->when($role, fn ($qq) => $qq->whereHas('roles', fn ($r) => $r->where('name', $role)))
-            ->when($createdFrom, fn ($qq) => $qq->whereDate('created_at', '>=', $createdFrom))
-            ->when($createdTo, fn ($qq) => $qq->whereDate('created_at', '<=', $createdTo))
-            ->latest();
+            ->with(['roles:id,name', 'manager:id,name', 'teamLeader:id,name'])
+            ->when(! $requestUser->hasRole('superadmin'), fn ($q) => $q->whereDoesntHave('roles', fn ($r) => $r->where('name', 'superadmin')));
 
-        $users = $query->clone()->paginate($request->get('per_page', 10));
-        $roles = Role::orderBy('name')->get(['id', 'name', 'description']);
+        $this->applyFilters($query, $validated);
+        $total = $query->count();
 
-        $statsQuery = User::query();
-        if (!$request->user()->hasRole('superadmin')) {
-            $statsQuery->whereDoesntHave('roles', fn ($r) => $r->where('name', 'superadmin'));
-        }
-        $stats = [
-            'total' => (clone $statsQuery)->count(),
-            'active' => (clone $statsQuery)->where('status', 'approved')->count(),
-            'inactive' => (clone $statsQuery)->where('status', 'rejected')->count(),
-            'pending' => (clone $statsQuery)->where('status', 'pending')->count(),
-        ];
+        $this->applySort($query, $sort, $order);
+        $users = $query->skip(($page - 1) * $perPage)->take($perPage)->get();
 
-        $userIds = collect($users->items())->pluck('id')->toArray();
+        $userIds = $users->pluck('id')->toArray();
         $lastLogins = collect();
-        if (!empty($userIds)) {
+        if (! empty($userIds)) {
             $lastLogins = UserLoginLog::query()
                 ->selectRaw('user_id, MAX(login_at) as login_at')
                 ->whereIn('user_id', $userIds)
@@ -67,27 +75,184 @@ class UserController extends Controller
                 ->keyBy('user_id');
         }
 
-        $items = collect($users->items())->map(function ($u) use ($lastLogins) {
+        $roles = Role::orderBy('name')->get(['id', 'name', 'description']);
+        $statsQuery = User::query()
+            ->when(! $requestUser->hasRole('superadmin'), fn ($q) => $q->whereDoesntHave('roles', fn ($r) => $r->where('name', 'superadmin')));
+        $stats = [
+            'total' => (clone $statsQuery)->count(),
+            'active' => (clone $statsQuery)->where('status', 'approved')->count(),
+            'inactive' => (clone $statsQuery)->where('status', 'rejected')->count(),
+            'pending' => (clone $statsQuery)->where('status', 'pending')->count(),
+        ];
+
+        $items = $users->map(function ($u) use ($lastLogins, $columns) {
             $log = $lastLogins->get($u->id);
-            $u->last_login_at = $log?->login_at ? (is_object($log->login_at) ? $log->login_at->format('c') : (string) $log->login_at) : null;
-            return $u;
+            $lastLoginAt = $log?->login_at ? (is_object($log->login_at) ? $log->login_at->format('c') : (string) $log->login_at) : null;
+            $row = [
+                'id' => $u->id,
+                'name' => $u->name,
+                'email' => $u->email,
+                'phone' => $u->phone,
+                'country' => $u->country,
+                'roles' => $u->roles->pluck('name')->values()->all(),
+                'status' => $u->status,
+                'last_login_at' => $lastLoginAt,
+                'created_at' => $u->created_at?->toIso8601String(),
+                'employee_number' => $u->employee_number,
+                'department' => $u->department,
+                'extension' => $u->extension,
+                'joining_date' => $u->joining_date?->format('Y-m-d'),
+                'terminate_date' => $u->terminate_date?->format('Y-m-d'),
+                'manager' => $u->manager?->name,
+                'team_leader' => $u->teamLeader?->name,
+            ];
+            return array_intersect_key($row, array_fill_keys(array_merge(['id'], $columns), true));
         });
+
+        $lastPage = $total > 0 ? (int) ceil($total / $perPage) : 1;
 
         return response()->json([
             'users' => $items,
             'pagination' => [
-                'current_page' => $users->currentPage(),
-                'last_page' => $users->lastPage(),
-                'per_page' => $users->perPage(),
-                'total' => $users->total(),
+                'current_page' => $page,
+                'last_page' => $lastPage,
+                'per_page' => $perPage,
+                'total' => $total,
             ],
             'stats' => $stats,
             'roles' => $roles,
         ]);
     }
 
+    private function resolveColumns($user, ?array $requestColumns): array
+    {
+        if (! empty($requestColumns)) {
+            return array_values(array_unique(array_intersect($requestColumns, self::ALLOWED_COLUMNS)));
+        }
+        $cacheKey = 'col_pref_' . $user->id . '_' . self::MODULE;
+        $preference = Cache::remember($cacheKey, 3600, function () use ($user) {
+            return UserColumnPreference::where('user_id', $user->id)
+                ->where('module', self::MODULE)
+                ->first();
+        });
+        $cols = $preference?->visible_columns ?? config('modules.users.default_columns', []);
+        $cols = is_array($cols) ? $cols : [];
+
+        return array_values(array_intersect($cols, self::ALLOWED_COLUMNS));
+    }
+
+    private function applyFilters($query, array $validated): void
+    {
+        if (! empty($validated['name'])) {
+            $term = '%' . addcslashes($validated['name'], '%_\\') . '%';
+            $query->where('name', 'like', $term);
+        }
+        if (! empty($validated['email'])) {
+            $term = '%' . addcslashes($validated['email'], '%_\\') . '%';
+            $query->where('email', 'like', $term);
+        }
+        if (! empty($validated['q']) && empty($validated['name']) && empty($validated['email'])) {
+            $term = '%' . addcslashes($validated['q'], '%_\\') . '%';
+            $query->where(function ($q) use ($term) {
+                $q->where('name', 'like', $term)->orWhere('email', 'like', $term);
+            });
+        }
+        if (! empty($validated['status'])) {
+            $statuses = is_array($validated['status']) ? $validated['status'] : array_map('trim', explode(',', $validated['status']));
+            $query->whereIn('status', $statuses);
+        }
+        if (! empty($validated['role'])) {
+            $query->whereHas('roles', fn ($r) => $r->where('name', $validated['role']));
+        }
+        if (! empty($validated['country'])) {
+            $term = '%' . addcslashes($validated['country'], '%_\\') . '%';
+            $query->where('country', 'like', $term);
+        }
+        if (! empty($validated['created_from'])) {
+            $query->whereDate('created_at', '>=', $validated['created_from']);
+        }
+        if (! empty($validated['created_to'])) {
+            $query->whereDate('created_at', '<=', $validated['created_to']);
+        }
+    }
+
+    private function applySort($query, string $sort, string $order): void
+    {
+        $direction = $order === 'asc' ? 'asc' : 'desc';
+        if (in_array($sort, ['manager', 'team_leader'], true)) {
+            $col = $sort === 'manager' ? 'manager_id' : 'team_leader_id';
+            $alias = $sort . '_u';
+            $query->leftJoin('users as ' . $alias, 'users.' . $col, '=', $alias . '.id')
+                ->orderBy($alias . '.name', $direction)
+                ->select('users.*');
+            return;
+        }
+        if ($sort === 'last_login_at') {
+            $sub = UserLoginLog::query()->selectRaw('user_id, MAX(login_at) as login_at')->groupBy('user_id');
+            $query->leftJoinSub($sub, 'last_logins', 'users.id', '=', 'last_logins.user_id')
+                ->orderBy('last_logins.login_at', $direction)
+                ->select('users.*');
+            return;
+        }
+        $query->orderBy('users.' . $sort, $direction);
+    }
+
+    public function filters(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $baseQuery = User::query()
+            ->when(! $user->hasRole('superadmin'), fn ($q) => $q->whereDoesntHave('roles', fn ($r) => $r->where('name', 'superadmin')));
+        $roles = Role::orderBy('name')->get(['id', 'name'])->map(fn ($r) => ['value' => $r->name, 'label' => $r->name])->all();
+
+        return response()->json([
+            'statuses' => [
+                ['value' => 'approved', 'label' => 'Active'],
+                ['value' => 'rejected', 'label' => 'Inactive'],
+                ['value' => 'pending', 'label' => 'Pending Approval'],
+            ],
+            'roles' => $roles,
+        ]);
+    }
+
+    public function columns(Request $request): JsonResponse
+    {
+        $config = config('modules.users.columns', []);
+        $allColumns = [];
+        foreach ($config as $key => $def) {
+            $allColumns[] = ['key' => $key, 'label' => $def['label'] ?? $key];
+        }
+        $pref = UserColumnPreference::where('user_id', $request->user()->id)
+            ->where('module', self::MODULE)
+            ->first();
+        $visible = $pref?->visible_columns ?? config('modules.users.default_columns', []);
+
+        return response()->json([
+            'all_columns' => $allColumns,
+            'visible_columns' => $visible,
+        ]);
+    }
+
+    public function saveColumns(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'visible_columns' => ['required', 'array', 'min:1'],
+            'visible_columns.*' => ['string', Rule::in(self::ALLOWED_COLUMNS)],
+        ]);
+        UserColumnPreference::updateOrCreate(
+            ['user_id' => $request->user()->id, 'module' => self::MODULE],
+            ['visible_columns' => $data['visible_columns']]
+        );
+        Cache::forget('col_pref_' . $request->user()->id . '_' . self::MODULE);
+
+        return response()->json(['success' => true]);
+    }
+
     public function store(Request $request): JsonResponse
     {
+        if (! $request->user()->hasRole('superadmin') && ! $request->user()->can('users.edit') && ! $request->user()->can('users.create')) {
+            return response()->json(['message' => 'You do not have permission to add users.'], 403);
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
@@ -314,5 +479,122 @@ class UserController extends Controller
     {
         $user->delete();
         return response()->json(['message' => 'User deleted successfully.']);
+    }
+
+    /**
+     * Inline edit: update a single field. Strict: super admin only editable by self; others by super admin or users.edit.
+     */
+    public function patch(Request $request, User $user): JsonResponse
+    {
+        if ($user->hasRole('superadmin')) {
+            if ($request->user()->id !== $user->id) {
+                return response()->json(['message' => 'Only the super admin can edit their own account.'], 403);
+            }
+        } else {
+            if (! $request->user()->hasRole('superadmin') && ! $request->user()->can('users.edit')) {
+                return response()->json(['message' => 'You do not have permission to edit users.'], 403);
+            }
+        }
+
+        $validated = $request->validate([
+            'field' => ['required', 'string', Rule::in([
+                'name', 'email', 'phone', 'country', 'status', 'employee_number',
+                'department', 'extension', 'joining_date', 'terminate_date',
+            ])],
+            'value' => ['nullable'],
+        ]);
+
+        $field = $validated['field'];
+        $value = $validated['value'];
+
+        if ($field === 'status') {
+            $request->validate(['value' => ['required', 'string', Rule::in(['approved', 'rejected', 'pending'])]]);
+            $user->status = $value;
+            if ($value === 'approved') {
+                $user->approved_by = auth()->id();
+                $user->approved_at = now();
+                $user->rejected_by = null;
+                $user->rejected_at = null;
+                $user->rejection_reason = null;
+            } elseif ($value === 'rejected') {
+                $user->rejected_by = auth()->id();
+                $user->rejected_at = now();
+            }
+            $user->save();
+        } elseif (in_array($field, ['joining_date', 'terminate_date'], true)) {
+            $user->$field = $value ? \Carbon\Carbon::parse($value)->format('Y-m-d') : null;
+            $user->save();
+        } else {
+            if ($field === 'email') {
+                $request->validate(['value' => ['required', 'string', 'email', 'max:255', 'unique:users,email,' . $user->id]]);
+            }
+            if ($field === 'name') {
+                $request->validate(['value' => ['required', 'string', 'max:255']]);
+            }
+            if (in_array($field, ['phone', 'country', 'employee_number', 'department', 'extension'], true)) {
+                $user->$field = $value === '' || $value === null ? null : (string) $value;
+            } else {
+                $user->$field = $value;
+            }
+            $user->save();
+        }
+
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $user->refresh();
+        $out = ['id' => $user->id, $field => $user->$field];
+        if (in_array($field, ['joining_date', 'terminate_date'], true) && $user->$field) {
+            $out[$field] = $user->$field->format('Y-m-d');
+        }
+
+        return response()->json($out);
+    }
+
+    public function auditLog(User $user): JsonResponse
+    {
+        if ($user->hasRole('superadmin') && request()->user()->id !== $user->id) {
+            return response()->json(['message' => 'Only the super admin can view this account.'], 403);
+        }
+
+        $logs = UserAudit::query()
+            ->where('user_id', $user->id)
+            ->with('changedByUser:id,name')
+            ->orderByDesc('changed_at')
+            ->limit(200)
+            ->get()
+            ->map(fn ($log) => [
+                'id' => $log->id,
+                'field_name' => $log->field_name,
+                'old_value' => $log->old_value,
+                'new_value' => $log->new_value,
+                'changed_at' => $log->changed_at?->toIso8601String(),
+                'changed_by' => $log->changedByUser?->name,
+            ]);
+
+        return response()->json(['data' => $logs]);
+    }
+
+    /**
+     * Send password reset email to the user. Super admin's password can only be reset by a super admin (self).
+     */
+    public function sendPasswordReset(User $user): JsonResponse
+    {
+        if ($user->hasRole('superadmin')) {
+            if ($user->id !== request()->user()->id) {
+                return response()->json(['message' => 'Only the super admin can reset their own password.'], 403);
+            }
+        } else {
+            if (! request()->user()->hasRole('superadmin') && ! request()->user()->can('users.edit')) {
+                return response()->json(['message' => 'You do not have permission to reset user passwords.'], 403);
+            }
+        }
+
+        $status = Password::sendResetLink(['email' => $user->email]);
+
+        if ($status !== Password::RESET_LINK_SENT) {
+            return response()->json(['message' => __($status)], 422);
+        }
+
+        return response()->json(['message' => __('Password reset link sent. They will receive an email with instructions to set a new password.')]);
     }
 }

@@ -31,6 +31,7 @@ const navItems = [
   { to: '/customer-support', label: 'Customer Support' },
   { to: '/vas-requests', label: 'VAS Requests' },
   { to: '/clients', label: 'Clients' },
+  { to: '/order-status', label: 'Order Status' },
   { to: '/dsp-tracker', label: 'DSP Tracker' },
   { to: '/employees', label: 'Employees' },
   { to: '/cisco-extensions', label: 'Cisco Extensions' },

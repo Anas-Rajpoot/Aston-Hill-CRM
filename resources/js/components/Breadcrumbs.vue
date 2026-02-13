@@ -20,6 +20,7 @@ const SEGMENT_LABELS = {
   'customer-support': 'Customer Support',
   'vas-requests': 'VAS Requests',
   clients: 'Clients',
+  'order-status': 'Order Status',
   'dsp-tracker': 'DSP Tracker',
   'gsm-tracker': 'DSP Tracker',
   employees: 'Employees',

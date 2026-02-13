@@ -9,9 +9,11 @@ use App\Models\ClientAddress;
 use App\Models\ClientAlert;
 use App\Models\ClientCompanyDetail;
 use App\Models\ClientContact;
+use App\Models\ClientCsr;
 use App\Models\UserColumnPreference;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -51,6 +53,7 @@ class ClientApiController extends Controller
             'columns.*' => ['string', Rule::in(array_merge(self::ALLOWED_COLUMNS, ['manager', 'team_leader', 'sales_agent', 'creator']))],
             'company_name' => ['sometimes', 'nullable', 'string', 'max:200'],
             'account_number' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'wo_number' => ['sometimes', 'nullable', 'string', 'max:100'],
             'status' => ['sometimes', 'nullable', 'string', Rule::in(Client::STATUSES)],
             'submitted_from' => ['sometimes', 'nullable', 'date'],
             'submitted_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:submitted_from'],
@@ -147,6 +150,10 @@ class ClientApiController extends Controller
         if (! empty($validated['account_number'])) {
             $term = '%' . addcslashes($validated['account_number'], '%_\\') . '%';
             $query->where('account_number', 'like', $term);
+        }
+        if (! empty($validated['wo_number'])) {
+            $term = '%' . addcslashes($validated['wo_number'], '%_\\') . '%';
+            $query->where('wo_number', 'like', $term);
         }
         if (! empty($validated['manager_id'])) {
             $query->where('manager_id', $validated['manager_id']);
@@ -402,8 +409,11 @@ class ClientApiController extends Controller
             'account_number' => ['nullable', 'string', 'max:100', Rule::unique('clients', 'account_number')],
             'submitted_at' => ['sometimes', 'nullable', 'date'],
             'manager_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'account_manager_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'team_leader_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'sales_agent_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'csrs' => ['sometimes', 'array', 'max:20'],
+            'csrs.*.user_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'status' => ['sometimes', 'string', Rule::in(Client::STATUSES)],
             'service_type' => ['sometimes', 'nullable', 'string', 'max:100'],
             'product_type' => ['sometimes', 'nullable', 'string', 'max:100'],
@@ -429,13 +439,13 @@ class ClientApiController extends Controller
             'company_detail.trade_license_issuing_authority' => ['sometimes', 'nullable', 'string', 'max:200'],
             'company_detail.company_category' => ['sometimes', 'nullable', 'string', 'max:100'],
             'company_detail.trade_license_number' => ['sometimes', 'nullable', 'string', 'max:100'],
-            'company_detail.trade_license_expiry_date' => ['sometimes', 'nullable', 'date'],
+            'company_detail.trade_license_expiry_date' => ['sometimes', 'nullable', 'string', 'max:20'],
             'company_detail.establishment_card_number' => ['sometimes', 'nullable', 'string', 'max:100'],
-            'company_detail.establishment_card_expiry_date' => ['sometimes', 'nullable', 'date'],
+            'company_detail.establishment_card_expiry_date' => ['sometimes', 'nullable', 'string', 'max:20'],
             'company_detail.account_taken_from' => ['sometimes', 'nullable', 'string', 'max:100'],
-            'company_detail.account_mapping_date' => ['sometimes', 'nullable', 'date'],
+            'company_detail.account_mapping_date' => ['sometimes', 'nullable', 'string', 'max:20'],
             'company_detail.account_transfer_given_to' => ['sometimes', 'nullable', 'string', 'max:200'],
-            'company_detail.account_transfer_given_date' => ['sometimes', 'nullable', 'date'],
+            'company_detail.account_transfer_given_date' => ['sometimes', 'nullable', 'string', 'max:20'],
             'company_detail.account_manager_name' => ['sometimes', 'nullable', 'string', 'max:200'],
             'company_detail.csr_name_1' => ['sometimes', 'nullable', 'string', 'max:100'],
             'company_detail.csr_name_2' => ['sometimes', 'nullable', 'string', 'max:100'],
@@ -465,11 +475,13 @@ class ClientApiController extends Controller
 
         $user = $request->user();
 
+        $accountManagerId = $validated['account_manager_id'] ?? $validated['manager_id'] ?? null;
         $clientData = [
             'company_name' => $validated['company_name'],
             'account_number' => ! empty(trim((string) ($validated['account_number'] ?? ''))) ? trim($validated['account_number']) : null,
             'submitted_at' => isset($validated['submitted_at']) ? $validated['submitted_at'] : now(),
-            'manager_id' => $validated['manager_id'] ?? null,
+            'manager_id' => $validated['manager_id'] ?? $accountManagerId,
+            'account_manager_id' => $accountManagerId,
             'team_leader_id' => $validated['team_leader_id'] ?? null,
             'sales_agent_id' => $validated['sales_agent_id'] ?? null,
             'status' => $validated['status'] ?? 'pending',
@@ -487,6 +499,7 @@ class ClientApiController extends Controller
 
             if (! empty($validated['company_detail'])) {
                 $cd = array_merge($validated['company_detail'], ['client_id' => $client->id]);
+                $cd = self::normalizeCompanyDetailDates($cd);
                 ClientCompanyDetail::create($cd);
             }
 
@@ -510,12 +523,59 @@ class ClientApiController extends Controller
                 ClientAddress::create($addrData);
             }
 
+            foreach ($validated['csrs'] ?? [] as $i => $row) {
+                if (! empty($row['user_id'])) {
+                    ClientCsr::create([
+                        'client_id' => $client->id,
+                        'user_id' => $row['user_id'],
+                        'sort_order' => $i,
+                    ]);
+                }
+            }
+
             return $client;
         });
 
-        $client->load(['manager:id,name', 'teamLeader:id,name', 'salesAgent:id,name', 'companyDetail', 'contacts', 'addresses']);
+        $client->load(['manager:id,name', 'teamLeader:id,name', 'salesAgent:id,name', 'accountManager:id,name', 'csrs.user:id,name', 'companyDetail', 'contacts', 'addresses']);
 
-        return response()->json($this->showPayload($client), 201);
+        return response()->json([
+            'success' => true,
+            'message' => 'Client created successfully.',
+            'status' => 201,
+            'data' => $this->showPayload($client),
+        ], 201);
+    }
+
+    /**
+     * Normalize company_detail date fields: empty string to null, parse to Y-m-d for DB.
+     */
+    private static function normalizeCompanyDetailDates(array $cd): array
+    {
+        $dateKeys = [
+            'trade_license_expiry_date',
+            'establishment_card_expiry_date',
+            'account_mapping_date',
+            'account_transfer_given_date',
+        ];
+        foreach ($dateKeys as $key) {
+            $v = $cd[$key] ?? null;
+            if ($v === null || $v === '') {
+                $cd[$key] = null;
+                continue;
+            }
+            $str = trim((string) $v);
+            if ($str === '') {
+                $cd[$key] = null;
+                continue;
+            }
+            try {
+                $parsed = Carbon::parse($str);
+                $cd[$key] = $parsed->format('Y-m-d');
+            } catch (\Throwable) {
+                $cd[$key] = null;
+            }
+        }
+        return $cd;
     }
 
     private function showPayload(Client $client): array
@@ -528,10 +588,13 @@ class ClientApiController extends Controller
             'submitted_at' => $client->submitted_at?->toIso8601String(),
             'manager_id' => $client->manager_id,
             'manager' => $client->manager?->name,
+            'account_manager_id' => $client->account_manager_id,
+            'account_manager' => $client->accountManager?->name,
             'team_leader_id' => $client->team_leader_id,
             'team_leader' => $client->teamLeader?->name,
             'sales_agent_id' => $client->sales_agent_id,
             'sales_agent' => $client->salesAgent?->name,
+            'csrs' => $client->relationLoaded('csrs') ? $client->csrs->map(fn ($c) => ['user_id' => $c->user_id, 'user' => $c->user?->name])->values()->all() : [],
             'status' => $client->status,
             'company_detail' => $companyDetail ? [
                 'trade_license_issuing_authority' => $companyDetail->trade_license_issuing_authority,
@@ -585,12 +648,14 @@ class ClientApiController extends Controller
 
         $client->load([
             'manager:id,name',
+            'accountManager:id,name',
             'teamLeader:id,name',
             'salesAgent:id,name',
             'creator:id,name',
             'companyDetail',
             'contacts',
             'addresses',
+            'csrs.user:id,name',
         ]);
 
         $companyDetail = $client->companyDetail;
@@ -601,6 +666,9 @@ class ClientApiController extends Controller
             'submitted_at' => $client->submitted_at?->toIso8601String(),
             'manager_id' => $client->manager_id,
             'manager' => $client->manager?->name,
+            'account_manager_id' => $client->account_manager_id,
+            'account_manager' => $client->accountManager?->name,
+            'csrs' => $client->csrs->map(fn ($c) => ['user_id' => $c->user_id, 'user' => $c->user?->name])->values()->all(),
             'team_leader_id' => $client->team_leader_id,
             'team_leader' => $client->teamLeader?->name,
             'sales_agent_id' => $client->sales_agent_id,
@@ -707,8 +775,9 @@ class ClientApiController extends Controller
         $query->orderBy($sort, $order);
 
         $paginated = $query->paginate($perPage, ['*'], 'page', $page);
-        $items = $paginated->getCollection()->map(function ($row) {
-            return $this->formatRow($row, array_merge(self::BASE_COLUMNS, self::ALLOWED_COLUMNS));
+        $columns = array_merge(self::BASE_COLUMNS, self::ALLOWED_COLUMNS, ['manager', 'team_leader', 'sales_agent']);
+        $items = $paginated->getCollection()->map(function ($row) use ($columns) {
+            return $this->formatRow($row, $columns);
         });
         $paginated->setCollection($items);
 
@@ -861,12 +930,35 @@ class ClientApiController extends Controller
             'account_number' => ['sometimes', 'nullable', 'string', 'max:100'],
             'status' => ['sometimes', 'string', Rule::in(Client::STATUSES)],
             'revenue' => ['sometimes', 'nullable', 'numeric'],
+            'manager_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'account_manager_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'csr_name_1' => ['sometimes', 'nullable', 'string', 'max:100'],
             'csr_name_2' => ['sometimes', 'nullable', 'string', 'max:100'],
             'csr_name_3' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'csrs' => ['sometimes', 'array', 'max:20'],
+            'csrs.*.user_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
         ]);
 
-        $client->update($validated);
+        $updateData = collect($validated)->except('csrs')->all();
+        if (array_key_exists('account_manager_id', $validated)) {
+            $updateData['account_manager_id'] = $validated['account_manager_id'];
+            $updateData['manager_id'] = $validated['manager_id'] ?? $validated['account_manager_id'];
+        }
+
+        $client->update($updateData);
+
+        if (array_key_exists('csrs', $validated)) {
+            ClientCsr::where('client_id', $client->id)->delete();
+            foreach ($validated['csrs'] as $i => $row) {
+                if (! empty($row['user_id'])) {
+                    ClientCsr::create([
+                        'client_id' => $client->id,
+                        'user_id' => $row['user_id'],
+                        'sort_order' => $i,
+                    ]);
+                }
+            }
+        }
 
         return response()->json(['success' => true]);
     }
@@ -879,13 +971,13 @@ class ClientApiController extends Controller
             'trade_license_issuing_authority' => ['sometimes', 'nullable', 'string', 'max:200'],
             'company_category' => ['sometimes', 'nullable', 'string', 'max:100'],
             'trade_license_number' => ['sometimes', 'nullable', 'string', 'max:100'],
-            'trade_license_expiry_date' => ['sometimes', 'nullable', 'date'],
+            'trade_license_expiry_date' => ['sometimes', 'nullable', 'string', 'max:20'],
             'establishment_card_number' => ['sometimes', 'nullable', 'string', 'max:100'],
-            'establishment_card_expiry_date' => ['sometimes', 'nullable', 'date'],
+            'establishment_card_expiry_date' => ['sometimes', 'nullable', 'string', 'max:20'],
             'account_taken_from' => ['sometimes', 'nullable', 'string', 'max:100'],
-            'account_mapping_date' => ['sometimes', 'nullable', 'date'],
+            'account_mapping_date' => ['sometimes', 'nullable', 'string', 'max:20'],
             'account_transfer_given_to' => ['sometimes', 'nullable', 'string', 'max:200'],
-            'account_transfer_given_date' => ['sometimes', 'nullable', 'date'],
+            'account_transfer_given_date' => ['sometimes', 'nullable', 'string', 'max:20'],
             'account_manager_name' => ['sometimes', 'nullable', 'string', 'max:200'],
             'csr_name_1' => ['sometimes', 'nullable', 'string', 'max:100'],
             'csr_name_2' => ['sometimes', 'nullable', 'string', 'max:100'],
@@ -898,9 +990,10 @@ class ClientApiController extends Controller
             'additional_comment_2' => ['sometimes', 'nullable', 'string'],
         ]);
 
+        $data = self::normalizeCompanyDetailDates(array_merge($validated, ['client_id' => $client->id]));
         ClientCompanyDetail::updateOrCreate(
             ['client_id' => $client->id],
-            array_merge($validated, ['client_id' => $client->id])
+            $data
         );
 
         return response()->json(['success' => true]);

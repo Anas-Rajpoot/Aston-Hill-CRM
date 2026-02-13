@@ -6,36 +6,26 @@ return [
         'model' => App\Models\User::class,
 
         'columns' => [
-            'id' => [
-                'label' => 'ID',
-                'filter' => null,
-                'sortable' => true,
-            ],
-            'name' => [
-                'label' => 'Name',
-                'filter' => 'text',
-                'sortable' => true,
-            ],
-            'email' => [
-                'label' => 'Email',
-                'filter' => 'text',
-                'sortable' => true,
-            ],
-            'status' => [
-                'label' => 'Status',
-                'filter' => 'select',
-                'options' => ['active', 'inactive'],
-                'sortable' => true,
-            ],
-            'created_at' => [
-                'label' => 'Created At',
-                'filter' => 'date',
-                'sortable' => true,
-            ],
+            'id' => ['label' => 'ID', 'filter' => null, 'sortable' => true],
+            'name' => ['label' => 'User', 'filter' => 'text', 'sortable' => true],
+            'email' => ['label' => 'Email', 'filter' => 'text', 'sortable' => true],
+            'phone' => ['label' => 'Phone', 'filter' => 'text', 'sortable' => true],
+            'country' => ['label' => 'Country', 'filter' => 'text', 'sortable' => true],
+            'roles' => ['label' => 'Assigned Roles', 'filter' => null, 'sortable' => false],
+            'status' => ['label' => 'Status', 'filter' => 'select', 'sortable' => true],
+            'last_login_at' => ['label' => 'Last Login', 'filter' => null, 'sortable' => false],
+            'created_at' => ['label' => 'Created Date', 'filter' => 'date', 'sortable' => true],
+            'employee_number' => ['label' => 'Employee ID', 'filter' => 'text', 'sortable' => true],
+            'department' => ['label' => 'Department', 'filter' => 'text', 'sortable' => true],
+            'extension' => ['label' => 'Extension', 'filter' => 'text', 'sortable' => true],
+            'joining_date' => ['label' => 'Joining Date', 'filter' => 'date', 'sortable' => true],
+            'terminate_date' => ['label' => 'Terminate Date', 'filter' => 'date', 'sortable' => true],
+            'manager' => ['label' => 'Manager', 'filter' => null, 'sortable' => true],
+            'team_leader' => ['label' => 'Team Leader', 'filter' => null, 'sortable' => true],
         ],
 
-        'default_columns' => ['id', 'name', 'email', 'status'],
-        'default_sort' => ['created_at', 'desc'],
+        'default_columns' => ['id', 'name', 'email', 'phone', 'country', 'roles', 'status', 'last_login_at', 'created_at'],
+        'default_sort' => ['name', 'asc'],
     ],
 
     'default_columns' => [

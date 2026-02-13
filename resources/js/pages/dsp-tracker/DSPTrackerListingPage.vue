@@ -1,11 +1,15 @@
 <script setup>
 /**
- * DSP Tracker listing – sortable table, same design as reference:
- * Light blue-grey header (sky-50), white rows, column order: Activity Number, Company Name, Account Number,
- * Request Type, Appointment Date, Appointment Time, Product, SO Number, Request Status, Rejection Reason, Verifier Name, Action.
+ * DSP Tracker listing – data from API (dsp_tracker_entries). Filters, advanced filters,
+ * customize columns, sortable table. Upload CSV saves to DB; Delete Old File deletes last batch.
  */
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { fromDdMmYyyy } from '@/lib/dateFormat'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import AdvancedFilters from '@/components/dsp-tracker/AdvancedFilters.vue'
+import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
+import DSPTrackerDetailModal from '@/components/dsp-tracker/DSPTrackerDetailModal.vue'
+import dspTrackerApi from '@/services/dspTrackerApi'
 
 const COLUMNS = [
   'activity_number',
@@ -19,6 +23,7 @@ const COLUMNS = [
   'request_status',
   'rejection_reason',
   'verifier_name',
+  'verifier_number',
 ]
 
 const COLUMN_LABELS = {
@@ -33,22 +38,126 @@ const COLUMN_LABELS = {
   request_status: 'Request Status',
   rejection_reason: 'Rejection Reason',
   verifier_name: 'Verifier Name',
+  verifier_number: 'Verifier Number',
 }
 
+/** Optional CSV columns (not required in file): DSP OM ID, Uploaded By, Uploaded At. */
+const OPTIONAL_CSV_COLUMNS = ['dsp_om_id', 'uploaded_by', 'uploaded_at']
+
+/** Columns that must be present in the CSV header (normalized match). */
+const REQUIRED_CSV_COLUMNS = [...COLUMNS]
+
 const loading = ref(false)
-const data = ref([
-  { id: 1, activity_number: 'DSP-2024-001', company_name: 'Emirates Tech Solutions LLC', account_number: 'Naeem', request_type: 'Ali', appointment_date: 'Anas', appointment_time: 'new', product: 'Fixed', so_number: 'Internet', request_status: 'Internet', rejection_reason: 'Down town dubai', verifier_name: 'Business Internet' },
-  { id: 2, activity_number: 'DSP-2024-001', company_name: 'Emirates Tech Solutions LLC', account_number: 'Naeem', request_type: 'Ali', appointment_date: 'Anas', appointment_time: 'new', product: 'Fixed', so_number: 'Internet', request_status: 'Internet', rejection_reason: 'Down town dubai', verifier_name: 'Business Internet' },
-  { id: 3, activity_number: 'DSP-2024-001', company_name: 'Emirates Tech Solutions LLC', account_number: 'Naeem', request_type: 'Ali', appointment_date: 'Anas', appointment_time: 'new', product: 'Fixed', so_number: 'Internet', request_status: 'Internet', rejection_reason: 'Down town dubai', verifier_name: 'Business Internet' },
-])
-const nextId = ref(4)
-const lastUploadedIds = ref([])
+const loadError = ref(null)
+const csvUploadError = ref('')
+const data = ref([])
+const lastUploadedBatchId = ref(null)
 const csvInputRef = ref(null)
 const sortBy = ref('activity_number')
 const sortOrder = ref('asc')
+const advancedVisible = ref(false)
+const columnModalVisible = ref(false)
+const detailModalVisible = ref(false)
+const selectedRecord = ref(null)
+const visibleColumns = ref([...COLUMNS])
+
+const filters = ref({
+  activity_number: '',
+  company_name: '',
+  account_number: '',
+  request_type: '',
+  appointment_date_from: '',
+  appointment_date_to: '',
+  product: '',
+  so_number: '',
+  request_status: '',
+  rejection_reason: '',
+  verifier_name: '',
+})
+
+const filterOptions = computed(() => {
+  const statusSet = new Set()
+  data.value.forEach((row) => {
+    const v = row.request_status
+    if (v != null && String(v).trim() !== '') statusSet.add(String(v).trim())
+  })
+  return {
+    request_status_options: [...statusSet].sort().map((v) => ({ value: v, label: v })),
+  }
+})
+
+function parseDateForCompare(val) {
+  if (val == null || val === '') return null
+  const s = String(val).trim()
+  const ymd = fromDdMmYyyy(s) || (s.match(/^\d{4}-\d{2}-\d{2}/) ? s.slice(0, 10) : '')
+  if (!ymd) return null
+  const t = new Date(ymd).getTime()
+  return Number.isNaN(t) ? null : t
+}
+
+function buildParams() {
+  const f = filters.value
+  const p = { sort: sortBy.value, order: sortOrder.value }
+  if (f.activity_number) p.activity_number = f.activity_number
+  if (f.company_name) p.company_name = f.company_name
+  if (f.account_number) p.account_number = f.account_number
+  if (f.request_type) p.request_type = f.request_type
+  if (f.appointment_date_from) p.appointment_date_from = f.appointment_date_from
+  if (f.appointment_date_to) p.appointment_date_to = f.appointment_date_to
+  if (f.product) p.product = f.product
+  if (f.so_number) p.so_number = f.so_number
+  if (f.request_status) p.request_status = f.request_status
+  if (f.rejection_reason) p.rejection_reason = f.rejection_reason
+  if (f.verifier_name) p.verifier_name = f.verifier_name
+  return p
+}
+
+async function load() {
+  loading.value = true
+  loadError.value = null
+  try {
+    const { data: res } = await dspTrackerApi.index(buildParams())
+    data.value = res?.data ?? []
+    lastUploadedBatchId.value = res?.meta?.last_import_batch_id ?? null
+  } catch (e) {
+    loadError.value = e?.response?.data?.message || 'Failed to load DSP tracker data.'
+    data.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+const filteredData = computed(() => {
+  const f = filters.value
+  const list = data.value.filter((row) => {
+    if (f.activity_number && !String(row.activity_number ?? '').toLowerCase().includes(f.activity_number.toLowerCase())) return false
+    if (f.company_name && !String(row.company_name ?? '').toLowerCase().includes(f.company_name.toLowerCase())) return false
+    if (f.account_number && !String(row.account_number ?? '').toLowerCase().includes(f.account_number.toLowerCase())) return false
+    if (f.request_type && !String(row.request_type ?? '').toLowerCase().includes(f.request_type.toLowerCase())) return false
+    if (f.product && !String(row.product ?? '').toLowerCase().includes(f.product.toLowerCase())) return false
+    if (f.so_number && !String(row.so_number ?? '').toLowerCase().includes(f.so_number.toLowerCase())) return false
+    if (f.request_status && (row.request_status ?? '') !== f.request_status) return false
+    if (f.rejection_reason && !String(row.rejection_reason ?? '').toLowerCase().includes(f.rejection_reason.toLowerCase())) return false
+    if (f.verifier_name && !String(row.verifier_name ?? '').toLowerCase().includes(f.verifier_name.toLowerCase())) return false
+    const rowDate = parseDateForCompare(row.appointment_date)
+    if (f.appointment_date_from) {
+      const fromTs = parseDateForCompare(f.appointment_date_from) ?? 0
+      if (rowDate == null || rowDate < fromTs) return false
+    }
+    if (f.appointment_date_to) {
+      const toTs = parseDateForCompare(f.appointment_date_to)
+      if (toTs == null) return false
+      const toEnd = new Date(toTs)
+      toEnd.setHours(23, 59, 59, 999)
+      if (rowDate == null || rowDate > toEnd.getTime()) return false
+    }
+    return true
+  })
+  return list
+})
 
 const sortedData = computed(() => {
-  const list = [...data.value]
+  const list = [...filteredData.value]
   const key = sortBy.value
   const dir = sortOrder.value === 'asc' ? 1 : -1
   list.sort((a, b) => {
@@ -63,6 +172,38 @@ const sortedData = computed(() => {
   })
   return list
 })
+
+const allColumnsForModal = computed(() =>
+  COLUMNS.map((key) => ({ key, label: COLUMN_LABELS[key] }))
+)
+
+function applyFilters() {
+  advancedVisible.value = false
+  load()
+}
+
+function resetFilters() {
+  filters.value = {
+    activity_number: '',
+    company_name: '',
+    account_number: '',
+    request_type: '',
+    appointment_date_from: '',
+    appointment_date_to: '',
+    product: '',
+    so_number: '',
+    request_status: '',
+    rejection_reason: '',
+    verifier_name: '',
+  }
+  advancedVisible.value = false
+  load()
+}
+
+function onColumnSave(columns) {
+  visibleColumns.value = columns
+  columnModalVisible.value = false
+}
 
 function toggleSort(col) {
   if (sortBy.value === col) {
@@ -80,16 +221,30 @@ function formatCell(row, col) {
 }
 
 function onView(row) {
-  // TODO: open view modal or navigate to detail
+  selectedRecord.value = row
+  detailModalVisible.value = true
 }
 function onEdit(row) {
   // TODO: open edit modal or navigate to edit
+}
+function closeDetailModal() {
+  detailModalVisible.value = false
+  selectedRecord.value = null
+}
+function onDetailEdit(record) {
+  detailModalVisible.value = false
+  selectedRecord.value = null
+  onEdit(record)
 }
 function onHistory(row) {
   // TODO: open history modal
 }
 
 function triggerImport() {
+  if (lastUploadedBatchId.value) {
+    alert('Before uploading, delete the previous record.')
+    return
+  }
   csvInputRef.value?.click()
 }
 
@@ -117,42 +272,116 @@ function parseCsvLine(line) {
 function onCsvChange(e) {
   const file = e.target?.files?.[0]
   if (!file) return
+  csvUploadError.value = ''
+
+  const norm = (s) => (s || '').toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
+
+  if (!file.name.toLowerCase().endsWith('.csv')) {
+    csvUploadError.value = 'Please upload a valid CSV file (file must have .csv extension).'
+    e.target.value = ''
+    return
+  }
+
   const reader = new FileReader()
-  reader.onload = (ev) => {
+  reader.onload = async (ev) => {
     const text = ev.target?.result
-    if (!text || typeof text !== 'string') return
+    if (!text || typeof text !== 'string') {
+      csvUploadError.value = 'The file could not be read. Please ensure it is a valid text/CSV file.'
+      e.target.value = ''
+      return
+    }
     const lines = text.split(/\r?\n/).filter((l) => l.trim())
-    if (lines.length < 2) return
+    if (lines.length < 2) {
+      csvUploadError.value = 'The file is empty or has no data rows. Please add a header row and at least one data row.'
+      e.target.value = ''
+      return
+    }
+
     const rawHeaders = parseCsvLine(lines[0])
-    const norm = (s) => (s || '').toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
     const keyMap = {}
     COLUMNS.forEach((col) => {
       const i = rawHeaders.findIndex((h) => norm(h) === col)
       if (i !== -1) keyMap[col] = i
     })
+    OPTIONAL_CSV_COLUMNS.forEach((col) => {
+      const i = rawHeaders.findIndex((h) => norm(h) === col)
+      if (i !== -1) keyMap[col] = i
+    })
+
+    const missingColumns = REQUIRED_CSV_COLUMNS.filter((col) => keyMap[col] === undefined)
+    if (missingColumns.length > 0) {
+      const names = missingColumns.map((c) => COLUMN_LABELS[c] || c).join(', ')
+      csvUploadError.value = `The CSV file is missing the following required columns: ${names}. Please add these columns to your file. Expected headers (or similar): ${REQUIRED_CSV_COLUMNS.map((c) => COLUMN_LABELS[c]).join(', ')}.`
+      e.target.value = ''
+      return
+    }
+
     const newRows = []
+    const rowErrors = []
     for (let i = 1; i < lines.length; i++) {
+      const lineNum = i + 1
       const cells = parseCsvLine(lines[i])
-      const row = { id: nextId.value++ }
+      const row = {}
       COLUMNS.forEach((col) => {
         const idx = keyMap[col]
-        row[col] = idx !== undefined && cells[idx] !== undefined ? cells[idx] : ''
+        row[col] = idx !== undefined && cells[idx] !== undefined ? String(cells[idx]).trim() : ''
       })
+      OPTIONAL_CSV_COLUMNS.forEach((col) => {
+        const idx = keyMap[col]
+        row[col] = idx !== undefined && cells[idx] !== undefined ? String(cells[idx]).trim() : ''
+      })
+      const activityNum = (row.activity_number ?? '').trim()
+      const companyName = (row.company_name ?? '').trim()
+      if (!activityNum && !companyName) {
+        rowErrors.push(lineNum)
+        continue
+      }
       newRows.push(row)
     }
-    data.value = [...data.value, ...newRows]
-    lastUploadedIds.value = newRows.map((r) => r.id)
+
+    if (rowErrors.length > 0 && newRows.length === 0) {
+      csvUploadError.value = `No valid rows found. Row(s) ${rowErrors.slice(0, 10).join(', ')}${rowErrors.length > 10 ? ` and ${rowErrors.length - 10} more` : ''} are missing both Activity Number and Company Name (at least one is required).`
+      e.target.value = ''
+      return
+    }
+    if (rowErrors.length > 0) {
+      csvUploadError.value = `${newRows.length} row(s) imported. ${rowErrors.length} row(s) skipped (missing Activity Number and Company Name): row(s) ${rowErrors.slice(0, 5).join(', ')}${rowErrors.length > 5 ? ` and ${rowErrors.length - 5} more` : ''}.`
+    }
+
+    loading.value = true
+    csvUploadError.value = ''
+    try {
+      const { data: res } = await dspTrackerApi.import(newRows)
+      lastUploadedBatchId.value = res?.batch_id ?? null
+      await load()
+    } catch (err) {
+      csvUploadError.value = err?.response?.data?.message || 'Failed to save uploaded data.'
+    } finally {
+      loading.value = false
+    }
+    if (!rowErrors.length) csvUploadError.value = ''
+    e.target.value = ''
   }
   reader.readAsText(file, 'UTF-8')
   e.target.value = ''
 }
 
-function deleteOldFile() {
-  if (!lastUploadedIds.value.length) return
-  const ids = new Set(lastUploadedIds.value)
-  data.value = data.value.filter((row) => !ids.has(row.id))
-  lastUploadedIds.value = []
+async function deleteOldFile() {
+  if (!lastUploadedBatchId.value) return
+  loading.value = true
+  csvUploadError.value = ''
+  try {
+    await dspTrackerApi.deleteBatch(lastUploadedBatchId.value)
+    lastUploadedBatchId.value = null
+    await load()
+  } catch (err) {
+    csvUploadError.value = err?.response?.data?.message || 'Failed to delete records.'
+  } finally {
+    loading.value = false
+  }
 }
+
+onMounted(() => load())
 </script>
 
 <template>
@@ -166,9 +395,11 @@ function deleteOldFile() {
             </svg>
           </div>
           <div>
-            <h1 class="text-xl font-bold text-gray-900 leading-tight">DSP Tracker - Status Check</h1>
+            <div class="flex flex-wrap items-baseline gap-4">
+              <h1 class="text-xl font-bold text-gray-900 leading-tight">DSP Tracker - Status Check</h1>
+              <Breadcrumbs class="text-sm text-gray-500" />
+            </div>
             <p class="mt-0.5 text-sm text-gray-500">Search and track DSP-related activities and requests.</p>
-            <Breadcrumbs class="mt-1" />
           </div>
         </div>
         <div class="flex flex-wrap items-center gap-2">
@@ -182,7 +413,7 @@ function deleteOldFile() {
           <button
             type="button"
             class="inline-flex items-center rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-            :disabled="!lastUploadedIds.length"
+            :disabled="!lastUploadedBatchId"
             @click="deleteOldFile"
           >
             Delete Old File
@@ -195,17 +426,99 @@ function deleteOldFile() {
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
-            Import
+            Upload CSV file
           </button>
         </div>
       </div>
+
+      <div v-if="loadError" class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        {{ loadError }}
+      </div>
+      <div v-if="csvUploadError" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        {{ csvUploadError }}
+      </div>
+
+      <!-- Filters: Request Status, Company Name, Apply/Reset, Advanced Filters, Customize Columns (Activity Number only in Advanced) -->
+      <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <div class="flex flex-wrap items-end gap-4">
+          <div class="min-w-[140px] max-w-[180px]">
+            <label class="mb-1 block text-xs font-medium text-gray-600">Request Status</label>
+            <select
+              v-model="filters.request_status"
+              class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              :disabled="loading"
+            >
+              <option value="">All</option>
+              <option v-for="o in filterOptions.request_status_options" :key="o.value" :value="o.value">{{ o.label }}</option>
+            </select>
+          </div>
+          <div class="min-w-[140px] max-w-[200px]">
+            <label class="mb-1 block text-xs font-medium text-gray-600">Company Name</label>
+            <input
+              v-model="filters.company_name"
+              type="text"
+              placeholder="Search company..."
+              class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              :disabled="loading"
+            />
+          </div>
+          <div class="flex gap-2">
+            <button
+              type="button"
+              class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+              :disabled="loading"
+              @click="applyFilters"
+            >
+              Apply Filters
+            </button>
+            <button
+              type="button"
+              class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              :disabled="loading"
+              @click="resetFilters"
+            >
+              Reset
+            </button>
+          </div>
+          <div class="flex gap-2 ml-auto">
+            <button
+              type="button"
+              class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              @click="advancedVisible = !advancedVisible"
+            >
+              Advanced Filters
+              <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              @click="columnModalVisible = true"
+            >
+              Customize Columns
+              <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <AdvancedFilters
+        :visible="advancedVisible"
+        :filters="filters"
+        :loading="loading"
+        @apply="applyFilters"
+        @reset="resetFilters"
+      />
 
       <div class="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
         <table class="min-w-full border-collapse">
           <thead>
             <tr class="border-b border-gray-200 bg-sky-50">
               <th
-                v-for="col in COLUMNS"
+                v-for="col in visibleColumns"
                 :key="col"
                 scope="col"
                 class="whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-gray-800"
@@ -228,7 +541,7 @@ function deleteOldFile() {
           </thead>
           <tbody class="bg-white">
             <tr v-if="loading" class="border-b border-gray-200">
-              <td :colspan="COLUMNS.length + 1" class="px-4 py-12 text-center text-sm text-gray-500">
+              <td :colspan="visibleColumns.length + 1" class="px-4 py-12 text-center text-sm text-gray-500">
                 <span class="inline-flex items-center gap-2">
                   <svg class="h-5 w-5 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
@@ -239,7 +552,7 @@ function deleteOldFile() {
               </td>
             </tr>
             <tr v-else-if="!sortedData.length" class="border-b border-gray-200">
-              <td :colspan="COLUMNS.length + 1" class="px-4 py-12 text-center text-sm text-gray-500">No records found.</td>
+              <td :colspan="visibleColumns.length + 1" class="px-4 py-12 text-center text-sm text-gray-500">No records found.</td>
             </tr>
             <tr
               v-for="row in sortedData"
@@ -247,7 +560,7 @@ function deleteOldFile() {
               class="border-b border-gray-200 bg-white hover:bg-gray-50/50"
             >
               <td
-                v-for="col in COLUMNS"
+                v-for="col in visibleColumns"
                 :key="col"
                 class="whitespace-nowrap px-4 py-3 text-sm text-gray-900"
               >
@@ -295,6 +608,22 @@ function deleteOldFile() {
           Showing {{ sortedData.length }} of {{ data.length }} entries
         </div>
       </div>
+
+      <ColumnCustomizerModal
+        :visible="columnModalVisible"
+        :all-columns="allColumnsForModal"
+        :visible-columns="visibleColumns"
+        :default-columns="COLUMNS"
+        @update:visible="columnModalVisible = $event"
+        @save="onColumnSave"
+      />
+
+      <DSPTrackerDetailModal
+        :visible="detailModalVisible"
+        :record="selectedRecord"
+        @close="closeDetailModal"
+        @edit="onDetailEdit"
+      />
     </div>
   </div>
 </template>

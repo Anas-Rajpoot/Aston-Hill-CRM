@@ -17,6 +17,7 @@ class Client extends Model
         'manager_id',
         'team_leader_id',
         'sales_agent_id',
+        'account_manager_id',
         'status',
         'service_type',
         'product_type',
@@ -67,6 +68,16 @@ class Client extends Model
     public function salesAgent()
     {
         return $this->belongsTo(User::class, 'sales_agent_id');
+    }
+
+    public function accountManager()
+    {
+        return $this->belongsTo(User::class, 'account_manager_id');
+    }
+
+    public function csrs()
+    {
+        return $this->hasMany(ClientCsr::class)->orderBy('sort_order');
     }
 
     public function companyDetail()
