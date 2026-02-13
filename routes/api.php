@@ -229,6 +229,14 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::post('/dsp-tracker/import', [\App\Http\Controllers\Api\DspTrackerApiController::class, 'import']);
     Route::delete('/dsp-tracker/batch/{batchId}', [\App\Http\Controllers\Api\DspTrackerApiController::class, 'destroyBatch'])->where('batchId', '[a-f0-9\-]{36}');
 
+    // Verifiers Detail (directory for DSP Tracker: add, import/export CSV, inline edit, delete with permission)
+    Route::get('/verifiers/export-csv', [\App\Http\Controllers\Api\VerifierApiController::class, 'exportCsv']);
+    Route::post('/verifiers/import-csv', [\App\Http\Controllers\Api\VerifierApiController::class, 'importCsv']);
+    Route::get('/verifiers', [\App\Http\Controllers\Api\VerifierApiController::class, 'index']);
+    Route::post('/verifiers', [\App\Http\Controllers\Api\VerifierApiController::class, 'store']);
+    Route::put('/verifiers/{verifier}', [\App\Http\Controllers\Api\VerifierApiController::class, 'update'])->whereNumber('verifier');
+    Route::delete('/verifiers/{verifier}', [\App\Http\Controllers\Api\VerifierApiController::class, 'destroy'])->whereNumber('verifier');
+
     // Users (list, show, update, delete, create – super admin / authorized)
     Route::get('/users', [UserController::class, 'index']);
     Route::get('/users/filters', [UserController::class, 'filters']);

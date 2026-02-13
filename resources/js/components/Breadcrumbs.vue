@@ -23,6 +23,7 @@ const SEGMENT_LABELS = {
   'order-status': 'Order Status',
   'dsp-tracker': 'DSP Tracker',
   'gsm-tracker': 'DSP Tracker',
+  'verifiers-detail': 'Verifiers Detail',
   employees: 'Employees',
   'cisco-extensions': 'Cisco Extensions',
   'attendance-log': 'Attendance Log',

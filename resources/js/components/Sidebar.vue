@@ -33,6 +33,7 @@ const navItems = [
   { to: '/clients', label: 'Clients' },
   { to: '/order-status', label: 'Order Status' },
   { to: '/dsp-tracker', label: 'DSP Tracker' },
+  { to: '/verifiers-detail', label: 'Verifiers Detail' },
   { to: '/employees', label: 'Employees' },
   { to: '/cisco-extensions', label: 'Cisco Extensions' },
   { to: '/attendance-log', label: 'Attendance Log' },

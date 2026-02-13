@@ -55,6 +55,7 @@ const routes = [
       { path: 'order-status', component: () => import('@/pages/order-status/OrderStatusListingPage.vue'), meta: { title: 'Order Status' } },
       { path: 'dsp-tracker', component: () => import('@/pages/dsp-tracker/DSPTrackerListingPage.vue') },
       { path: 'gsm-tracker', redirect: '/dsp-tracker' },
+      { path: 'verifiers-detail', component: () => import('@/pages/verifiers/VerifiersDetailPage.vue'), meta: { title: 'Verifiers Detail' } },
       { path: 'employees', component: () => import('@/pages/employees/EmployeesListingPage.vue') },
       { path: 'employees/:id', component: UserShow },
       { path: 'employees/:id/edit', component: UserEdit },
