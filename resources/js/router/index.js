@@ -99,6 +99,8 @@ const router = createRouter({
 const authPaths = ['/login', '/register', '/forgot-password', '/2fa/verify']
 const isAuthPath = (path) => authPaths.includes(path) || path.startsWith('/reset-password')
 
+// Note: In-flight API requests are cancelled by composables (e.g. useUserEditData) via AbortController in onUnmounted when navigating away.
+
 router.beforeEach(async (to, from, next) => {
   const auth = useAuthStore()
   const authPath = isAuthPath(to.path)

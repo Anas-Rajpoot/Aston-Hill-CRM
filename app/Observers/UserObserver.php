@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Models\User;
 use App\Models\UserAudit;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
 class UserObserver
 {
@@ -29,11 +30,17 @@ class UserObserver
         self::$oldValues[$user->id] = array_intersect_key($original, array_flip(array_keys($dirty)));
     }
 
+    public function deleted(User $user): void
+    {
+        $this->invalidateUserCache($user->id);
+    }
+
     public function updated(User $user): void
     {
         if (! $user->exists) {
             return;
         }
+        $this->invalidateUserCache($user->id);
         $changes = $user->getChanges();
         $oldSnapshot = self::$oldValues[$user->id] ?? [];
         unset(self::$oldValues[$user->id]);
@@ -80,5 +87,17 @@ class UserObserver
             return $value->toIso8601String();
         }
         return (string) $value;
+    }
+
+    /** Invalidate cached user data so next request gets fresh data (Redis tagged cache). */
+    protected function invalidateUserCache(int $userId): void
+    {
+        $tags = ['user.' . $userId];
+        if (Cache::getStore()->getRepository()->supportsTags()) {
+            Cache::tags($tags)->flush();
+        } else {
+            Cache::forget('user.prime.' . $userId);
+            Cache::forget('user.extras.' . $userId);
+        }
     }
 }

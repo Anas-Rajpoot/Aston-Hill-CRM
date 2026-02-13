@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\UserResource;
 use App\Models\TeamRoleMapping;
 use App\Models\User;
 use App\Models\UserAudit;
@@ -365,6 +366,71 @@ class UserController extends Controller
             'manager_label' => $mappings['manager']['label'] ?? 'Manager',
             'team_leader_label' => $mappings['team_leader']['label'] ?? 'Team Leader',
         ]);
+    }
+
+    /**
+     * Critical data for initial render only (edit page above-the-fold).
+     * Eager load roles; single last_login query; optional Cache::remember (Redis 5–15 min TTL).
+     */
+    public function prime(User $user): JsonResponse
+    {
+        if ($user->hasRole('superadmin') && request()->user()->id !== $user->id) {
+            return response()->json(['message' => 'Only the super admin can view this account.'], 403);
+        }
+
+        $ttl = (int) (config('cache.user_prime_ttl', 300)); // 5 min default
+        $cacheKey = 'user.prime.' . $user->id;
+
+        $data = Cache::remember($cacheKey, $ttl, function () use ($user) {
+            $user->load(['roles:id,name']);
+            $lastLog = UserLoginLog::where('user_id', $user->id)->orderByDesc('login_at')->first();
+            $user->last_login_at = $lastLog?->login_at
+                ? (is_object($lastLog->login_at) ? $lastLog->login_at->format('c') : (string) $lastLog->login_at)
+                : null;
+            return (new UserResource($user))->toArray(request());
+        });
+
+        return response()->json(['user' => $data]);
+    }
+
+    /**
+     * Secondary data for edit page (dropdowns, lists). Fetched in parallel with prime on frontend.
+     */
+    public function extras(User $user): JsonResponse
+    {
+        if ($user->hasRole('superadmin') && request()->user()->id !== $user->id) {
+            return response()->json(['message' => 'Only the super admin can view this account.'], 403);
+        }
+
+        $ttl = (int) (config('cache.user_extras_ttl', 600)); // 10 min for reference data
+        $cacheKey = 'user.extras.' . $user->id;
+
+        $data = Cache::remember($cacheKey, $ttl, function () use ($user) {
+            $mappings = TeamRoleMapping::allMappings();
+            $managerRoleId = TeamRoleMapping::roleIdFor('manager');
+            $teamLeaderRoleId = TeamRoleMapping::roleIdFor('team_leader');
+            $salesAgentRoleId = TeamRoleMapping::roleIdFor('sales_agent');
+            $managerRole = $managerRoleId ? Role::find($managerRoleId) : null;
+            $teamLeaderRole = $teamLeaderRoleId ? Role::find($teamLeaderRoleId) : null;
+            $managers = $managerRole
+                ? User::role($managerRole)->where('status', 'approved')->where('id', '!=', $user->id)->orderBy('name')->get(['id', 'name', 'email'])
+                : collect();
+            $teamLeaders = $teamLeaderRole
+                ? User::role($teamLeaderRole)->where('status', 'approved')->where('id', '!=', $user->id)->orderBy('name')->get(['id', 'name', 'email', 'manager_id'])
+                : collect();
+            $roles = Role::orderBy('name')->get(['id', 'name', 'description']);
+            return [
+                'roles' => $roles,
+                'managers' => $managers,
+                'team_leaders' => $teamLeaders,
+                'team_leader_role_id' => $teamLeaderRoleId,
+                'sales_agent_role_id' => $salesAgentRoleId,
+                'manager_label' => $mappings['manager']['label'] ?? 'Manager',
+                'team_leader_label' => $mappings['team_leader']['label'] ?? 'Team Leader',
+            ];
+        });
+
+        return response()->json($data);
     }
 
     public function update(Request $request, User $user): JsonResponse

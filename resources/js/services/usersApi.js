@@ -25,6 +25,16 @@ export default {
     return api.get(`/users/${id}`)
   },
 
+  /** Critical data for initial render (edit page). Use with ?fields[user]=... for sparse fieldsets. */
+  prime(id, config = {}) {
+    return api.get(`/users/${id}/prime`, config)
+  },
+
+  /** Secondary data (roles, managers, team_leaders). */
+  extras(id, config = {}) {
+    return api.get(`/users/${id}/extras`, config)
+  },
+
   update(id, data) {
     return api.put(`/users/${id}`, data)
   },

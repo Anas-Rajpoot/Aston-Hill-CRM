@@ -63,6 +63,9 @@ class RoleApiController extends Controller
 
     /**
      * Update a role.
+     * Role name change updates the single row in roles table; permissions and user assignments
+     * are linked by role_id, so they stay with the role. Do not rename system roles (e.g. superadmin)
+     * because application code checks them by name (hasRole('superadmin'), etc.).
      */
     public function update(Request $request, Role $role): JsonResponse
     {
@@ -71,6 +74,14 @@ class RoleApiController extends Controller
             'description' => ['nullable', 'string', 'max:500'],
             'status' => ['nullable', 'string', 'in:active,inactive'],
         ]);
+
+        // Prevent renaming system role used by middleware, policies, and Blade directives
+        if ($role->name === 'superadmin' && $data['name'] !== 'superadmin') {
+            return response()->json([
+                'message' => 'The superadmin role name cannot be changed. It is used by the application for access control.',
+            ], 422);
+        }
+
         $role->update([
             'name' => $data['name'],
             'description' => $data['description'] ?? $role->description,

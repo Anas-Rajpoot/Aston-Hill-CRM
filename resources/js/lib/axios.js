@@ -41,4 +41,25 @@ const addCsrf = (config) => {
 api.interceptors.request.use(addCsrf)
 web.interceptors.request.use(addCsrf)
 
+// Retry with exponential backoff for transient errors (429, 5xx). Cancel-safe: respect config.signal.
+const RETRY_STATUSES = [429, 500, 502, 503, 504]
+const RETRY_MAX = 3
+const RETRY_DELAY_MS = 1000
+
+api.interceptors.response.use(
+  (res) => res,
+  async (err) => {
+    const config = err.config
+    if (!config || config.__retryCount >= RETRY_MAX) return Promise.reject(err)
+    const status = err.response?.status
+    if (!status || !RETRY_STATUSES.includes(status)) return Promise.reject(err)
+    if (config.signal?.aborted) return Promise.reject(err)
+    config.__retryCount = (config.__retryCount || 0) + 1
+    const delay = RETRY_DELAY_MS * Math.pow(2, config.__retryCount - 1)
+    await new Promise((r) => setTimeout(r, delay))
+    if (config.signal?.aborted) return Promise.reject(err)
+    return api.request(config)
+  }
+)
+
 export default api

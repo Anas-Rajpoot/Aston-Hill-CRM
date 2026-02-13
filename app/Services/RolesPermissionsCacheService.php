@@ -173,17 +173,46 @@ class RolesPermissionsCacheService
                 $join->on('model_has_roles.role_id', '=', 'roles.id')
                     ->where('model_has_roles.model_type', '=', $userModel);
             })
+            ->where('roles.guard_name', '=', 'web')
             ->groupBy('roles.id', 'roles.name', 'roles.description', 'roles.status', 'roles.created_at')
             ->orderBy('roles.name')
+            ->orderBy('roles.id')
             ->get();
 
-        $totalUsersAssigned = (int) $rows->sum('users_count');
+        // One row per role name: if DB has duplicate names (e.g. from before unique constraint), keep one and sum users
+        $byName = [];
+        foreach ($rows as $row) {
+            $name = $row->name;
+            $r = (object) [
+                'id' => $row->id,
+                'name' => $row->name,
+                'description' => $row->description,
+                'status' => $row->status,
+                'created_at' => $row->created_at,
+                'users_count' => (int) $row->users_count,
+            ];
+            if (! isset($byName[$name])) {
+                $byName[$name] = $r;
+            } else {
+                $byName[$name]->users_count += (int) $row->users_count;
+                // Keep the row with the earliest id (original role)
+                if ($row->id < $byName[$name]->id) {
+                    $byName[$name]->id = $row->id;
+                    $byName[$name]->description = $row->description;
+                    $byName[$name]->status = $row->status;
+                    $byName[$name]->created_at = $row->created_at;
+                }
+            }
+        }
+        $uniqueByName = collect(array_values($byName))->sortBy('name')->values();
+
+        $totalUsersAssigned = (int) $uniqueByName->sum('users_count');
 
         return [
-            'data' => $rows->toArray(),
+            'data' => $uniqueByName->toArray(),
             'stats' => [
-                'total_roles' => $rows->count(),
-                'active_roles' => $rows->where('status', 'active')->count(),
+                'total_roles' => $uniqueByName->count(),
+                'active_roles' => $uniqueByName->where('status', 'active')->count(),
                 'total_users_assigned' => $totalUsersAssigned,
             ],
         ];

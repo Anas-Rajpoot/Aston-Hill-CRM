@@ -395,8 +395,13 @@ async function openUserDetail(user) {
   detailError.value = null
   detailLoading.value = true
   try {
-    const data = await usersApi.show(user.id)
-    detailUser.value = data.user
+    const response = await usersApi.show(user.id)
+    const userData = response?.data?.user
+    if (userData) {
+      detailUser.value = userData
+    } else {
+      detailError.value = 'Could not load user details.'
+    }
   } catch {
     detailError.value = 'Could not load user details.'
   } finally {
@@ -407,6 +412,9 @@ async function openUserDetail(user) {
 function closeUserDetail() {
   detailUser.value = null
   detailError.value = null
+  if (route.path !== '/users') {
+    router.push('/users')
+  }
 }
 
 function fromDetailEditUser() {

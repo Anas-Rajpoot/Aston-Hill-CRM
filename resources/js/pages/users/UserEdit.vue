@@ -1,11 +1,15 @@
 <script setup>
+/**
+ * User edit page: progressive loading with prime + extras (parallel fetch).
+ * Shell (title, breadcrumbs, actions) renders immediately; form area shows skeleton until data is ready.
+ */
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import usersApi from '@/services/usersApi'
-import api from '@/lib/axios'
-import extensionsApi from '@/services/extensionsApi'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import UserEditSectionSkeleton from '@/components/skeletons/UserEditSectionSkeleton.vue'
+import { useUserEditData } from '@/composables/useUserEditData'
 import { toDdMmYyyy, fromDdMmYyyy, toDdMonYyyyLower, fromDdMonYyyyLower } from '@/lib/dateFormat'
 
 const DEPARTMENTS = [
@@ -57,10 +61,8 @@ const form = ref({
   terminate_date: '',
   status: '',
 })
-const joiningDateValue = ref('') // readonly: yyyy-mm-dd from user
-const extensionOptions = ref([])
+const joiningDateValue = ref('')
 const roles = ref([])
-const countries = ref([])
 const managers = ref([])
 const teamLeaders = ref([])
 const teamLeaderRoleId = ref(null)
@@ -68,8 +70,20 @@ const salesAgentRoleId = ref(null)
 const managerLabel = ref('Manager')
 const teamLeaderLabel = ref('Team Leader')
 const user = ref(null)
-const loading = ref(true)
+const formPopulated = ref(false)
 const saving = ref(false)
+
+const {
+  user: composableUser,
+  extras: composableExtras,
+  countries: composableCountries,
+  extensionOptions: composableExtensionOptions,
+  loadingPrime,
+  loadingExtras,
+  errorPrime,
+  errorExtras,
+  retry,
+} = useUserEditData({ useCache: true })
 const error = ref('')
 const showPassword = ref(false)
 const rolesDropdownOpen = ref(false)
@@ -161,22 +175,17 @@ watch(
   }
 )
 
-onMounted(async () => {
-  if (!canEdit.value) {
-    router.push('/employees')
-    return
-  }
-  try {
-    const [userRes, countriesRes] = await Promise.all([
-      usersApi.show(route.params.id),
-      api.get('/countries').catch(() => ({ data: [] })),
-    ])
-    const d = userRes.data
-    user.value = d.user
-    const u = user.value
+// Sync composable user ref to local user for display
+watch(composableUser, (v) => { user.value = v }, { immediate: true })
+
+// Populate form when prime + extras are ready (one-time per load)
+watch(
+  [composableUser, composableExtras],
+  ([u, ext]) => {
+    if (!u || !ext || formPopulated.value) return
+    const d = ext
     roles.value = d.roles ?? []
     const allRoles = d.roles ?? []
-    // Build same dedupe-by-name list as assignableRoles so selected IDs match the options we show
     const assignableList = (() => {
       const list = allRoles.filter((r) => (r?.name ?? '').toLowerCase() !== 'superadmin')
       const seen = new Map()
@@ -188,7 +197,6 @@ onMounted(async () => {
       }
       return Array.from(seen.values())
     })()
-    // Support roles as [{ id, name }], pivot-style [{ role_id, name }], or role_ids array; normalize to assignable IDs
     const rawUserRoles = Array.isArray(u.roles) ? u.roles : []
     const roleIdsFromApi = Array.isArray(u.role_ids) ? u.role_ids : []
     const userRoleIds = rawUserRoles.length > 0
@@ -205,6 +213,13 @@ onMounted(async () => {
         }).filter((id) => id != null)
     const joiningRaw = u.joining_date ? String(u.joining_date).substring(0, 10) : (u.created_at ? String(u.created_at).substring(0, 10) : '')
     joiningDateValue.value = joiningRaw
+    // Set extras first so the form.roles watch has correct teamLeaderRoleId/salesAgentRoleId and does not clear team_leader_id
+    managers.value = d.managers ?? []
+    teamLeaders.value = (d.team_leaders ?? []).map((t) => ({ ...t, manager_id: t.manager_id ?? null }))
+    teamLeaderRoleId.value = d.team_leader_role_id ?? null
+    salesAgentRoleId.value = d.sales_agent_role_id ?? null
+    managerLabel.value = d.manager_label ?? 'Manager'
+    teamLeaderLabel.value = d.team_leader_label ?? 'Team Leader'
     form.value = {
       name: u.name ?? '',
       email: u.email ?? '',
@@ -224,23 +239,17 @@ onMounted(async () => {
       terminate_date: u.terminate_date ? String(u.terminate_date).substring(0, 10) : '',
       status: u.status ?? 'pending',
     }
-    managers.value = d.managers ?? []
-    teamLeaders.value = (d.team_leaders ?? []).map((t) => ({ ...t, manager_id: t.manager_id ?? null }))
-    teamLeaderRoleId.value = d.team_leader_role_id ?? null
-    salesAgentRoleId.value = d.sales_agent_role_id ?? null
-    managerLabel.value = d.manager_label ?? 'Manager'
-    teamLeaderLabel.value = d.team_leader_label ?? 'Team Leader'
-    countries.value = Array.isArray(countriesRes.data) ? countriesRes.data : countriesRes.data?.data ?? []
-    const extRes = await extensionsApi.index({ status: ['active'], usage: ['unassigned', 'assigned'], per_page: 100 }).catch(() => ({ data: { data: [] } }))
-    const rows = extRes.data?.data ?? extRes.data ?? []
-    const userId = parseInt(route.params.id, 10)
-    extensionOptions.value = rows
-      .filter((r) => r.assigned_to == null || r.assigned_to === userId)
-      .map((r) => ({ value: r.extension ?? String(r.id), label: r.extension ?? String(r.id) }))
-  } catch {
+    formPopulated.value = true
+  },
+  { immediate: true }
+)
+
+// Reset formPopulated when route id changes so we can populate again
+watch(() => route.params?.id, () => { formPopulated.value = false })
+
+onMounted(() => {
+  if (!canEdit.value) {
     router.push(isEmployeeRoute.value ? '/employees' : '/users')
-  } finally {
-    loading.value = false
   }
 })
 
@@ -343,24 +352,29 @@ onUnmounted(() => {
 
 <template>
   <div class="space-y-6">
-    <div v-if="loading" class="flex justify-center py-16">
-      <svg class="animate-spin h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-      </svg>
+    <!-- Shell: always visible -->
+    <div class="flex flex-wrap items-baseline gap-2">
+      <Breadcrumbs />
+      <h1 class="text-2xl font-bold text-gray-900 leading-tight">Edit Employee</h1>
+    </div>
+    <p class="text-sm text-gray-500">Update employee record in the system.</p>
+
+    <div v-if="errorPrime || errorExtras" class="rounded-xl bg-red-50 border border-red-200 px-4 py-3 flex items-center justify-between">
+      <span class="text-sm text-red-700">{{ errorPrime || errorExtras }}</span>
+      <button type="button" class="text-red-600 hover:text-red-800 font-medium" @click="retry">Retry</button>
+    </div>
+    <div v-if="error" class="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+      {{ error }}
     </div>
 
-    <form v-else @submit.prevent="save(true)" class="space-y-6">
-      <div class="flex flex-wrap items-baseline gap-2">
-        <h1 class="text-2xl font-bold text-gray-900">Edit Employee</h1>
-        <Breadcrumbs />
-      </div>
-      <p class="text-sm text-gray-500">Update employee record in the system.</p>
+    <!-- Section-level loading: show skeletons until prime + extras are ready -->
+    <template v-if="loadingPrime || loadingExtras">
+      <UserEditSectionSkeleton :lines="6" />
+      <UserEditSectionSkeleton :lines="4" />
+      <UserEditSectionSkeleton :lines="6" />
+    </template>
 
-      <div v-if="error" class="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
-        {{ error }}
-      </div>
-
+    <form v-else-if="formPopulated" @submit.prevent="save(true)" class="space-y-6">
       <!-- Basic Information -->
       <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
         <div class="px-6 py-4 border-b border-gray-200 flex items-center gap-2 bg-gray-50">
@@ -483,7 +497,7 @@ onUnmounted(() => {
               <label class="block text-sm font-medium text-gray-700 mb-1">Extension</label>
               <select v-model="form.extension" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500">
                 <option value="">Select extension</option>
-                <option v-for="opt in extensionOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                <option v-for="opt in composableExtensionOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
               </select>
             </div>
           </div>
@@ -511,7 +525,7 @@ onUnmounted(() => {
             <label class="block text-sm font-medium text-gray-700 mb-1">Country</label>
             <select v-model="form.country" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500">
               <option value="">Select country</option>
-              <option v-for="c in countries" :key="c.id" :value="c.code || c.name">{{ c.name }}</option>
+              <option v-for="c in composableCountries" :key="c.id" :value="c.code || c.name">{{ c.name }}</option>
             </select>
           </div>
           <div>

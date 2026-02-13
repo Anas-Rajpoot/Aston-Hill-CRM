@@ -237,11 +237,25 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::post('/users/bulk-activate', [UserController::class, 'bulkActivate']);
     Route::post('/users/bulk-deactivate', [UserController::class, 'bulkDeactivate']);
     Route::get('/users/{user}', [UserController::class, 'show'])->whereNumber('user');
+    Route::get('/users/{user}/prime', [UserController::class, 'prime'])->whereNumber('user');
+    Route::get('/users/{user}/extras', [UserController::class, 'extras'])->whereNumber('user');
     Route::put('/users/{user}', [UserController::class, 'update'])->whereNumber('user');
     Route::patch('/users/{user}', [UserController::class, 'patch'])->whereNumber('user');
     Route::get('/users/{user}/audit-log', [UserController::class, 'auditLog'])->whereNumber('user');
     Route::post('/users/{user}/send-password-reset', [UserController::class, 'sendPasswordReset'])->whereNumber('user');
     Route::delete('/users/{user}', [UserController::class, 'destroy'])->whereNumber('user');
+
+    // Super admin only (same auth stack as above; extra role check)
+    Route::middleware(['role:superadmin'])->prefix('super-admin')->group(function () {
+        Route::get('/team-role-mappings', [TeamRoleMappingController::class, 'index']);
+        Route::put('/team-role-mappings', [TeamRoleMappingController::class, 'update']);
+
+        Route::get('/permissions/structure', [RoleApiController::class, 'permissionsStructure']);
+        Route::get('/roles/{role}/permissions-page', [RoleApiController::class, 'permissionsPageData']);
+        Route::get('/roles/{role}/permissions', [RoleApiController::class, 'rolePermissions']);
+        Route::put('/roles/{role}/permissions', [RoleApiController::class, 'updateRolePermissions']);
+        Route::apiResource('roles', RoleApiController::class);
+    });
 
     // Datatable
     Route::get('/datatable/{module}', [DataTableController::class, 'index']);
@@ -259,16 +273,4 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
 Route::middleware(['web', 'auth:sanctum'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::post('/auth/2fa/verify', [AuthController::class, 'verify2FA'])->name('api.auth.2fa.verify')->middleware('throttle:5,1');
-});
-
-// ----- Super admin only -----
-Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_superadmin', 'role:superadmin'])->prefix('super-admin')->group(function () {
-    Route::get('/team-role-mappings', [TeamRoleMappingController::class, 'index']);
-    Route::put('/team-role-mappings', [TeamRoleMappingController::class, 'update']);
-
-    Route::get('/permissions/structure', [RoleApiController::class, 'permissionsStructure']);
-    Route::get('/roles/{role}/permissions-page', [RoleApiController::class, 'permissionsPageData']);
-    Route::get('/roles/{role}/permissions', [RoleApiController::class, 'rolePermissions']);
-    Route::put('/roles/{role}/permissions', [RoleApiController::class, 'updateRolePermissions']);
-    Route::apiResource('roles', RoleApiController::class);
 });

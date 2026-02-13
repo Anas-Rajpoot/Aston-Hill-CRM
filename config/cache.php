@@ -115,4 +115,14 @@ return [
 
     'prefix' => env('CACHE_PREFIX', Str::slug((string) env('APP_NAME', 'laravel')).'-cache-'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | User API cache TTL (seconds)
+    |--------------------------------------------------------------------------
+    | prime: critical data for edit page initial render (default 300 = 5 min).
+    | extras: dropdowns/lists (default 600 = 10 min). Invalidation on User update/delete.
+    */
+    'user_prime_ttl' => (int) env('CACHE_USER_PRIME_TTL', 300),
+    'user_extras_ttl' => (int) env('CACHE_USER_EXTRAS_TTL', 600),
+
 ];
