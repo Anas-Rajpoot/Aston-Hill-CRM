@@ -36,7 +36,7 @@ const SEGMENT_LABELS = {
   'team-hierarchy': 'Team Hierarchy',
   'system-preferences': 'System Preferences',
   sla: 'SLA Configuration',
-  'notifications-email': 'Notifications & Email',
+  'notifications-email': 'Notifications & Email Rules',
   'announcement-center': 'Announcement Center',
   library: 'Library',
   'data-import-export': 'Data & Import/Export',

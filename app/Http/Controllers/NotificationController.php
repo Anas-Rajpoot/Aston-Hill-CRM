@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\DatabaseNotification;
 use Yajra\DataTables\Facades\DataTables;
@@ -107,28 +108,55 @@ class NotificationController extends Controller
     {
         $user = $request->user();
 
-        $unreadCount = $user->unreadNotifications()->count();
+        // If in-app (web) notifications are globally disabled, return empty
+        if (! NotificationService::isWebEnabled()) {
+            return response()->json([
+                'unreadCount' => 0,
+                'badge'       => '0',
+                'top'         => [],
+                'web_enabled' => false,
+            ]);
+        }
 
-        $top = $user->notifications()
-            ->latest()
-            ->limit(4)
-            ->get()
-            ->map(function ($n) {
-                $data = $n->data ?? [];
-                return [
-                    'id' => $n->id,
-                    'title' => $data['title'] ?? 'Notification',
-                    'message' => $data['message'] ?? '',
-                    'url' => $data['url'] ?? route('notifications.index'),
-                    'is_unread' => is_null($n->read_at),
-                    'created_at' => $n->created_at->format('d-M-Y h:i A'),
-                ];
+        $slaEnabled = NotificationService::isSlaAlertsEnabled();
+
+        // Build query — exclude SLA notifications if SLA alerts are disabled
+        $query = $user->unreadNotifications();
+        if (! $slaEnabled) {
+            $query->where(function ($q) {
+                $q->whereNull('data->is_sla')
+                  ->orWhere('data->is_sla', false);
             });
+        }
+        $unreadCount = $query->count();
+
+        $topQuery = $user->notifications()->latest()->limit(4);
+        if (! $slaEnabled) {
+            $topQuery->where(function ($q) {
+                $q->whereNull('data->is_sla')
+                  ->orWhere('data->is_sla', false);
+            });
+        }
+
+        $top = $topQuery->get()->map(function ($n) {
+            $data = $n->data ?? [];
+            return [
+                'id'         => $n->id,
+                'title'      => $data['title'] ?? 'Notification',
+                'message'    => $data['message'] ?? '',
+                'url'        => $data['url'] ?? '/notifications',
+                'is_unread'  => is_null($n->read_at),
+                'is_sla'     => $data['is_sla'] ?? false,
+                'kind'       => $data['kind'] ?? 'general',
+                'created_at' => $n->created_at->format('d-M-Y h:i A'),
+            ];
+        });
 
         return response()->json([
             'unreadCount' => $unreadCount,
-            'badge' => $unreadCount > 5 ? '5+' : (string)$unreadCount,
-            'top' => $top,
+            'badge'       => $unreadCount > 5 ? '5+' : (string) $unreadCount,
+            'top'         => $top,
+            'web_enabled' => true,
         ]);
     }
 

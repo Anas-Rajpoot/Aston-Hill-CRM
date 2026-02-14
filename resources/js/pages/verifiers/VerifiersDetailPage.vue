@@ -5,6 +5,7 @@
  */
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { useTablePageSize } from '@/composables/useTablePageSize'
 import api from '@/lib/axios'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Toast from '@/components/Toast.vue'
@@ -17,7 +18,7 @@ const loading = ref(false)
 const searchQ = ref('')
 const sortBy = ref('id')
 const sortOrder = ref('desc')
-const perPage = ref(10)
+const { perPage, perPageOptions, perPageReady, setPerPage } = useTablePageSize('verifiers')
 const successMessage = ref('')
 const errorMessage = ref('')
 
@@ -307,16 +308,44 @@ function goPage(p) {
   load(p)
 }
 
-async function deleteVerifier(row) {
+// Delete verifier: confirmation modal and toast feedback
+const showDeleteModal = ref(false)
+const verifierToDelete = ref(null)
+const deleteInProgress = ref(false)
+
+function openDeleteModal(row) {
   if (!canDelete.value) return
-  if (!confirm(`Delete verifier "${row.verifier_name || row.id}"?`)) return
+  verifierToDelete.value = row
+  showDeleteModal.value = true
+}
+
+function closeDeleteModal() {
+  if (deleteInProgress.value) return
+  showDeleteModal.value = false
+  verifierToDelete.value = null
+}
+
+async function confirmDeleteVerifier() {
+  const row = verifierToDelete.value
+  if (!row?.id || !canDelete.value) return
+  deleteInProgress.value = true
   try {
     await api.delete(`/verifiers/${row.id}`)
+    closeDeleteModal()
+    toastType.value = 'success'
+    toastMessage.value = 'Verifier deleted successfully.'
+    showToast.value = true
     await load()
-    successMessage.value = 'Verifier deleted.'
-    setTimeout(() => { successMessage.value = '' }, 3000)
   } catch (e) {
-    errorMessage.value = e?.response?.data?.message || 'Failed to delete verifier.'
+    const msg = e?.response?.status === 403
+      ? 'You do not have permission to delete verifiers.'
+      : (e?.response?.data?.message || 'Failed to delete verifier.')
+    closeDeleteModal()
+    toastType.value = 'error'
+    toastMessage.value = msg
+    showToast.value = true
+  } finally {
+    deleteInProgress.value = false
   }
 }
 
@@ -623,7 +652,7 @@ onMounted(() => load())
                   <button
                     v-if="canDelete"
                     type="button"
-                    @click="deleteVerifier(row)"
+                    @click="openDeleteModal(row)"
                     class="rounded px-2 py-1 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100"
                   >
                     Delete
@@ -642,14 +671,11 @@ onMounted(() => load())
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <select
-            v-model.number="perPage"
+            :value="perPage"
             class="rounded border border-gray-300 text-sm py-1.5 pl-3 pr-8 min-w-[4.5rem]"
-            @change="load(1)"
+            @change="(e) => { setPerPage(Number(e.target.value)); load(1) }"
           >
-            <option :value="10">10</option>
-            <option :value="20">20</option>
-            <option :value="50">50</option>
-            <option :value="100">100</option>
+            <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
           </select>
           <span class="text-sm text-gray-500">per page</span>
           <button
@@ -935,6 +961,47 @@ onMounted(() => load())
               @click="submitEdit"
             >
               Update Verifier
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Delete Verifier confirmation modal (only for users with delete permission) -->
+    <Teleport to="body">
+      <div v-if="showDeleteModal && verifierToDelete" class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50" @click.self="closeDeleteModal">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden" @click.stop>
+          <div class="px-6 pt-6 pb-4">
+            <div class="flex gap-3">
+              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900">Delete Verifier</h3>
+                <p class="mt-2 text-sm text-gray-600">
+                  Are you sure you want to delete <strong>{{ verifierToDelete.verifier_name || 'this verifier' }}</strong>? This action cannot be undone.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="px-6 pb-6 pt-2 flex justify-end gap-3">
+            <button
+              type="button"
+              class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              :disabled="deleteInProgress"
+              @click="closeDeleteModal"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+              :disabled="deleteInProgress"
+              @click="confirmDeleteVerifier"
+            >
+              {{ deleteInProgress ? 'Deleting…' : 'Delete' }}
             </button>
           </div>
         </div>

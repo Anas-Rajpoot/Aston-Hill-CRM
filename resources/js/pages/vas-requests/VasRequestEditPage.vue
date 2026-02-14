@@ -7,6 +7,7 @@ import { useRoute, useRouter } from 'vue-router'
 import vasRequestsApi from '@/services/vasRequestsApi'
 import { useAuthStore } from '@/stores/auth'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import { useFormDraft } from '@/composables/useFormDraft'
 
 const MAX_FILE_MB = 3
 const MAX_TOTAL_MB = 10
@@ -46,6 +47,8 @@ const form = ref({
   sales_agent_id: null,
   back_office_executive_id: null,
 })
+
+const { draftSaving, draftSavedAt, clearDraft } = useFormDraft('vas-request', route.params.id || 'new', form)
 
 const id = computed(() => {
   const p = route.params.id
@@ -287,6 +290,7 @@ async function submitForm() {
       sales_agent_id: form.value.sales_agent_id,
       back_office_executive_id: form.value.back_office_executive_id || null,
     })
+    await clearDraft()
     router.push(`/vas-requests/${id.value}`)
   } catch (err) {
     const msg = err.response?.data?.message || err.message || 'Failed to save.'
@@ -306,6 +310,11 @@ onMounted(() => load())
         <div class="px-4 py-4 sm:px-5">
           <div class="flex flex-wrap items-baseline gap-2">
             <h1 class="text-xl font-semibold text-gray-900">Edit VAS Request</h1>
+            <span v-if="draftSavedAt" class="text-xs text-gray-400 flex items-center gap-1">
+              <svg v-if="draftSaving" class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="4" class="opacity-25" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+              <svg v-else class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+              Draft saved
+            </span>
             <Breadcrumbs />
           </div>
         </div>

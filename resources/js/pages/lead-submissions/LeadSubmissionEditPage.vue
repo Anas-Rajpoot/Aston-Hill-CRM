@@ -7,6 +7,7 @@ import { useRoute, useRouter } from 'vue-router'
 import leadSubmissionsApi from '@/services/leadSubmissionsApi'
 import { useAuthStore } from '@/stores/auth'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import { useFormDraft } from '@/composables/useFormDraft'
 
 const route = useRoute()
 const router = useRouter()
@@ -66,6 +67,8 @@ const form = ref({
   du_remarks: '',
   additional_note: '',
 })
+
+const { draftSaving, draftSavedAt, clearDraft } = useFormDraft('lead-submission', route.params.id || 'new', form)
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Select' },
@@ -332,6 +335,7 @@ async function save() {
       completion_date: form.value.completion_date || null,
     }
     await leadSubmissionsApi.updateBackOffice(id, payload)
+    await clearDraft()
     goBack()
   } catch (err) {
     const msg = err.response?.data?.message || err.message || 'Failed to save.'
@@ -367,6 +371,11 @@ onMounted(() => {
           <div class="flex flex-wrap items-baseline gap-2">
             <h1 class="text-xl font-semibold text-gray-900">Edit Lead Submission #{{ leadId }}</h1>
             <Breadcrumbs />
+            <span v-if="draftSavedAt" class="text-xs text-gray-400 flex items-center gap-1">
+              <svg v-if="draftSaving" class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="4" class="opacity-25" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+              <svg v-else class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+              Draft saved
+            </span>
           </div>
           <router-link
             :to="'/lead-submissions'"

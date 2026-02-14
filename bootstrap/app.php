@@ -37,8 +37,14 @@ return Application::configure(basePath: dirname(__DIR__))
             'crud' => \App\Http\Middleware\CrudPermission::class,
             'crud_permission' => \App\Http\Middleware\CrudPermission::class,
         ]);
+        $middleware->web(prepend: [
+            \App\Http\Middleware\ApplySecuritySettings::class,
+        ]);
         $middleware->web(append: [
             \App\Http\Middleware\BreadcrumbTrail::class,
+        ]);
+        $middleware->api(append: [
+            \App\Http\Middleware\ApplySecuritySettings::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

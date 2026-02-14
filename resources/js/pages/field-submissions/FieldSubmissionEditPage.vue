@@ -4,6 +4,7 @@
  */
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useFormDraft } from '@/composables/useFormDraft'
 import fieldSubmissionsApi from '@/services/fieldSubmissionsApi'
 import { useAuthStore } from '@/stores/auth'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
@@ -50,6 +51,8 @@ const form = ref({
   meeting_date: '',
   remarks_by_field_agent: '',
 })
+
+const { draftSaving, draftSavedAt, clearDraft } = useFormDraft('field-submission', route.params.id || 'new', form)
 
 const newFiles = ref([])
 const fileInput = ref(null)
@@ -188,6 +191,7 @@ async function submitForm() {
       remarks_by_field_agent: form.value.remarks_by_field_agent || null,
     }
     await fieldSubmissionsApi.updateSubmission(id.value, payload, newFiles.value.length ? newFiles.value : null)
+    await clearDraft()
     await load()
     newFiles.value = []
   } catch (err) {
@@ -213,6 +217,11 @@ onMounted(() => {
           <div class="flex flex-wrap items-baseline gap-2">
             <h1 class="text-xl font-semibold text-gray-900">Edit Field Submission</h1>
             <Breadcrumbs />
+            <span v-if="draftSavedAt" class="text-xs text-gray-400 flex items-center gap-1">
+              <svg v-if="draftSaving" class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="4" class="opacity-25" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+              <svg v-else class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+              Draft saved
+            </span>
           </div>
         </div>
         <div class="border-t border-gray-200" />

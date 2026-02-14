@@ -81,7 +81,7 @@ const settingCards = [
 </script>
 
 <template>
-  <div class="space-y-8">
+  <div class="space-y-8 bg-white -mx-4 -my-5 min-h-full px-6 py-6">
     <div>
       <div class="flex flex-wrap items-baseline gap-2">
         <h1 class="text-2xl font-bold text-gray-900">Settings</h1>

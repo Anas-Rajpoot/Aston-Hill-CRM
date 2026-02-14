@@ -60,7 +60,7 @@ const save = async () => {
 </script>
 
 <template>
-  <div class="max-w-2xl space-y-6">
+  <div class="space-y-6 bg-white -mx-4 -my-5 min-h-full px-6 py-6">
     <div>
       <h1 class="text-xl font-semibold text-gray-900">Team Hierarchy Roles</h1>
       <p class="mt-1 text-sm text-gray-500">

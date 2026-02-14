@@ -45,6 +45,29 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::get('/me', MeController::class);
     Route::get('/bootstrap', \App\Http\Controllers\Api\BootstrapController::class);
 
+    // Dashboard
+    Route::get('/dashboard/stats', [\App\Http\Controllers\Api\DashboardController::class, 'stats']);
+
+    // Session heartbeat (extend session)
+    Route::post('/session/heartbeat', function (\Illuminate\Http\Request $request) {
+        // Touch the session to extend its lifetime
+        $request->session()->regenerateToken();
+        $timeoutMin = \App\Models\SecuritySetting::current()->auto_logout_after_minutes ?? 30;
+        return response()->json([
+            'message'    => 'Session extended.',
+            'expires_at' => now()->addMinutes($timeoutMin)->toIso8601String(),
+        ]);
+    });
+
+    // Table page-size preferences (per user + module)
+    Route::get('/table-preferences/{module}', [\App\Http\Controllers\Api\TablePreferenceController::class, 'show']);
+    Route::post('/table-preferences/{module}', [\App\Http\Controllers\Api\TablePreferenceController::class, 'store']);
+
+    // Form drafts (auto-save)
+    Route::get('/form-drafts/{module}/{recordRef}', [\App\Http\Controllers\Api\FormDraftController::class, 'show']);
+    Route::post('/form-drafts/{module}/{recordRef}', [\App\Http\Controllers\Api\FormDraftController::class, 'store']);
+    Route::delete('/form-drafts/{module}/{recordRef}', [\App\Http\Controllers\Api\FormDraftController::class, 'destroy']);
+
     // Field submissions
     Route::get('/field-submissions/team-options', [FieldSubmissionController::class, 'teamOptions']);
     Route::post('/field-submissions', [FieldSubmissionController::class, 'store']);
@@ -265,6 +288,76 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
         Route::put('/roles/{role}/permissions', [RoleApiController::class, 'updateRolePermissions']);
         Route::apiResource('roles', RoleApiController::class);
     });
+
+    // System Preferences (GET: all auth users; PUT/RESET: super admin or manage-system-preferences)
+    Route::get('/system-preferences', [\App\Http\Controllers\Api\SystemPreferenceController::class, 'index']);
+    Route::put('/system-preferences', [\App\Http\Controllers\Api\SystemPreferenceController::class, 'update']);
+    Route::post('/system-preferences/reset', [\App\Http\Controllers\Api\SystemPreferenceController::class, 'reset']);
+    Route::get('/meta/timezones', [\App\Http\Controllers\Api\MetaController::class, 'timezones']);
+    Route::get('/meta/landing-pages', [\App\Http\Controllers\Api\MetaController::class, 'landingPages']);
+
+    // SLA Rules (GET: all auth users; PATCH: super admin or manage-sla)
+    Route::get('/sla-rules', [\App\Http\Controllers\Api\SlaRuleController::class, 'index']);
+    Route::patch('/sla-rules/{slaRule}', [\App\Http\Controllers\Api\SlaRuleController::class, 'update']);
+    Route::patch('/sla-rules/{slaRule}/toggle', [\App\Http\Controllers\Api\SlaRuleController::class, 'toggle']);
+
+    // Notification & Email Rules
+    Route::get('/notification-config', [\App\Http\Controllers\Api\NotificationConfigController::class, 'index']);
+    Route::put('/notification-settings', [\App\Http\Controllers\Api\NotificationConfigController::class, 'updateSettings']);
+    Route::patch('/notification-triggers/{trigger}', [\App\Http\Controllers\Api\NotificationConfigController::class, 'updateTrigger']);
+    Route::put('/notification-triggers/{trigger}/{channel}', [\App\Http\Controllers\Api\NotificationConfigController::class, 'updateUserTriggerPreference']);
+    Route::post('/notification-triggers/{channel}/reset', [\App\Http\Controllers\Api\NotificationConfigController::class, 'resetChannelPreferences']);
+    Route::put('/notification-escalations', [\App\Http\Controllers\Api\NotificationConfigController::class, 'upsertEscalations']);
+
+    // Escalation Levels (new structured system)
+    Route::get('/escalation-levels', [\App\Http\Controllers\Api\EscalationLevelController::class, 'index']);
+    Route::post('/escalation-levels', [\App\Http\Controllers\Api\EscalationLevelController::class, 'store']);
+    Route::put('/escalation-levels/reorder', [\App\Http\Controllers\Api\EscalationLevelController::class, 'reorder']);
+    Route::post('/escalation-levels/reset', [\App\Http\Controllers\Api\EscalationLevelController::class, 'reset']);
+    Route::put('/escalation-levels/{escalationLevel}', [\App\Http\Controllers\Api\EscalationLevelController::class, 'update']);
+    Route::delete('/escalation-levels/{escalationLevel}', [\App\Http\Controllers\Api\EscalationLevelController::class, 'destroy']);
+    Route::post('/notification-test', [\App\Http\Controllers\Api\NotificationConfigController::class, 'testNotification']);
+    Route::get('/email-templates', [\App\Http\Controllers\Api\EmailTemplateController::class, 'index']);
+    Route::post('/email-templates', [\App\Http\Controllers\Api\EmailTemplateController::class, 'store']);
+    Route::get('/email-templates/{emailTemplate}', [\App\Http\Controllers\Api\EmailTemplateController::class, 'show']);
+    Route::put('/email-templates/{emailTemplate}', [\App\Http\Controllers\Api\EmailTemplateController::class, 'update']);
+    Route::delete('/email-templates/{emailTemplate}', [\App\Http\Controllers\Api\EmailTemplateController::class, 'destroy']);
+    Route::get('/notification-logs', [\App\Http\Controllers\Api\NotificationLogController::class, 'index']);
+
+    // Announcements
+    Route::get('/announcements', [\App\Http\Controllers\Api\AnnouncementController::class, 'index']);
+    Route::post('/announcements', [\App\Http\Controllers\Api\AnnouncementController::class, 'store']);
+    Route::get('/announcements/{announcement}', [\App\Http\Controllers\Api\AnnouncementController::class, 'show']);
+    Route::put('/announcements/{announcement}', [\App\Http\Controllers\Api\AnnouncementController::class, 'update']);
+    Route::patch('/announcements/{announcement}/publish-now', [\App\Http\Controllers\Api\AnnouncementController::class, 'publishNow']);
+    Route::post('/announcements/{announcement}/duplicate', [\App\Http\Controllers\Api\AnnouncementController::class, 'duplicate']);
+    Route::delete('/announcements/{announcement}', [\App\Http\Controllers\Api\AnnouncementController::class, 'destroy']);
+    Route::delete('/announcements/{announcement}/permanent', [\App\Http\Controllers\Api\AnnouncementController::class, 'forceDelete']);
+    Route::post('/announcements/{announcement}/acknowledge', [\App\Http\Controllers\Api\AnnouncementController::class, 'acknowledge']);
+
+    // Security, Session & Access Control (GET: all auth; PUT/RESET: super admin or manage-security-settings)
+    Route::get('/security-settings', [\App\Http\Controllers\Api\SecuritySettingsController::class, 'index']);
+    Route::put('/security-settings', [\App\Http\Controllers\Api\SecuritySettingsController::class, 'update']);
+    Route::post('/security-settings/reset', [\App\Http\Controllers\Api\SecuritySettingsController::class, 'reset']);
+
+    // Audit Logs (read-only for all auth; export requires permission)
+    Route::get('/audit-logs/stats', [\App\Http\Controllers\Api\AuditLogController::class, 'stats']);
+    Route::get('/audit-logs/meta', [\App\Http\Controllers\Api\AuditLogController::class, 'meta']);
+    Route::get('/audit-logs/export', [\App\Http\Controllers\Api\AuditLogController::class, 'export']);
+    Route::get('/audit-logs/{auditLog}', [\App\Http\Controllers\Api\AuditLogController::class, 'show']);
+    Route::get('/audit-logs', [\App\Http\Controllers\Api\AuditLogController::class, 'index']);
+
+    // Library — Templates & Forms
+    Route::get('/library/documents/meta', [\App\Http\Controllers\Api\LibraryDocumentController::class, 'meta']);
+    Route::get('/library/export', [\App\Http\Controllers\Api\LibraryDocumentController::class, 'export']);
+    Route::get('/library/documents/{document}/download', [\App\Http\Controllers\Api\LibraryDocumentController::class, 'download']);
+    Route::get('/library/documents/{document}/versions', [\App\Http\Controllers\Api\LibraryDocumentController::class, 'versions']);
+    Route::patch('/library/documents/{document}/toggle', [\App\Http\Controllers\Api\LibraryDocumentController::class, 'toggle']);
+    Route::get('/library/documents/{document}', [\App\Http\Controllers\Api\LibraryDocumentController::class, 'show']);
+    Route::post('/library/documents', [\App\Http\Controllers\Api\LibraryDocumentController::class, 'store']);
+    Route::post('/library/documents/{document}', [\App\Http\Controllers\Api\LibraryDocumentController::class, 'update']);
+    Route::delete('/library/documents/{document}', [\App\Http\Controllers\Api\LibraryDocumentController::class, 'destroy']);
+    Route::get('/library/documents', [\App\Http\Controllers\Api\LibraryDocumentController::class, 'index']);
 
     // Reports (stats for Lead and Field Operations report pages)
     Route::get('/reports/lead-stats', [ReportsApiController::class, 'leadStats']);

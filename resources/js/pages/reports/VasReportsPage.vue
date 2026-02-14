@@ -6,8 +6,10 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/lib/axios'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import { useTablePageSize } from '@/composables/useTablePageSize'
 
 const router = useRouter()
+const { perPage, perPageOptions, perPageReady, setPerPage } = useTablePageSize('vas-reports')
 const statsLoading = ref(true)
 const tableLoading = ref(false)
 const stats = ref({
@@ -34,7 +36,7 @@ const SLA_DAYS = 7
 const params = computed(() => {
   const p = {
     page: tableMeta.value.current_page,
-    per_page: tableMeta.value.per_page,
+    per_page: perPage.value,
     sort: 'submitted_at',
     order: 'desc',
     columns: ['id', 'submitted_at', 'request_type', 'company_name', 'account_number', 'status', 'executive', 'sales_agent', 'approved_at'],
@@ -189,8 +191,8 @@ function goToDetail(id) {
 
 const showingCount = computed(() => tableData.value.length)
 const totalCount = computed(() => tableMeta.value.total)
-const fromEntry = computed(() => (tableMeta.value.current_page - 1) * tableMeta.value.per_page + 1)
-const toEntry = computed(() => Math.min(tableMeta.value.current_page * tableMeta.value.per_page, tableMeta.value.total))
+const fromEntry = computed(() => (tableMeta.value.current_page - 1) * perPage.value + 1)
+const toEntry = computed(() => Math.min(tableMeta.value.current_page * perPage.value, tableMeta.value.total))
 
 const paginationPages = computed(() => {
   const last = tableMeta.value.last_page
@@ -201,7 +203,8 @@ const paginationPages = computed(() => {
   return pages
 })
 
-function changePerPage() {
+function onPerPageChange(e) {
+  setPerPage(e.target.value)
   tableMeta.value.current_page = 1
   loadTable()
 }
@@ -399,13 +402,11 @@ onMounted(async () => {
           <div class="flex items-center gap-2">
             <label class="text-sm text-gray-500">Per page</label>
             <select
-              :value="tableMeta.per_page"
+              :value="perPage"
               class="rounded border border-gray-300 px-2 py-1 text-sm"
-              @change="(e) => { tableMeta.per_page = Number(e.target.value); changePerPage() }"
+              @change="onPerPageChange"
             >
-              <option :value="10">10</option>
-              <option :value="20">20</option>
-              <option :value="50">50</option>
+              <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
             </select>
           </div>
           <div class="flex gap-1">

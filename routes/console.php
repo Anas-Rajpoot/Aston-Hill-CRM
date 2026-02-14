@@ -19,3 +19,22 @@ Schedule::command('sessions:logout-inactive', ['--hours' => 2])
     ->withoutOverlapping()
     ->onOneServer();
 
+// Unlock accounts whose lockout has expired
+Schedule::command('security:unlock-expired')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->onOneServer();
+
+// Purge form drafts older than 30 days
+Schedule::command('drafts:purge-expired')
+    ->daily()
+    ->at('03:00')
+    ->withoutOverlapping()
+    ->onOneServer();
+
+// SLA Escalation check — fires queued job every 5 minutes
+Schedule::job(new \App\Jobs\CheckEscalationJob())
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->onOneServer();
+

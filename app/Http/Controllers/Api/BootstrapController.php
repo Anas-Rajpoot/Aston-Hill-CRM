@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\SecuritySetting;
+use App\Models\SystemPreference;
 use App\Services\UserPermissionResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -34,6 +36,9 @@ class BootstrapController extends Controller
                 $user->getMorphClass()
             );
 
+            $prefs    = SystemPreference::singleton();
+            $security = SecuritySetting::current();
+
             return [
                 'user' => [
                     'id' => $user->id,
@@ -42,6 +47,12 @@ class BootstrapController extends Controller
                     'roles' => $resolved['roles'],
                 ],
                 'permissions' => $resolved['permissions'],
+                'timezone' => $prefs->timezone ?? 'Asia/Dubai',
+                'session' => [
+                    'timeout_minutes'         => (int) $security->auto_logout_after_minutes,
+                    'warning_enabled'         => (bool) $prefs->session_warning_before_logout,
+                    'warning_minutes_before'  => (int) ($prefs->session_warning_minutes ?? $security->session_warning_minutes ?? 5),
+                ],
             ];
         });
 

@@ -7,8 +7,6 @@ import SidebarLink from './SidebarLink.vue'
 const auth = useAuthStore()
 const route = useRoute()
 const router = useRouter()
-const settingsOpen = ref(false)
-
 const logout = async () => {
   await auth.logout()
   router.push('/login')
@@ -41,15 +39,6 @@ const navItems = [
   { to: '/personal-notes', label: 'Personal Notes' },
   { to: '/email-followups', label: 'Email Follow Up' },
   { to: '/reports', label: 'Reports' },
-]
-
-const settingsItems = [
-  { to: '/settings', label: 'Settings' },
-  { to: '/settings/team-hierarchy', label: 'Team Hierarchy', show: () => userHasRole('superadmin') },
-  { to: '/announcements', label: 'Announcements' },
-  { to: '/notifications', label: 'Notifications' },
-  { to: '/accounts', label: 'Accounts' },
-  { to: '/login-logs', label: 'Login Logs' },
 ]
 
 const superAdminOnly = [
@@ -93,36 +82,14 @@ const isActive = (to) => {
         :active="isActive(item.to)"
       />
 
-      <!-- Settings with dropdown -->
+      <!-- Settings -->
       <div class="pt-2">
-        <button
-          type="button"
-          class="w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-800 hover:text-white"
-          @click="settingsOpen = !settingsOpen"
-        >
-          <span>Settings</span>
-          <svg
-            class="w-4 h-4 transition-transform"
-            :class="settingsOpen && 'rotate-180'"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
-        <div v-show="settingsOpen" class="mt-0.5 ml-3 pl-3 border-l border-gray-700 space-y-0.5">
-          <SidebarLink
-            v-for="item in settingsItems"
-            :key="item.to"
-            v-show="item.show?.() !== false"
-            :to="item.to"
-            :label="item.label"
-            dark
-            :active="isActive(item.to)"
-            sub
-          />
-        </div>
+        <SidebarLink
+          to="/settings"
+          label="Settings"
+          dark
+          :active="isActive('/settings')"
+        />
       </div>
     </nav>
 

@@ -13,6 +13,7 @@ import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Toast from '@/components/Toast.vue'
 import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
 import { toDdMmYyyy, fromDdMmYyyy } from '@/lib/dateFormat'
+import { useFormDraft } from '@/composables/useFormDraft'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -125,6 +126,8 @@ const form = ref({
     { full_address: '', area: '', building: '', unit: '', emirates: '' },
   ],
 })
+
+const { draftSaving, draftSavedAt, clearDraft } = useFormDraft('client', 'new', form)
 
 const createdByLabel = computed(() => auth.user?.name ? `${auth.user.name} (Auto)` : 'Current User (Auto)')
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -415,6 +418,7 @@ async function submit(andAddAnother = false) {
 
     if (success) {
       error.value = ''
+      await clearDraft()
       if (andAddAnother) {
         successMessage.value = 'New client is added successfully. You can add another below.'
         resetForm()
@@ -556,6 +560,11 @@ function closeToast() {
       <div>
         <div class="flex flex-wrap items-baseline gap-2">
           <h1 class="text-2xl font-semibold text-gray-900">Add New Client</h1>
+          <span v-if="draftSavedAt" class="text-xs text-gray-400 flex items-center gap-1">
+            <svg v-if="draftSaving" class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="4" class="opacity-25" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+            <svg v-else class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+            Draft saved
+          </span>
           <Breadcrumbs />
         </div>
         <p class="mt-2 text-sm text-gray-500">Create a new client master record.</p>

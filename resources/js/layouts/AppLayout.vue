@@ -2,9 +2,10 @@
 import Sidebar from '@/components/Sidebar.vue'
 import Topbar from '@/components/Topbar.vue'
 import Footer from '@/components/Footer.vue'
+import SessionWarningBanner from '@/components/SessionWarningBanner.vue'
 import { useInactivityLogout } from '@/composables/useInactivityLogout'
 
-useInactivityLogout()
+const { showWarning, countdownSecs, totalWarningSecs, extending, staySignedIn, logoutNow } = useInactivityLogout()
 </script>
 
 <template>
@@ -25,5 +26,15 @@ useInactivityLogout()
         <Footer />
       </footer>
     </div>
+
+    <!-- Session expiry warning banner -->
+    <SessionWarningBanner
+      :show="showWarning"
+      :countdown-secs="countdownSecs"
+      :total-warning-secs="totalWarningSecs"
+      :extending="extending"
+      @stay="staySignedIn"
+      @logout="logoutNow"
+    />
   </div>
 </template>

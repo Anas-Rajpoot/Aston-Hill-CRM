@@ -5,6 +5,7 @@
  * Permissions: view_attendance_logs, force_logout, export_attendance_data.
  */
 import { ref, computed, onMounted } from 'vue'
+import { useTablePageSize } from '@/composables/useTablePageSize'
 import attendanceLogApi from '@/services/attendanceLogApi'
 import { useAuthStore } from '@/stores/auth'
 import { toDdMmYyyy, fromDdMmYyyy, formatDateDdMmYyyy } from '@/lib/dateFormat'
@@ -60,7 +61,7 @@ const filters = ref({
   to: '',
   status: '',
 })
-const perPage = ref(10)
+const { perPage, perPageOptions, perPageReady, setPerPage } = useTablePageSize('attendance')
 const sort = ref('login_at')
 const order = ref('desc')
 const advancedVisible = ref(false)
@@ -154,7 +155,8 @@ function onPageChange(page) {
   load()
 }
 
-function onPerPageChange() {
+function onPerPageChange(e) {
+  setPerPage(e.target.value)
   meta.value.current_page = 1
   load()
 }
@@ -550,13 +552,11 @@ onMounted(() => {
             <div class="flex items-center gap-2">
               <span class="text-sm text-gray-600">Per page</span>
               <select
-                v-model.number="perPage"
+                :value="perPage"
                 class="rounded border border-gray-300 px-2 py-1 text-sm"
                 @change="onPerPageChange"
               >
-                <option :value="10">10</option>
-                <option :value="20">20</option>
-                <option :value="50">50</option>
+                <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
               </select>
             </div>
             <Pagination

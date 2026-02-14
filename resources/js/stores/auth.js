@@ -28,6 +28,12 @@ export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null,
     token: null,
+    timezone: 'Asia/Dubai',
+    session: {
+      timeout_minutes: 30,
+      warning_enabled: false,
+      warning_minutes_before: 5,
+    },
     loading: false,
     _fetchPromise: null,
     _lastFetchedAt: 0,
@@ -71,6 +77,8 @@ export const useAuthStore = defineStore('auth', {
             roles: cached.user.roles ?? [],
             permissions: cached.permissions ?? [],
           }
+          if (cached.timezone) this.timezone = cached.timezone
+          if (cached.session) this.session = { ...this.session, ...cached.session }
           this._lastFetchedAt = Date.now()
         }
 
@@ -79,8 +87,10 @@ export const useAuthStore = defineStore('auth', {
           const u = data.user ?? data
           const roles = Array.isArray(u.roles) ? u.roles.map((r) => (typeof r === 'string' ? r : r?.name)).filter(Boolean) : []
           this.user = { id: u.id, name: u.name, email: u.email, roles, permissions: data.permissions ?? [] }
+          if (data.timezone) this.timezone = data.timezone
+          if (data.session) this.session = { ...this.session, ...data.session }
           this._lastFetchedAt = Date.now()
-          setBootstrapInStorage({ user: this.user, permissions: this.user.permissions })
+          setBootstrapInStorage({ user: this.user, permissions: this.user.permissions, timezone: this.timezone, session: this.session })
           return
         } catch {
           if (this.user) return
@@ -88,6 +98,8 @@ export const useAuthStore = defineStore('auth', {
         const { data } = await api.get('/me')
         const roles = Array.isArray(data.roles) ? data.roles.map((r) => (typeof r === 'string' ? r : r?.name)).filter(Boolean) : []
         this.user = { ...data, roles, permissions: [] }
+        if (data.timezone) this.timezone = data.timezone
+        if (data.session) this.session = { ...this.session, ...data.session }
         this._lastFetchedAt = Date.now()
       } catch {
         this.user = null

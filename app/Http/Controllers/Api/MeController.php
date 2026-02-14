@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\SecuritySetting;
+use App\Models\SystemPreference;
 use App\Services\UserPermissionResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,11 +30,20 @@ class MeController extends Controller
                 (int) $user->id,
                 $user->getMorphClass()
             );
+            $prefs    = SystemPreference::singleton();
+            $security = SecuritySetting::current();
+
             return [
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
                 'roles' => $resolved['roles'],
+                'timezone' => $prefs->timezone ?? 'Asia/Dubai',
+                'session' => [
+                    'timeout_minutes'         => (int) $security->auto_logout_after_minutes,
+                    'warning_enabled'         => (bool) $prefs->session_warning_before_logout,
+                    'warning_minutes_before'  => (int) ($prefs->session_warning_minutes ?? $security->session_warning_minutes ?? 5),
+                ],
             ];
         });
 

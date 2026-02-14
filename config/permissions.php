@@ -335,5 +335,21 @@ return [
                 ['key' => 'manage_permissions', 'label' => 'Manage Permissions', 'priority' => 'high'],
             ],
         ],
+        'notification_rules' => [
+            'label' => 'Notifications & Email Rules',
+            'icon' => 'notifications',
+            'permissions' => [
+                ['key' => 'list', 'label' => 'Access Notifications Page', 'priority' => 'high'],
+                ['key' => 'view', 'label' => 'View Notification Settings', 'priority' => 'high'],
+                ['key' => 'edit_settings', 'label' => 'Edit Global Email Settings', 'priority' => 'high'],
+                ['key' => 'manage_channels', 'label' => 'Manage Notification Channels', 'priority' => 'high'],
+                ['key' => 'manage_triggers', 'label' => 'Manage Notification Triggers', 'priority' => 'high'],
+                ['key' => 'manage_escalations', 'label' => 'Manage Escalation Levels', 'priority' => 'high'],
+                ['key' => 'manage_templates', 'label' => 'Manage Email Templates', 'priority' => 'high'],
+                ['key' => 'view_logs', 'label' => 'View Notification Logs', 'priority' => 'medium'],
+                ['key' => 'send_test', 'label' => 'Send Test Notification', 'priority' => 'medium'],
+                ['key' => 'delete', 'label' => 'Delete Templates / Levels', 'priority' => 'high'],
+            ],
+        ],
     ],
 ];

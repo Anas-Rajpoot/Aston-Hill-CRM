@@ -3,60 +3,92 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Cache;
 
 class Announcement extends Model
 {
-    use Notifiable;
+    public const CACHE_KEY   = 'announcements';
+    public const CACHE_TTL   = 600;
+    public const TYPES       = ['text', 'image', 'link', 'banner'];
+    public const PRIORITIES  = ['low', 'normal', 'high', 'critical'];
+
     protected $fillable = [
-        'created_by',
-        'title',
-        'body',
-        'attachment_path',
-        'attachment_name',
-        'attachment_mime',
-        'attachment_size',
-        'is_pinned',
-        'is_active',
-        'published_at',
+        'title', 'type', 'body', 'link_url', 'link_label',
+        'priority', 'all_users', 'audiences', 'channels',
+        'is_pinned', 'require_ack', 'ack_due_at',
+        'published_at', 'expire_at', 'archived_at',
+        'is_active', 'created_by', 'updated_by',
     ];
 
     protected $casts = [
-        'is_pinned' => 'boolean',
-        'is_active' => 'boolean',
+        'all_users'    => 'boolean',
+        'audiences'    => 'array',
+        'channels'     => 'array',
+        'is_pinned'    => 'boolean',
+        'is_active'    => 'boolean',
+        'require_ack'  => 'boolean',
+        'ack_due_at'   => 'datetime',
         'published_at' => 'datetime',
+        'expire_at'    => 'datetime',
+        'archived_at'  => 'datetime',
     ];
 
-    public function creator()
+    /* ─── Computed status accessor ─────────────────────── */
+
+    public function getStatusAttribute(): string
     {
-        return $this->belongsTo(User::class, 'created_by');
+        if ($this->archived_at)                                      return 'archived';
+        $now = now();
+        if ($this->published_at && $this->published_at->isFuture())  return 'scheduled';
+        if ($this->expire_at && $this->expire_at->isPast())          return 'expired';
+        if ($this->published_at && $this->published_at->lte($now))   return 'active';
+        return 'draft';
     }
 
-    public function getHasAttachmentAttribute(): bool
+    /* ─── Scopes ───────────────────────────────────────── */
+
+    public function scopeActive($q)
     {
-        return !empty($this->attachment_path);
+        $now = now();
+        $q->whereNull('archived_at')
+          ->where('published_at', '<=', $now)
+          ->where(fn ($w) => $w->whereNull('expire_at')->orWhere('expire_at', '>', $now));
     }
 
-    public function getAttachmentUrlAttribute(): ?string
+    public function scopeScheduled($q)
     {
-        return $this->attachment_path ? asset('storage/'.$this->attachment_path) : null;
+        $q->whereNull('archived_at')->where('published_at', '>', now());
     }
 
-    public function scopeFilter($query, array $f)
+    public function scopeExpired($q)
     {
-        return $query
-            ->when(isset($f['active']) && $f['active'] !== '', fn($qq) => $qq->where('is_active', (int)$f['active']))
-            ->when(isset($f['pinned']) && $f['pinned'] !== '', fn($qq) => $qq->where('is_pinned', (int)$f['pinned']))
-            ->when(!empty($f['has_attachment']), fn($qq) => $qq->whereNotNull('attachment_path'))
-            ->when(!empty($f['q']), function ($qq) use ($f) {
-                $term = $f['q'];
-                $qq->where(function ($sub) use ($term) {
-                    $sub->where('title', 'like', "%{$term}%")
-                        ->orWhere('body', 'like', "%{$term}%");
-                });
-            })
-            ->when(!empty($f['from']), fn($qq) => $qq->whereDate('created_at', '>=', $f['from']))
-            ->when(!empty($f['to']), fn($qq) => $qq->whereDate('created_at', '<=', $f['to']));
+        $q->whereNull('archived_at')
+          ->whereNotNull('expire_at')
+          ->where('expire_at', '<=', now());
     }
 
+    public function scopeArchived($q)  { $q->whereNotNull('archived_at'); }
+    public function scopeNotArchived($q) { $q->whereNull('archived_at'); }
+
+    /* ─── Relationships ────────────────────────────────── */
+
+    public function creator()          { return $this->belongsTo(User::class, 'created_by'); }
+    public function updater()          { return $this->belongsTo(User::class, 'updated_by'); }
+    public function acknowledgements() { return $this->hasMany(AnnouncementAcknowledgement::class); }
+
+    /* ─── Cache helpers ────────────────────────────────── */
+
+    public static function clearCache(): void { Cache::forget(self::CACHE_KEY . '_counters'); }
+
+    public static function counters(): array
+    {
+        return Cache::remember(self::CACHE_KEY . '_counters', self::CACHE_TTL, function () {
+            return [
+                'total'     => self::notArchived()->count(),
+                'active'    => self::active()->count(),
+                'scheduled' => self::scheduled()->count(),
+                'expired'   => self::expired()->count(),
+            ];
+        });
+    }
 }

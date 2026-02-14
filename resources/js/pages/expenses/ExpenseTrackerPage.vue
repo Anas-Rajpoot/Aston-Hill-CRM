@@ -4,6 +4,7 @@
  */
 import { ref, computed, onMounted } from 'vue'
 import { toDdMmYyyy, fromDdMmYyyy } from '@/lib/dateFormat'
+import { useTablePageSize } from '@/composables/useTablePageSize'
 import expensesApi from '@/services/expensesApi'
 import { useAuthStore } from '@/stores/auth'
 import AdvancedFilters from '@/components/expenses/AdvancedFilters.vue'
@@ -16,6 +17,7 @@ import ExpenseEditHistoryModal from '@/components/expenses/ExpenseEditHistoryMod
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 
 const auth = useAuthStore()
+const { perPage, perPageOptions, perPageReady, setPerPage } = useTablePageSize('expenses')
 const permissions = computed(() => auth.user?.permissions ?? [])
 const isSuperAdmin = computed(() => {
   const r = auth.user?.roles ?? []
@@ -86,7 +88,7 @@ function buildParams() {
   const f = filters.value
   const p = {
     page: meta.value.current_page,
-    per_page: meta.value.per_page,
+    per_page: perPage.value,
     sort: sort.value,
     order: order.value,
     columns: visibleColumns.value,
@@ -218,14 +220,10 @@ function onPageChange(page) {
   load()
 }
 
-const perPageOptions = [10, 20, 50]
-function onPerPageChange(ev) {
-  const val = parseInt(ev.target?.value, 10)
-  if (val > 0) {
-    meta.value.per_page = val
-    meta.value.current_page = 1
-    load()
-  }
+function onPerPageChange(e) {
+  setPerPage(e.target.value)
+  meta.value.current_page = 1
+  load()
 }
 const pageNumbers = computed(() => {
   const n = meta.value.last_page || 1
@@ -541,7 +539,7 @@ onMounted(() => {
           :saving-row-id="savingRowId"
           :saving-cell="savingCell"
           :current-page="meta.current_page"
-          :per-page="meta.per_page"
+          :per-page="perPage"
           :filter-options="filterOptions"
           :can-edit="canEdit"
           :can-delete="canDelete"
@@ -554,17 +552,17 @@ onMounted(() => {
         />
         <div class="flex flex-wrap items-center gap-4 border-t border-gray-200 bg-white px-4 py-3">
           <p class="text-sm text-gray-600">
-            Showing {{ meta.total ? (meta.current_page - 1) * meta.per_page + 1 : 0 }} to {{ Math.min(meta.current_page * meta.per_page, meta.total) }} of {{ meta.total }} entries
+            Showing {{ meta.total ? (meta.current_page - 1) * perPage + 1 : 0 }} to {{ Math.min(meta.current_page * perPage, meta.total) }} of {{ meta.total }} entries
           </p>
           <div class="flex items-center gap-2">
             <label for="expense-per-page" class="text-sm text-gray-600">Number of pages</label>
             <select
               id="expense-per-page"
-              :value="meta.per_page"
+              :value="perPage"
               class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700"
               @change="onPerPageChange"
             >
-              <option v-for="n in perPageOptions" :key="n" :value="n">{{ n }}</option>
+              <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
             </select>
           </div>
           <div v-if="meta.last_page > 1" class="ml-auto flex items-center gap-1">
