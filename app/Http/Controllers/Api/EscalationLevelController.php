@@ -24,7 +24,12 @@ class EscalationLevelController extends Controller
 {
     private function canManage($user): bool
     {
-        return $user && ($user->hasRole('superadmin') || $user->can('manage-escalation-levels'));
+        return $user && (
+            $user->hasRole('superadmin')
+            || $user->can('manage-escalation-levels')
+            || $user->can('notification_rules.manage_escalations')
+            || $user->can('manage-notification-rules')
+        );
     }
 
     // ──────────────────────────────────────────────────────────

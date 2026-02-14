@@ -4,17 +4,37 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\NotificationLog;
+use App\Models\SystemAuditLog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class NotificationLogController extends Controller
 {
     /**
-     * Check if user can view all logs (super admin or has permission).
+     * Super admin check.
+     */
+    private function isSuperAdmin($user): bool
+    {
+        return $user && $user->hasRole('superadmin');
+    }
+
+    /**
+     * Check if user can view ALL logs (super admin or has view_logs permission).
+     * Other users see only their own logs.
      */
     private function canViewAll($user): bool
     {
-        return $user && ($user->hasRole('superadmin') || $user->can('notification_rules.view_logs'));
+        return $this->isSuperAdmin($user)
+            || ($user && ($user->can('notification_rules.view_logs') || $user->can('manage-notification-rules')));
+    }
+
+    /**
+     * Check if user can delete logs.
+     */
+    private function canDeleteLogs($user): bool
+    {
+        return $this->isSuperAdmin($user)
+            || ($user && ($user->can('notification_rules.delete_logs') || $user->can('manage-notification-rules')));
     }
 
     /**
@@ -23,15 +43,18 @@ class NotificationLogController extends Controller
      * - Super admin / users with 'notification_rules.view_logs': see latest 10 of ALL logs
      * - Other users: see latest 10 logs related to their email only
      *
-     * Supports: per_page (default 10), page, trigger, channel, status, date_from, date_to, q
+     * Fixed at 10 records to show the most recent notifications.
+     * Supports filters: trigger, channel, status, date_from, date_to, q
      */
     public function index(Request $request): JsonResponse
     {
         $user  = $request->user();
         $query = NotificationLog::query()->orderByDesc('created_at');
 
+        $canViewAll = $this->canViewAll($user);
+
         // Non-admin users: only show logs where sent_to matches their email
-        if (! $this->canViewAll($user)) {
+        if (! $canViewAll) {
             $query->where('sent_to', $user->email);
         }
 
@@ -58,10 +81,45 @@ class NotificationLogController extends Controller
             });
         }
 
-        // Default to 10 per page (latest 10)
-        $perPage   = min((int) $request->input('per_page', 10), 100);
+        // Fixed at 10 latest records
+        $perPage   = 10;
         $paginated = $query->paginate($perPage);
 
-        return response()->json($paginated);
+        return response()->json(array_merge($paginated->toArray(), [
+            'meta' => [
+                'can_view_all'    => $canViewAll,
+                'can_delete_logs' => $this->canDeleteLogs($user),
+                'viewing_scope'   => $canViewAll ? 'all' : 'personal',
+            ],
+        ]));
+    }
+
+    /**
+     * DELETE /api/notification-logs/{notificationLog}
+     *
+     * Only super admin or users with 'notification_rules.delete_logs' can delete.
+     */
+    public function destroy(Request $request, NotificationLog $notificationLog): JsonResponse
+    {
+        $user = $request->user();
+
+        if (! $this->canDeleteLogs($user)) {
+            return response()->json(['message' => 'Unauthorized. You need "Delete Notification Logs" permission.'], 403);
+        }
+
+        $old = $notificationLog->toArray();
+        $notificationLog->delete();
+
+        // Audit log the deletion
+        SystemAuditLog::record(
+            'notification_log.deleted',
+            $old,
+            [],
+            $user->id,
+            'notification_log',
+            $old['id'],
+        );
+
+        return response()->json(['message' => 'Notification log entry deleted.']);
     }
 }

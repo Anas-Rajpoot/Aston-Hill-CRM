@@ -33,12 +33,20 @@ function dismissToast() { showToast.value = false }
 function toast(type, msg) { toastType.value = type; toastMsg.value = msg; showToast.value = true }
 
 // ═══════════════════════════════════════════════════════════
-//  Loading & auth
+//  Loading & auth (granular permissions from backend)
 // ═══════════════════════════════════════════════════════════
 const configLoading     = ref(true)
 const templatesLoading  = ref(true)
 const logsLoading       = ref(true)
-const canUpdate         = ref(false)
+const canUpdate         = ref(false)    // legacy: general manage permission
+const canEditSettings   = ref(false)    // notification_rules.edit_settings
+const canManageChannels = ref(false)    // notification_rules.manage_channels
+const canManageTriggers = ref(false)    // notification_rules.manage_triggers
+const canManageEscalations = ref(false) // notification_rules.manage_escalations
+const canManageTemplates = ref(false)   // notification_rules.manage_templates
+const canViewLogs       = ref(false)    // notification_rules.view_logs
+const canSendTest       = ref(false)    // notification_rules.send_test
+const canDelete         = ref(false)    // notification_rules.delete
 
 // ═══════════════════════════════════════════════════════════
 //  § 1 – Global Email Settings
@@ -73,7 +81,7 @@ const channelMeta = [
 ]
 
 async function toggleChannel(key) {
-  if (!canUpdate.value || channelSaving[key]) return
+  if (!canManageChannels.value || channelSaving[key]) return
   const old = channels[key]
   channels[key] = !old
   channelSaving[key] = true
@@ -478,7 +486,7 @@ const testTrigger = ref('')
 const testSending = ref(false)
 
 async function sendTest() {
-  if (!canUpdate.value || testSending.value || !testEmail.value || !testTrigger.value) return
+  if (!canSendTest.value || testSending.value || !testEmail.value || !testTrigger.value) return
   testSending.value = true
   try {
     const { data } = await api.post('/notification-test', { trigger_key: testTrigger.value, email: testEmail.value })
@@ -496,7 +504,18 @@ async function loadConfig() {
   configLoading.value = true
   try {
     const { data } = await api.get('/notification-config')
-    canUpdate.value = data?.meta?.can_update ?? false
+
+    // Granular permissions from backend
+    const meta = data?.meta ?? {}
+    canUpdate.value           = meta.can_update ?? false
+    canEditSettings.value     = meta.can_edit_settings ?? false
+    canManageChannels.value   = meta.can_manage_channels ?? false
+    canManageTriggers.value   = meta.can_manage_triggers ?? false
+    canManageEscalations.value = meta.can_manage_escalations ?? false
+    canManageTemplates.value  = meta.can_manage_templates ?? false
+    canViewLogs.value         = meta.can_view_logs ?? false
+    canSendTest.value         = meta.can_send_test ?? false
+    canDelete.value           = meta.can_delete ?? false
 
     const s = data?.data?.settings ?? {}
     emailForm.default_sender_email = s.default_sender_email ?? ''
@@ -538,7 +557,7 @@ const anySaving = computed(() => emailSaving.value)
 const anyDirty  = computed(() => emailDirty.value)
 
 async function saveAll() {
-  if (!canUpdate.value || anySaving.value) return
+  if (!canEditSettings.value || anySaving.value) return
 
   let ok = true
 
@@ -569,16 +588,34 @@ onBeforeRouteLeave((to, from, next) => {
   if (anyDirty.value && !confirm('You have unsaved changes. Leave anyway?')) next(false)
   else next()
 })
-function beforeUnloadHandler(e) { if (anyDirty.value) { e.preventDefault(); e.returnValue = '' } }
+// Only attach beforeunload AFTER user interacts — Chrome blocks the
+// confirmation dialog for frames that never received a user gesture.
+function beforeUnloadHandler(e) {
+  if (anyDirty.value) { e.preventDefault(); e.returnValue = '' }
+}
+let beforeUnloadAttached = false
+function attachBeforeUnload() {
+  if (!beforeUnloadAttached) {
+    window.addEventListener('beforeunload', beforeUnloadHandler)
+    beforeUnloadAttached = true
+  }
+}
 
 onMounted(() => {
   loadConfig()
   loadEscalationLevels()
   loadTemplates()
   fetchLogs(1)
-  window.addEventListener('beforeunload', beforeUnloadHandler)
+  // Defer beforeunload registration until first user gesture
+  window.addEventListener('click', attachBeforeUnload, { once: true })
+  window.addEventListener('keydown', attachBeforeUnload, { once: true })
 })
-onBeforeUnmount(() => { window.removeEventListener('beforeunload', beforeUnloadHandler) })
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', beforeUnloadHandler)
+  window.removeEventListener('click', attachBeforeUnload)
+  window.removeEventListener('keydown', attachBeforeUnload)
+  beforeUnloadAttached = false
+})
 
 // ═══════════════════════════════════════════════════════════
 //  Helpers
@@ -614,7 +651,7 @@ function channelIcon(ch) {
       <div class="flex items-center gap-3">
         <h1 class="text-2xl font-bold text-gray-900">Notifications & Email Rules</h1>
         <Breadcrumbs />
-        <span v-if="!configLoading && !canUpdate" class="inline-flex items-center gap-1.5 rounded-lg bg-green-50 border border-green-200 px-3 py-1.5 text-xs font-semibold text-green-700">
+        <span v-if="!configLoading && !canEditSettings && !canManageChannels" class="inline-flex items-center gap-1.5 rounded-lg bg-green-50 border border-green-200 px-3 py-1.5 text-xs font-semibold text-green-700">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
           Super Admin Only
         </span>
@@ -639,7 +676,7 @@ function channelIcon(ch) {
             <p class="text-xs text-gray-500 mt-0.5">Primary email for all system notifications.</p>
             <p v-if="emailErrors.default_sender_email" class="text-xs text-red-600 mt-1">{{ emailErrors.default_sender_email }}</p>
           </div>
-          <input id="sender" v-model="emailForm.default_sender_email" type="email" :disabled="!canUpdate" class="flex-1 min-w-[200px] rounded-lg border border-gray-300 px-3 py-2.5 text-sm disabled:bg-gray-100 disabled:opacity-70" placeholder="order@astonhill.ae" />
+          <input id="sender" v-model="emailForm.default_sender_email" type="email" :disabled="!canEditSettings" class="flex-1 min-w-[200px] rounded-lg border border-gray-300 px-3 py-2.5 text-sm disabled:bg-gray-100 disabled:opacity-70" placeholder="order@astonhill.ae" />
         </div>
         <!-- CC -->
         <div class="px-6 py-5 flex flex-wrap items-start gap-4">
@@ -648,7 +685,7 @@ function channelIcon(ch) {
             <p class="text-xs text-gray-500 mt-0.5">Carbon copy recipients, separated by commas.</p>
             <p v-if="emailErrors.cc_emails" class="text-xs text-red-600 mt-1">{{ emailErrors.cc_emails }}</p>
           </div>
-          <input id="cc" v-model="emailForm.cc_emails" type="text" :disabled="!canUpdate" class="flex-1 min-w-[200px] rounded-lg border border-gray-300 px-3 py-2.5 text-sm disabled:bg-gray-100 disabled:opacity-70" placeholder="operations@astonhill.ae, management@astonhill.ae" />
+          <input id="cc" v-model="emailForm.cc_emails" type="text" :disabled="!canEditSettings" class="flex-1 min-w-[200px] rounded-lg border border-gray-300 px-3 py-2.5 text-sm disabled:bg-gray-100 disabled:opacity-70" placeholder="operations@astonhill.ae, management@astonhill.ae" />
         </div>
         <!-- BCC -->
         <div class="px-6 py-5 flex flex-wrap items-start gap-4">
@@ -657,7 +694,7 @@ function channelIcon(ch) {
             <p class="text-xs text-gray-500 mt-0.5">Blind carbon copy recipients, separated by commas.</p>
             <p v-if="emailErrors.bcc_emails" class="text-xs text-red-600 mt-1">{{ emailErrors.bcc_emails }}</p>
           </div>
-          <input id="bcc" v-model="emailForm.bcc_emails" type="text" :disabled="!canUpdate" class="flex-1 min-w-[200px] rounded-lg border border-gray-300 px-3 py-2.5 text-sm disabled:bg-gray-100 disabled:opacity-70" placeholder="email1@example.com, email2@example.com" />
+          <input id="bcc" v-model="emailForm.bcc_emails" type="text" :disabled="!canEditSettings" class="flex-1 min-w-[200px] rounded-lg border border-gray-300 px-3 py-2.5 text-sm disabled:bg-gray-100 disabled:opacity-70" placeholder="email1@example.com, email2@example.com" />
         </div>
       </div>
     </section>
@@ -680,7 +717,7 @@ function channelIcon(ch) {
           <div class="flex items-center gap-3">
             <button
               type="button" role="switch" :aria-checked="channels[ch.key]" :aria-label="ch.label"
-              :disabled="!canUpdate || !!channelSaving[ch.key]"
+              :disabled="!canManageChannels || !!channelSaving[ch.key]"
               class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
               :class="channels[ch.key] ? 'bg-blue-600' : 'bg-gray-300'"
               @click="toggleChannel(ch.key)"
@@ -1113,11 +1150,13 @@ function channelIcon(ch) {
       </div>
     </Teleport>
 
-    <!-- ═══ § 6 Notification Log ═══ -->
+    <!-- ═══ § 6 Notification Log (latest 10) ═══ -->
     <section class="rounded-xl border border-gray-400 bg-white shadow-sm overflow-hidden">
       <div class="px-6 py-4 border-b border-gray-400">
         <h2 class="text-base font-semibold text-gray-900">Notification Log</h2>
-        <p class="text-sm text-gray-500 mt-0.5">Recent notification delivery history.</p>
+        <p class="text-sm text-gray-500 mt-0.5">
+          {{ canViewLogs ? 'Latest 10 system-wide notification delivery records.' : 'Latest 10 notifications related to you.' }}
+        </p>
       </div>
       <div v-if="logsLoading && !logs.length" class="p-6 space-y-3">
         <div v-for="i in 6" :key="i" class="flex items-center gap-6"><SkeletonBox width="140px" height="14px" /><SkeletonBox width="140px" height="14px" /><SkeletonBox width="100px" height="14px" /><SkeletonBox width="160px" height="14px" /><SkeletonBox width="60px" height="14px" /><SkeletonBox width="50px" height="22px" /></div>
@@ -1125,17 +1164,17 @@ function channelIcon(ch) {
       <div v-else class="overflow-x-auto">
         <table class="min-w-full text-sm">
           <thead>
-            <tr class="border-b border-gray-200 bg-gray-50 text-left">
-              <th class="px-6 py-3 font-semibold text-gray-600 whitespace-nowrap">Date &amp; Time</th>
-              <th class="px-6 py-3 font-semibold text-gray-600 whitespace-nowrap">Trigger</th>
-              <th class="px-6 py-3 font-semibold text-gray-600 whitespace-nowrap">Channel</th>
-              <th class="px-6 py-3 font-semibold text-gray-600 whitespace-nowrap">Module</th>
-              <th class="px-6 py-3 font-semibold text-gray-600 whitespace-nowrap">Sent To</th>
-              <th class="px-6 py-3 font-semibold text-gray-600 whitespace-nowrap">Status</th>
+            <tr class="border-b border-gray-300 bg-gray-50 text-left">
+              <th class="px-6 py-3 font-semibold text-gray-700 whitespace-nowrap">Date &amp; Time</th>
+              <th class="px-6 py-3 font-semibold text-gray-700 whitespace-nowrap">Trigger</th>
+              <th class="px-6 py-3 font-semibold text-gray-700 whitespace-nowrap">Channel</th>
+              <th class="px-6 py-3 font-semibold text-gray-700 whitespace-nowrap">Module</th>
+              <th class="px-6 py-3 font-semibold text-gray-700 whitespace-nowrap">Sent To</th>
+              <th class="px-6 py-3 font-semibold text-gray-700 whitespace-nowrap">Status</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-100">
-            <tr v-for="log in logs" :key="log.id" class="hover:bg-gray-50/50">
+          <tbody class="divide-y divide-gray-200">
+            <tr v-for="log in logs" :key="log.id" class="hover:bg-gray-50/50 transition-colors">
               <td class="px-6 py-3 text-gray-600 whitespace-nowrap text-xs">{{ fmtDate(log.created_at) }}</td>
               <td class="px-6 py-3 text-gray-900 whitespace-nowrap">{{ triggerLabel(log.trigger_key) }}</td>
               <td class="px-6 py-3 text-gray-600 whitespace-nowrap">{{ channelIcon(log.channel) }} {{ log.channel?.charAt(0).toUpperCase() + log.channel?.slice(1) }}</td>
@@ -1148,13 +1187,9 @@ function channelIcon(ch) {
             <tr v-if="!logs.length"><td colspan="6" class="px-6 py-8 text-center text-sm text-gray-400">No notification logs found.</td></tr>
           </tbody>
         </table>
-        <!-- Pagination -->
-        <div v-if="logsMeta.last_page > 1" class="px-6 py-3 border-t border-gray-100 flex items-center justify-between text-sm">
-          <span class="text-gray-500">Page {{ logsMeta.current_page }} of {{ logsMeta.last_page }} ({{ logsMeta.total }} total)</span>
-          <div class="flex gap-1">
-            <button :disabled="logsPage <= 1" class="rounded border border-gray-300 px-3 py-1 text-sm disabled:opacity-40" @click="fetchLogs(logsPage - 1)">Prev</button>
-            <button :disabled="logsPage >= logsMeta.last_page" class="rounded border border-gray-300 px-3 py-1 text-sm disabled:opacity-40" @click="fetchLogs(logsPage + 1)">Next</button>
-          </div>
+        <!-- Footer: total count info -->
+        <div v-if="logsMeta.total > 0" class="px-6 py-3 border-t border-gray-100 text-xs text-gray-500">
+          Showing {{ logs.length }} of {{ logsMeta.total }} total records
         </div>
       </div>
     </section>
@@ -1162,7 +1197,7 @@ function channelIcon(ch) {
     <!-- ═══ § 7 Test Notification + Save ═══ -->
     <div class="flex flex-wrap items-end justify-between gap-4 pt-2 border-t border-gray-200">
       <!-- Test -->
-      <div v-if="canUpdate" class="flex flex-wrap items-end gap-3">
+      <div v-if="canSendTest" class="flex flex-wrap items-end gap-3">
         <div>
           <label class="block text-xs font-medium text-gray-600 mb-1">Send test email to</label>
           <input v-model="testEmail" type="email" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-52" placeholder="test@example.com" />
@@ -1204,7 +1239,6 @@ function channelIcon(ch) {
       <div>
         <p class="font-semibold text-blue-900">Audit &amp; Safety</p>
         <ul class="mt-2 space-y-1 text-sm text-blue-800">
-          <li>• All notification changes are logged in Audit Logs.</li>
           <li>• Only Super Admin can modify notification rules.</li>
           <li>• Email templates follow SLA configuration and system behaviour.</li>
           <li>• Email templates are managed by system administrator.</li>

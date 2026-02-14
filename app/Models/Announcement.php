@@ -37,7 +37,7 @@ class Announcement extends Model
 
     public function getStatusAttribute(): string
     {
-        if ($this->archived_at)                                      return 'archived';
+        if ($this->archived_at)                                      return 'disabled';
         $now = now();
         if ($this->published_at && $this->published_at->isFuture())  return 'scheduled';
         if ($this->expire_at && $this->expire_at->isPast())          return 'expired';
@@ -84,10 +84,11 @@ class Announcement extends Model
     {
         return Cache::remember(self::CACHE_KEY . '_counters', self::CACHE_TTL, function () {
             return [
-                'total'     => self::notArchived()->count(),
+                'total'     => self::count(),
                 'active'    => self::active()->count(),
                 'scheduled' => self::scheduled()->count(),
                 'expired'   => self::expired()->count(),
+                'disabled'  => self::archived()->count(),
             ];
         });
     }

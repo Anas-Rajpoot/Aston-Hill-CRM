@@ -177,19 +177,31 @@ onBeforeRouteLeave((to, from, next) => {
   }
 })
 
+// Only attach beforeunload AFTER user interacts (Chrome intervention fix)
 function beforeUnloadHandler(e) {
   if (isDirty.value) {
     e.preventDefault()
     e.returnValue = ''
   }
 }
+let beforeUnloadAttached = false
+function attachBeforeUnload() {
+  if (!beforeUnloadAttached) {
+    window.addEventListener('beforeunload', beforeUnloadHandler)
+    beforeUnloadAttached = true
+  }
+}
 
 onMounted(() => {
   loadAll()
-  window.addEventListener('beforeunload', beforeUnloadHandler)
+  window.addEventListener('click', attachBeforeUnload, { once: true })
+  window.addEventListener('keydown', attachBeforeUnload, { once: true })
 })
 onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', beforeUnloadHandler)
+  window.removeEventListener('click', attachBeforeUnload)
+  window.removeEventListener('keydown', attachBeforeUnload)
+  beforeUnloadAttached = false
 })
 
 // ─── Timezone filter ─────────────────────────────────────────────────────────

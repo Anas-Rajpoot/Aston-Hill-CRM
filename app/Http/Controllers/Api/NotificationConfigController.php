@@ -16,17 +16,57 @@ use Illuminate\Support\Facades\DB;
 
 class NotificationConfigController extends Controller
 {
+    /**
+     * Check if user is super admin.
+     */
+    private function isSuperAdmin($user): bool
+    {
+        return $user && $user->hasRole('superadmin');
+    }
+
+    /**
+     * Check if user can manage any notification settings (legacy + granular).
+     */
     private function canManage($user): bool
     {
-        return $user && ($user->hasRole('superadmin') || $user->can('manage-notification-rules'));
+        return $this->isSuperAdmin($user) || ($user && $user->can('manage-notification-rules'));
+    }
+
+    /**
+     * Check if user can view the notifications page at all.
+     */
+    private function canView($user): bool
+    {
+        return $this->isSuperAdmin($user)
+            || ($user && (
+                $user->can('notification_rules.list')
+                || $user->can('notification_rules.view')
+                || $user->can('manage-notification-rules')
+            ));
+    }
+
+    /**
+     * Check specific granular permission (falls back to canManage for super admin).
+     */
+    private function canDo($user, string $permission): bool
+    {
+        return $this->isSuperAdmin($user) || ($user && (
+            $user->can($permission) || $user->can('manage-notification-rules')
+        ));
     }
 
     // ──────────────────────────────────────────────────────────
-    //  GET /api/notification-config — aggregated config + can_update
+    //  GET /api/notification-config — aggregated config + permissions
     // ──────────────────────────────────────────────────────────
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
+
+        // Any authenticated user can view (with limited data for non-admins)
+        // But only users with view permission see the full config
+        if (! $this->canView($user)) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
 
         // Settings + escalations are global (cached)
         $global = Cache::remember(NotificationSetting::CACHE_KEY, NotificationSetting::CACHE_TTL, function () {
@@ -47,6 +87,19 @@ class NotificationConfigController extends Controller
             'enable_sla_alerts' => (bool) $s->enable_sla_alerts,
         ];
 
+        // Granular permissions for the frontend to conditionally show/hide sections
+        $permissions = [
+            'can_update'           => $this->canManage($user),
+            'can_edit_settings'    => $this->canDo($user, 'notification_rules.edit_settings'),
+            'can_manage_channels'  => $this->canDo($user, 'notification_rules.manage_channels'),
+            'can_manage_triggers'  => $this->canDo($user, 'notification_rules.manage_triggers'),
+            'can_manage_escalations' => $this->canDo($user, 'notification_rules.manage_escalations'),
+            'can_manage_templates' => $this->canDo($user, 'notification_rules.manage_templates'),
+            'can_view_logs'        => $this->canDo($user, 'notification_rules.view_logs'),
+            'can_send_test'        => $this->canDo($user, 'notification_rules.send_test'),
+            'can_delete'           => $this->canDo($user, 'notification_rules.delete'),
+        ];
+
         return response()->json([
             'data' => [
                 'settings'    => $global['settings'],
@@ -54,7 +107,7 @@ class NotificationConfigController extends Controller
                 'escalations' => $global['escalations'],
                 'channels'    => $channels,
             ],
-            'meta' => ['can_update' => $this->canManage($user)],
+            'meta' => $permissions,
         ]);
     }
 
@@ -64,8 +117,8 @@ class NotificationConfigController extends Controller
     // ──────────────────────────────────────────────────────────
     public function updateSettings(Request $request): JsonResponse
     {
-        if (! $this->canManage($request->user())) {
-            return response()->json(['message' => 'Unauthorized.'], 403);
+        if (! $this->canDo($request->user(), 'notification_rules.edit_settings')) {
+            return response()->json(['message' => 'Unauthorized. You need "Edit Global Email Settings" permission.'], 403);
         }
 
         $validated = $request->validate([
@@ -131,8 +184,8 @@ class NotificationConfigController extends Controller
     // ──────────────────────────────────────────────────────────
     public function updateTrigger(Request $request, NotificationTrigger $trigger): JsonResponse
     {
-        if (! $this->canManage($request->user())) {
-            return response()->json(['message' => 'Unauthorized.'], 403);
+        if (! $this->canDo($request->user(), 'notification_rules.manage_triggers')) {
+            return response()->json(['message' => 'Unauthorized. You need "Manage Notification Triggers" permission.'], 403);
         }
 
         $fields = ['website_enabled', 'email_enabled', 'in_app_enabled', 'email_alert_enabled', 'is_active'];
@@ -270,8 +323,8 @@ class NotificationConfigController extends Controller
     // ──────────────────────────────────────────────────────────
     public function upsertEscalations(Request $request): JsonResponse
     {
-        if (! $this->canManage($request->user())) {
-            return response()->json(['message' => 'Unauthorized.'], 403);
+        if (! $this->canDo($request->user(), 'notification_rules.manage_escalations')) {
+            return response()->json(['message' => 'Unauthorized. You need "Manage Escalation Levels" permission.'], 403);
         }
 
         $request->validate([
@@ -319,8 +372,8 @@ class NotificationConfigController extends Controller
     // ──────────────────────────────────────────────────────────
     public function testNotification(Request $request): JsonResponse
     {
-        if (! $this->canManage($request->user())) {
-            return response()->json(['message' => 'Unauthorized.'], 403);
+        if (! $this->canDo($request->user(), 'notification_rules.send_test')) {
+            return response()->json(['message' => 'Unauthorized. You need "Send Test Notification" permission.'], 403);
         }
 
         $request->validate([

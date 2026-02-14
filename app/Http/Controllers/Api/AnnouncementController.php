@@ -21,7 +21,8 @@ class AnnouncementController extends Controller
     /* ── GET /api/announcements ──────────────────────── */
     public function index(Request $request): JsonResponse
     {
-        $query = Announcement::with('creator')->notArchived();
+        // Show ALL announcements by default (including disabled/archived)
+        $query = Announcement::with('creator');
 
         if ($q = $request->input('q')) {
             $query->where(fn ($w) => $w->where('title', 'like', "%{$q}%")->orWhere('body', 'like', "%{$q}%"));
@@ -31,12 +32,10 @@ class AnnouncementController extends Controller
                 'active'    => $query->active(),
                 'scheduled' => $query->scheduled(),
                 'expired'   => $query->expired(),
-                'archived'  => null, // handled below
+                'disabled'  => $query->archived(),
+                'archived'  => $query->archived(),
                 default     => null,
             };
-            if ($status === 'archived') {
-                $query = Announcement::with('creator')->archived();
-            }
         }
         if ($priority = $request->input('priority')) {
             $query->where('priority', $priority);
@@ -133,6 +132,47 @@ class AnnouncementController extends Controller
         $changed = array_filter($old, fn ($v, $k) => json_encode($v) !== json_encode($data[$k] ?? null), ARRAY_FILTER_USE_BOTH);
         if (! empty($changed)) {
             SystemAuditLog::record('announcement.updated', $changed, array_intersect_key($data, $changed), $request->user()->id, 'announcement', $announcement->id);
+        }
+
+        return response()->json([
+            'message' => 'Announcement updated.',
+            'data'    => new AnnouncementResource($announcement->fresh()->load('creator')),
+        ]);
+    }
+
+    /* ── PATCH /api/announcements/{announcement} ─ inline field update ── */
+    public function patchField(Request $request, Announcement $announcement): JsonResponse
+    {
+        if (! $this->canManage($request->user())) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
+        $allowed = ['title', 'type', 'priority', 'published_at', 'expire_at'];
+        $validated = $request->validate(
+            collect($allowed)
+                ->filter(fn ($f) => $request->has($f))
+                ->mapWithKeys(fn ($f) => [$f => match ($f) {
+                    'title'        => 'required|string|max:255',
+                    'type'         => 'required|string|in:' . implode(',', Announcement::TYPES),
+                    'priority'     => 'required|string|in:' . implode(',', Announcement::PRIORITIES),
+                    'published_at' => 'required|date',
+                    'expire_at'    => 'nullable|date',
+                    default        => 'nullable|string|max:255',
+                }])
+                ->toArray()
+        );
+
+        if (empty($validated)) {
+            return response()->json(['message' => 'No valid fields to update.'], 422);
+        }
+
+        $old = $announcement->only(array_keys($validated));
+        $announcement->update(array_merge($validated, ['updated_by' => $request->user()->id]));
+        Announcement::clearCache();
+
+        $changed = array_filter($old, fn ($v, $k) => json_encode($v) !== json_encode($validated[$k] ?? null), ARRAY_FILTER_USE_BOTH);
+        if (! empty($changed)) {
+            SystemAuditLog::record('announcement.field_updated', $changed, array_intersect_key($validated, $changed), $request->user()->id, 'announcement', $announcement->id);
         }
 
         return response()->json([

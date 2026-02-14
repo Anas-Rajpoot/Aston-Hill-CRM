@@ -13,7 +13,20 @@ class EmailTemplateController extends Controller
 {
     private function canManage($user): bool
     {
-        return $user && ($user->hasRole('superadmin') || $user->can('manage-notification-rules'));
+        return $user && (
+            $user->hasRole('superadmin')
+            || $user->can('notification_rules.manage_templates')
+            || $user->can('manage-notification-rules')
+        );
+    }
+
+    private function canDelete($user): bool
+    {
+        return $user && (
+            $user->hasRole('superadmin')
+            || $user->can('notification_rules.delete')
+            || $user->can('manage-notification-rules')
+        );
     }
 
     /**
@@ -138,8 +151,8 @@ class EmailTemplateController extends Controller
     public function destroy(Request $request, EmailTemplate $emailTemplate): JsonResponse
     {
         $user = $request->user();
-        if (! $this->canManage($user)) {
-            return response()->json(['message' => 'Unauthorized.'], 403);
+        if (! $this->canDelete($user)) {
+            return response()->json(['message' => 'Unauthorized. You need "Delete Templates / Levels" permission.'], 403);
         }
 
         $old = $emailTemplate->toArray();

@@ -323,12 +323,14 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::put('/email-templates/{emailTemplate}', [\App\Http\Controllers\Api\EmailTemplateController::class, 'update']);
     Route::delete('/email-templates/{emailTemplate}', [\App\Http\Controllers\Api\EmailTemplateController::class, 'destroy']);
     Route::get('/notification-logs', [\App\Http\Controllers\Api\NotificationLogController::class, 'index']);
+    Route::delete('/notification-logs/{notificationLog}', [\App\Http\Controllers\Api\NotificationLogController::class, 'destroy']);
 
     // Announcements
     Route::get('/announcements', [\App\Http\Controllers\Api\AnnouncementController::class, 'index']);
     Route::post('/announcements', [\App\Http\Controllers\Api\AnnouncementController::class, 'store']);
     Route::get('/announcements/{announcement}', [\App\Http\Controllers\Api\AnnouncementController::class, 'show']);
     Route::put('/announcements/{announcement}', [\App\Http\Controllers\Api\AnnouncementController::class, 'update']);
+    Route::patch('/announcements/{announcement}', [\App\Http\Controllers\Api\AnnouncementController::class, 'patchField']);
     Route::patch('/announcements/{announcement}/publish-now', [\App\Http\Controllers\Api\AnnouncementController::class, 'publishNow']);
     Route::post('/announcements/{announcement}/duplicate', [\App\Http\Controllers\Api\AnnouncementController::class, 'duplicate']);
     Route::delete('/announcements/{announcement}', [\App\Http\Controllers\Api\AnnouncementController::class, 'destroy']);

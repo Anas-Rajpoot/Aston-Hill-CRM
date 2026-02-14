@@ -27,14 +27,26 @@ function toast(type, msg) { toastType.value = type; toastMsg.value = msg; showTo
 const loading    = ref(true)
 const canUpdate  = ref(false)
 
-// ═══ Counters ═════════════════════════════════════════════
-const counters = reactive({ total: 0, active: 0, scheduled: 0, expired: 0 })
+// ═══ Counters & KPI card filtering ═══════════════════════
+const counters = reactive({ total: 0, active: 0, scheduled: 0, expired: 0, disabled: 0 })
+const activeCard = ref('') // '' = all, 'active', 'scheduled', 'expired', 'disabled'
 const counterCards = computed(() => [
-  { label: 'Total',     value: counters.total,     color: 'blue',   icon: 'megaphone' },
-  { label: 'Active',    value: counters.active,    color: 'green',  icon: 'check' },
-  { label: 'Scheduled', value: counters.scheduled, color: 'purple', icon: 'calendar' },
-  { label: 'Expired',   value: counters.expired,   color: 'gray',   icon: 'clock' },
+  { label: 'Total',     value: counters.total,     color: 'blue',   icon: 'megaphone', filter: '' },
+  { label: 'Active',    value: counters.active,    color: 'green',  icon: 'check',     filter: 'active' },
+  { label: 'Scheduled', value: counters.scheduled, color: 'purple', icon: 'calendar',  filter: 'scheduled' },
+  { label: 'Expired',   value: counters.expired,   color: 'gray',   icon: 'clock',     filter: 'expired' },
+  { label: 'Disabled',  value: counters.disabled,  color: 'red',    icon: 'ban',       filter: 'disabled' },
 ])
+
+function onCardClick(card) {
+  if (activeCard.value === card.filter) {
+    activeCard.value = '' // toggle off => show all
+  } else {
+    activeCard.value = card.filter
+  }
+  filters.status = activeCard.value
+  fetchList(1)
+}
 
 // ═══ Filters ══════════════════════════════════════════════
 const showFilters = ref(false)
@@ -42,6 +54,7 @@ const filters = reactive({ q: '', status: '', priority: '', visibility: '', crea
 
 function clearFilters() {
   Object.assign(filters, { q: '', status: '', priority: '', visibility: '', created_by: '', date_from: '', date_to: '' })
+  activeCard.value = ''
   fetchList(1)
 }
 
@@ -72,6 +85,7 @@ async function fetchList(page = 1) {
     counters.active    = c.active ?? 0
     counters.scheduled = c.scheduled ?? 0
     counters.expired   = c.expired ?? 0
+    counters.disabled  = c.disabled ?? 0
   } catch (e) {
     toast('error', e?.response?.data?.message || 'Failed to load announcements.')
   } finally { loading.value = false }
@@ -205,6 +219,7 @@ function statusBadge(s) {
     active:    'bg-green-100 text-green-800',
     scheduled: 'bg-purple-100 text-purple-800',
     expired:   'bg-gray-100 text-gray-600',
+    disabled:  'bg-red-100 text-red-800',
     archived:  'bg-red-100 text-red-800',
     draft:     'bg-yellow-100 text-yellow-800',
   }
@@ -214,6 +229,46 @@ function typeIcon(t) {
   if (t === 'link') return '🔗'
   if (t === 'banner') return '🏷️'
   return '📝'
+}
+
+// ═══ Inline editing (double-click) ═══════════════════════
+const editingAnnId    = ref(null)
+const editingAnnDraft = reactive({})
+
+function startEditAnn(ann) {
+  if (!canUpdate.value) return
+  editingAnnId.value = ann.id
+  Object.assign(editingAnnDraft, {
+    title: ann.title || '',
+    type:  ann.type || 'text',
+  })
+}
+
+function cancelEditAnn() {
+  editingAnnId.value = null
+  Object.keys(editingAnnDraft).forEach(k => delete editingAnnDraft[k])
+}
+
+async function saveEditAnn(ann) {
+  if (!editingAnnDraft.title?.trim()) {
+    toast('error', 'Title is required.')
+    return
+  }
+  try {
+    const { data } = await api.patch(`/announcements/${ann.id}`, {
+      title: editingAnnDraft.title,
+      type:  editingAnnDraft.type,
+    })
+    // Update locally
+    const idx = rows.value.findIndex(r => r.id === ann.id)
+    if (idx !== -1 && data.data) {
+      rows.value[idx] = { ...rows.value[idx], ...data.data }
+    }
+    toast('success', 'Announcement updated.')
+  } catch (e) {
+    toast('error', e?.response?.data?.message || 'Failed to update.')
+  }
+  editingAnnId.value = null
 }
 
 // ═══ Mount ════════════════════════════════════════════════
@@ -227,8 +282,10 @@ onMounted(() => fetchList(1))
     <!-- ═══ Header ═══ -->
     <div class="flex flex-wrap items-start justify-between gap-4">
       <div>
-        <Breadcrumbs />
-        <h1 class="text-2xl font-bold text-gray-900 mt-1">Announcement Center</h1>
+        <div class="flex items-center gap-3">
+          <h1 class="text-2xl font-bold text-gray-900">Announcement Center</h1>
+          <Breadcrumbs />
+        </div>
         <p class="mt-1 text-sm text-gray-500">Create and manage system-wide announcements for operational updates and alerts.</p>
       </div>
       <div class="flex items-center gap-3">
@@ -243,21 +300,35 @@ onMounted(() => fetchList(1))
       </div>
     </div>
 
-    <!-- ═══ KPI Counters ═══ -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <!-- ═══ KPI Counters (clickable to filter) ═══ -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
       <template v-if="loading && !rows.length">
-        <div v-for="i in 4" :key="i" class="rounded-xl border border-gray-200 bg-white p-5"><SkeletonBox width="40%" height="14px" /><SkeletonBox width="30%" height="28px" class="mt-3" /></div>
+        <div v-for="i in 5" :key="i" class="rounded-xl border border-gray-200 bg-white p-5"><SkeletonBox width="40%" height="14px" /><SkeletonBox width="30%" height="28px" class="mt-3" /></div>
       </template>
       <template v-else>
-        <div v-for="c in counterCards" :key="c.label" class="rounded-xl border border-gray-200 bg-white p-5 flex items-center justify-between">
+        <div
+          v-for="c in counterCards" :key="c.label"
+          class="rounded-xl border-2 bg-white p-5 flex items-center justify-between cursor-pointer transition-all hover:shadow-md"
+          :class="activeCard === c.filter
+            ? (c.color === 'blue' ? 'border-blue-500 ring-2 ring-blue-100' : c.color === 'green' ? 'border-green-500 ring-2 ring-green-100' : c.color === 'purple' ? 'border-purple-500 ring-2 ring-purple-100' : c.color === 'red' ? 'border-red-500 ring-2 ring-red-100' : 'border-gray-400 ring-2 ring-gray-100')
+            : 'border-gray-200 hover:border-gray-300'"
+          @click="onCardClick(c)"
+        >
           <div>
             <p class="text-sm text-gray-500">{{ c.label }}</p>
             <p class="text-2xl font-bold text-gray-900 mt-1">{{ c.value }}</p>
           </div>
-          <div class="flex h-10 w-10 items-center justify-center rounded-full" :class="{'bg-blue-100 text-blue-600': c.color==='blue', 'bg-green-100 text-green-600': c.color==='green', 'bg-purple-100 text-purple-600': c.color==='purple', 'bg-gray-100 text-gray-500': c.color==='gray'}">
+          <div class="flex h-10 w-10 items-center justify-center rounded-full" :class="{
+            'bg-blue-100 text-blue-600': c.color==='blue',
+            'bg-green-100 text-green-600': c.color==='green',
+            'bg-purple-100 text-purple-600': c.color==='purple',
+            'bg-gray-100 text-gray-500': c.color==='gray',
+            'bg-red-100 text-red-500': c.color==='red',
+          }">
             <svg v-if="c.icon==='megaphone'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" /></svg>
             <svg v-else-if="c.icon==='check'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             <svg v-else-if="c.icon==='calendar'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            <svg v-else-if="c.icon==='ban'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
             <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           </div>
         </div>
@@ -285,7 +356,7 @@ onMounted(() => fetchList(1))
               <option value="active">Active</option>
               <option value="scheduled">Scheduled</option>
               <option value="expired">Expired</option>
-              <option value="archived">Archived</option>
+              <option value="disabled">Disabled</option>
             </select>
           </div>
           <div>
@@ -347,16 +418,37 @@ onMounted(() => fetchList(1))
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
-            <tr v-for="ann in rows" :key="ann.id" class="hover:bg-gray-50/50 transition-colors">
-              <!-- Title -->
-              <td class="px-6 py-3.5 font-medium text-gray-900 max-w-[260px]">
-                <span class="line-clamp-1">{{ ann.title }}</span>
+            <tr v-for="ann in rows" :key="ann.id" class="hover:bg-gray-50/50 transition-colors" :class="{ 'opacity-60': ann.status === 'disabled' }">
+              <!-- Title (editable on double-click) -->
+              <td class="px-6 py-3.5 max-w-[260px]" @dblclick="startEditAnn(ann)">
+                <template v-if="editingAnnId === ann.id">
+                  <input
+                    v-model="editingAnnDraft.title"
+                    type="text"
+                    class="rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm w-full max-w-[240px]"
+                    @keyup.enter="saveEditAnn(ann)"
+                    @keyup.escape="cancelEditAnn"
+                  />
+                </template>
+                <template v-else>
+                  <span class="line-clamp-1 font-medium text-gray-900 cursor-pointer" :title="canUpdate ? 'Double-click to edit' : ''">{{ ann.title }}</span>
+                </template>
               </td>
-              <!-- Type -->
-              <td class="px-4 py-3.5">
-                <span class="inline-flex items-center gap-1 rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
-                  {{ typeIcon(ann.type) }} {{ ann.type.charAt(0).toUpperCase() + ann.type.slice(1) }}
-                </span>
+              <!-- Type (editable on double-click) -->
+              <td class="px-4 py-3.5" @dblclick="startEditAnn(ann)">
+                <template v-if="editingAnnId === ann.id">
+                  <select v-model="editingAnnDraft.type" class="rounded-lg border border-gray-300 px-2 py-1.5 text-xs w-full max-w-[100px]">
+                    <option value="text">Text</option>
+                    <option value="link">Link</option>
+                    <option value="image">Image</option>
+                    <option value="banner">Banner</option>
+                  </select>
+                </template>
+                <template v-else>
+                  <span class="inline-flex items-center gap-1 rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 cursor-pointer">
+                    {{ typeIcon(ann.type) }} {{ ann.type.charAt(0).toUpperCase() + ann.type.slice(1) }}
+                  </span>
+                </template>
               </td>
               <!-- Audience chips -->
               <td class="px-4 py-3.5">
@@ -384,26 +476,39 @@ onMounted(() => fetchList(1))
               <!-- Actions -->
               <td class="px-4 py-3.5">
                 <div class="flex items-center gap-1.5">
-                  <!-- View -->
-                  <button type="button" class="p-1.5 rounded text-green-600 hover:bg-green-50" title="View" @click="openView(ann)">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                  </button>
-                  <!-- Edit -->
-                  <button v-if="canUpdate" type="button" class="p-1.5 rounded text-blue-600 hover:bg-blue-50" title="Edit" @click="openEdit(ann)">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                  </button>
-                  <!-- Duplicate -->
-                  <button v-if="canUpdate" type="button" class="p-1.5 rounded text-purple-600 hover:bg-purple-50" :disabled="!!duplicating[ann.id]" title="Duplicate" @click="duplicateAnn(ann)">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                  </button>
-                  <!-- Archive / Disable -->
-                  <button v-if="canUpdate && ann.status !== 'archived'" type="button" class="p-1.5 rounded text-amber-500 hover:bg-amber-50" :disabled="!!archiving[ann.id]" title="Disable" @click="openArchiveConfirm(ann)">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
-                  </button>
-                  <!-- Delete (permanent) -->
-                  <button v-if="canUpdate" type="button" class="p-1.5 rounded text-red-500 hover:bg-red-50" :disabled="!!deleting[ann.id]" title="Delete" @click="openDeleteConfirm(ann)">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                  </button>
+                  <template v-if="editingAnnId === ann.id">
+                    <!-- Save -->
+                    <button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-green-600 text-white text-xs font-medium hover:bg-green-700 transition-colors" @click="saveEditAnn(ann)">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                      Save
+                    </button>
+                    <!-- Cancel -->
+                    <button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded border border-gray-300 text-gray-600 text-xs font-medium hover:bg-gray-50 transition-colors" @click="cancelEditAnn">
+                      Cancel
+                    </button>
+                  </template>
+                  <template v-else>
+                    <!-- View -->
+                    <button type="button" class="p-1.5 rounded text-green-600 hover:bg-green-50" title="View" @click="openView(ann)">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                    </button>
+                    <!-- Edit (full modal) -->
+                    <button v-if="canUpdate" type="button" class="p-1.5 rounded text-blue-600 hover:bg-blue-50" title="Edit" @click="openEdit(ann)">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                    </button>
+                    <!-- Duplicate -->
+                    <button v-if="canUpdate" type="button" class="p-1.5 rounded text-purple-600 hover:bg-purple-50" :disabled="!!duplicating[ann.id]" title="Duplicate" @click="duplicateAnn(ann)">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                    </button>
+                    <!-- Disable (only if not already disabled) -->
+                    <button v-if="canUpdate && ann.status !== 'disabled'" type="button" class="p-1.5 rounded text-amber-500 hover:bg-amber-50" :disabled="!!archiving[ann.id]" title="Disable" @click="openArchiveConfirm(ann)">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                    </button>
+                    <!-- Delete (permanent) -->
+                    <button v-if="canUpdate" type="button" class="p-1.5 rounded text-red-500 hover:bg-red-50" :disabled="!!deleting[ann.id]" title="Delete" @click="openDeleteConfirm(ann)">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                  </template>
                 </div>
               </td>
             </tr>
