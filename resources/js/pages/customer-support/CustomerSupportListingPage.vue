@@ -10,6 +10,25 @@ import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomize
 import CustomerSupportTable from '@/components/customer-support/CustomerSupportTable.vue'
 import Pagination from '@/components/Pagination.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import RecordHistoryModal from '@/components/RecordHistoryModal.vue'
+
+const historyModalVisible = ref(false)
+const historyRecordId = ref(null)
+const historyRecordLabel = ref('')
+function openHistoryModal(row) {
+  if (!row?.id) return
+  historyRecordId.value = row.id
+  historyRecordLabel.value = row.company_name || `Support Request #${row.id}`
+  historyModalVisible.value = true
+}
+function closeHistoryModal() {
+  historyModalVisible.value = false
+  historyRecordId.value = null
+  historyRecordLabel.value = ''
+}
+async function fetchSupportAudits(id) {
+  return await customerSupportApi.getAudits(id)
+}
 
 const loading = ref(true)
 const filterOptions = ref({
@@ -345,6 +364,7 @@ onMounted(() => {
           :edit-options="filterOptions"
           @sort="onSort"
           @update-cell="onUpdateCell"
+          @view-history="openHistoryModal"
         />
         <div
           class="flex flex-wrap items-center gap-4 border-t border-black bg-white px-4 py-3"
@@ -373,6 +393,15 @@ onMounted(() => {
       :visible-columns="visibleColumns"
       @update:visible="columnModalVisible = $event"
       @save="onSaveColumns"
+    />
+
+    <RecordHistoryModal
+      :visible="historyModalVisible"
+      :record-id="historyRecordId"
+      :record-label="historyRecordLabel"
+      module-name="Customer Support"
+      :fetch-fn="fetchSupportAudits"
+      @close="closeHistoryModal"
     />
   </div>
 </template>

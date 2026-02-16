@@ -764,4 +764,35 @@ class FieldSubmissionApiController extends Controller
             ],
         ]);
     }
+
+    /**
+     * GET /api/field-submissions/{fieldSubmission}/audits
+     * Change history for a field submission: field, old value, new value, date/time, who.
+     */
+    public function audits(Request $request, FieldSubmission $fieldSubmission): JsonResponse
+    {
+        $this->authorize('view', $fieldSubmission);
+
+        $rows = FieldSubmissionAudit::query()
+            ->where('field_submission_id', $fieldSubmission->id)
+            ->with('changedByUser:id,name')
+            ->orderByDesc('changed_at')
+            ->orderByDesc('id')
+            ->limit(500)
+            ->get();
+
+        $data = $rows->map(function (FieldSubmissionAudit $audit) {
+            return [
+                'id' => $audit->id,
+                'field_name' => $audit->field_name,
+                'old_value' => $audit->old_value,
+                'new_value' => $audit->new_value,
+                'changed_at' => $audit->changed_at?->toIso8601String(),
+                'changed_by' => $audit->changed_by,
+                'changed_by_name' => $audit->changedByUser?->name ?? '—',
+            ];
+        });
+
+        return response()->json(['data' => $data]);
+    }
 }

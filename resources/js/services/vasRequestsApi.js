@@ -72,6 +72,11 @@ export default {
     return data
   },
 
+  async getAudits(vasRequestId) {
+    const { data } = await api.get(`/vas-requests/${vasRequestId}/audits`)
+    return data
+  },
+
   async downloadDocument(vasRequestId, documentId) {
     const { data } = await api.get(
       `/vas-requests/${vasRequestId}/documents/${documentId}/download`,

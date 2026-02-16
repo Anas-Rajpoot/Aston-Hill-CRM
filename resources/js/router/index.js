@@ -69,7 +69,7 @@ const routes = [
       { path: 'reports/lead', component: () => import('@/pages/reports/LeadReportsPage.vue'), meta: { title: 'Lead Reports' } },
       { path: 'reports/field-operations', component: () => import('@/pages/reports/FieldOperationsReportsPage.vue'), meta: { title: 'Field Operations Reports' } },
       { path: 'reports/vas', component: () => import('@/pages/reports/VasReportsPage.vue'), meta: { title: 'VAS Reports' } },
-      { path: 'reports/sla', ...ph('SLA & Performance Reports') },
+      { path: 'reports/sla', component: () => import('@/pages/reports/SlaPerformanceReportsPage.vue'), meta: { title: 'SLA Performance Report' } },
       { path: 'settings', component: () => import('@/pages/settings/SettingsPage.vue'), meta: { title: 'Settings' } },
       { path: 'settings/team-hierarchy', component: () => import('@/pages/settings/TeamHierarchyPage.vue') },
       { path: 'settings/system-preferences', component: () => import('@/pages/settings/SystemPreferencesPage.vue'), meta: { title: 'System Preferences' } },

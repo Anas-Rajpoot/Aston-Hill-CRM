@@ -8,6 +8,7 @@ use App\Http\Controllers\VasRequestController;
 use App\Models\SystemAuditLog;
 use App\Models\User;
 use App\Models\UserColumnPreference;
+use App\Models\VasRequestAudit;
 use App\Models\VasRequestSubmission;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -453,5 +454,36 @@ class VasRequestApiController extends Controller
             'message' => "Assigned {$updated} request(s) to back office executive. Rows that already had an executive were left unchanged.",
             'updated_count' => $updated,
         ]);
+    }
+
+    /**
+     * GET /api/vas-requests/{vasRequest}/audits
+     * Change history for a VAS request: field, old value, new value, date/time, who.
+     */
+    public function audits(Request $request, VasRequestSubmission $vasRequest): JsonResponse
+    {
+        $this->authorize('view', $vasRequest);
+
+        $rows = VasRequestAudit::query()
+            ->where('vas_request_submission_id', $vasRequest->id)
+            ->with('user:id,name')
+            ->orderByDesc('changed_at')
+            ->orderByDesc('id')
+            ->limit(500)
+            ->get();
+
+        $data = $rows->map(function (VasRequestAudit $audit) {
+            return [
+                'id' => $audit->id,
+                'field_name' => $audit->field_name,
+                'old_value' => $audit->old_value,
+                'new_value' => $audit->new_value,
+                'changed_at' => $audit->changed_at?->toIso8601String(),
+                'changed_by' => $audit->changed_by,
+                'changed_by_name' => $audit->user?->name ?? '—',
+            ];
+        });
+
+        return response()->json(['data' => $data]);
     }
 }

@@ -10,6 +10,25 @@ import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomize
 import ClientTable from '@/components/clients/ClientTable.vue'
 import Pagination from '@/components/Pagination.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import RecordHistoryModal from '@/components/RecordHistoryModal.vue'
+
+const historyModalVisible = ref(false)
+const historyRecordId = ref(null)
+const historyRecordLabel = ref('')
+function openHistoryModal(row) {
+  if (!row?.id) return
+  historyRecordId.value = row.id
+  historyRecordLabel.value = row.company_name || `Client #${row.id}`
+  historyModalVisible.value = true
+}
+function closeHistoryModal() {
+  historyModalVisible.value = false
+  historyRecordId.value = null
+  historyRecordLabel.value = ''
+}
+async function fetchClientAudits(id) {
+  return await clientsApi.audits(id)
+}
 
 const router = useRouter()
 const loading = ref(true)
@@ -313,6 +332,7 @@ onMounted(() => {
           :current-page="meta.current_page"
           :per-page="meta.per_page"
           @sort="onSort"
+          @view-history="openHistoryModal"
         />
         <div
           class="flex flex-wrap items-center gap-4 border-t border-black bg-white px-4 py-3"
@@ -342,6 +362,15 @@ onMounted(() => {
       :default-columns="defaultColumns"
       @update:visible="columnModalVisible = $event"
       @save="onSaveColumns"
+    />
+
+    <RecordHistoryModal
+      :visible="historyModalVisible"
+      :record-id="historyRecordId"
+      :record-label="historyRecordLabel"
+      module-name="Clients"
+      :fetch-fn="fetchClientAudits"
+      @close="closeHistoryModal"
     />
   </div>
 </template>

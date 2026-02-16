@@ -3,15 +3,18 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\CustomerSupportSubmission;
 use App\Models\FieldSubmission;
 use App\Models\LeadSubmission;
+use App\Models\SlaRule;
 use App\Models\VasRequestSubmission;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Report statistics and aggregations for Lead, Field Operations, and VAS Reports.
+ * Report statistics and aggregations for Lead, Field Operations, VAS, and SLA Reports.
  */
 class ReportsApiController extends Controller
 {
@@ -227,6 +230,393 @@ class ReportsApiController extends Controller
             'completed_today' => $completedToday,
             'sla_compliance_pct' => $slaCompliancePct,
         ]);
+    }
+
+    /**
+     * GET /api/reports/sla-performance
+     * Comprehensive SLA dashboard: KPIs, department breakdown, category bars,
+     * priority stats, recent breaches, monthly trend, and auto-generated insights.
+     */
+    public function slaPerformance(Request $request): JsonResponse
+    {
+        $request->validate([
+            'from' => ['sometimes', 'nullable', 'date'],
+            'to'   => ['sometimes', 'nullable', 'date', 'after_or_equal:from'],
+        ]);
+
+        $user = $request->user();
+        $from = $request->filled('from') ? Carbon::parse($request->from)->startOfDay() : null;
+        $to   = $request->filled('to') ? Carbon::parse($request->to)->endOfDay() : null;
+        $now  = Carbon::now();
+
+        $rules = SlaRule::cached()->keyBy('module_key');
+
+        $modules = [
+            'lead_submissions' => [
+                'label'      => 'Lead Submissions',
+                'department' => 'Back Office',
+                'dept_sub'   => 'Lead Processing',
+                'priority'   => 'High',
+                'icon'       => 'document',
+            ],
+            'field_submissions' => [
+                'label'      => 'Field Submissions',
+                'department' => 'Field Operations',
+                'dept_sub'   => 'Field Submissions',
+                'priority'   => 'High',
+                'icon'       => 'map',
+            ],
+            'customer_support_requests' => [
+                'label'      => 'Customer Support Tickets',
+                'department' => 'Customer Support',
+                'dept_sub'   => 'Ticket Resolution',
+                'priority'   => 'Medium',
+                'icon'       => 'support',
+            ],
+            'vas_requests' => [
+                'label'      => 'VAS Requests',
+                'department' => 'VAS Operations',
+                'dept_sub'   => 'VAS Processing',
+                'priority'   => 'Medium',
+                'icon'       => 'cog',
+            ],
+        ];
+
+        $allBreaches = collect();
+        $departments = [];
+        $categories = [];
+        $priorityBuckets = ['High' => ['total' => 0, 'on_time' => 0, 'at_risk' => 0, 'breached' => 0],
+                            'Medium' => ['total' => 0, 'on_time' => 0, 'at_risk' => 0, 'breached' => 0],
+                            'Low' => ['total' => 0, 'on_time' => 0, 'at_risk' => 0, 'breached' => 0]];
+        $monthlyData = [];
+        $globalTotals = ['total' => 0, 'on_time' => 0, 'at_risk' => 0, 'breached' => 0];
+
+        foreach ($modules as $moduleKey => $meta) {
+            $rule = $rules->get($moduleKey);
+            $slaMins = $rule?->sla_duration_minutes ?? 480;
+            $warnMins = $rule?->warning_threshold_minutes ?? 60;
+
+            $rows = $this->fetchModuleRows($moduleKey, $user, $from, $to);
+
+            $onTime = 0; $atRisk = 0; $breached = 0;
+            $totalResponseMinutes = 0; $resolvedCount = 0;
+
+            foreach ($rows as $row) {
+                $submittedAt = $row->submitted_at ? Carbon::parse($row->submitted_at) : null;
+                if (!$submittedAt) continue;
+
+                $deadline = $submittedAt->copy()->addMinutes($slaMins);
+                $warnStart = $deadline->copy()->subMinutes($warnMins);
+
+                $resolvedAt = $this->getResolvedAt($moduleKey, $row);
+                $slaStatus = 'on_time';
+
+                if ($resolvedAt) {
+                    $resolvedAt = Carbon::parse($resolvedAt);
+                    $responseMinutes = $submittedAt->diffInMinutes($resolvedAt);
+                    $totalResponseMinutes += $responseMinutes;
+                    $resolvedCount++;
+                    $slaStatus = $resolvedAt->lte($deadline) ? 'on_time' : 'breached';
+                } else {
+                    if ($now->gt($deadline)) {
+                        $slaStatus = 'breached';
+                    } elseif ($now->gte($warnStart)) {
+                        $slaStatus = 'at_risk';
+                    }
+                }
+
+                if ($slaStatus === 'on_time') $onTime++;
+                elseif ($slaStatus === 'at_risk') $atRisk++;
+                else $breached++;
+
+                if ($slaStatus === 'breached') {
+                    $actualMinutes = $resolvedAt
+                        ? $submittedAt->diffInMinutes($resolvedAt)
+                        : $submittedAt->diffInMinutes($now);
+                    $breachMinutes = max(0, $actualMinutes - $slaMins);
+
+                    $allBreaches->push([
+                        'request_id'     => $this->formatRequestId($moduleKey, $row->id),
+                        'category'       => $meta['label'],
+                        'department'     => $meta['department'],
+                        'priority'       => $meta['priority'],
+                        'submitted_date' => $submittedAt->toDateString(),
+                        'sla_target'     => $this->minutesToHuman($slaMins),
+                        'actual_time'    => $this->minutesToHuman((int) $actualMinutes),
+                        'breach_duration' => '+' . $this->minutesToHuman((int) $breachMinutes),
+                        'assigned_to'    => $this->getAssignedName($moduleKey, $row),
+                        'submitted_at_ts' => $submittedAt->timestamp,
+                    ]);
+                }
+
+                $monthKey = $submittedAt->format('Y-m');
+                if (!isset($monthlyData[$monthKey])) {
+                    $monthlyData[$monthKey] = ['total' => 0, 'on_time' => 0];
+                }
+                $monthlyData[$monthKey]['total']++;
+                if ($slaStatus === 'on_time') $monthlyData[$monthKey]['on_time']++;
+            }
+
+            $total = $onTime + $atRisk + $breached;
+            $compliancePct = $total > 0 ? round(100 * $onTime / $total, 1) : 0;
+            $avgHours = $resolvedCount > 0 ? round($totalResponseMinutes / $resolvedCount / 60, 1) : 0;
+
+            $departments[] = [
+                'name'            => $meta['department'],
+                'subtitle'        => $meta['dept_sub'],
+                'icon'            => $meta['icon'],
+                'total_requests'  => $total,
+                'on_time'         => $onTime,
+                'at_risk'         => $atRisk,
+                'breached'        => $breached,
+                'compliance_pct'  => $compliancePct,
+                'avg_response'    => $avgHours . ' hours',
+            ];
+
+            $categories[] = [
+                'name'           => $meta['label'],
+                'total'          => $total,
+                'breached'       => $breached,
+                'compliance_pct' => $compliancePct,
+            ];
+
+            $priorityBuckets[$meta['priority']]['total'] += $total;
+            $priorityBuckets[$meta['priority']]['on_time'] += $onTime;
+            $priorityBuckets[$meta['priority']]['at_risk'] += $atRisk;
+            $priorityBuckets[$meta['priority']]['breached'] += $breached;
+
+            $globalTotals['total'] += $total;
+            $globalTotals['on_time'] += $onTime;
+            $globalTotals['at_risk'] += $atRisk;
+            $globalTotals['breached'] += $breached;
+        }
+
+        $gt = $globalTotals;
+        $kpis = [
+            'total_requests'  => $gt['total'],
+            'on_time_pct'     => $gt['total'] > 0 ? round(100 * $gt['on_time'] / $gt['total'], 1) : 0,
+            'on_time_count'   => $gt['on_time'],
+            'at_risk_pct'     => $gt['total'] > 0 ? round(100 * $gt['at_risk'] / $gt['total'], 1) : 0,
+            'at_risk_count'   => $gt['at_risk'],
+            'breached_pct'    => $gt['total'] > 0 ? round(100 * $gt['breached'] / $gt['total'], 1) : 0,
+            'breached_count'  => $gt['breached'],
+        ];
+
+        $priority = [];
+        foreach ($priorityBuckets as $level => $b) {
+            if ($b['total'] === 0) continue;
+            $priority[] = [
+                'level'          => $level,
+                'total'          => $b['total'],
+                'on_time'        => $b['on_time'],
+                'at_risk'        => $b['at_risk'],
+                'breached'       => $b['breached'],
+                'compliance_pct' => round(100 * $b['on_time'] / $b['total'], 1),
+            ];
+        }
+
+        ksort($monthlyData);
+        $monthlyTrend = [];
+        foreach (array_slice($monthlyData, -6, null, true) as $ym => $d) {
+            $monthlyTrend[] = [
+                'label'          => Carbon::createFromFormat('Y-m', $ym)->format('M'),
+                'total'          => $d['total'],
+                'compliance_pct' => $d['total'] > 0 ? round(100 * $d['on_time'] / $d['total'], 1) : 0,
+            ];
+        }
+
+        $recentBreaches = $allBreaches
+            ->sortByDesc('submitted_at_ts')
+            ->take(50)
+            ->map(fn ($b) => collect($b)->except('submitted_at_ts')->toArray())
+            ->values()
+            ->toArray();
+
+        $insights = $this->generateInsights($departments, $priority, $kpis, $monthlyTrend);
+
+        return response()->json([
+            'kpis'            => $kpis,
+            'departments'     => $departments,
+            'categories'      => $categories,
+            'priority'        => $priority,
+            'monthly_trend'   => $monthlyTrend,
+            'recent_breaches' => $recentBreaches,
+            'insights'        => $insights,
+        ]);
+    }
+
+    /* ──── SLA helpers ──────────────────────────────────────────────── */
+
+    private function fetchModuleRows(string $moduleKey, $user, ?Carbon $from, ?Carbon $to): \Illuminate\Support\Collection
+    {
+        switch ($moduleKey) {
+            case 'lead_submissions':
+                $q = LeadSubmission::query()->visibleTo($user)
+                    ->whereNotNull('submitted_at')->where('status', '!=', 'draft')
+                    ->select(['id', 'submitted_at', 'status', 'status_changed_at', 'created_by',
+                              'sales_agent_id', 'team_leader_id', 'manager_id', 'executive_id']);
+                break;
+            case 'field_submissions':
+                $q = FieldSubmission::query()->visibleTo($user)
+                    ->whereNotNull('submitted_at')->where('status', '!=', 'draft')
+                    ->select(['id', 'submitted_at', 'field_status', 'updated_at', 'created_by',
+                              'field_executive_id', 'sales_agent_id', 'team_leader_id', 'manager_id']);
+                break;
+            case 'customer_support_requests':
+                $q = CustomerSupportSubmission::query()
+                    ->whereNotNull('submitted_at')->where('status', '!=', 'draft')
+                    ->select(['id', 'submitted_at', 'workflow_status', 'completion_date', 'updated_at',
+                              'created_by', 'sales_agent_id', 'team_leader_id', 'manager_id']);
+                if (!$user->hasRole('superadmin')) {
+                    $uid = (int) $user->id;
+                    $q->where(function ($w) use ($uid) {
+                        $w->where('created_by', $uid)
+                          ->orWhere('sales_agent_id', $uid)
+                          ->orWhere('team_leader_id', $uid)
+                          ->orWhere('manager_id', $uid);
+                    });
+                }
+                break;
+            case 'vas_requests':
+                $q = VasRequestSubmission::query()
+                    ->whereNotNull('submitted_at')->where('status', '!=', 'draft')
+                    ->select(['id', 'submitted_at', 'status', 'approved_at', 'rejected_at', 'created_by',
+                              'sales_agent_id', 'team_leader_id', 'manager_id', 'back_office_executive_id']);
+                if (!$user->hasRole('superadmin')) {
+                    $uid = (int) $user->id;
+                    $q->where(function ($w) use ($uid) {
+                        $w->where('created_by', $uid)
+                          ->orWhere('sales_agent_id', $uid)
+                          ->orWhere('team_leader_id', $uid)
+                          ->orWhere('manager_id', $uid)
+                          ->orWhere('back_office_executive_id', $uid);
+                    });
+                }
+                break;
+            default:
+                return collect();
+        }
+
+        if ($from) $q->where('submitted_at', '>=', $from);
+        if ($to) $q->where('submitted_at', '<=', $to);
+
+        return $q->get();
+    }
+
+    private function getResolvedAt(string $moduleKey, $row): ?string
+    {
+        switch ($moduleKey) {
+            case 'lead_submissions':
+                return in_array($row->status, ['approved', 'rejected']) ? ($row->status_changed_at ?? null) : null;
+            case 'field_submissions':
+                $done = ['Survey Completed', 'Completed', 'Visited'];
+                return in_array($row->field_status, $done) ? ($row->updated_at ?? null) : null;
+            case 'customer_support_requests':
+                if (in_array($row->workflow_status, ['resolved', 'closed'])) {
+                    return $row->completion_date ?? $row->updated_at ?? null;
+                }
+                return null;
+            case 'vas_requests':
+                if ($row->status === 'approved') return $row->approved_at ?? null;
+                if ($row->status === 'rejected') return $row->rejected_at ?? null;
+                return null;
+            default:
+                return null;
+        }
+    }
+
+    private function getAssignedName(string $moduleKey, $row): string
+    {
+        $userId = match ($moduleKey) {
+            'lead_submissions' => $row->executive_id ?? $row->sales_agent_id,
+            'field_submissions' => $row->field_executive_id ?? $row->sales_agent_id,
+            'customer_support_requests' => $row->sales_agent_id ?? $row->created_by,
+            'vas_requests' => $row->back_office_executive_id ?? $row->sales_agent_id,
+            default => null,
+        };
+        if (!$userId) return '—';
+        static $nameCache = [];
+        if (!isset($nameCache[$userId])) {
+            $nameCache[$userId] = \App\Models\User::where('id', $userId)->value('name') ?? '—';
+        }
+        return $nameCache[$userId];
+    }
+
+    private function formatRequestId(string $moduleKey, int $id): string
+    {
+        $prefix = match ($moduleKey) {
+            'lead_submissions' => 'LD',
+            'field_submissions' => 'FD',
+            'customer_support_requests' => 'CS',
+            'vas_requests' => 'VAS',
+            default => 'REQ',
+        };
+        return $prefix . '-' . str_pad($id, 4, '0', STR_PAD_LEFT);
+    }
+
+    private function minutesToHuman(int $minutes): string
+    {
+        if ($minutes <= 0) return '0 hours';
+        $h = intdiv($minutes, 60);
+        $m = $minutes % 60;
+        if ($h > 0 && $m > 0) return "{$h}.{$m} hours";
+        if ($h > 0) return "{$h} hours";
+        return "{$m} min";
+    }
+
+    private function generateInsights(array $departments, array $priority, array $kpis, array $monthlyTrend): array
+    {
+        $insights = [];
+
+        $sorted = collect($departments)->sortByDesc('compliance_pct');
+        $best = $sorted->first();
+        $worst = $sorted->last();
+
+        if ($best && $best['compliance_pct'] >= 85) {
+            $insights[] = [
+                'type'  => 'positive',
+                'title' => 'Strong Performance',
+                'text'  => "{$best['name']} maintains {$best['compliance_pct']}% compliance rate with excellent response times.",
+            ];
+        }
+
+        if ($worst && $worst['compliance_pct'] < 85 && count($departments) > 1) {
+            $insights[] = [
+                'type'  => 'warning',
+                'title' => 'Needs Attention',
+                'text'  => "{$worst['name']} showing {$worst['compliance_pct']}% compliance — requires process review.",
+            ];
+        }
+
+        $highPriority = collect($priority)->firstWhere('level', 'High');
+        if ($highPriority) {
+            $insights[] = [
+                'type'  => 'info',
+                'title' => 'High Priority Focus',
+                'text'  => "High priority requests have {$highPriority['compliance_pct']}% compliance — consider resource allocation.",
+            ];
+        }
+
+        if (count($monthlyTrend) >= 2) {
+            $last = end($monthlyTrend);
+            $prev = prev($monthlyTrend);
+            $diff = round($last['compliance_pct'] - $prev['compliance_pct'], 1);
+            if ($diff >= 0) {
+                $insights[] = [
+                    'type'  => 'positive',
+                    'title' => 'Positive Trend',
+                    'text'  => "Overall compliance improved by {$diff}% compared to previous period.",
+                ];
+            } else {
+                $insights[] = [
+                    'type'  => 'warning',
+                    'title' => 'Declining Trend',
+                    'text'  => 'Overall compliance dropped by ' . abs($diff) . '% compared to previous period.',
+                ];
+            }
+        }
+
+        return $insights;
     }
 
     private function applyLeadFilters($query, array $validated): void

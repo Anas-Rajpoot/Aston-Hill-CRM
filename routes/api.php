@@ -92,6 +92,7 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
         ->whereNumber('fieldSubmission');
     Route::patch('/field-submissions/{fieldSubmission}/assign-field-technician', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'assignFieldTechnician'])
         ->whereNumber('fieldSubmission');
+    Route::get('/field-submissions/{fieldSubmission}/audits', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'audits'])->whereNumber('fieldSubmission');
     Route::get('/field-submissions/audit-log', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'auditLog']);
 
     // Customer support
@@ -141,6 +142,7 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::post('/vas-requests/columns', [\App\Http\Controllers\Api\VasRequestApiController::class, 'saveColumns']);
     Route::get('/vas-requests/back-office-options', [\App\Http\Controllers\Api\VasRequestApiController::class, 'backOfficeOptions']);
     Route::post('/vas-requests/bulk-assign', [\App\Http\Controllers\Api\VasRequestApiController::class, 'bulkAssign']);
+    Route::get('/vas-requests/{vasRequest}/audits', [\App\Http\Controllers\Api\VasRequestApiController::class, 'audits'])->whereNumber('vasRequest');
     Route::get('/vas-requests/{vasRequest}', [VasRequestController::class, 'show'])->whereNumber('vasRequest');
     Route::get('/vas-requests/{vasRequest}/documents/{document}/download', [VasRequestController::class, 'downloadDocument'])->whereNumber('vasRequest')->whereNumber('document');
     Route::delete('/vas-requests/{vasRequest}/documents/{document}', [VasRequestController::class, 'deleteDocument'])->whereNumber('vasRequest')->whereNumber('document');
@@ -373,6 +375,7 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::get('/reports/lead-stats', [ReportsApiController::class, 'leadStats']);
     Route::get('/reports/field-stats', [ReportsApiController::class, 'fieldStats']);
     Route::get('/reports/vas-stats', [ReportsApiController::class, 'vasStats']);
+    Route::get('/reports/sla-performance', [ReportsApiController::class, 'slaPerformance']);
 
     // Datatable
     Route::get('/datatable/{module}', [DataTableController::class, 'index']);

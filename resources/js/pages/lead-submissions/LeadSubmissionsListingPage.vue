@@ -14,6 +14,7 @@ import LeadTable from '@/components/lead-submissions/LeadTable.vue'
 import Pagination from '@/components/Pagination.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Toast from '@/components/Toast.vue'
+import RecordHistoryModal from '@/components/RecordHistoryModal.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -49,6 +50,24 @@ const showToast = ref(false)
 const toastType = ref('success')
 const toastMsg  = ref('')
 function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
+
+const historyModalVisible = ref(false)
+const historyRecordId = ref(null)
+const historyRecordLabel = ref('')
+function openHistoryModal(row) {
+  if (!row?.id) return
+  historyRecordId.value = row.id
+  historyRecordLabel.value = row.company_name || row.lead_id || `Lead #${row.id}`
+  historyModalVisible.value = true
+}
+function closeHistoryModal() {
+  historyModalVisible.value = false
+  historyRecordId.value = null
+  historyRecordLabel.value = ''
+}
+async function fetchLeadAudits(id) {
+  return await leadSubmissionsApi.getAudits(id)
+}
 const canBulkAssign = (() => {
   const roles = auth.user?.roles ?? []
   if (!Array.isArray(roles)) return false
@@ -598,6 +617,7 @@ onMounted(() => {
           @update-cell="onUpdateCell"
           @open-edit="openEditPage"
           @open-assign="openAssignModal"
+          @view-history="openHistoryModal"
         />
         <div
           class="flex flex-wrap items-center gap-3 border-t border-black bg-white px-3 py-2"
@@ -634,6 +654,15 @@ onMounted(() => {
       :bulk-lead-ids="assignBulkIds"
       @close="onAssignModalClose"
       @saved="onAssignModalSaved"
+    />
+
+    <RecordHistoryModal
+      :visible="historyModalVisible"
+      :record-id="historyRecordId"
+      :record-label="historyRecordLabel"
+      module-name="Lead Submissions"
+      :fetch-fn="fetchLeadAudits"
+      @close="closeHistoryModal"
     />
 
     <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />

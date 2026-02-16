@@ -28,7 +28,7 @@ const props = defineProps({
   selectedIds: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['sort', 'updateCell', 'openAssign', 'update:selectedIds'])
+const emit = defineEmits(['sort', 'updateCell', 'openAssign', 'update:selectedIds', 'viewHistory'])
 
 const auth = useAuthStore()
 const canInlineEdit = computed(() => {
@@ -417,6 +417,11 @@ function statusBadgeClass(status) {
               <button type="button" class="rounded-full p-1.5 text-green-600 hover:bg-green-50" title="Edit" @click="goToEdit(row)">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+              </button>
+              <button type="button" class="rounded-full p-1.5 text-amber-600 hover:bg-amber-50" title="View History" @click="$emit('viewHistory', row)">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </button>
             </div>

@@ -14,7 +14,7 @@ const props = defineProps({
   perPage: { type: Number, default: 15 },
 })
 
-const emit = defineEmits(['sort'])
+const emit = defineEmits(['sort', 'viewHistory'])
 
 const router = useRouter()
 
@@ -192,12 +192,24 @@ function goToDetail(row) {
             </template>
           </td>
           <td class="whitespace-nowrap border-r border-gray-200 px-4 py-3 text-right text-sm last:border-r-0" @click.stop>
-            <router-link
-              :to="`/clients/${row.id}`"
-              class="text-green-600 hover:text-green-800 font-medium"
-            >
-              View
-            </router-link>
+            <div class="inline-flex items-center gap-2">
+              <router-link
+                :to="`/clients/${row.id}`"
+                class="text-green-600 hover:text-green-800 font-medium"
+              >
+                View
+              </router-link>
+              <button
+                type="button"
+                class="rounded-full p-1.5 text-amber-600 hover:bg-amber-50"
+                title="View History"
+                @click="$emit('viewHistory', row)"
+              >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </button>
+            </div>
           </td>
         </tr>
       </tbody>

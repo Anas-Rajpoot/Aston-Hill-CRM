@@ -13,6 +13,7 @@ import FieldTable from '@/components/field-submissions/FieldTable.vue'
 import Pagination from '@/components/Pagination.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Toast from '@/components/Toast.vue'
+import RecordHistoryModal from '@/components/RecordHistoryModal.vue'
 
 const auth = useAuthStore()
 const loading = ref(true)
@@ -43,6 +44,25 @@ const showToast = ref(false)
 const toastType = ref('success')
 const toastMsg  = ref('')
 function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
+
+const historyModalVisible = ref(false)
+const historyRecordId = ref(null)
+const historyRecordLabel = ref('')
+function openHistoryModal(row) {
+  if (!row?.id) return
+  historyRecordId.value = row.id
+  historyRecordLabel.value = row.company_name || `Field Submission #${row.id}`
+  historyModalVisible.value = true
+}
+function closeHistoryModal() {
+  historyModalVisible.value = false
+  historyRecordId.value = null
+  historyRecordLabel.value = ''
+}
+async function fetchFieldAudits(id) {
+  return await fieldSubmissionsApi.getAudits(id)
+}
+
 const canBulkAssign = (() => {
   const roles = auth.user?.roles ?? []
   if (!Array.isArray(roles)) return false
@@ -524,6 +544,7 @@ onMounted(() => {
           @update-status="onUpdateStatus"
           @update-cell="onUpdateCell"
           @assign-technician="onOpenAssignTechnician"
+          @view-history="openHistoryModal"
         />
         <div
           class="flex flex-wrap items-center gap-3 border-t border-black bg-white px-3 py-2"
@@ -560,6 +581,15 @@ onMounted(() => {
       :field-technicians="filterOptions.field_executives"
       @close="onAssignModalClose"
       @assign="onAssignFieldTechnician"
+    />
+
+    <RecordHistoryModal
+      :visible="historyModalVisible"
+      :record-id="historyRecordId"
+      :record-label="historyRecordLabel"
+      module-name="Field Submissions"
+      :fetch-fn="fetchFieldAudits"
+      @close="closeHistoryModal"
     />
 
     <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />

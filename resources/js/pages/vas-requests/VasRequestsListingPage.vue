@@ -15,6 +15,7 @@ import AssignBackOfficeModal from '@/components/vas-requests/AssignBackOfficeMod
 import Pagination from '@/components/Pagination.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Toast from '@/components/Toast.vue'
+import RecordHistoryModal from '@/components/RecordHistoryModal.vue'
 
 const loading = ref(true)
 const selectedSubmissionIds = ref([])
@@ -28,6 +29,25 @@ const showToast = ref(false)
 const toastType = ref('success')
 const toastMsg  = ref('')
 function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
+
+const historyModalVisible = ref(false)
+const historyRecordId = ref(null)
+const historyRecordLabel = ref('')
+function openHistoryModal(row) {
+  if (!row?.id) return
+  historyRecordId.value = row.id
+  historyRecordLabel.value = row.company_name || `VAS Request #${row.id}`
+  historyModalVisible.value = true
+}
+function closeHistoryModal() {
+  historyModalVisible.value = false
+  historyRecordId.value = null
+  historyRecordLabel.value = ''
+}
+async function fetchVasAudits(id) {
+  return await vasRequestsApi.getAudits(id)
+}
+
 const filterOptions = ref({
   statuses: [],
   request_types: [],
@@ -433,6 +453,7 @@ onMounted(() => {
           @sort="onSort"
           @update-cell="onUpdateCell"
           @open-assign="openAssignModal"
+          @view-history="openHistoryModal"
         />
         <div
           class="flex flex-wrap items-center gap-4 border-t border-black bg-white px-4 py-3"
@@ -469,6 +490,15 @@ onMounted(() => {
       :bulk-vas-ids="assignBulkIds"
       @close="onAssignModalClose"
       @saved="onAssignModalSaved"
+    />
+
+    <RecordHistoryModal
+      :visible="historyModalVisible"
+      :record-id="historyRecordId"
+      :record-label="historyRecordLabel"
+      module-name="VAS Requests"
+      :fetch-fn="fetchVasAudits"
+      @close="closeHistoryModal"
     />
 
     <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />

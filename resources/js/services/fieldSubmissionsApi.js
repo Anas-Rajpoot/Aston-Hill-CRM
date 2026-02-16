@@ -79,6 +79,12 @@ export default {
     return data
   },
 
+  /** Change history (audit log) for a single field submission. */
+  async getAudits(fieldSubmissionId) {
+    const { data } = await api.get(`/field-submissions/${fieldSubmissionId}/audits`)
+    return data
+  },
+
   /** Audit log (super admin only). Params: page, per_page, field_submission_id. */
   async getAuditLog(params = {}) {
     const { data } = await api.get('/field-submissions/audit-log', { params })

@@ -85,12 +85,26 @@ class FieldSubmission extends Model
         return $this->hasMany(FieldSubmissionAudit::class)->orderByDesc('changed_at');
     }
 
-    /** Visibility for listing: user must have field_head.list to see submissions. */
+    /**
+     * Visibility scope:
+     * - Users with field_head.list see ALL submissions.
+     * - Other users see submissions they created or are assigned to (as field executive,
+     *   sales agent, team leader, or manager).
+     */
     public function scopeVisibleTo($query, User $user)
     {
         if ($user->can('field_head.list')) {
             return $query;
         }
-        return $query->whereRaw('1 = 0');
+
+        $userId = (int) $user->id;
+
+        return $query->where(function ($q) use ($userId) {
+            $q->where('created_by', $userId)
+              ->orWhere('field_executive_id', $userId)
+              ->orWhere('sales_agent_id', $userId)
+              ->orWhere('team_leader_id', $userId)
+              ->orWhere('manager_id', $userId);
+        });
     }
 }
