@@ -39,7 +39,7 @@ const submit = async () => {
         </div>
         <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
         <p v-if="success" class="text-sm text-green-600">{{ success }}</p>
-        <button type="submit" :disabled="loading" class="w-full py-2.5 px-4 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 disabled:opacity-50">
+        <button type="submit" :disabled="loading" class="w-full py-2.5 px-4 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 focus:ring-green-500 disabled:opacity-50">
           {{ loading ? 'Sending...' : 'Email Password Reset Link' }}
         </button>
       </form>

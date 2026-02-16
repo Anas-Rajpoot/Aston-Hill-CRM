@@ -13,6 +13,7 @@ import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Pagination from '@/components/Pagination.vue'
 import FiltersBar from '@/components/attendance/FiltersBar.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
+import Toast from '@/components/Toast.vue'
 
 const auth = useAuthStore()
 const permissions = computed(() => auth.user?.permissions ?? [])
@@ -36,7 +37,7 @@ const ATTENDANCE_COLUMNS = [
   { key: 'status', label: 'Status' },
 ]
 
-const SORTABLE_COLUMNS = ['employee_name', 'department', 'login_date']
+const SORTABLE_COLUMNS = ['employee_name', 'employee_id', 'role', 'department', 'login_date', 'login_time', 'status']
 /** Map visible column key to API sort param (backend uses login_at for date ordering). */
 function sortKey(col) {
   if (col === 'login_date' || col === 'login_time') return 'login_at'
@@ -71,6 +72,11 @@ const allColumns = ref([...ATTENDANCE_COLUMNS])
 const forceLogoutLoading = ref(null)
 const exportLoading = ref(false)
 const forceLogoutConfirmRow = ref(null)
+
+const showToast = ref(false)
+const toastType = ref('success')
+const toastMsg  = ref('')
+function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
 
 function buildParams() {
   const p = {
@@ -215,11 +221,12 @@ async function confirmForceLogout() {
   forceLogoutLoading.value = row.id
   try {
     await attendanceLogApi.forceLogoutLog(row.id)
+    toast('success', 'User logged out successfully.')
     closeForceLogoutConfirm()
     await loadSummary()
     await load()
-  } catch {
-    //
+  } catch (e) {
+    toast('error', e?.response?.data?.message || 'Failed to force logout.')
   } finally {
     forceLogoutLoading.value = null
   }
@@ -644,5 +651,7 @@ onMounted(() => {
         </div>
       </Transition>
     </Teleport>
+
+    <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />
   </div>
 </template>

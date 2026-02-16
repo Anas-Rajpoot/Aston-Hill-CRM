@@ -14,6 +14,7 @@ import ViewExtensionModal from '@/components/extensions/ViewExtensionModal.vue'
 import ExtensionsTable from '@/components/extensions/ExtensionsTable.vue'
 import Pagination from '@/components/Pagination.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import Toast from '@/components/Toast.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -64,6 +65,11 @@ const summary = ref({
   unassigned: 0,
   active_status: 0,
 })
+
+const showToast = ref(false)
+const toastType = ref('success')
+const toastMsg  = ref('')
+function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
 
 const filters = ref({
   extension: '',
@@ -247,11 +253,12 @@ async function confirmDelete() {
   deleting.value = true
   try {
     await extensionsApi.destroy(row.id)
+    toast('success', 'Extension deleted successfully.')
     closeDeleteConfirm()
     loadSummary()
     load()
-  } catch {
-    //
+  } catch (e) {
+    toast('error', e?.response?.data?.message || 'Failed to delete extension.')
   } finally {
     deleting.value = false
   }
@@ -321,6 +328,7 @@ function closeEditModal() {
 }
 
 function onEditUpdated() {
+  toast('success', 'Extension updated successfully.')
   closeEditModal()
   loadSummary()
   load()
@@ -610,7 +618,7 @@ onMounted(async () => {
       :gateways="filterOptions.gateways"
       :statuses="filterOptions.statuses"
       @close="addModalVisible = false"
-      @created="() => { loadSummary(); load() }"
+      @created="() => { toast('success', 'Extension created successfully.'); loadSummary(); load() }"
     />
 
     <ViewExtensionModal
@@ -761,5 +769,7 @@ onMounted(async () => {
         </div>
       </div>
     </Teleport>
+
+    <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />
   </div>
 </template>

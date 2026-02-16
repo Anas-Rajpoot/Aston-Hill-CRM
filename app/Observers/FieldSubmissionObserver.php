@@ -55,11 +55,13 @@ class FieldSubmissionObserver
     ): void {
         FieldSubmissionAudit::create([
             'field_submission_id' => $fieldSubmissionId,
-            'field_name' => $fieldName,
-            'old_value' => $this->serializeValue($oldValue),
-            'new_value' => $this->serializeValue($newValue),
-            'changed_at' => $changedAt,
-            'changed_by' => $changedBy,
+            'field_name'  => $fieldName,
+            'old_value'   => $this->serializeValue($oldValue),
+            'new_value'   => $this->serializeValue($newValue),
+            'changed_at'  => $changedAt,
+            'changed_by'  => $changedBy,
+            'ip_address'  => request()->ip(),
+            'user_agent'  => substr((string) request()->userAgent(), 0, 500),
         ]);
     }
 

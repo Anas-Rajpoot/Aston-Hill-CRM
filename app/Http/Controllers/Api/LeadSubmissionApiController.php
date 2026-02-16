@@ -7,6 +7,7 @@ use App\Models\LeadSubmission;
 use App\Models\LeadSubmissionAudit;
 use App\Models\ServiceCategory;
 use App\Models\ServiceType;
+use App\Models\SystemAuditLog;
 use App\Models\User;
 use App\Models\UserColumnPreference;
 use App\Rules\AllowedDocumentFile;
@@ -631,6 +632,12 @@ class LeadSubmissionApiController extends Controller
             ->visibleTo($user)
             ->update(['executive_id' => $executiveId]);
 
+        try {
+            SystemAuditLog::record('lead_submission.bulk_assigned', null, ['lead_ids' => $leadIds, 'assigned_to' => $executiveId, 'count' => count($leadIds)], $request->user()->id, 'lead_submission');
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
         return response()->json([
             'message' => "Assigned {$updated} submission(s) to back office executive.",
             'updated_count' => $updated,
@@ -710,6 +717,12 @@ class LeadSubmissionApiController extends Controller
 
         $this->leadSubmissionService->deleteDocument($lead, $document);
 
+        try {
+            SystemAuditLog::record('lead_submission.document_deleted', ['document_id' => $document], null, $request->user()->id, 'lead_submission', $lead->id);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
         return response()->json(['message' => 'Document removed.']);
     }
 
@@ -730,6 +743,12 @@ class LeadSubmissionApiController extends Controller
         ]);
 
         $this->leadSubmissionService->addDocumentsFromRequest($request, $lead);
+
+        try {
+            SystemAuditLog::record('lead_submission.documents_uploaded', null, ['count' => count($request->file('documents', []))], $request->user()->id, 'lead_submission', $lead->id);
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return response()->json(['message' => 'Documents added.']);
     }

@@ -19,8 +19,20 @@ class ApplySecuritySettings
         try {
             $settings = SecuritySetting::current();
 
+            // Session lifetime controls how long the server keeps the session alive
+            // and when the session cookie expires.
+            //
+            // IMPORTANT: This must NOT equal the inactivity timeout.
+            // The inactivity timeout (auto_logout_after_minutes) is enforced by
+            // the frontend (useInactivityLogout) which tracks mouse/keyboard/scroll
+            // activity and triggers a logout API call when idle too long.
+            //
+            // We set session.lifetime to 24 hours so the server-side session
+            // and cookie stay valid while the user has the app open.
+            // If force_logout_on_close is enabled, the cookie expires when the
+            // browser closes regardless of this lifetime.
             config([
-                'session.lifetime'        => $settings->auto_logout_after_minutes,
+                'session.lifetime'        => 1440, // 24 hours
                 'session.expire_on_close' => $settings->force_logout_on_close,
             ]);
         } catch (\Throwable $e) {

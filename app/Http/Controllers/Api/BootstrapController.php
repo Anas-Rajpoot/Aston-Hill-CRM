@@ -39,6 +39,24 @@ class BootstrapController extends Controller
             $prefs    = SystemPreference::singleton();
             $security = SecuritySetting::current();
 
+            // Determine password action (must_change or expired)
+            // Super admins are exempt from password expiry – they change when they choose to.
+            $passwordAction = null;
+            $isSuperAdmin = $user->hasRole('superadmin');
+            try {
+                if ($security->force_password_reset_on_first_login && $user->must_change_password) {
+                    $passwordAction = 'must_change_password';
+                } elseif (! $isSuperAdmin && $security->password_expiry_days > 0) {
+                    if (! $user->password_changed_at) {
+                        $passwordAction = 'password_expired';
+                    } elseif ($user->password_changed_at->addDays($security->password_expiry_days)->isPast()) {
+                        $passwordAction = 'password_expired';
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Silently fail
+            }
+
             return [
                 'user' => [
                     'id' => $user->id,
@@ -49,10 +67,12 @@ class BootstrapController extends Controller
                 'permissions' => $resolved['permissions'],
                 'timezone' => $prefs->timezone ?? 'Asia/Dubai',
                 'session' => [
-                    'timeout_minutes'         => (int) $security->auto_logout_after_minutes,
-                    'warning_enabled'         => (bool) $prefs->session_warning_before_logout,
-                    'warning_minutes_before'  => (int) ($prefs->session_warning_minutes ?? $security->session_warning_minutes ?? 5),
+                    'timeout_minutes'            => (int) $security->auto_logout_after_minutes,
+                    'warning_enabled'            => (bool) $prefs->session_warning_before_logout,
+                    'warning_minutes_before'     => (int) ($prefs->session_warning_minutes ?? $security->session_warning_minutes ?? 5),
+                    'force_logout_on_close'      => (bool) $security->force_logout_on_close,
                 ],
+                'password_action' => $passwordAction,
             ];
         });
 

@@ -55,7 +55,7 @@ onMounted(() => loadNote())
 </script>
 
 <template>
-  <div class="flex h-[calc(100vh-4rem)] flex-col bg-[#E8E8E8]">
+  <div class="flex h-[calc(100vh-4rem)] flex-col bg-white">
     <!-- Dark teal header: Personal Notes + Cancel / Save -->
     <header class="flex shrink-0 items-center justify-between bg-[#0D7377] px-4 py-3 text-white">
       <div class="flex items-center gap-3">

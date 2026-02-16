@@ -122,7 +122,7 @@ const COLUMN_LABELS = {
   status: 'Status',
 }
 
-const SORTABLE_COLUMNS = ['id', 'expense_date', 'product_category', 'product_description', 'invoice_number', 'vat_amount', 'amount_without_vat', 'full_amount', 'added_by', 'created_at', 'status']
+const SORTABLE_COLUMNS = ['id', 'expense_date', 'product_category', 'product_description', 'invoice_number', 'vat_amount', 'amount_without_vat', 'vat_amount_currency', 'full_amount', 'added_by', 'created_at', 'status']
 
 function label(col) {
   return COLUMN_LABELS[col] ?? col

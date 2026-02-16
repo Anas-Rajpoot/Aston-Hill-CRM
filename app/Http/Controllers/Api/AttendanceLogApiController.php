@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\SystemAuditLog;
 use App\Models\User;
 use App\Models\UserLoginLog;
 use Illuminate\Http\JsonResponse;
@@ -173,6 +174,19 @@ class AttendanceLogApiController extends Controller
             $userLoginLog->update(['logout_at' => now()]);
         }
 
+        try {
+            SystemAuditLog::record(
+                'attendance.force_logout_log',
+                null,
+                ['log_id' => $userLoginLog->id, 'user_id' => $userLoginLog->user_id],
+                $request->user()->id,
+                'attendance',
+                $userLoginLog->id
+            );
+        } catch (\Exception $e) {
+            // Ignore audit logging errors
+        }
+
         return response()->json(['message' => 'Session logged out.']);
     }
 
@@ -188,6 +202,19 @@ class AttendanceLogApiController extends Controller
         UserLoginLog::where('user_id', $user->id)
             ->whereNull('logout_at')
             ->update(['logout_at' => now()]);
+
+        try {
+            SystemAuditLog::record(
+                'attendance.force_logout_user',
+                null,
+                ['user_id' => $user->id],
+                $request->user()->id,
+                'attendance',
+                $user->id
+            );
+        } catch (\Exception $e) {
+            // Ignore audit logging errors
+        }
 
         return response()->json(['message' => 'User logged out from all sessions.']);
     }

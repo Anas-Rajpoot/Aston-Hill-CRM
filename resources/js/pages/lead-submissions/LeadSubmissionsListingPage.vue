@@ -13,6 +13,7 @@ import AssignBackOfficeModal from '@/components/lead-submissions/AssignBackOffic
 import LeadTable from '@/components/lead-submissions/LeadTable.vue'
 import Pagination from '@/components/Pagination.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import Toast from '@/components/Toast.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -43,6 +44,11 @@ const assignBulkIds = ref([])
 const selectedLeadIds = ref([])
 /** Shown when user clicks Bulk Assign with no rows selected. */
 const bulkAssignMessage = ref('')
+
+const showToast = ref(false)
+const toastType = ref('success')
+const toastMsg  = ref('')
+function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
 const canBulkAssign = (() => {
   const roles = auth.user?.roles ?? []
   if (!Array.isArray(roles)) return false
@@ -431,6 +437,7 @@ function openBulkAssign() {
 }
 
 function onAssignModalSaved() {
+  toast('success', 'Lead assigned successfully.')
   assignLeadRow.value = null
   assignBulkIds.value = []
   selectedLeadIds.value = []
@@ -628,5 +635,7 @@ onMounted(() => {
       @close="onAssignModalClose"
       @saved="onAssignModalSaved"
     />
+
+    <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />
   </div>
 </template>

@@ -492,7 +492,7 @@ const cancel = () => window.history.back()
           type="button"
           :disabled="submitting"
           @click="goNext"
-          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-black text-sm font-medium disabled:opacity-50 bg-[#7ED321] hover:bg-[#6ab81e]"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-black text-sm font-medium disabled:opacity-50 bg-green-600 hover:bg-green-700"
         >
           <span class="text-black">{{ submitting ? 'Saving...' : 'Next' }}</span>
           <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

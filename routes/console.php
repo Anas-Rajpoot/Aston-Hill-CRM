@@ -38,3 +38,10 @@ Schedule::job(new \App\Jobs\CheckEscalationJob())
     ->withoutOverlapping()
     ->onOneServer();
 
+// Flag users whose passwords have expired (daily at 2 AM)
+Schedule::job(new \App\Jobs\CheckExpiredPasswords())
+    ->daily()
+    ->at('02:00')
+    ->withoutOverlapping()
+    ->onOneServer();
+

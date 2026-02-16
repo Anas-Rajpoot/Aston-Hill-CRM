@@ -50,6 +50,8 @@ class PermissionSeeder extends Seeder
             'manage-security-settings',
             'manage-announcements',
             'manage-library',
+            'view-library',
+            'download-library',
             'export-audit-logs',
         ];
 

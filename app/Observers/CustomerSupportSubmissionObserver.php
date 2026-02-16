@@ -55,11 +55,13 @@ class CustomerSupportSubmissionObserver
     ): void {
         CustomerSupportSubmissionAudit::create([
             'customer_support_submission_id' => $customerSupportSubmissionId,
-            'field_name' => $fieldName,
-            'old_value' => $this->serializeValue($oldValue),
-            'new_value' => $this->serializeValue($newValue),
-            'changed_at' => $changedAt,
-            'changed_by' => $changedBy,
+            'field_name'  => $fieldName,
+            'old_value'   => $this->serializeValue($oldValue),
+            'new_value'   => $this->serializeValue($newValue),
+            'changed_at'  => $changedAt,
+            'changed_by'  => $changedBy,
+            'ip_address'  => request()->ip(),
+            'user_agent'  => substr((string) request()->userAgent(), 0, 500),
         ]);
     }
 

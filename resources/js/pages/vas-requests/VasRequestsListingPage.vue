@@ -14,6 +14,7 @@ import VasRequestTable from '@/components/vas-requests/VasRequestTable.vue'
 import AssignBackOfficeModal from '@/components/vas-requests/AssignBackOfficeModal.vue'
 import Pagination from '@/components/Pagination.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import Toast from '@/components/Toast.vue'
 
 const loading = ref(true)
 const selectedSubmissionIds = ref([])
@@ -22,6 +23,11 @@ const assignModalVisible = ref(false)
 const assignVasRow = ref(null)
 const assignBulkIds = ref([])
 const loadError = ref(null)
+
+const showToast = ref(false)
+const toastType = ref('success')
+const toastMsg  = ref('')
+function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
 const filterOptions = ref({
   statuses: [],
   request_types: [],
@@ -297,6 +303,7 @@ function openBulkAssign() {
 }
 
 function onAssignModalSaved() {
+  toast('success', 'VAS request assigned successfully.')
   assignVasRow.value = null
   assignBulkIds.value = []
   selectedSubmissionIds.value = []
@@ -463,5 +470,7 @@ onMounted(() => {
       @close="onAssignModalClose"
       @saved="onAssignModalSaved"
     />
+
+    <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />
   </div>
 </template>

@@ -10,13 +10,18 @@ import usersApi from '@/services/usersApi'
 import api from '@/lib/axios'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
+import Toast from '@/components/Toast.vue'
 import { toDdMmYyyy, toDdMonYyyy } from '@/lib/dateFormat'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 
-const successMessage = ref('')
+const showToast = ref(false)
+const toastType = ref('success')
+const toastMsg  = ref('')
+function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
+
 const users = ref([])
 const roles = ref([])
 const stats = ref({ total: 0, active: 0, inactive: 0, pending: 0 })
@@ -269,8 +274,10 @@ async function saveEdit() {
       else u[field] = editValue.value === '' ? null : editValue.value
     }
     cancelEdit()
-  } catch {
+    toast('success', 'Field updated successfully.')
+  } catch (e) {
     cancelEdit()
+    toast('error', e?.response?.data?.message || 'Failed to update field.')
   } finally {
     savingCell.value = false
   }
@@ -358,7 +365,10 @@ async function confirmDeactivate() {
   try {
     await usersApi.bulkDeactivate([user.id])
     userToDeactivate.value = null
+    toast('success', 'User deactivated successfully.')
     await load()
+  } catch (e) {
+    toast('error', e?.response?.data?.message || 'Failed to deactivate user.')
   } finally {
     deactivating.value = false
   }
@@ -381,8 +391,9 @@ async function confirmResetPassword() {
   try {
     await usersApi.sendPasswordReset(user.id)
     userToResetPassword.value = null
-  } catch {
-    // keep modal open on error
+    toast('success', 'Password reset email sent successfully.')
+  } catch (e) {
+    toast('error', e?.response?.data?.message || 'Failed to send password reset.')
   } finally {
     resetPasswordLoading.value = false
   }
@@ -526,7 +537,7 @@ async function submitAddUser() {
       password_confirmation: f.password_confirmation,
     })
     closeAddUserModal()
-    successMessage.value = 'User created successfully.'
+    toast('success', 'User created successfully.')
     load()
   } catch (e) {
     const msg = e?.response?.data?.message
@@ -604,9 +615,8 @@ onMounted(() => {
   loadColumns().then(() => load())
   document.addEventListener('click', handleClickOutside)
   if (route.query.updated) {
-    successMessage.value = `${route.query.updated} updated successfully.`
+    toast('success', `${route.query.updated} updated successfully.`)
     router.replace({ path: '/users', query: {} })
-    setTimeout(() => { successMessage.value = '' }, 5000)
   }
 })
 
@@ -634,7 +644,7 @@ watch(addUserRolesDropdownOpen, (open) => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6 bg-white -mx-4 -my-5 min-h-full px-6 py-6">
     <div class="flex flex-wrap items-start justify-between gap-4">
       <div>
         <div class="flex flex-wrap items-baseline gap-2">
@@ -674,22 +684,7 @@ watch(addUserRolesDropdownOpen, (open) => {
       </div>
     </div>
 
-    <div
-      v-if="successMessage"
-      class="rounded-xl bg-green-50 border border-green-200 px-4 py-3 flex items-center justify-between"
-    >
-      <div class="flex items-center gap-2 text-sm text-green-700">
-        <svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-        </svg>
-        {{ successMessage }}
-      </div>
-      <button type="button" @click="successMessage = ''" class="text-green-500 hover:text-green-700">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
-    </div>
+    <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />
 
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
       <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm border-t-4 border-t-blue-500">
@@ -1200,7 +1195,7 @@ watch(addUserRolesDropdownOpen, (open) => {
                 <button
                   type="submit"
                   :disabled="addUserLoading"
-                  class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-70"
+                  class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-70"
                 >
                   <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -1298,7 +1293,7 @@ watch(addUserRolesDropdownOpen, (open) => {
             <div class="flex items-center gap-3 px-6 pb-6">
               <button
                 type="button"
-                class="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-70"
+                class="rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-70"
                 :disabled="resetPasswordLoading"
                 @click="confirmResetPassword"
               >
@@ -1429,7 +1424,7 @@ watch(addUserRolesDropdownOpen, (open) => {
                 <button
                   v-if="canEditRow(detailUser)"
                   type="button"
-                  class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
                   @click="fromDetailEditUser"
                 >
                   <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

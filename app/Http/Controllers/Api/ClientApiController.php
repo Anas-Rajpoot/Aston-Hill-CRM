@@ -10,6 +10,7 @@ use App\Models\ClientAlert;
 use App\Models\ClientCompanyDetail;
 use App\Models\ClientContact;
 use App\Models\ClientCsr;
+use App\Models\SystemAuditLog;
 use App\Models\UserColumnPreference;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -389,6 +390,12 @@ class ClientApiController extends Controller
             }
         }
         fclose($handle);
+
+        try {
+            SystemAuditLog::record('client.bulk_imported', null, ['count' => $created], $request->user()->id, 'client');
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return response()->json([
             'message' => "Imported {$created} client(s).",
@@ -990,11 +997,19 @@ class ClientApiController extends Controller
             'additional_comment_2' => ['sometimes', 'nullable', 'string'],
         ]);
 
+        $old = $client->companyDetail?->toArray() ?? null;
         $data = self::normalizeCompanyDetailDates(array_merge($validated, ['client_id' => $client->id]));
         ClientCompanyDetail::updateOrCreate(
             ['client_id' => $client->id],
             $data
         );
+        $new = $client->fresh()->companyDetail?->toArray() ?? null;
+
+        try {
+            SystemAuditLog::record('client.company_details_updated', $old, $new, $request->user()->id, 'client', $client->id);
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return response()->json(['success' => true]);
     }
@@ -1035,6 +1050,12 @@ class ClientApiController extends Controller
 
         ClientContact::where('client_id', $client->id)->whereNotIn('id', $idsToKeep)->delete();
 
+        try {
+            SystemAuditLog::record('client.contacts_updated', null, ['client_id' => $client->id, 'contacts_count' => count($validated['contacts'] ?? [])], $request->user()->id, 'client', $client->id);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
         return response()->json(['success' => true]);
     }
 
@@ -1070,6 +1091,12 @@ class ClientApiController extends Controller
         }
 
         ClientAddress::where('client_id', $client->id)->whereNotIn('id', $idsToKeep)->delete();
+
+        try {
+            SystemAuditLog::record('client.addresses_updated', null, ['client_id' => $client->id, 'addresses_count' => count($validated['addresses'] ?? [])], $request->user()->id, 'client', $client->id);
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return response()->json(['success' => true]);
     }

@@ -1,0 +1,129 @@
+--- a/resources/js/pages/users/UsersPage.vue
++++ b/resources/js/pages/users/UsersPage.vue
+@@ DESCRIPTION
+  This patch demonstrates adding permission guards to the UsersPage.vue
+  "Bulk Deactivate" button which currently lacks a v-if permission check.
+  
+  The button at lines ~655-662 is disabled only by `!selectedIds.length || bulkLoading`
+  but has no `v-if` based on canEditUsers permission. Any user viewing the page
+  can see (and attempt to click) the Bulk Deactivate button.
+
+  BEFORE:
+    <button
+      :disabled="!selectedIds.length || bulkLoading"
+      @click="bulkDeactivate"
+      class="..."
+    >
+      Bulk Deactivate
+    </button>
+
+  AFTER:
+    <button
+      v-if="canEditUsers"
+      :disabled="!selectedIds.length || bulkLoading"
+      @click="bulkDeactivate"
+      class="..."
+    >
+      Bulk Deactivate
+    </button>
+
+--- Similar pattern for other pages ---
+
+--- a/resources/js/pages/clients/ClientsListingPage.vue
++++ b/resources/js/pages/clients/ClientsListingPage.vue
+@@ DESCRIPTION
+  ClientsListingPage.vue has NO client-side permission guards.
+  Import CSV, Export CSV, and Add New Client buttons are always visible.
+
+  FIX: Add these computed properties to <script setup>:
+
+    const auth = useAuthStore()
+    const isSuperAdmin = computed(() => (auth.user?.roles ?? []).includes('superadmin'))
+    const perms = computed(() => auth.user?.permissions ?? [])
+    const canCreate = computed(() => isSuperAdmin.value || perms.value.includes('accounts.create') || perms.value.includes('accounts.edit'))
+    const canImport = computed(() => isSuperAdmin.value || perms.value.includes('accounts.create'))
+    const canExport = computed(() => isSuperAdmin.value || perms.value.includes('accounts.export_client_data'))
+
+  Then wrap buttons:
+    <button v-if="canImport" ...>Import CSV</button>
+    <button v-if="canExport" ...>Export CSV</button>
+    <button v-if="canCreate" ...>Add New Client</button>
+
+--- a/resources/js/pages/dsp-tracker/DSPTrackerListingPage.vue
++++ b/resources/js/pages/dsp-tracker/DSPTrackerListingPage.vue
+@@ DESCRIPTION
+  CRITICAL: DSPTrackerListingPage.vue has ZERO permission guards.
+  Delete Old File and Upload CSV buttons are always visible/clickable.
+
+  FIX: Add these computed properties to <script setup>:
+
+    const auth = useAuthStore()
+    const isSuperAdmin = computed(() => (auth.user?.roles ?? []).includes('superadmin'))
+    const perms = computed(() => auth.user?.permissions ?? [])
+    const canUpload = computed(() => isSuperAdmin.value || perms.value.includes('dsp_tracker.upload_csv'))
+    const canDelete = computed(() => isSuperAdmin.value || perms.value.includes('dsp_tracker.delete_existing_csv'))
+
+  Then wrap buttons:
+    <button v-if="canDelete" ...>Delete Old File</button>
+    <button v-if="canUpload" ...>Upload CSV</button>
+
+--- a/resources/js/pages/employees/EmployeesListingPage.vue
++++ b/resources/js/pages/employees/EmployeesListingPage.vue
+@@ DESCRIPTION
+  CRITICAL: canForceLogout is referenced but NEVER defined.
+  Bulk Activate/Deactivate buttons lack v-if permission guards.
+
+  FIX 1: Define the missing variable in <script setup>:
+
+    const canForceLogout = computed(() =>
+      isSuperAdmin.value || (auth.user?.permissions ?? []).includes('force_logout')
+    )
+
+  FIX 2: Add permission guards to bulk buttons:
+
+    const canManageEmployees = computed(() =>
+      isSuperAdmin.value || (auth.user?.permissions ?? []).includes('users.edit')
+    )
+
+    <button v-if="canManageEmployees" ...>Bulk Deactivate</button>
+    <button v-if="canManageEmployees" ...>Bulk Activate</button>
+
+--- a/resources/js/pages/email-followups/EmailFollowUpPage.vue
++++ b/resources/js/pages/email-followups/EmailFollowUpPage.vue
+@@ DESCRIPTION
+  EmailFollowUpPage.vue: Add Entry and Export Report buttons have no
+  v-if permission guards. Both rely purely on backend enforcement.
+
+  FIX: Add computed properties:
+
+    const auth = useAuthStore()
+    const isSuperAdmin = computed(() => (auth.user?.roles ?? []).includes('superadmin'))
+    const perms = computed(() => auth.user?.permissions ?? [])
+    const canCreate = computed(() => isSuperAdmin.value || perms.value.includes('emails_followup.create'))
+    const canExport = computed(() => isSuperAdmin.value || perms.value.includes('emails_followup.export_email_data'))
+
+  Then wrap:
+    <button v-if="canCreate" ...>Add Entry</button>
+    <button v-if="canExport" ...>Export Report</button>
+
+--- a/resources/js/pages/customer-support/CustomerSupportListingPage.vue
++++ b/resources/js/pages/customer-support/CustomerSupportListingPage.vue
+@@ DESCRIPTION
+  Export button has no v-if guard. Error handler for 403 is empty.
+
+  FIX: Add computed property:
+
+    const auth = useAuthStore()
+    const isSuperAdmin = computed(() => (auth.user?.roles ?? []).includes('superadmin'))
+    const perms = computed(() => auth.user?.permissions ?? [])
+    const canExport = computed(() => isSuperAdmin.value || perms.value.includes('customer_support_requests.export_tickets'))
+
+  Then wrap:
+    <button v-if="canExport" ...>Export</button>
+
+  Also fix error handler:
+    catch (err) {
+      if (err.response?.status === 403) {
+        toast.error('You do not have permission to export.')
+      }
+    }

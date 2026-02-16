@@ -55,7 +55,7 @@ class AnnouncementController extends Controller
         $sortDir   = 'desc';
         if ($sort = $request->input('sort')) {
             $parts     = explode(':', $sort);
-            $allowed   = ['title', 'published_at', 'expire_at', 'priority', 'created_at'];
+            $allowed   = ['title', 'type', 'published_at', 'expire_at', 'priority', 'status', 'created_at'];
             $sortField = in_array($parts[0], $allowed) ? $parts[0] : 'published_at';
             $sortDir   = ($parts[1] ?? 'desc') === 'asc' ? 'asc' : 'desc';
         }

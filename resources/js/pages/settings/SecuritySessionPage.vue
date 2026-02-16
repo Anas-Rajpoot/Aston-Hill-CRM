@@ -31,7 +31,7 @@ function toast(type, msg) { toastType.value = type; toastMessage.value = msg; sh
 // ─── Form fields ──────────────────────────────────────────
 const form = reactive({
   // Session Management
-  auto_logout_after_minutes: 30,
+  auto_logout_after_minutes: 120,
   session_warning_minutes: 5,
   force_logout_on_close: false,
   prevent_multiple_sessions: false,
@@ -144,8 +144,12 @@ const autoLogoutOptions = [
   { value: 15, label: '15 Minutes' },
   { value: 30, label: '30 Minutes' },
   { value: 45, label: '45 Minutes' },
-  { value: 60, label: '60 Minutes' },
-  { value: 120, label: '120 Minutes' },
+  { value: 60, label: '1 Hour' },
+  { value: 120, label: '2 Hours (Default)' },
+  { value: 240, label: '4 Hours' },
+  { value: 480, label: '8 Hours' },
+  { value: 720, label: '12 Hours' },
+  { value: 1440, label: '24 Hours' },
 ]
 const warningOptions = [
   { value: 1, label: '1 Minute' },
@@ -164,10 +168,12 @@ const warningOptions = [
 
     <!-- ═══ Header ═══ -->
     <div>
-      <div class="flex flex-wrap items-baseline gap-2">
-        <h1 class="text-2xl font-bold text-gray-900 leading-tight">Security, Session & Access Control</h1>
-        <Breadcrumbs />
-        <span v-if="!canUpdate && !loading" class="inline-flex items-center gap-1.5 rounded-lg bg-green-50 border border-green-200 px-2.5 py-1 text-xs font-semibold text-green-700 ml-auto">
+      <div class="flex items-center justify-between gap-4">
+        <div class="flex flex-wrap items-baseline gap-2">
+          <h1 class="text-2xl font-bold text-gray-900 leading-tight">Security, Session & Access Control</h1>
+          <Breadcrumbs />
+        </div>
+        <span class="inline-flex items-center gap-1.5 shrink-0 rounded-lg bg-amber-50 border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-700">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
           Super Admin Only
         </span>
@@ -289,9 +295,9 @@ const warningOptions = [
                 >
                   <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out" :class="form.prevent_multiple_sessions ? 'translate-x-5' : 'translate-x-0'" />
                 </button>
-                <span class="text-sm text-gray-600">{{ form.prevent_multiple_sessions ? 'Enabled' : 'Disabled' }}</span>
+                <span class="text-sm" :class="form.prevent_multiple_sessions ? 'text-green-600' : 'text-red-600'">{{ form.prevent_multiple_sessions ? '\u2705 Users can login on multiple devices' : '\u274C Users can only login on one device' }}</span>
               </div>
-              <p class="text-xs text-gray-400 mt-1.5">Only one active session per user</p>
+              <p class="text-xs text-gray-400 mt-1.5">When enabled: users can login on multiple devices simultaneously. When disabled: new login terminates all other active sessions.</p>
             </div>
           </div>
         </div>
@@ -480,7 +486,8 @@ const warningOptions = [
                 :disabled="!canUpdate"
                 class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500 transition"
               />
-              <p class="text-xs text-gray-400 mt-1">Force password change after this period</p>
+              <p class="text-xs text-gray-400 mt-1">Force password change after this period (0 = never expires)</p>
+              <p class="text-xs text-gray-400 mt-0.5 italic">Note: Super admin accounts are exempt from password expiry</p>
               <p v-if="errors.password_expiry_days" class="mt-1 text-xs text-red-600">{{ errors.password_expiry_days }}</p>
             </div>
           </div>
@@ -521,7 +528,7 @@ const warningOptions = [
             v-if="canUpdate"
             type="button"
             :disabled="saving || !isDirty"
-            class="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             @click="save"
           >
             <svg v-if="saving" class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

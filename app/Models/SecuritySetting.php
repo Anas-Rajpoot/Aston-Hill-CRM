@@ -14,7 +14,7 @@ class SecuritySetting extends Model
      * Safe defaults — used by seeder and reset.
      */
     public const DEFAULTS = [
-        'auto_logout_after_minutes'        => 30,
+        'auto_logout_after_minutes'        => 120,
         'session_warning_minutes'          => 5,
         'force_logout_on_close'            => false,
         'prevent_multiple_sessions'        => false,

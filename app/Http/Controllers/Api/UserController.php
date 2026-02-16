@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
+use App\Models\SystemAuditLog;
 use App\Models\TeamRoleMapping;
 use App\Models\User;
 use App\Models\UserAudit;
@@ -257,7 +258,7 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'password' => ['required', 'string', 'confirmed', new \App\Rules\MeetsPasswordPolicy],
             'phone' => ['nullable', 'string', 'max:15'],
             'country' => ['nullable', 'string', 'max:100'],
             'roles' => ['nullable', 'array'],
@@ -274,6 +275,12 @@ class UserController extends Controller
             $request->validate(['roles' => ['required', 'array', 'min:1']], ['roles.required' => 'Select at least one role when status is Approved.']);
         }
 
+        // Set must_change_password if security settings require it for first login
+        $mustChange = false;
+        try {
+            $mustChange = \App\Models\SecuritySetting::current()->force_password_reset_on_first_login;
+        } catch (\Throwable $e) {}
+
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
@@ -286,6 +293,8 @@ class UserController extends Controller
             'extension' => $validated['extension'] ?? null,
             'joining_date' => $validated['joining_date'] ?? null,
             'terminate_date' => $validated['terminate_date'] ?? null,
+            'must_change_password' => $mustChange,
+            'password_changed_at' => now(),
         ]);
 
         if (!empty($validated['roles'])) {
@@ -309,7 +318,8 @@ class UserController extends Controller
     public function bulkActivate(Request $request): JsonResponse
     {
         $validated = $request->validate(['ids' => ['required', 'array'], 'ids.*' => ['integer', 'exists:users,id']]);
-        $count = User::whereIn('id', $validated['ids'])->update([
+        $ids = $validated['ids'];
+        $count = User::whereIn('id', $ids)->update([
             'status' => 'approved',
             'approved_by' => auth()->id(),
             'approved_at' => now(),
@@ -317,6 +327,9 @@ class UserController extends Controller
             'rejected_at' => null,
             'rejection_reason' => null,
         ]);
+        try {
+            SystemAuditLog::record('user.bulk_activated', null, ['user_ids' => $ids, 'count' => count($ids)], $request->user()->id, 'user');
+        } catch (\Throwable $e) {}
         app(PermissionRegistrar::class)->forgetCachedPermissions();
         return response()->json(['message' => "{$count} user(s) activated.", 'count' => $count]);
     }
@@ -329,6 +342,9 @@ class UserController extends Controller
         $idsToDeactivate = $ids->diff($superAdminIds)->values()->all();
         $count = User::whereIn('id', $idsToDeactivate)
             ->update(['status' => 'rejected', 'rejected_by' => auth()->id(), 'rejected_at' => now()]);
+        try {
+            SystemAuditLog::record('user.bulk_deactivated', null, ['user_ids' => $idsToDeactivate, 'count' => count($idsToDeactivate)], $request->user()->id, 'user');
+        } catch (\Throwable $e) {}
         // Roles are preserved on deactivation; only super admin / authorized user can change roles explicitly.
         app(PermissionRegistrar::class)->forgetCachedPermissions();
         return response()->json(['message' => "{$count} user(s) deactivated.", 'count' => $count]);
@@ -543,6 +559,10 @@ class UserController extends Controller
 
     public function destroy(User $user): JsonResponse
     {
+        $oldData = ['id' => $user->id, 'name' => $user->name, 'email' => $user->email];
+        try {
+            SystemAuditLog::record('user.deleted', $oldData, null, request()->user()->id, 'user', $user->id);
+        } catch (\Throwable $e) {}
         $user->delete();
         return response()->json(['message' => 'User deleted successfully.']);
     }

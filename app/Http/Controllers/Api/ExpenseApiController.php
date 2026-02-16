@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Expense;
 use App\Models\ExpenseAudit;
 use App\Models\ExpenseAttachment;
+use App\Models\SystemAuditLog;
 use App\Models\User;
 use App\Models\UserColumnPreference;
 use Illuminate\Http\JsonResponse;
@@ -344,6 +345,9 @@ class ExpenseApiController extends Controller
         if (Storage::disk($disk)->exists($attachment->path)) {
             Storage::disk($disk)->delete($attachment->path);
         }
+        try {
+            SystemAuditLog::record('expense.attachment_deleted', ['expense_id' => $expense->id, 'attachment_id' => $attachment->id, 'attachment_name' => $attachment->original_name], null, request()->user()->id, 'expense', $expense->id);
+        } catch (\Throwable $e) {}
         $attachment->delete();
         return response()->json(['message' => 'Attachment removed.']);
     }
@@ -358,6 +362,10 @@ class ExpenseApiController extends Controller
         }
         $this->storeAttachments($request, $expense);
         $expense->load(['user:id,name', 'attachments']);
+        $attachmentCount = $expense->attachments->count();
+        try {
+            SystemAuditLog::record('expense.attachments_added', null, ['expense_id' => $expense->id, 'attachment_count' => $attachmentCount], request()->user()->id, 'expense', $expense->id);
+        } catch (\Throwable $e) {}
         $data = $this->formatShowData($expense);
         return response()->json(['message' => 'Attachments added.', 'data' => $data]);
     }
@@ -475,6 +483,8 @@ class ExpenseApiController extends Controller
             'action' => $action,
             'old_values' => $oldValues,
             'new_values' => $newValues,
+            'ip_address' => request()->ip(),
+            'user_agent' => substr((string) request()->userAgent(), 0, 500),
         ]);
     }
 

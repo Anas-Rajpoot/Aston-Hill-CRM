@@ -78,9 +78,9 @@ const columnLabels = {
 }
 
 const SORTABLE_COLUMNS = [
-  'submitted_at', 'created_at', 'company_name', 'contact_number',
+  'id', 'submitted_at', 'created_at', 'company_name', 'contact_number',
   'product', 'emirates', 'status', 'field_status', 'sales_agent', 'team_leader', 'manager', 'field_agent',
-  'target_date', 'sla_timer', 'sla_status', 'last_updated',
+  'target_date', 'sla_timer', 'sla_status', 'last_updated', 'creator',
 ]
 
 function label(col) {

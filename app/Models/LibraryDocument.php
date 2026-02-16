@@ -68,7 +68,7 @@ class LibraryDocument extends Model
         if ($v = ($f['category_id'] ?? null)) $q->where('category_id', $v);
         if ($v = ($f['file_type'] ?? null))   $q->where('file_type', $v);
         if ($v = ($f['status'] ?? null))      $q->where('status', $v);
-        if ($v = ($f['module'] ?? null))      $q->whereJsonContains('module_keys', $v);
+        if ($v = ($f['visibility'] ?? null))  $q->where('visibility', $v);
         if ($v = ($f['uploaded_by'] ?? null))  $q->where('uploaded_by', $v);
         if ($v = ($f['date_from'] ?? null))   $q->whereDate('created_at', '>=', $v);
         if ($v = ($f['date_to'] ?? null))     $q->whereDate('created_at', '<=', $v);

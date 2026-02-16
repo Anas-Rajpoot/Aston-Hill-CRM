@@ -1,24 +1,43 @@
 <script setup>
 /**
  * Settings main page: System Status, 8 setting category cards, Role-Based Access panel.
- * Each "Manage" links to a dedicated setting page (to be provided later).
+ * Each "Manage" links to a dedicated setting page.
+ * System Status + card labels are fetched live from /api/settings/status.
  */
+import { ref, reactive, onMounted, computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import api from '@/lib/axios'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 
-const systemStatus = {
-  sessionTimeout: '2 Hours',
-  activeSlaRules: '7 Modules',
-  notificationsEnabled: '5 Types',
+const loading = ref(true)
+const systemStatus = reactive({
+  sessionTimeout: '—',
+  activeSlaRules: '—',
+  notificationsEnabled: '—',
+  announcementsCount: 0,
+  libraryDocsCount: 0,
+  auditLogsCount: 0,
+  language: '—',
+})
+
+async function fetchStatus() {
+  loading.value = true
+  try {
+    const { data } = await api.get('/settings/status')
+    Object.assign(systemStatus, data)
+  } catch { /* silent */ }
+  finally { loading.value = false }
 }
 
-const settingCards = [
+onMounted(fetchStatus)
+
+const settingCards = computed(() => [
   {
     id: 'system-preferences',
     title: 'System Preferences',
     description: 'Configure language, date format, timezone, and default system behaviors.',
     icon: 'gear',
-    label: 'English',
+    label: systemStatus.language,
     route: '/settings/system-preferences',
   },
   {
@@ -26,7 +45,7 @@ const settingCards = [
     title: 'SLA Configuration',
     description: 'Manage SLA timers, warning thresholds, and notification rules per module.',
     icon: 'clock',
-    label: '7 Active Rules',
+    label: systemStatus.activeSlaRules,
     route: '/settings/sla',
   },
   {
@@ -34,7 +53,7 @@ const settingCards = [
     title: 'Notifications & Email Rules',
     description: 'Configure email notifications, SLA breach alerts, and notification preferences.',
     icon: 'bell',
-    label: '5 Enabled',
+    label: systemStatus.notificationsEnabled,
     route: '/settings/notifications-email',
   },
   {
@@ -42,7 +61,7 @@ const settingCards = [
     title: 'Announcement Center',
     description: 'Create and manage system-wide announcements visible to all users.',
     icon: 'megaphone',
-    label: null,
+    label: systemStatus.announcementsCount ? `${systemStatus.announcementsCount} Active` : null,
     route: '/settings/announcement-center',
   },
   {
@@ -50,23 +69,15 @@ const settingCards = [
     title: 'Library (Templates & Forms)',
     description: 'Central repository for application forms, NOC templates, and document formats.',
     icon: 'folder',
-    label: null,
+    label: systemStatus.libraryDocsCount ? `${systemStatus.libraryDocsCount} Documents` : null,
     route: '/settings/library',
-  },
-  {
-    id: 'data-import-export',
-    title: 'Data & Import/Export',
-    description: 'Bulk upload clients, employees, extensions, and export data.',
-    icon: 'database',
-    label: null,
-    route: '/settings/data-import-export',
   },
   {
     id: 'security-session',
     title: 'Security & Session',
     description: 'Configure session timeout, password policies, and security settings.',
     icon: 'shield',
-    label: '2 Hours',
+    label: systemStatus.sessionTimeout,
     route: '/settings/security-session',
   },
   {
@@ -74,10 +85,10 @@ const settingCards = [
     title: 'Audit Logs',
     description: 'Track all system changes and user actions for accountability.',
     icon: 'document',
-    label: null,
+    label: systemStatus.auditLogsCount ? `${systemStatus.auditLogsCount} Entries` : null,
     route: '/settings/audit-logs',
   },
-]
+])
 </script>
 
 <template>

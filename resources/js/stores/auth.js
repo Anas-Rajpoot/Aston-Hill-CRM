@@ -3,10 +3,50 @@ import { api, web } from '@/lib/axios'
 
 const BOOTSTRAP_CACHE_KEY = 'auth_bootstrap'
 const BOOTSTRAP_CACHE_TTL_MS = 4 * 60 * 1000 // 4 min – under server 5 min
+const FORCE_LOGOUT_KEY = 'force_logout_on_close'
+
+/**
+ * Returns the correct storage based on force_logout_on_close setting.
+ * - Enabled  → sessionStorage (cleared when browser closes)
+ * - Disabled → localStorage   (persists across browser sessions)
+ */
+function getStorage() {
+  try {
+    return sessionStorage.getItem(FORCE_LOGOUT_KEY) === '1' ? sessionStorage : localStorage
+  } catch {
+    return localStorage
+  }
+}
+
+function setForceLogoutFlag(enabled) {
+  try {
+    if (enabled) {
+      sessionStorage.setItem(FORCE_LOGOUT_KEY, '1')
+      // Migrate bootstrap cache from localStorage → sessionStorage
+      const existing = localStorage.getItem(BOOTSTRAP_CACHE_KEY)
+      if (existing) {
+        sessionStorage.setItem(BOOTSTRAP_CACHE_KEY, existing)
+        localStorage.removeItem(BOOTSTRAP_CACHE_KEY)
+      }
+      localStorage.removeItem('api_token')
+    } else {
+      sessionStorage.removeItem(FORCE_LOGOUT_KEY)
+      // Migrate bootstrap cache from sessionStorage → localStorage
+      const existing = sessionStorage.getItem(BOOTSTRAP_CACHE_KEY)
+      if (existing) {
+        localStorage.setItem(BOOTSTRAP_CACHE_KEY, existing)
+        sessionStorage.removeItem(BOOTSTRAP_CACHE_KEY)
+      }
+    }
+  } catch {
+    //
+  }
+}
 
 function getBootstrapFromStorage() {
   try {
-    const raw = localStorage.getItem(BOOTSTRAP_CACHE_KEY)
+    const store = getStorage()
+    const raw = store.getItem(BOOTSTRAP_CACHE_KEY)
     if (!raw) return null
     const { at, data } = JSON.parse(raw)
     if (Date.now() - at > BOOTSTRAP_CACHE_TTL_MS) return null
@@ -18,7 +58,7 @@ function getBootstrapFromStorage() {
 
 function setBootstrapInStorage(data) {
   try {
-    localStorage.setItem(BOOTSTRAP_CACHE_KEY, JSON.stringify({ at: Date.now(), data }))
+    getStorage().setItem(BOOTSTRAP_CACHE_KEY, JSON.stringify({ at: Date.now(), data }))
   } catch {
     //
   }
@@ -30,10 +70,11 @@ export const useAuthStore = defineStore('auth', {
     token: null,
     timezone: 'Asia/Dubai',
     session: {
-      timeout_minutes: 30,
+      timeout_minutes: 120,
       warning_enabled: false,
       warning_minutes_before: 5,
     },
+    passwordAction: null, // 'must_change_password' | 'password_expired' | null
     loading: false,
     _fetchPromise: null,
     _lastFetchedAt: 0,
@@ -62,7 +103,7 @@ export const useAuthStore = defineStore('auth', {
     async _doFetchUser() {
       if (this.user?.pending2FA) return
       try {
-        const hasToken = sessionStorage.getItem('api_token') || localStorage.getItem('api_token')
+        const hasToken = getStorage().getItem('api_token') || sessionStorage.getItem('api_token') || localStorage.getItem('api_token')
         const hasCsrfFromPage = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
         if (!hasToken && !hasCsrfFromPage) {
           await web.get('/sanctum/csrf-cookie')
@@ -79,6 +120,7 @@ export const useAuthStore = defineStore('auth', {
           }
           if (cached.timezone) this.timezone = cached.timezone
           if (cached.session) this.session = { ...this.session, ...cached.session }
+          this.passwordAction = cached.password_action ?? null
           this._lastFetchedAt = Date.now()
         }
 
@@ -88,9 +130,13 @@ export const useAuthStore = defineStore('auth', {
           const roles = Array.isArray(u.roles) ? u.roles.map((r) => (typeof r === 'string' ? r : r?.name)).filter(Boolean) : []
           this.user = { id: u.id, name: u.name, email: u.email, roles, permissions: data.permissions ?? [] }
           if (data.timezone) this.timezone = data.timezone
-          if (data.session) this.session = { ...this.session, ...data.session }
+          if (data.session) {
+            this.session = { ...this.session, ...data.session }
+            setForceLogoutFlag(!!data.session.force_logout_on_close)
+          }
+          this.passwordAction = data.password_action ?? null
           this._lastFetchedAt = Date.now()
-          setBootstrapInStorage({ user: this.user, permissions: this.user.permissions, timezone: this.timezone, session: this.session })
+          setBootstrapInStorage({ user: this.user, permissions: this.user.permissions, timezone: this.timezone, session: this.session, password_action: this.passwordAction })
           return
         } catch {
           if (this.user) return
@@ -100,11 +146,13 @@ export const useAuthStore = defineStore('auth', {
         this.user = { ...data, roles, permissions: [] }
         if (data.timezone) this.timezone = data.timezone
         if (data.session) this.session = { ...this.session, ...data.session }
+        this.passwordAction = data.password_action ?? null
         this._lastFetchedAt = Date.now()
       } catch {
         this.user = null
         this._lastFetchedAt = 0
         try {
+          sessionStorage.removeItem(BOOTSTRAP_CACHE_KEY)
           localStorage.removeItem(BOOTSTRAP_CACHE_KEY)
         } catch {
           //
@@ -121,23 +169,26 @@ export const useAuthStore = defineStore('auth', {
         }
         const headers = options.token ? { 'X-Request-Token': 'true' } : {}
         const { data } = await api.post('/auth/login', credentials, { headers })
+        // Capture password_action from login response
+        this.passwordAction = data.password_action ?? null
         if (data.token) {
           this.token = data.token
-          sessionStorage.setItem('api_token', data.token)
+          getStorage().setItem('api_token', data.token)
           this.user = { ...data.user, permissions: data.user?.permissions ?? [] }
           this._lastFetchedAt = Date.now()
-          setBootstrapInStorage({ user: this.user, permissions: this.user.permissions })
+          setBootstrapInStorage({ user: this.user, permissions: this.user.permissions, password_action: this.passwordAction })
           return data
         }
         if (data.user && data.permissions) {
           this.user = { ...data.user, permissions: data.permissions }
           this._lastFetchedAt = Date.now()
-          setBootstrapInStorage({ user: this.user, permissions: data.permissions })
+          setBootstrapInStorage({ user: this.user, permissions: data.permissions, password_action: this.passwordAction })
           return data
         }
         if (data.redirect === '/2fa/verify') {
           this.user = { pending2FA: true }
           try {
+            sessionStorage.removeItem(BOOTSTRAP_CACHE_KEY)
             localStorage.removeItem(BOOTSTRAP_CACHE_KEY)
           } catch {
             //
@@ -157,11 +208,14 @@ export const useAuthStore = defineStore('auth', {
       } finally {
         this.user = null
         this.token = null
+        this.passwordAction = null
         this._lastFetchedAt = 0
         sessionStorage.removeItem('api_token')
         localStorage.removeItem('api_token')
         try {
+          sessionStorage.removeItem(BOOTSTRAP_CACHE_KEY)
           localStorage.removeItem(BOOTSTRAP_CACHE_KEY)
+          sessionStorage.removeItem(FORCE_LOGOUT_KEY)
         } catch {
           //
         }

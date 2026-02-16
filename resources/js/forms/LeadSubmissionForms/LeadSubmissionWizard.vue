@@ -245,7 +245,7 @@ function startNewSubmission() {
       <button
         type="button"
         @click="startNewSubmission"
-        class="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#7ED321] px-4 py-2.5 text-sm font-medium text-black shadow-sm hover:bg-[#6ab81e]"
+        class="mt-4 inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-black shadow-sm hover:bg-green-700"
       >
         New lead submission
       </button>

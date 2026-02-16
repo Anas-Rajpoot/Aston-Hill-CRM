@@ -1019,7 +1019,7 @@ function channelIcon(ch) {
         <button
           v-if="tplCanUpdate"
           type="button"
-          class="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+          class="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors"
           @click="openCreateTemplate"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
@@ -1209,7 +1209,7 @@ function channelIcon(ch) {
             <option v-for="tr in triggers" :key="tr.key" :value="tr.key">{{ tr.name }}</option>
           </select>
         </div>
-        <button type="button" :disabled="testSending || !testEmail || !testTrigger" class="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-colors" @click="sendTest">
+        <button type="button" :disabled="testSending || !testEmail || !testTrigger" class="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 transition-colors" @click="sendTest">
           <svg v-if="testSending" class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
           {{ testSending ? 'Sending…' : 'Send Test' }}
         </button>

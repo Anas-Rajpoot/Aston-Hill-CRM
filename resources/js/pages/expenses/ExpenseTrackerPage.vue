@@ -15,6 +15,7 @@ import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomize
 import ExpenseTable from '@/components/expenses/ExpenseTable.vue'
 import ExpenseEditHistoryModal from '@/components/expenses/ExpenseEditHistoryModal.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import Toast from '@/components/Toast.vue'
 
 const auth = useAuthStore()
 const { perPage, perPageOptions, perPageReady, setPerPage } = useTablePageSize('expenses')
@@ -67,6 +68,11 @@ const historyExpenseId = ref(null)
 const historyExpenseRef = ref('')
 const savingRowId = ref(null)
 const savingCell = ref({ rowId: null, col: null })
+
+const showToast = ref(false)
+const toastType = ref('success')
+const toastMsg  = ref('')
+function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
 
 const filters = ref({
   expense_date_from: '',
@@ -342,9 +348,11 @@ async function confirmDelete() {
   deleting.value = true
   try {
     await expensesApi.destroy(row.id)
+    toast('success', 'Expense deleted successfully.')
     closeDeleteConfirm()
     load()
-  } catch {
+  } catch (e) {
+    toast('error', e?.response?.data?.message || 'Failed to delete expense.')
     load()
   } finally {
     deleting.value = false
@@ -389,7 +397,7 @@ onMounted(() => {
           <button
             v-if="canCreate"
             type="button"
-            class="inline-flex items-center rounded bg-[#6BC100] px-3 py-2 text-sm font-medium text-white hover:bg-[#5da800]"
+            class="inline-flex items-center rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
             @click="addModalVisible = true"
           >
             <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -555,11 +563,11 @@ onMounted(() => {
             Showing {{ meta.total ? (meta.current_page - 1) * perPage + 1 : 0 }} to {{ Math.min(meta.current_page * perPage, meta.total) }} of {{ meta.total }} entries
           </p>
           <div class="flex items-center gap-2">
-            <label for="expense-per-page" class="text-sm text-gray-600">Number of pages</label>
+            <label for="expense-per-page" class="text-sm text-gray-600">Number of rows</label>
             <select
               id="expense-per-page"
               :value="perPage"
-              class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-700"
+              class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm min-w-[85px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
               @change="onPerPageChange"
             >
               <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
@@ -605,7 +613,7 @@ onMounted(() => {
       :added-by-users="filterOptions.added_by_users"
       :current-user-id="auth.user?.id"
       @close="addModalVisible = false"
-      @created="load()"
+      @created="toast('success', 'Expense created successfully.'); load()"
     />
 
     <EditExpenseModal
@@ -615,7 +623,7 @@ onMounted(() => {
       :vat-percent-options="filterOptions.vat_percent_options"
       :added-by-users="filterOptions.added_by_users"
       @close="closeEditModal"
-      @updated="load(); closeEditModal()"
+      @updated="toast('success', 'Expense updated successfully.'); load(); closeEditModal()"
     />
 
     <ExpenseDetailModal
@@ -666,5 +674,7 @@ onMounted(() => {
         </div>
       </div>
     </Teleport>
+
+    <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />
   </div>
 </template>

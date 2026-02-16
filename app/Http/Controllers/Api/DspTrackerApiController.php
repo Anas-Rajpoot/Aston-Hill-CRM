@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\DspTrackerEntry;
+use App\Models\SystemAuditLog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -121,18 +122,49 @@ class DspTrackerApiController extends Controller
         }
 
         DspTrackerEntry::query()->insert($toInsert);
+        $count = count($toInsert);
+
+        try {
+            SystemAuditLog::record(
+                'dsp_tracker.imported',
+                null,
+                ['count' => $count, 'batch_id' => $batchId],
+                $request->user()->id,
+                'dsp_tracker',
+                null
+            );
+        } catch (\Exception $e) {
+            // Ignore audit logging errors
+        }
 
         return response()->json([
             'batch_id' => $batchId,
-            'count' => count($toInsert),
+            'count' => $count,
         ], 201);
     }
 
     public function destroyBatch(Request $request, string $batchId): JsonResponse
     {
+        $count = DspTrackerEntry::query()
+            ->where('import_batch_id', $batchId)
+            ->count();
+
         $deleted = DspTrackerEntry::query()
             ->where('import_batch_id', $batchId)
             ->delete();
+
+        try {
+            SystemAuditLog::record(
+                'dsp_tracker.batch_deleted',
+                ['batch_id' => $batchId, 'count' => $count],
+                null,
+                $request->user()->id,
+                'dsp_tracker',
+                null
+            );
+        } catch (\Exception $e) {
+            // Ignore audit logging errors
+        }
 
         return response()->json([
             'deleted' => $deleted,

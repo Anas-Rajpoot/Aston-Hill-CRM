@@ -28,7 +28,7 @@ const goToRolePermissions = (role) => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6 bg-white -mx-4 -my-5 min-h-full px-6 py-6">
     <div>
       <h1 class="text-2xl font-bold text-gray-900">Permissions</h1>
       <p class="mt-1 text-sm text-gray-500">

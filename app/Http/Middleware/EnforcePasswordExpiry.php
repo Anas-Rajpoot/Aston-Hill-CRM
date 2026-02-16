@@ -28,6 +28,11 @@ class EnforcePasswordExpiry
                 return $this->addPasswordFlag($request, $next, 'must_change_password');
             }
 
+            // Super admins are exempt from password expiry – they change when they choose to.
+            if ($user->hasRole('superadmin')) {
+                return $next($request);
+            }
+
             // Check password expiry
             if ($settings->password_expiry_days > 0 && $user->password_changed_at) {
                 $expiresAt = $user->password_changed_at->addDays($settings->password_expiry_days);

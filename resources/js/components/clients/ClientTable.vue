@@ -52,7 +52,7 @@ const SORTABLE_COLUMNS = [
   'manager', 'team_leader', 'sales_agent', 'status',
   'service_type', 'product_type', 'product_name', 'mrc', 'quantity',
   'fiber', 'order_number', 'wo_number', 'completion_date',
-  'contract_type', 'contract_end_date', 'renewal_alert',
+  'contract_type', 'contract_end_date', 'renewal_alert', 'creator',
 ]
 
 function label(col) {

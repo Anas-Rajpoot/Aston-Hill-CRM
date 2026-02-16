@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\SystemAuditLog;
 use App\Models\User;
 use App\Models\UserColumnPreference;
 use Illuminate\Http\JsonResponse;
@@ -293,6 +294,13 @@ class EmployeeApiController extends Controller
                 $created++;
             }
         }
+
+        try {
+            SystemAuditLog::record('employee.bulk_imported', null, ['count' => $created], $request->user()->id, 'employee');
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
         return response()->json([
             'message' => "Import complete. Created: {$created}, Updated: {$updated}.",
             'created' => $created,

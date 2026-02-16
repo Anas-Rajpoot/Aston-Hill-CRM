@@ -10,6 +10,7 @@ import AdvancedFilters from '@/components/dsp-tracker/AdvancedFilters.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import DSPTrackerDetailModal from '@/components/dsp-tracker/DSPTrackerDetailModal.vue'
 import dspTrackerApi from '@/services/dspTrackerApi'
+import Toast from '@/components/Toast.vue'
 
 const COLUMNS = [
   'activity_number',
@@ -60,6 +61,11 @@ const columnModalVisible = ref(false)
 const detailModalVisible = ref(false)
 const selectedRecord = ref(null)
 const visibleColumns = ref([...COLUMNS])
+
+const showToast = ref(false)
+const toastType = ref('success')
+const toastMsg  = ref('')
+function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
 
 const filters = ref({
   activity_number: '',
@@ -353,9 +359,11 @@ function onCsvChange(e) {
     try {
       const { data: res } = await dspTrackerApi.import(newRows)
       lastUploadedBatchId.value = res?.batch_id ?? null
+      toast('success', 'CSV uploaded successfully.')
       await load()
     } catch (err) {
       csvUploadError.value = err?.response?.data?.message || 'Failed to save uploaded data.'
+      toast('error', csvUploadError.value)
     } finally {
       loading.value = false
     }
@@ -373,9 +381,11 @@ async function deleteOldFile() {
   try {
     await dspTrackerApi.deleteBatch(lastUploadedBatchId.value)
     lastUploadedBatchId.value = null
+    toast('success', 'Records deleted successfully.')
     await load()
   } catch (err) {
     csvUploadError.value = err?.response?.data?.message || 'Failed to delete records.'
+    toast('error', csvUploadError.value)
   } finally {
     loading.value = false
   }
@@ -420,7 +430,7 @@ onMounted(() => load())
           </button>
           <button
             type="button"
-            class="inline-flex items-center gap-2 rounded bg-[#6BC100] px-4 py-2 text-sm font-medium text-white hover:bg-[#5da800]"
+            class="inline-flex items-center gap-2 rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
             @click="triggerImport"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -625,5 +635,7 @@ onMounted(() => load())
         @edit="onDetailEdit"
       />
     </div>
+
+    <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />
   </div>
 </template>

@@ -13,6 +13,8 @@ class ExpenseAudit extends Model
         'action',
         'old_values',
         'new_values',
+        'ip_address',
+        'user_agent',
     ];
 
     protected $casts = [

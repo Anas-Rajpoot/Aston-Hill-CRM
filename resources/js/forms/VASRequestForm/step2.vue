@@ -441,7 +441,7 @@ async function goNext() {
             type="button"
             @click="goNext"
             :disabled="saving || submitting"
-            class="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white shadow-sm disabled:opacity-50 bg-[#7ED321] hover:bg-[#6ab81e]"
+            class="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white shadow-sm disabled:opacity-50 bg-green-600 hover:bg-green-700"
           >
             {{ submitting ? 'Saving...' : 'Next' }}
             <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

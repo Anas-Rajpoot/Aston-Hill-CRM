@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\EmailFollowUp;
+use App\Models\SystemAuditLog;
 use App\Models\UserColumnPreference;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -288,6 +289,19 @@ class EmailFollowUpController extends Controller
 
         $entry = EmailFollowUp::create($data);
 
+        try {
+            SystemAuditLog::record(
+                'email_follow_up.created',
+                null,
+                $entry->toArray(),
+                $request->user()->id,
+                'email_follow_up',
+                $entry->id
+            );
+        } catch (\Exception $e) {
+            // Ignore audit logging errors
+        }
+
         return response()->json([
             'id' => $entry->id,
             'message' => 'Email follow-up entry added.',
@@ -309,7 +323,22 @@ class EmailFollowUpController extends Controller
         ]);
 
         if (! empty($data)) {
+            $old = $emailFollowUp->getOriginal();
             $emailFollowUp->update($data);
+            $changed = $emailFollowUp->getChanges();
+
+            try {
+                SystemAuditLog::record(
+                    'email_follow_up.updated',
+                    array_intersect_key($old, $changed),
+                    $changed,
+                    $request->user()->id,
+                    'email_follow_up',
+                    $emailFollowUp->id
+                );
+            } catch (\Exception $e) {
+                // Ignore audit logging errors
+            }
         }
 
         $emailFollowUp->load('creator:id,name,email');
@@ -335,7 +364,22 @@ class EmailFollowUpController extends Controller
             'status' => ['required', 'string', Rule::in(EmailFollowUp::STATUSES)],
         ]);
 
+        $old = $emailFollowUp->getOriginal();
         $emailFollowUp->update(['status' => $data['status']]);
+        $changed = $emailFollowUp->getChanges();
+
+        try {
+            SystemAuditLog::record(
+                'email_follow_up.status_updated',
+                array_intersect_key($old, $changed),
+                $changed,
+                $request->user()->id,
+                'email_follow_up',
+                $emailFollowUp->id
+            );
+        } catch (\Exception $e) {
+            // Ignore audit logging errors
+        }
 
         return response()->json([
             'id' => $emailFollowUp->id,

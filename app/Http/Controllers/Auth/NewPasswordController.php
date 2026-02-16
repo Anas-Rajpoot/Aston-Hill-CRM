@@ -33,15 +33,17 @@ class NewPasswordController extends Controller
         $request->validate([
             'token' => ['required'],
             'email' => ['required', 'email'],
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'password' => ['required', 'confirmed', new \App\Rules\MeetsPasswordPolicy],
         ]);
 
         $status = Password::reset(
             $request->only('email', 'password', 'password_confirmation', 'token'),
             function (User $user) use ($request) {
                 $user->forceFill([
-                    'password' => Hash::make($request->password),
-                    'remember_token' => Str::random(60),
+                    'password'             => Hash::make($request->password),
+                    'remember_token'       => Str::random(60),
+                    'password_changed_at'  => now(),
+                    'must_change_password' => false,
                 ])->save();
                 event(new PasswordReset($user));
             }

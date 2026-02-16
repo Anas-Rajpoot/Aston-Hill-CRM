@@ -16,7 +16,7 @@ class UpdateSecuritySettingsRequest extends FormRequest
     {
         return [
             // Session Management
-            'auto_logout_after_minutes'  => 'required|integer|in:10,15,30,45,60,120',
+            'auto_logout_after_minutes'  => 'required|integer|min:1|in:10,15,30,45,60,120,240,480,720,1440',
             'session_warning_minutes'    => 'required|integer|in:1,3,5,10,15|lte:auto_logout_after_minutes',
             'force_logout_on_close'      => 'boolean',
             'prevent_multiple_sessions'  => 'boolean',

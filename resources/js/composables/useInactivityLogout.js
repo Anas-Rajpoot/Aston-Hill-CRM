@@ -33,7 +33,7 @@ export function useInactivityLogout() {
   let lastActivity      = Date.now()
 
   // ── Config (from auth store, populated by bootstrap) ──
-  const timeoutMs = computed(() => (auth.session?.timeout_minutes ?? 30) * 60_000)
+  const timeoutMs = computed(() => (auth.session?.timeout_minutes ?? 120) * 60_000)
   const warningEnabled = computed(() => auth.session?.warning_enabled ?? false)
   const warningMs = computed(() => (auth.session?.warning_minutes_before ?? 5) * 60_000)
 

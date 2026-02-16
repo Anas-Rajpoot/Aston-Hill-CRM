@@ -4,18 +4,15 @@
  */
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { useDashboardAutoRefresh } from '@/composables/useDashboardAutoRefresh'
 import api from '@/lib/axios'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import SkeletonBox from '@/components/skeletons/SkeletonBox.vue'
 
 const auth = useAuthStore()
 const loading = ref(true)
+const refreshing = ref(false)
 const kpis = ref({})
 const recentActivity = ref([])
-
-// ── Auto-refresh composable ───────────────────────────
-const { enabled: autoRefreshOn, refreshing, lastRefreshed, doRefresh } = useDashboardAutoRefresh(applyData)
 
 function applyData(data) {
   if (!data) return
@@ -29,12 +26,19 @@ async function initialLoad() {
   try {
     const { data } = await api.get('/dashboard/stats')
     applyData(data.data)
-    // Set auto-refresh from server config
-    if (data.auto_refresh?.enabled) {
-      autoRefreshOn.value = true
-    }
   } catch { /* silent */ }
   finally { loading.value = false }
+}
+
+// ── Manual refresh ────────────────────────────────────
+async function doRefresh() {
+  if (refreshing.value) return
+  refreshing.value = true
+  try {
+    const { data } = await api.get('/dashboard/stats')
+    applyData(data.data)
+  } catch { /* silent */ }
+  finally { refreshing.value = false }
 }
 
 onMounted(initialLoad)
@@ -87,37 +91,6 @@ function timeAgo(iso) {
           <Breadcrumbs />
         </div>
         <p class="text-sm text-gray-500 mt-0.5">Welcome back, {{ auth.user?.name ?? 'User' }}</p>
-      </div>
-
-      <!-- Auto-Refresh toggle -->
-      <div class="flex items-center gap-3">
-        <div class="flex items-center gap-2">
-          <!-- Spinning sync icon while refreshing -->
-          <svg
-            v-if="refreshing"
-            class="w-4 h-4 text-green-600 animate-spin"
-            fill="none" stroke="currentColor" viewBox="0 0 24 24"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-
-          <span class="text-sm text-gray-600">Auto Refresh</span>
-
-          <button
-            type="button"
-            role="switch"
-            :aria-checked="autoRefreshOn"
-            class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
-            :class="autoRefreshOn ? 'bg-green-500' : 'bg-gray-300'"
-            @click="autoRefreshOn = !autoRefreshOn"
-          >
-            <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform" :class="autoRefreshOn ? 'translate-x-4' : 'translate-x-0.5'" />
-          </button>
-        </div>
-
-        <span v-if="lastRefreshed" class="text-xs text-gray-400">
-          Updated {{ timeAgo(lastRefreshed.toISOString()) }}
-        </span>
       </div>
     </div>
 

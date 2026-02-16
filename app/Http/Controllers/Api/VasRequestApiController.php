@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\FieldSubmissionController;
 use App\Http\Controllers\VasRequestController;
+use App\Models\SystemAuditLog;
 use App\Models\User;
 use App\Models\UserColumnPreference;
 use App\Models\VasRequestSubmission;
@@ -441,6 +442,12 @@ class VasRequestApiController extends Controller
             ->whereIn('id', $ids)
             ->whereNull('back_office_executive_id')
             ->update(['back_office_executive_id' => $executiveId]);
+
+        try {
+            SystemAuditLog::record('vas_request.bulk_assigned', null, ['vas_ids' => $ids, 'assigned_to' => $executiveId, 'count' => count($ids)], $request->user()->id, 'vas_request');
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return response()->json([
             'message' => "Assigned {$updated} request(s) to back office executive. Rows that already had an executive were left unchanged.",

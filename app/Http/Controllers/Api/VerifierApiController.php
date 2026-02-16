@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\SystemAuditLog;
 use App\Models\Verifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -115,6 +116,19 @@ class VerifierApiController extends Controller
 
         $verifier = Verifier::create($validated);
 
+        try {
+            SystemAuditLog::record(
+                'verifier.created',
+                null,
+                $verifier->toArray(),
+                $request->user()->id,
+                'verifier',
+                $verifier->id
+            );
+        } catch (\Exception $e) {
+            // Ignore audit logging errors
+        }
+
         return response()->json([
             'message' => 'Verifier created.',
             'data' => [
@@ -141,7 +155,22 @@ class VerifierApiController extends Controller
             'remarks' => ['nullable', 'string'],
         ]);
 
+        $old = $verifier->getOriginal();
         $verifier->update($validated);
+        $changed = $verifier->getChanges();
+
+        try {
+            SystemAuditLog::record(
+                'verifier.updated',
+                array_intersect_key($old, $changed),
+                $changed,
+                $request->user()->id,
+                'verifier',
+                $verifier->id
+            );
+        } catch (\Exception $e) {
+            // Ignore audit logging errors
+        }
 
         return response()->json([
             'message' => 'Verifier updated.',
@@ -161,6 +190,19 @@ class VerifierApiController extends Controller
     {
         if (! $this->canDelete($request)) {
             return response()->json(['message' => 'Unauthorized to delete verifiers.'], 403);
+        }
+
+        try {
+            SystemAuditLog::record(
+                'verifier.deleted',
+                $verifier->toArray(),
+                null,
+                $request->user()->id,
+                'verifier',
+                $verifier->id
+            );
+        } catch (\Exception $e) {
+            // Ignore audit logging errors
         }
 
         $verifier->delete();
@@ -202,13 +244,28 @@ class VerifierApiController extends Controller
             ];
         }
 
+        $count = 0;
         if (! empty($toInsert)) {
             Verifier::query()->insert($toInsert);
+            $count = count($toInsert);
+        }
+
+        try {
+            SystemAuditLog::record(
+                'verifier.bulk_imported',
+                null,
+                ['count' => $count],
+                $request->user()->id,
+                'verifier',
+                null
+            );
+        } catch (\Exception $e) {
+            // Ignore audit logging errors
         }
 
         return response()->json([
-            'message' => count($toInsert) . ' verifier(s) imported.',
-            'imported' => count($toInsert),
+            'message' => $count . ' verifier(s) imported.',
+            'imported' => $count,
         ]);
     }
 

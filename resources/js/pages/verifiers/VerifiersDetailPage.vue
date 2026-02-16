@@ -443,7 +443,7 @@ onMounted(() => load())
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6 bg-white -mx-4 -my-5 min-h-full px-6 py-6">
     <Toast
       :show="showToast"
       :type="toastType"
@@ -769,7 +769,7 @@ onMounted(() => load())
             </button>
             <button
               type="button"
-              class="rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50 transition-colors"
+              class="rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
               :disabled="addSaving"
               @click="submitAdd"
             >
@@ -956,7 +956,7 @@ onMounted(() => load())
             </button>
             <button
               type="button"
-              class="rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50 transition-colors"
+              class="rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
               :disabled="editSaving"
               @click="submitEdit"
             >

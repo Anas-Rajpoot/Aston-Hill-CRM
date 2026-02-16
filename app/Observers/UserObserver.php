@@ -33,6 +33,17 @@ class UserObserver
     public function deleted(User $user): void
     {
         $this->invalidateUserCache($user->id);
+
+        UserAudit::create([
+            'user_id'    => $user->id,
+            'field_name' => '_deleted',
+            'old_value'  => $this->serializeValue($user->email),
+            'new_value'  => null,
+            'changed_at' => now(),
+            'changed_by' => Auth::id(),
+            'ip_address' => request()->ip(),
+            'user_agent' => substr((string) request()->userAgent(), 0, 500),
+        ]);
     }
 
     public function updated(User $user): void
@@ -66,12 +77,14 @@ class UserObserver
         ?int $changedBy
     ): void {
         UserAudit::create([
-            'user_id' => $userId,
+            'user_id'    => $userId,
             'field_name' => $fieldName,
-            'old_value' => $this->serializeValue($oldValue),
-            'new_value' => $this->serializeValue($newValue),
+            'old_value'  => $this->serializeValue($oldValue),
+            'new_value'  => $this->serializeValue($newValue),
             'changed_at' => $changedAt,
             'changed_by' => $changedBy,
+            'ip_address' => request()->ip(),
+            'user_agent' => substr((string) request()->userAgent(), 0, 500),
         ]);
     }
 
@@ -92,12 +105,16 @@ class UserObserver
     /** Invalidate cached user data so next request gets fresh data (Redis tagged cache). */
     protected function invalidateUserCache(int $userId): void
     {
-        $tags = ['user.' . $userId];
-        if (Cache::getStore()->getRepository()->supportsTags()) {
-            Cache::tags($tags)->flush();
-        } else {
-            Cache::forget('user.prime.' . $userId);
-            Cache::forget('user.extras.' . $userId);
+        try {
+            if (Cache::supportsTags()) {
+                Cache::tags(['user.' . $userId])->flush();
+                return;
+            }
+        } catch (\Throwable $e) {
+            // Driver does not support tags – fall through to manual forget.
         }
+
+        Cache::forget('user.prime.' . $userId);
+        Cache::forget('user.extras.' . $userId);
     }
 }

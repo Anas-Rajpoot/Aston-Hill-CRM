@@ -462,7 +462,7 @@ async function uploadNewAttachments() {
 
         <div class="flex justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4">
           <button type="button" class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="back">Cancel</button>
-          <button v-if="canEdit" type="submit" class="rounded bg-[#6BC100] px-4 py-2 text-sm font-medium text-white hover:bg-[#5da800] disabled:opacity-50" :disabled="saving">
+          <button v-if="canEdit" type="submit" class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50" :disabled="saving">
             {{ saving ? 'Updating...' : 'Update Expense' }}
           </button>
         </div>

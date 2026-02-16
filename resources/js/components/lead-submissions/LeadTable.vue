@@ -266,7 +266,7 @@ const columnLabels = {
 }
 
 const SORTABLE_COLUMNS = [
-  'submitted_at', 'updated_at', 'account_number', 'company_name',
+  'id', 'submitted_at', 'updated_at', 'account_number', 'company_name',
   'category', 'type', 'product', 'mrc_aed', 'quantity', 'status',
   'status_changed_at', 'sales_agent', 'team_leader', 'manager', 'creator',
   'executive', 'email', 'contact_number_gsm', 'submission_type', 'sla_timer',

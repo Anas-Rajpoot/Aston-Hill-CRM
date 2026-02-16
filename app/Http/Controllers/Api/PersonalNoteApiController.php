@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\PersonalNote;
+use App\Models\SystemAuditLog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -63,6 +64,19 @@ class PersonalNoteApiController extends Controller
             'body' => (string) ($validated['body'] ?? ''),
         ]);
 
+        try {
+            SystemAuditLog::record(
+                'personal_note.created',
+                null,
+                $note->toArray(),
+                $request->user()->id,
+                'personal_note',
+                $note->id
+            );
+        } catch (\Exception $e) {
+            // Ignore audit logging errors
+        }
+
         return response()->json([
             'id' => $note->id,
             'title' => $note->title,
@@ -84,10 +98,25 @@ class PersonalNoteApiController extends Controller
         $title = array_key_exists('title', $validated) ? (string) ($validated['title'] ?? '') : $personal_note->title;
         $body = array_key_exists('body', $validated) ? (string) ($validated['body'] ?? '') : $personal_note->body;
 
+        $old = $personal_note->getOriginal();
         $personal_note->update([
             'title' => $title,
             'body' => $body,
         ]);
+        $changed = $personal_note->getChanges();
+
+        try {
+            SystemAuditLog::record(
+                'personal_note.updated',
+                array_intersect_key($old, $changed),
+                $changed,
+                $request->user()->id,
+                'personal_note',
+                $personal_note->id
+            );
+        } catch (\Exception $e) {
+            // Ignore audit logging errors
+        }
 
         return response()->json([
             'id' => $personal_note->id,
@@ -100,6 +129,19 @@ class PersonalNoteApiController extends Controller
     public function destroy(Request $request, PersonalNote $personal_note): JsonResponse
     {
         $this->authorizeCreatorOnly($personal_note);
+
+        try {
+            SystemAuditLog::record(
+                'personal_note.deleted',
+                $personal_note->toArray(),
+                null,
+                $request->user()->id,
+                'personal_note',
+                $personal_note->id
+            );
+        } catch (\Exception $e) {
+            // Ignore audit logging errors
+        }
 
         $personal_note->delete();
 

@@ -27,6 +27,7 @@ class User extends Authenticatable
         'manager_id', 'team_leader_id',
         'employee_number', 'department', 'extension', 'joining_date', 'terminate_date',
         'must_change_password', 'password_changed_at', 'locked_until', 'failed_login_attempts',
+        'active_session_token',
     ];
 
     /**
@@ -37,6 +38,7 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'active_session_token',
     ];
 
     /**

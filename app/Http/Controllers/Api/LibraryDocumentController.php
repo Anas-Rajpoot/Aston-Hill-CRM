@@ -22,18 +22,47 @@ class LibraryDocumentController extends Controller
         return $user && ($user->hasRole('superadmin') || $user->can('manage-library'));
     }
 
+    private function canView($user): bool
+    {
+        return $user && ($user->hasRole('superadmin') || $user->can('manage-library') || $user->can('view-library'));
+    }
+
+    private function canDownload($user): bool
+    {
+        return $user && ($user->hasRole('superadmin') || $user->can('manage-library') || $user->can('download-library'));
+    }
+
     /* ── GET /api/library/documents ── */
     public function index(Request $request): JsonResponse
     {
+        $user = $request->user();
+
+        if (! $this->canView($user)) {
+            return response()->json(['message' => 'You do not have permission to view the library.'], 403);
+        }
+
         $query = LibraryDocument::with(['category', 'uploader'])
-            ->filter($request->only(['q', 'category_id', 'file_type', 'status', 'module', 'uploaded_by', 'date_from', 'date_to']));
+            ->filter($request->only(['q', 'category_id', 'file_type', 'status', 'visibility', 'uploaded_by', 'date_from', 'date_to']));
+
+        // Non-managers only see documents visible to their role(s) or public documents
+        if (! $this->canManage($user)) {
+            $userRoles = $user->getRoleNames()->toArray();
+            $query->where(function ($q) use ($userRoles) {
+                $q->where('visibility', 'public');
+                foreach ($userRoles as $role) {
+                    $q->orWhereJsonContains('allowed_roles', $role);
+                }
+            });
+            // Non-managers should only see active documents
+            $query->where('status', 'active');
+        }
 
         // Sort
         $sortField = 'created_at';
         $sortDir   = 'desc';
         if ($sort = $request->input('sort')) {
             $parts   = explode(':', $sort);
-            $allowed = ['name', 'created_at', 'size_bytes', 'status', 'file_type'];
+            $allowed = ['name', 'created_at', 'size_bytes', 'status', 'file_type', 'visibility', 'updated_at'];
             $sortField = in_array($parts[0], $allowed) ? $parts[0] : 'created_at';
             $sortDir   = ($parts[1] ?? 'desc') === 'asc' ? 'asc' : 'desc';
         }
@@ -51,27 +80,49 @@ class LibraryDocumentController extends Controller
                 'last_page'    => $paginated->lastPage(),
                 'from'         => $paginated->firstItem(),
                 'to'           => $paginated->lastItem(),
-                'can_manage'   => $this->canManage($request->user()),
+                'can_manage'   => $this->canManage($user),
+                'can_download' => $this->canDownload($user),
             ],
         ]);
     }
 
     /* ── GET /api/library/documents/meta ── */
-    public function meta(): JsonResponse
+    public function meta(Request $request): JsonResponse
     {
         $data = Cache::remember('library_meta', 600, function () {
             return [
                 'categories' => LibraryCategory::orderBy('name')->get(['id', 'name', 'slug']),
                 'modules'    => LibraryDocument::distinct()->whereNotNull('module_keys')->pluck('module_keys')->flatten()->unique()->sort()->values(),
                 'file_types' => LibraryDocument::FILE_TYPES,
+                'roles'      => \Spatie\Permission\Models\Role::where('guard_name', 'web')
+                                    ->orderBy('name')
+                                    ->pluck('name')
+                                    ->unique()
+                                    ->values(),
             ];
         });
         return response()->json(['data' => $data]);
     }
 
     /* ── GET /api/library/documents/{id} ── */
-    public function show(LibraryDocument $document): JsonResponse
+    public function show(Request $request, LibraryDocument $document): JsonResponse
     {
+        $user = $request->user();
+
+        if (! $this->canView($user)) {
+            return response()->json(['message' => 'You do not have permission to view this document.'], 403);
+        }
+
+        // Non-managers can only see documents visible to their role
+        if (! $this->canManage($user)) {
+            $userRoles = $user->getRoleNames()->toArray();
+            $isAllowed = $document->visibility === 'public'
+                || ! empty(array_intersect($userRoles, $document->allowed_roles ?? []));
+            if (! $isAllowed) {
+                return response()->json(['message' => 'You do not have access to this document.'], 403);
+            }
+        }
+
         $document->load(['category', 'uploader']);
         return response()->json(['data' => new LibraryDocumentResource($document)]);
     }
@@ -219,17 +270,50 @@ class LibraryDocumentController extends Controller
     {
         if (! $this->canManage($request->user())) return response()->json(['message' => 'Unauthorized.'], 403);
 
-        $document->update(['archived_at' => now(), 'status' => 'archived', 'updated_by' => $request->user()->id]);
+        $docName = $document->name;
+        $docId   = $document->id;
+
+        // Delete file from storage
+        $disk = Storage::disk($document->storage_disk);
+        if ($disk->exists($document->storage_path)) {
+            $disk->delete($document->storage_path);
+        }
+
+        // Delete version files
+        foreach ($document->versions as $ver) {
+            if ($disk->exists($ver->storage_path)) {
+                $disk->delete($ver->storage_path);
+            }
+        }
+
+        $document->versions()->delete();
+        $document->delete();
         LibraryDocument::clearCache();
 
-        SystemAuditLog::record('library_document.archived', null, ['archived_at' => now()->toIso8601String()], $request->user()->id, 'library_document', $document->id);
+        SystemAuditLog::record('library_document.deleted', null, ['name' => $docName], $request->user()->id, 'library_document', $docId);
 
-        return response()->json(['message' => 'Document archived.']);
+        return response()->json(['message' => 'Document deleted.']);
     }
 
     /* ── GET /api/library/documents/{id}/download ── */
-    public function download(LibraryDocument $document)
+    public function download(Request $request, LibraryDocument $document)
     {
+        $user = $request->user();
+
+        if (! $this->canDownload($user)) {
+            return response()->json(['message' => 'You do not have permission to download documents.'], 403);
+        }
+
+        // Non-managers can only download documents visible to their role
+        if (! $this->canManage($user)) {
+            $userRoles = $user->getRoleNames()->toArray();
+            $isAllowed = $document->visibility === 'public'
+                || ! empty(array_intersect($userRoles, $document->allowed_roles ?? []));
+            if (! $isAllowed) {
+                return response()->json(['message' => 'You do not have access to this document.'], 403);
+            }
+        }
+
         $disk = Storage::disk($document->storage_disk);
         if (! $disk->exists($document->storage_path)) {
             return response()->json(['message' => 'File not found.'], 404);
@@ -260,6 +344,81 @@ class LibraryDocumentController extends Controller
         return response()->json(['data' => $versions]);
     }
 
+    /* ── POST /api/library/documents/bulk-upload ── */
+    public function bulkUpload(Request $request): JsonResponse
+    {
+        if (! $this->canManage($request->user())) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
+        $request->validate([
+            'files'   => ['required', 'array', 'min:1', 'max:20'],
+            'files.*' => ['required', 'file', 'max:20480'],
+        ]);
+
+        $uploaded = [];
+        $errors   = [];
+
+        foreach ($request->file('files') as $i => $file) {
+            try {
+                $mime     = $file->getMimeType();
+                $fileType = LibraryDocument::inferFileType($mime);
+                $path     = $file->store('library', 'public');
+                $size     = $file->getSize();
+                $checksum = hash_file('sha256', $file->getRealPath());
+                $name     = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+
+                $doc = LibraryDocument::create([
+                    'document_code' => LibraryDocument::nextCode(),
+                    'name'          => $name,
+                    'category_id'   => $request->input('category_id') ?: null,
+                    'module_keys'   => [],
+                    'tags'          => [],
+                    'visibility'    => 'internal',
+                    'file_type'     => $fileType,
+                    'mime_type'     => $mime,
+                    'storage_disk'  => 'public',
+                    'storage_path'  => $path,
+                    'size_bytes'    => $size,
+                    'checksum_sha256' => $checksum,
+                    'status'        => 'active',
+                    'uploaded_by'   => $request->user()->id,
+                ]);
+
+                $ver = LibraryDocumentVersion::create([
+                    'document_id'     => $doc->id,
+                    'version'         => 1,
+                    'change_note'     => 'Initial upload (bulk)',
+                    'storage_disk'    => 'public',
+                    'storage_path'    => $path,
+                    'mime_type'       => $mime,
+                    'size_bytes'      => $size,
+                    'checksum_sha256' => $checksum,
+                    'uploaded_by'     => $request->user()->id,
+                    'created_at'      => now(),
+                ]);
+
+                $doc->update(['last_version_id' => $ver->id]);
+                $uploaded[] = $doc->name;
+            } catch (\Throwable $e) {
+                $errors[] = $file->getClientOriginalName() . ': ' . $e->getMessage();
+            }
+        }
+
+        LibraryDocument::clearCache();
+        Cache::forget('library_meta');
+
+        SystemAuditLog::record('library_document.bulk_uploaded', null, [
+            'count' => count($uploaded), 'names' => $uploaded,
+        ], $request->user()->id, 'library_document');
+
+        return response()->json([
+            'message'  => count($uploaded) . ' document(s) uploaded successfully.',
+            'uploaded' => $uploaded,
+            'errors'   => $errors,
+        ], count($uploaded) > 0 ? 201 : 422);
+    }
+
     /* ── GET /api/library/export ── */
     public function export(Request $request): StreamedResponse
     {
@@ -269,7 +428,7 @@ class LibraryDocumentController extends Controller
         }
 
         $query = LibraryDocument::with(['category', 'uploader'])
-            ->filter($request->only(['q', 'category_id', 'file_type', 'status', 'module']))
+            ->filter($request->only(['q', 'category_id', 'file_type', 'status', 'visibility']))
             ->orderByDesc('created_at')
             ->limit(50000);
 
@@ -277,15 +436,20 @@ class LibraryDocumentController extends Controller
 
         return response()->streamDownload(function () use ($query) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Document Code', 'Name', 'Category', 'Modules', 'File Type', 'Size', 'Status', 'Uploaded By', 'Uploaded On', 'Version', 'Tags']);
+            fputcsv($out, ['Document Name', 'Category', 'Related Module', 'File Type', 'Uploaded By', 'Uploaded On', 'Size', 'Status', 'Document Code', 'Version', 'Tags']);
 
             $query->cursor()->each(function ($doc) use ($out) {
                 fputcsv($out, [
-                    $doc->document_code, $doc->name,
-                    $doc->category?->name, implode(', ', $doc->module_keys ?? []),
-                    strtoupper($doc->file_type), $doc->size_human,
-                    $doc->status, $doc->uploader?->name,
-                    $doc->created_at?->format('Y-m-d'), 'v' . $doc->current_version,
+                    $doc->name,
+                    $doc->category?->name,
+                    implode(', ', $doc->module_keys ?? []),
+                    strtoupper($doc->file_type),
+                    $doc->uploader?->name,
+                    $doc->created_at?->format('Y-m-d'),
+                    $doc->size_human,
+                    ucfirst($doc->status),
+                    $doc->document_code,
+                    'v' . $doc->current_version,
                     implode(', ', $doc->tags ?? []),
                 ]);
             });

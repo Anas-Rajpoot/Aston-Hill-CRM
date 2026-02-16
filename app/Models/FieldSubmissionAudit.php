@@ -13,6 +13,8 @@ class FieldSubmissionAudit extends Model
         'new_value',
         'changed_at',
         'changed_by',
+        'ip_address',
+        'user_agent',
     ];
 
     protected $casts = [

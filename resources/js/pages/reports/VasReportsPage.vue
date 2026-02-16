@@ -216,7 +216,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6 bg-white -mx-4 -my-5 min-h-full px-6 py-6">
     <div>
       <Breadcrumbs />
       <h1 class="text-2xl font-bold text-gray-900 mt-1">VAS Reports</h1>
@@ -237,7 +237,7 @@ onMounted(async () => {
       />
       <button
         type="button"
-        class="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+        class="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700"
         @click="applySearch"
       >
         Search

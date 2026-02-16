@@ -42,7 +42,7 @@ const COLUMN_LABELS = {
 }
 
 const SORTABLE_COLUMNS = [
-  'id', 'employee_number', 'name', 'team_leader', 'manager', 'department',
+  'id', 'employee_number', 'name', 'roles', 'team_leader', 'manager', 'department',
   'email', 'phone', 'cnic_number', 'extension', 'status', 'joining_date', 'terminate_date',
 ]
 

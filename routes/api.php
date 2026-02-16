@@ -45,6 +45,10 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::get('/me', MeController::class);
     Route::get('/bootstrap', \App\Http\Controllers\Api\BootstrapController::class);
 
+    // Change password (enforced by policy or user-initiated)
+    Route::get('/change-password/policy', [\App\Http\Controllers\Api\ChangePasswordController::class, 'policy']);
+    Route::post('/change-password', [\App\Http\Controllers\Api\ChangePasswordController::class, 'update']);
+
     // Dashboard
     Route::get('/dashboard/stats', [\App\Http\Controllers\Api\DashboardController::class, 'stats']);
 
@@ -337,6 +341,9 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::delete('/announcements/{announcement}/permanent', [\App\Http\Controllers\Api\AnnouncementController::class, 'forceDelete']);
     Route::post('/announcements/{announcement}/acknowledge', [\App\Http\Controllers\Api\AnnouncementController::class, 'acknowledge']);
 
+    // Settings dashboard status (live values)
+    Route::get('/settings/status', \App\Http\Controllers\Api\SettingsStatusController::class);
+
     // Security, Session & Access Control (GET: all auth; PUT/RESET: super admin or manage-security-settings)
     Route::get('/security-settings', [\App\Http\Controllers\Api\SecuritySettingsController::class, 'index']);
     Route::put('/security-settings', [\App\Http\Controllers\Api\SecuritySettingsController::class, 'update']);
@@ -356,6 +363,7 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::get('/library/documents/{document}/versions', [\App\Http\Controllers\Api\LibraryDocumentController::class, 'versions']);
     Route::patch('/library/documents/{document}/toggle', [\App\Http\Controllers\Api\LibraryDocumentController::class, 'toggle']);
     Route::get('/library/documents/{document}', [\App\Http\Controllers\Api\LibraryDocumentController::class, 'show']);
+    Route::post('/library/documents/bulk-upload', [\App\Http\Controllers\Api\LibraryDocumentController::class, 'bulkUpload']);
     Route::post('/library/documents', [\App\Http\Controllers\Api\LibraryDocumentController::class, 'store']);
     Route::post('/library/documents/{document}', [\App\Http\Controllers\Api\LibraryDocumentController::class, 'update']);
     Route::delete('/library/documents/{document}', [\App\Http\Controllers\Api\LibraryDocumentController::class, 'destroy']);

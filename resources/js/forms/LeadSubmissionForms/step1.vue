@@ -713,7 +713,7 @@ const cancel = () => {
           <button
             type="submit"
             :disabled="saving"
-            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-50 bg-[#7ED321] hover:bg-[#6ab81e]"
+            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-50 bg-green-600 hover:bg-green-700"
           >
             Next
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

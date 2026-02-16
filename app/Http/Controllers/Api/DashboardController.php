@@ -81,33 +81,33 @@ class DashboardController extends Controller
         $items = collect();
 
         // Recent lead submissions
-        LeadSubmission::orderByDesc('created_at')->limit(5)->get(['id', 'ref_no', 'applicant_full_name', 'status', 'created_at'])->each(function ($r) use ($items) {
+        LeadSubmission::orderByDesc('created_at')->limit(5)->get(['id', 'company_name', 'account_number', 'status', 'created_at'])->each(function ($r) use ($items) {
             $items->push([
                 'type'      => 'lead',
-                'label'     => 'Lead ' . ($r->ref_no ?? '#' . $r->id),
-                'detail'    => $r->applicant_full_name ?? '—',
+                'label'     => 'Lead ' . ($r->account_number ?? '#' . $r->id),
+                'detail'    => $r->company_name ?? '—',
                 'status'    => $r->status ?? 'new',
                 'timestamp' => $r->created_at?->toIso8601String(),
             ]);
         });
 
         // Recent field submissions
-        FieldSubmission::orderByDesc('created_at')->limit(5)->get(['id', 'ref_no', 'applicant_full_name', 'status', 'created_at'])->each(function ($r) use ($items) {
+        FieldSubmission::orderByDesc('created_at')->limit(5)->get(['id', 'company_name', 'status', 'created_at'])->each(function ($r) use ($items) {
             $items->push([
                 'type'      => 'field',
-                'label'     => 'Field ' . ($r->ref_no ?? '#' . $r->id),
-                'detail'    => $r->applicant_full_name ?? '—',
+                'label'     => 'Field #' . $r->id,
+                'detail'    => $r->company_name ?? '—',
                 'status'    => $r->status ?? 'new',
                 'timestamp' => $r->created_at?->toIso8601String(),
             ]);
         });
 
         // Recent support tickets
-        CustomerSupportSubmission::orderByDesc('created_at')->limit(3)->get(['id', 'subject', 'status', 'created_at'])->each(function ($r) use ($items) {
+        CustomerSupportSubmission::orderByDesc('created_at')->limit(3)->get(['id', 'issue_category', 'status', 'created_at'])->each(function ($r) use ($items) {
             $items->push([
                 'type'      => 'support',
                 'label'     => 'Support #' . $r->id,
-                'detail'    => $r->subject ?? '—',
+                'detail'    => $r->issue_category ?? '—',
                 'status'    => $r->status ?? 'open',
                 'timestamp' => $r->created_at?->toIso8601String(),
             ]);

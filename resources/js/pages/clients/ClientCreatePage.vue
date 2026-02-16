@@ -535,7 +535,7 @@ function closeToast() {
           <h2 id="result-success-title" class="text-lg font-semibold text-gray-900">Success</h2>
           <p class="mt-2 text-gray-700">{{ resultModalMessage }}</p>
           <p class="mt-3 text-sm text-gray-500">Redirecting to clients listing in {{ redirectCountdown }} seconds…</p>
-          <button type="button" class="mt-4 rounded-lg bg-[#21A67B] px-4 py-2 text-sm font-medium text-white hover:opacity-90" @click="goToClients">
+          <button type="button" class="mt-4 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700" @click="goToClients">
             Go to clients
           </button>
         </div>
@@ -937,7 +937,7 @@ function closeToast() {
                 <p class="mt-0.5 text-sm text-gray-500">Assign account manager and customer service representatives.</p>
               </div>
             </div>
-            <button type="button" class="inline-flex items-center rounded bg-[#21A67B] px-4 py-2 text-sm font-medium text-white hover:opacity-90" @click="addCsr">
+            <button type="button" class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700" @click="addCsr">
               Add CSR
             </button>
           </div>
@@ -1037,10 +1037,10 @@ function closeToast() {
             <button type="button" class="inline-flex items-center rounded-lg border border-blue-500 bg-white px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50" :disabled="loading" @click="cancel">
               Cancel
             </button>
-            <button type="submit" class="inline-flex items-center rounded-lg border border-blue-500 bg-white px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50" :disabled="loading">
+            <button type="submit" class="inline-flex items-center rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50" :disabled="loading">
               {{ loading ? 'Creating…' : 'Create Client' }}
             </button>
-            <button type="button" class="inline-flex items-center rounded-lg bg-[#21A67B] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50" :disabled="loading" @click="submit(true)">
+            <button type="button" class="inline-flex items-center rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50" :disabled="loading" @click="submit(true)">
               <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
               </svg>

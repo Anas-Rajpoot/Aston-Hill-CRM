@@ -49,6 +49,7 @@ class LibrarySeeder extends Seeder
                 'module_keys'   => $d[3],
                 'tags'          => [strtolower($d[2]), 'template'],
                 'visibility'    => 'internal',
+                'allowed_roles' => ['manager', 'team_leader', 'sales_agent', 'Back Office', 'field_agent', 'field_operations_head', 'customer_support_representative', 'support_manager1'],
                 'file_type'     => $d[4],
                 'mime_type'     => match ($d[4]) { 'pdf' => 'application/pdf', 'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation', default => 'application/octet-stream' },
                 'storage_disk'  => 'public',

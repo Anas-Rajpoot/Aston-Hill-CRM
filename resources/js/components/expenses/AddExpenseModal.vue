@@ -453,7 +453,7 @@ async function submit() {
               </button>
               <button
                 type="submit"
-                class="rounded bg-[#6BC100] px-4 py-2 text-sm font-medium text-white hover:bg-[#5da800] disabled:opacity-50 transition-colors"
+                class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
                 :disabled="submitting"
               >
                 {{ submitting ? 'Adding...' : 'Add Expense' }}

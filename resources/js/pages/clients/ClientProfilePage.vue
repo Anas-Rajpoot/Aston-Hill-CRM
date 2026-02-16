@@ -12,6 +12,7 @@ import { toDdMmYyyy } from '@/lib/dateFormat'
 import ClientTable from '@/components/clients/ClientTable.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import Pagination from '@/components/Pagination.vue'
+import Toast from '@/components/Toast.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -65,6 +66,11 @@ const auditLoading = ref(false)
 const contactDraft = ref([])
 const addressDraft = ref([])
 const contactSaveLoading = ref(false)
+
+const showToast = ref(false)
+const toastType = ref('success')
+const toastMsg  = ref('')
+function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
 
 // Products & Services
 const products = ref([])
@@ -249,9 +255,11 @@ async function saveContactDetails() {
   contactSaveLoading.value = true
   try {
     await clientsApi.updateContacts(id.value, { contacts: contactDraft.value })
+    toast('success', 'Contact details saved successfully.')
     await loadClient()
-  } catch {}
-  finally {
+  } catch (e) {
+    toast('error', e?.response?.data?.message || 'Failed to save contact details.')
+  } finally {
     contactSaveLoading.value = false
   }
 }
@@ -950,5 +958,7 @@ onMounted(() => {
         Client not found or you don't have permission to view it.
       </div>
     </div>
+
+    <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />
   </div>
 </template>

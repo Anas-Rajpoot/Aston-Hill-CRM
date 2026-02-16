@@ -509,6 +509,8 @@ class ExtensionsApiController extends Controller
             'action' => $action,
             'old_values' => $mask($oldValues),
             'new_values' => $mask($newValues),
+            'ip_address' => request()->ip(),
+            'user_agent' => substr((string) request()->userAgent(), 0, 500),
         ]);
     }
 

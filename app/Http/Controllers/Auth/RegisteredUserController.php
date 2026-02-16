@@ -41,11 +41,17 @@ class RegisteredUserController extends Controller
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:'.User::class],
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'password' => ['required', 'confirmed', new \App\Rules\MeetsPasswordPolicy],
             'phone' => ['required'],
             'country' => ['required'],
             'cnic_number' => ['required'],
         ]);
+
+        // Set must_change_password if security settings require it for first login
+        $mustChange = false;
+        try {
+            $mustChange = \App\Models\SecuritySetting::current()->force_password_reset_on_first_login;
+        } catch (\Throwable $e) {}
 
         $user = User::create([
             'name' => $request->name,
@@ -57,6 +63,8 @@ class RegisteredUserController extends Controller
             'cnic_number' => $request->cnic_number,
             'status' => 'pending',
             'two_factor_enabled' => 1,
+            'must_change_password' => $mustChange,
+            'password_changed_at' => now(),
         ]);
 
         User::role('superadmin')->each(function ($admin) use ($user) {

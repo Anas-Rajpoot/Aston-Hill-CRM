@@ -11,6 +11,7 @@ import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomize
 import EmployeeTable from '@/components/employees/EmployeeTable.vue'
 import Pagination from '@/components/Pagination.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import Toast from '@/components/Toast.vue'
 
 const loading = ref(true)
 const loadError = ref(null)
@@ -44,6 +45,11 @@ const employeeToDeactivate = ref(null)
 const employeeToActivate = ref(null)
 const deactivating = ref(false)
 const activating = ref(false)
+
+const showToast = ref(false)
+const toastType = ref('success')
+const toastMsg  = ref('')
+function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
 
 const filters = ref({
   q: '',
@@ -290,10 +296,11 @@ async function confirmDeactivate() {
   deactivating.value = true
   try {
     await usersApi.bulkDeactivate([row.id])
+    toast('success', 'Employee deactivated successfully.')
     closeDeactivateConfirm()
     load()
-  } catch {
-    //
+  } catch (e) {
+    toast('error', e?.response?.data?.message || 'Failed to deactivate employee.')
   } finally {
     deactivating.value = false
   }
@@ -312,10 +319,11 @@ async function confirmActivate() {
   activating.value = true
   try {
     await usersApi.bulkActivate([row.id])
+    toast('success', 'Employee activated successfully.')
     closeActivateConfirm()
     load()
-  } catch {
-    //
+  } catch (e) {
+    toast('error', e?.response?.data?.message || 'Failed to activate employee.')
   } finally {
     activating.value = false
   }
@@ -693,5 +701,7 @@ onMounted(() => {
         </div>
       </div>
     </Teleport>
+
+    <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />
   </div>
 </template>

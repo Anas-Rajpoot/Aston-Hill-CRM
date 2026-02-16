@@ -58,6 +58,45 @@ function clearFilters() {
   fetchList(1)
 }
 
+// ═══ Sort ═════════════════════════════════════════════════
+const sortKey = ref('published_at')
+const sortDir = ref('desc')
+
+function toggleSort(key) {
+  if (sortKey.value === key) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortKey.value = key
+    sortDir.value = 'asc'
+  }
+  fetchList(1)
+}
+
+// ═══ Column Customization ═════════════════════════════════
+const ALL_COLUMNS = [
+  { key: 'title',        label: 'Title',        sortable: true  },
+  { key: 'type',         label: 'Type',         sortable: true  },
+  { key: 'audience',     label: 'Audience',      sortable: false },
+  { key: 'published_at', label: 'Publish date',  sortable: true  },
+  { key: 'expire_at',    label: 'Expiry date',   sortable: true  },
+  { key: 'status',       label: 'Status',        sortable: true  },
+  { key: 'priority',     label: 'Priority',      sortable: true  },
+  { key: 'creator_name', label: 'Created by',    sortable: false },
+]
+const DEFAULT_VISIBLE = ['title', 'type', 'audience', 'published_at', 'expire_at', 'status', 'creator_name']
+const visibleColumns = ref([...DEFAULT_VISIBLE])
+const columnModalOpen = ref(false)
+const localSelectedCols = ref([])
+
+const activeColumns = computed(() => ALL_COLUMNS.filter(c => visibleColumns.value.includes(c.key)))
+
+function openColumnModal() { localSelectedCols.value = [...visibleColumns.value]; columnModalOpen.value = true }
+function toggleCol(key) { const i = localSelectedCols.value.indexOf(key); i >= 0 ? localSelectedCols.value.splice(i, 1) : localSelectedCols.value.push(key) }
+function colCheckAll() { localSelectedCols.value = ALL_COLUMNS.map(c => c.key) }
+function colUncheckAll() { localSelectedCols.value = [] }
+function colByDefault() { localSelectedCols.value = [...DEFAULT_VISIBLE] }
+function saveColumns() { visibleColumns.value = [...localSelectedCols.value]; columnModalOpen.value = false }
+
 // ═══ Table / Pagination ═══════════════════════════════════
 const rows    = ref([])
 const meta    = reactive({ total: 0, per_page: 10, current_page: 1, last_page: 1, from: 0, to: 0 })
@@ -66,7 +105,7 @@ const { perPage, perPageOptions, perPageReady, setPerPage } = useTablePageSize('
 async function fetchList(page = 1) {
   loading.value = true
   try {
-    const params = { page, per_page: perPage.value, sort: 'publish_at:desc' }
+    const params = { page, per_page: perPage.value, sort: `${sortKey.value}:${sortDir.value}` }
     if (filters.q)          params.q = filters.q
     if (filters.status)     params.status = filters.status
     if (filters.priority)   params.priority = filters.priority
@@ -293,6 +332,10 @@ onMounted(() => fetchList(1))
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
           Filter
         </button>
+        <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="openColumnModal">
+          <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7" /></svg>
+          Customize Columns
+        </button>
         <button v-if="canUpdate" type="button" class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 transition-colors" @click="openCreate">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
           Add New Announcement
@@ -407,20 +450,28 @@ onMounted(() => fetchList(1))
         <table class="min-w-full text-sm">
           <thead>
             <tr class="border-b border-gray-200 bg-gray-50 text-left">
-              <th class="px-6 py-3 font-semibold text-gray-600">Title</th>
-              <th class="px-4 py-3 font-semibold text-gray-600">Type</th>
-              <th class="px-4 py-3 font-semibold text-gray-600">Audience</th>
-              <th class="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Publish Date</th>
-              <th class="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Expiry Date</th>
-              <th class="px-4 py-3 font-semibold text-gray-600">Status</th>
-              <th class="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Created By</th>
+              <th
+                v-for="col in activeColumns"
+                :key="col.key"
+                class="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap select-none"
+                :class="{ 'cursor-pointer hover:text-gray-900': col.sortable, 'pl-6': col.key === 'title' }"
+                @click="col.sortable && toggleSort(col.key)"
+              >
+                <div class="inline-flex items-center gap-1">
+                  {{ col.label }}
+                  <template v-if="col.sortable">
+                    <svg v-if="sortKey === col.key" class="w-3.5 h-3.5 text-green-600" :class="{ 'rotate-180': sortDir === 'desc' }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
+                    <svg v-else class="w-3.5 h-3.5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
+                  </template>
+                </div>
+              </th>
               <th class="px-4 py-3 font-semibold text-gray-600">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
             <tr v-for="ann in rows" :key="ann.id" class="hover:bg-gray-50/50 transition-colors" :class="{ 'opacity-60': ann.status === 'disabled' }">
               <!-- Title (editable on double-click) -->
-              <td class="px-6 py-3.5 max-w-[260px]" @dblclick="startEditAnn(ann)">
+              <td v-if="visibleColumns.includes('title')" class="px-6 py-3.5 max-w-[260px]" @dblclick="startEditAnn(ann)">
                 <template v-if="editingAnnId === ann.id">
                   <input
                     v-model="editingAnnDraft.title"
@@ -435,7 +486,7 @@ onMounted(() => fetchList(1))
                 </template>
               </td>
               <!-- Type (editable on double-click) -->
-              <td class="px-4 py-3.5" @dblclick="startEditAnn(ann)">
+              <td v-if="visibleColumns.includes('type')" class="px-4 py-3.5" @dblclick="startEditAnn(ann)">
                 <template v-if="editingAnnId === ann.id">
                   <select v-model="editingAnnDraft.type" class="rounded-lg border border-gray-300 px-2 py-1.5 text-xs w-full max-w-[100px]">
                     <option value="text">Text</option>
@@ -451,7 +502,7 @@ onMounted(() => fetchList(1))
                 </template>
               </td>
               <!-- Audience chips -->
-              <td class="px-4 py-3.5">
+              <td v-if="visibleColumns.includes('audience')" class="px-4 py-3.5">
                 <div class="flex flex-wrap gap-1">
                   <template v-if="ann.audience_chips?.length">
                     <span v-for="(chip, ci) in ann.audience_chips.slice(0, 2)" :key="ci"
@@ -464,15 +515,20 @@ onMounted(() => fetchList(1))
                 </div>
               </td>
               <!-- Publish Date -->
-              <td class="px-4 py-3.5 text-gray-600 whitespace-nowrap text-xs">{{ fmtDate(ann.published_at) }}</td>
+              <td v-if="visibleColumns.includes('published_at')" class="px-4 py-3.5 text-gray-600 whitespace-nowrap text-xs">{{ fmtDate(ann.published_at) }}</td>
               <!-- Expiry Date -->
-              <td class="px-4 py-3.5 text-gray-600 whitespace-nowrap text-xs">{{ fmtDate(ann.expire_at) }}</td>
+              <td v-if="visibleColumns.includes('expire_at')" class="px-4 py-3.5 text-gray-600 whitespace-nowrap text-xs">{{ fmtDate(ann.expire_at) }}</td>
               <!-- Status -->
-              <td class="px-4 py-3.5">
+              <td v-if="visibleColumns.includes('status')" class="px-4 py-3.5">
                 <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize" :class="statusBadge(ann.status)">{{ ann.status }}</span>
               </td>
+              <!-- Priority -->
+              <td v-if="visibleColumns.includes('priority')" class="px-4 py-3.5">
+                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize"
+                  :class="ann.priority === 'critical' ? 'bg-red-100 text-red-700' : ann.priority === 'high' ? 'bg-orange-100 text-orange-700' : ann.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'">{{ ann.priority || '—' }}</span>
+              </td>
               <!-- Created By -->
-              <td class="px-4 py-3.5 text-gray-600 whitespace-nowrap text-xs">{{ ann.creator_name }}</td>
+              <td v-if="visibleColumns.includes('creator_name')" class="px-4 py-3.5 text-gray-600 whitespace-nowrap text-xs">{{ ann.creator_name }}</td>
               <!-- Actions -->
               <td class="px-4 py-3.5">
                 <div class="flex items-center gap-1.5">
@@ -522,8 +578,8 @@ onMounted(() => fetchList(1))
         <span class="text-gray-500">Showing {{ meta.from || 0 }} to {{ meta.to || 0 }} of {{ meta.total }} entries</span>
         <div class="flex items-center gap-3">
           <div class="flex items-center gap-2">
-            <span class="text-gray-500 whitespace-nowrap">Number of pages</span>
-            <select :value="perPage" class="rounded border border-gray-300 px-2 py-1 text-sm min-w-[60px]" @change="e => { setPerPage(e.target.value); fetchList(1) }">
+            <span class="text-gray-500 whitespace-nowrap">Number of rows</span>
+            <select :value="perPage" class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm min-w-[85px] focus:border-green-500 focus:ring-1 focus:ring-green-500" @change="e => { setPerPage(e.target.value); fetchList(1) }">
               <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
             </select>
           </div>
@@ -733,6 +789,40 @@ onMounted(() => fetchList(1))
               class="rounded-lg bg-red-500 px-5 py-2 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
               @click="confirmDelete"
             >{{ deletePending ? 'Deleting…' : 'Delete Announcement' }}</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ═══ Customize Columns Modal ═══ -->
+    <Teleport to="body">
+      <div v-if="columnModalOpen" class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 py-8" @click.self="columnModalOpen = false">
+        <div class="flex max-h-[85vh] min-h-0 w-full max-w-sm flex-col overflow-hidden rounded-xl bg-white shadow-xl" @click.stop>
+          <div class="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-5 py-3">
+            <div>
+              <h3 class="text-base font-bold text-gray-900">Customize Columns</h3>
+              <p class="text-xs text-gray-500 mt-0.5">Select which columns to display in the table.</p>
+            </div>
+            <button type="button" class="-m-1 rounded p-1 text-gray-400 hover:bg-gray-100" @click="columnModalOpen = false">
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+          <div class="flex items-center gap-2 border-b border-gray-100 px-5 py-2">
+            <button type="button" class="text-xs font-medium text-green-600 hover:text-green-700" @click="colCheckAll">Select All</button>
+            <span class="text-gray-300">|</span>
+            <button type="button" class="text-xs font-medium text-gray-500 hover:text-gray-700" @click="colUncheckAll">Deselect All</button>
+            <span class="text-gray-300">|</span>
+            <button type="button" class="text-xs font-medium text-blue-500 hover:text-blue-700" @click="colByDefault">Default</button>
+          </div>
+          <div class="flex-1 overflow-y-auto px-5 py-3">
+            <label v-for="col in ALL_COLUMNS" :key="col.key" class="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-gray-50 cursor-pointer">
+              <input type="checkbox" :checked="localSelectedCols.includes(col.key)" class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500" @change="toggleCol(col.key)" />
+              <span class="text-sm text-gray-700">{{ col.label }}</span>
+            </label>
+          </div>
+          <div class="flex justify-end gap-2 border-t border-gray-200 bg-gray-50 px-5 py-3">
+            <button type="button" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="columnModalOpen = false">Cancel</button>
+            <button type="button" class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700" @click="saveColumns">Save</button>
           </div>
         </div>
       </div>

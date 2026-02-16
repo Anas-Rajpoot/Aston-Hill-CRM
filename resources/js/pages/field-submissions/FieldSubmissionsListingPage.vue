@@ -12,6 +12,7 @@ import AssignFieldTechnicianModal from '@/components/field-submissions/AssignFie
 import FieldTable from '@/components/field-submissions/FieldTable.vue'
 import Pagination from '@/components/Pagination.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import Toast from '@/components/Toast.vue'
 
 const auth = useAuthStore()
 const loading = ref(true)
@@ -37,6 +38,11 @@ const assignSubmission = ref(null)
 const assignBulkIds = ref([])
 const selectedSubmissionIds = ref([])
 const bulkAssignMessage = ref('')
+
+const showToast = ref(false)
+const toastType = ref('success')
+const toastMsg  = ref('')
+function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
 const canBulkAssign = (() => {
   const roles = auth.user?.roles ?? []
   if (!Array.isArray(roles)) return false
@@ -360,12 +366,12 @@ async function onAssignFieldTechnician(payload) {
     }
     onAssignModalSaved()
   } catch (err) {
-    const msg = err.response?.data?.message || err.message || 'Failed to assign.'
-    alert(msg)
+    toast('error', err.response?.data?.message || err.message || 'Failed to assign.')
   }
 }
 
 function onAssignModalSaved() {
+  toast('success', 'Field technician assigned successfully.')
   assignModalVisible.value = false
   assignSubmission.value = null
   assignBulkIds.value = []
@@ -555,5 +561,7 @@ onMounted(() => {
       @close="onAssignModalClose"
       @assign="onAssignFieldTechnician"
     />
+
+    <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />
   </div>
 </template>

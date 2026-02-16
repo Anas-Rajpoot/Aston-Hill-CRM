@@ -283,7 +283,7 @@ function close() {
             type="button"
             @click="submit"
             :disabled="submitting"
-            class="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-black shadow-sm disabled:opacity-50 bg-[#7ED321] hover:bg-[#6ab81e]"
+            class="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-black shadow-sm disabled:opacity-50 bg-green-600 hover:bg-green-700"
           >
             <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 12L3.269 3.126a59.768 59.768 0 0118.216-8.268 59.768 59.768 0 0118.216 8.268L18 12m-6 0h7.5" />

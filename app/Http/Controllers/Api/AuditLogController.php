@@ -32,7 +32,7 @@ class AuditLogController extends Controller
         $sortDir   = 'desc';
         if ($sort = $request->input('sort')) {
             $parts   = explode(':', $sort);
-            $allowed = ['occurred_at', 'user_name', 'action', 'module', 'result'];
+            $allowed = ['occurred_at', 'user_name', 'user_role', 'action', 'module', 'record_ref', 'ip', 'device', 'result'];
             $sortField = in_array($parts[0], $allowed) ? $parts[0] : 'occurred_at';
             $sortDir   = ($parts[1] ?? 'desc') === 'asc' ? 'asc' : 'desc';
         }

@@ -16,6 +16,7 @@ const authRoutes = [
   { path: '/forgot-password', name: 'forgot-password', component: () => import('@/pages/auth/ForgotPassword.vue') },
   { path: '/reset-password/:token', name: 'reset-password', component: () => import('@/pages/auth/ResetPassword.vue') },
   { path: '/2fa/verify', name: '2fa-verify', component: () => import('@/pages/auth/TwoFactorVerify.vue') },
+  { path: '/change-password', name: 'change-password', component: () => import('@/pages/auth/ChangePassword.vue') },
 ]
 
 const routes = [
@@ -109,7 +110,7 @@ const router = createRouter({
   },
 })
 
-const authPaths = ['/login', '/register', '/forgot-password', '/2fa/verify']
+const authPaths = ['/login', '/register', '/forgot-password', '/2fa/verify', '/change-password']
 const isAuthPath = (path) => authPaths.includes(path) || path.startsWith('/reset-password')
 
 // Note: In-flight API requests are cancelled by composables (e.g. useUserEditData) via AbortController in onUnmounted when navigating away.
@@ -123,6 +124,16 @@ router.beforeEach(async (to, from, next) => {
     return next()
   }
 
+  // Allow /change-password for authenticated users who must change their password
+  if (to.path === '/change-password') {
+    if (!auth.user && !auth.isAuthenticated) {
+      await auth.fetchUser()
+    }
+    // If not authenticated at all, go to login
+    if (!auth.isAuthenticated) return next('/login')
+    return next()
+  }
+
   if (!auth.user || !auth.user.pending2FA) await auth.fetchUser()
 
   if (authPath && auth.isAuthenticated) {
@@ -130,6 +141,12 @@ router.beforeEach(async (to, from, next) => {
   }
   if (!authPath && !auth.isAuthenticated) {
     return next('/login')
+  }
+
+  // If authenticated user has a pending password action, redirect to change-password
+  // (except for API/logout routes)
+  if (auth.isAuthenticated && auth.passwordAction && to.path !== '/change-password') {
+    return next('/change-password')
   }
 
   next()

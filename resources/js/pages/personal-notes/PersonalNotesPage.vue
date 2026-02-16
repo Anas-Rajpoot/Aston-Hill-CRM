@@ -6,6 +6,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import personalNotesApi from '@/services/personalNotesApi'
 import { toDdMonYyyyLower } from '@/lib/dateFormat'
+import Toast from '@/components/Toast.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -15,6 +16,11 @@ const currentIndex = ref(0)
 const loading = ref(true)
 const showDeleteModal = ref(false)
 const deleting = ref(false)
+
+const showToast = ref(false)
+const toastType = ref('success')
+const toastMsg  = ref('')
+function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
 
 const currentNote = computed(() => {
   const list = notes.value
@@ -107,6 +113,7 @@ async function confirmDeleteNote() {
   deleting.value = true
   try {
     await personalNotesApi.delete(note.id)
+    toast('success', 'Note deleted successfully.')
     showDeleteModal.value = false
     await loadNotes()
     if (currentIndex.value >= notes.value.length && notes.value.length > 0) {
@@ -116,8 +123,8 @@ async function confirmDeleteNote() {
     } else {
       updateRoute()
     }
-  } catch {
-    // leave list as is on error
+  } catch (e) {
+    toast('error', e?.response?.data?.message || 'Failed to delete note.')
   } finally {
     deleting.value = false
   }
@@ -136,7 +143,7 @@ watch(
 </script>
 
 <template>
-  <div class="flex h-[calc(100vh-4rem)] flex-col bg-[#E8E8E8]">
+  <div class="flex h-[calc(100vh-4rem)] flex-col bg-white">
     <!-- Dark teal header -->
     <header class="flex shrink-0 items-center justify-between bg-[#0D7377] px-4 py-3 text-white">
       <div class="flex items-center gap-3">
@@ -313,5 +320,7 @@ watch(
         </div>
       </Transition>
     </Teleport>
+
+    <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />
   </div>
 </template>

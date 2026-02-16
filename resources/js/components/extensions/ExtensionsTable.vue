@@ -114,7 +114,7 @@ const COLUMN_LABELS = {
   updated_at: 'Last Updated',
 }
 
-const SORTABLE_COLUMNS = ['id', 'extension', 'landline_number', 'gateway', 'username', 'status', 'team_leader', 'manager', 'updated_at']
+const SORTABLE_COLUMNS = ['id', 'extension', 'landline_number', 'gateway', 'username', 'status', 'team_leader', 'manager', 'usage', 'assigned_to_name', 'comment', 'updated_at']
 
 function label(col) {
   return COLUMN_LABELS[col] ?? col

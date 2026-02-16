@@ -229,7 +229,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6 bg-white -mx-4 -my-5 min-h-full px-6 py-6">
     <!-- Header: page title first, then breadcrumb -->
     <div class="flex flex-wrap items-center justify-between gap-4">
       <div>
@@ -242,7 +242,7 @@ onUnmounted(() => {
       <button
         type="button"
         @click="goToCreate"
-        class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+        class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
       >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -511,7 +511,7 @@ onUnmounted(() => {
                 <button
                   type="submit"
                   :disabled="editSaving"
-                  class="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-70"
+                  class="rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-70"
                 >
                   {{ editSaving ? 'Saving…' : 'Save' }}
                 </button>
