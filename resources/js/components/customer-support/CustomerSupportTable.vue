@@ -70,23 +70,35 @@ function toggleRow(id) {
 const columnLabels = {
   id: '#',
   submitted_at: 'Submission Date',
-  created_at: 'Created',
-  issue_category: 'Issue Category',
-  company_name: 'Company Name',
+  ticket_number: 'Ticket ID',
   account_number: 'Account Number',
+  company_name: 'Company Name',
+  issue_category: 'Issue Category',
   contact_number: 'Contact Number',
   issue_description: 'Issue Description',
   attachments: 'Attachments',
+  creator: 'Submitted By',
+  csr: 'CSR Name',
   manager: 'Manager',
   team_leader: 'Team Leader',
   sales_agent: 'Sales Agent',
   status: 'Status',
-  creator: 'Created By',
+  workflow_status: 'SLA Status',
+  completion_date: 'Completion Date',
+  updated_at: 'Last Updated',
+  created_at: 'Created',
+  trouble_ticket: 'Trouble Ticket',
+  activity: 'Activity',
+  pending: 'Pending With',
+  resolution_remarks: 'Resolution Remarks',
+  internal_remarks: 'Internal Remarks',
 }
 
 const SORTABLE_COLUMNS = [
-  'id', 'submitted_at', 'created_at', 'issue_category', 'company_name', 'account_number',
-  'contact_number', 'manager', 'team_leader', 'sales_agent', 'status', 'creator',
+  'id', 'submitted_at', 'ticket_number', 'account_number', 'company_name', 'issue_category',
+  'contact_number', 'csr', 'manager', 'team_leader', 'sales_agent',
+  'status', 'workflow_status', 'completion_date', 'updated_at', 'created_at',
+  'trouble_ticket', 'pending',
 ]
 
 function label(col) {
@@ -125,8 +137,10 @@ function fullValue(row, col) {
 
 const TRUNCATE_COLUMNS = [
   'issue_category', 'company_name', 'account_number', 'contact_number', 'issue_description',
-  'manager', 'team_leader', 'sales_agent', 'creator', 'status',
-  'submitted_at', 'created_at', 'attachments',
+  'manager', 'team_leader', 'sales_agent', 'creator', 'csr', 'status',
+  'submitted_at', 'created_at', 'updated_at', 'completion_date', 'attachments',
+  'trouble_ticket', 'activity', 'pending', 'resolution_remarks', 'internal_remarks',
+  'workflow_status', 'ticket_number',
 ]
 function shouldTruncate(col) {
   return TRUNCATE_COLUMNS.includes(col)
@@ -209,9 +223,41 @@ function isEditing(rowId, col) {
 const STATUS_BADGES = {
   draft: 'bg-gray-100 text-gray-700',
   submitted: 'bg-blue-100 text-blue-700',
+  approved: 'bg-green-100 text-green-700',
+  rejected: 'bg-red-100 text-red-700',
 }
 function statusBadgeClass(status) {
   return STATUS_BADGES[status] ?? 'bg-gray-100 text-gray-700'
+}
+
+function canResubmit(row) {
+  if (row.status !== 'rejected') return false
+  const roles = auth.user?.roles ?? []
+  const isSuperAdmin = Array.isArray(roles) && roles.some((r) => (typeof r === 'string' ? r : r?.name) === 'superadmin')
+  if (isSuperAdmin) return true
+  const creatorId = row.creator_id ?? row.created_by
+  return creatorId != null && Number(creatorId) === Number(auth.user?.id)
+}
+
+const WORKFLOW_BADGES = {
+  'On Time': 'bg-green-100 text-green-700',
+  'on_time': 'bg-green-100 text-green-700',
+  'Breached': 'bg-red-100 text-red-700',
+  'breached': 'bg-red-100 text-red-700',
+  'Approaching Breach': 'bg-orange-100 text-orange-700',
+  'approaching_breach': 'bg-orange-100 text-orange-700',
+  'open': 'bg-blue-100 text-blue-700',
+  'in_progress': 'bg-yellow-100 text-yellow-700',
+  'pending': 'bg-orange-100 text-orange-700',
+  'resolved': 'bg-green-100 text-green-700',
+  'closed': 'bg-gray-100 text-gray-700',
+}
+function workflowBadgeClass(val) {
+  return WORKFLOW_BADGES[val] ?? 'bg-gray-100 text-gray-700'
+}
+
+function isUnassignedCsr(row) {
+  return row.csr_id == null && (!row.csr || row.csr === '' || row.csr === '—')
 }
 </script>
 
@@ -277,7 +323,7 @@ function statusBadgeClass(status) {
             </button>
             <span v-else class="font-bold text-white">{{ label(col) }}</span>
           </th>
-          <th scope="col" class="whitespace-nowrap px-4 py-3 text-right text-sm font-bold uppercase tracking-wider text-white">
+          <th scope="col" class="whitespace-nowrap px-4 py-3 text-center text-sm font-bold uppercase tracking-wider text-white">
             Actions
           </th>
         </tr>
@@ -352,6 +398,28 @@ function statusBadgeClass(status) {
                 </div>
               </div>
             </template>
+            <!-- CSR Name: show "Unassigned" in red when not assigned -->
+            <template v-else-if="col === 'csr' && isUnassignedCsr(row)">
+              <button
+                v-if="canBulkAssign"
+                type="button"
+                class="cursor-pointer text-red-600 underline hover:text-red-700"
+                @click="$emit('openAssign', row)"
+              >
+                Unassigned
+              </button>
+              <span v-else class="text-red-600">Unassigned</span>
+            </template>
+            <!-- Workflow / SLA Status badge -->
+            <template v-else-if="col === 'workflow_status'">
+              <span
+                v-if="row.workflow_status"
+                :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', workflowBadgeClass(row.workflow_status)]"
+              >
+                {{ row.workflow_status }}
+              </span>
+              <span v-else class="text-gray-400">—</span>
+            </template>
             <template v-else-if="col === 'status' && canInlineEdit && isEditing(row.id, 'status')">
               <div class="flex flex-col gap-1.5">
                 <select
@@ -362,6 +430,8 @@ function statusBadgeClass(status) {
                 >
                   <option value="draft">Draft</option>
                   <option value="submitted">Submitted</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
                 </select>
                 <div class="flex gap-1">
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
@@ -401,19 +471,8 @@ function statusBadgeClass(status) {
               {{ truncate(formatValue(row, col)) }}
             </template>
           </td>
-          <td class="whitespace-nowrap px-4 py-3 text-right">
+          <td class="whitespace-nowrap px-4 py-3 text-center">
             <div class="inline-flex items-center gap-2">
-              <button
-                v-if="canBulkAssign"
-                type="button"
-                class="rounded-full p-1.5 text-purple-600 hover:bg-purple-50"
-                title="Assign to CSR"
-                @click="$emit('openAssign', row)"
-              >
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                </svg>
-              </button>
               <button
                 type="button"
                 class="rounded-full p-1.5 text-blue-600 hover:bg-blue-50"
@@ -445,6 +504,14 @@ function statusBadgeClass(status) {
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </button>
+            </div>
+            <div v-if="canResubmit(row)" class="mt-1 inline-flex justify-center">
+              <router-link
+                :to="`/customer-support/${row.id}/resubmit`"
+                class="rounded bg-blue-800 px-2 py-1 text-xs font-medium text-white hover:bg-blue-900"
+              >
+                Resubmit
+              </router-link>
             </div>
           </td>
         </tr>

@@ -336,6 +336,12 @@ trait ResolvesAuditDisplayValues
                 $row['new_value'] = $this->resolveJsonPayload($row['new_value'], $userNames, $categoryNames, $typeNames, $teamNames, $departmentNames);
             }
 
+            // Resolve attachment/document arrays to comma-separated file names
+            if (in_array($field, ['attachments', 'documents', 'files', 'uploaded_files'], true)) {
+                $row['old_value'] = $this->resolveAttachmentValue($row['old_value']);
+                $row['new_value'] = $this->resolveAttachmentValue($row['new_value']);
+            }
+
             return $row;
         });
     }
@@ -471,6 +477,48 @@ trait ResolvesAuditDisplayValues
         }
 
         return $value;
+    }
+
+    /**
+     * Resolve an attachment array value to comma-separated file names.
+     * Handles both JSON-encoded strings and actual arrays.
+     */
+    private function resolveAttachmentValue(mixed $value): mixed
+    {
+        if ($value === null || $value === '') {
+            return $value;
+        }
+
+        $arr = $value;
+        if (is_string($value)) {
+            $trimmed = trim($value);
+            if (str_starts_with($trimmed, '[')) {
+                $decoded = json_decode($trimmed, true);
+                if (is_array($decoded)) {
+                    $arr = $decoded;
+                } else {
+                    return $value;
+                }
+            } else {
+                return $value;
+            }
+        }
+
+        if (! is_array($arr)) {
+            return $value;
+        }
+
+        $names = [];
+        foreach ($arr as $item) {
+            if (is_array($item)) {
+                $name = $item['file_name'] ?? $item['original_name'] ?? $item['name'] ?? $item['label'] ?? null;
+                if ($name) {
+                    $names[] = $name;
+                }
+            }
+        }
+
+        return count($names) > 0 ? implode(', ', $names) : $value;
     }
 
     /**

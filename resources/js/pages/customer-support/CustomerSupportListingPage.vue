@@ -3,6 +3,7 @@
  * Customer Support Requests listing – same design as Field / Lead Submissions.
  */
 import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import customerSupportApi from '@/services/customerSupportApi'
 import api from '@/lib/axios'
@@ -17,9 +18,15 @@ import Toast from '@/components/Toast.vue'
 import { debounce } from '@/composables/useApiRequest'
 import { useFilterCache } from '@/composables/useFilterCache'
 
+const router = useRouter()
 const historyModalVisible = ref(false)
 const historyRecordId = ref(null)
 const historyRecordLabel = ref('')
+function onResubmit(row) {
+  if (!row?.id) return
+  router.push(`/customer-support/${row.id}/edit?resubmit=1`)
+}
+
 function openHistoryModal(row) {
   if (!row?.id) return
   historyRecordId.value = row.id
@@ -52,8 +59,11 @@ const meta = ref({ current_page: 1, last_page: 1, per_page: auth.defaultTablePag
 const perPageOptions = ref([10, 20, 25, 50, 100])
 const allColumns = ref([])
 const visibleColumns = ref([
-  'id', 'submitted_at', 'issue_category', 'company_name', 'account_number', 'contact_number',
-  'manager', 'team_leader', 'sales_agent', 'status', 'creator',
+  'id', 'submitted_at', 'ticket_number', 'account_number', 'company_name', 'issue_category',
+  'contact_number', 'creator', 'csr', 'status', 'workflow_status',
+  'pending', 'completion_date', 'updated_at',
+  'trouble_ticket', 'activity', 'resolution_remarks', 'internal_remarks',
+  'attachments', 'manager', 'team_leader', 'sales_agent',
 ])
 const sort = ref('submitted_at')
 const order = ref('desc')
@@ -125,18 +135,28 @@ function buildParams() {
 const COLUMN_LABELS = {
   id: 'ID',
   submitted_at: 'Submission Date',
-  created_at: 'Created',
-  issue_category: 'Issue Category',
-  company_name: 'Company Name',
+  ticket_number: 'Ticket ID',
   account_number: 'Account Number',
+  company_name: 'Company Name',
+  issue_category: 'Issue Category',
   contact_number: 'Contact Number',
   issue_description: 'Issue Description',
   attachments: 'Attachments',
+  creator: 'Submitted By',
+  csr: 'CSR Name',
   manager: 'Manager',
   team_leader: 'Team Leader',
   sales_agent: 'Sales Agent',
   status: 'Status',
-  creator: 'Created By',
+  workflow_status: 'SLA Status',
+  completion_date: 'Completion Date',
+  updated_at: 'Last Updated',
+  created_at: 'Created',
+  trouble_ticket: 'Trouble Ticket',
+  activity: 'Activity',
+  pending: 'Pending With',
+  resolution_remarks: 'Resolution Remarks',
+  internal_remarks: 'Internal Remarks',
 }
 
 function escapeCsv(val) {
@@ -534,6 +554,7 @@ onMounted(async () => {
           @update-cell="onUpdateCell"
           @open-assign="openAssignModal"
           @view-history="openHistoryModal"
+          @resubmit="onResubmit"
         />
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
           <p class="text-sm text-gray-600">

@@ -12,7 +12,7 @@ const props = defineProps({
   visible: { type: Boolean, default: false },
   allColumns: { type: Array, default: () => [] },
   visibleColumns: { type: Array, default: () => [] },
-  /** Optional default column keys for "By Default" button. If omitted, uses all columns. */
+  /** Accepted but not used (kept for backward compat). */
   defaultColumns: { type: Array, default: () => [] },
 })
 
@@ -49,19 +49,6 @@ function checkAll() {
 function uncheckAll() {
   errorMessage.value = ''
   localSelected.value = []
-}
-
-function applyByDefault() {
-  errorMessage.value = ''
-  const defaultKeys = props.defaultColumns?.length
-    ? props.defaultColumns
-    : props.allColumns.map((c) => c.key)
-  localSelected.value = [...defaultKeys]
-}
-
-function reset() {
-  errorMessage.value = ''
-  localSelected.value = [...(props.visibleColumns || [])]
 }
 
 function save() {
@@ -123,20 +110,6 @@ function close() {
                 @click="uncheckAll"
               >
                 Uncheck All
-              </button>
-              <button
-                type="button"
-                class="rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50"
-                @click="applyByDefault"
-              >
-                By Default
-              </button>
-              <button
-                type="button"
-                class="rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50"
-                @click="reset"
-              >
-                Reset
               </button>
             </div>
             <div class="space-y-2">

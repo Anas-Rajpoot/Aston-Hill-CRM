@@ -25,10 +25,13 @@ class CustomerSupportApiController extends Controller
 
     private const ALLOWED_COLUMNS = [
         'id', 'submitted_at', 'created_at', 'created_by',
-        'issue_category', 'company_name', 'account_number', 'contact_number',
+        'ticket_number', 'issue_category', 'company_name', 'account_number', 'contact_number',
         'issue_description', 'attachments',
         'manager_id', 'team_leader_id', 'sales_agent_id',
-        'status',
+        'csr_id', 'csr_name', 'status', 'workflow_status',
+        'completion_date', 'updated_at',
+        'trouble_ticket', 'activity', 'pending',
+        'resolution_remarks', 'internal_remarks',
     ];
 
     private const BASE_COLUMNS = ['id', 'status'];
@@ -45,10 +48,10 @@ class CustomerSupportApiController extends Controller
         $validated = $request->validate([
             'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
-            'sort' => ['sometimes', 'string', Rule::in(array_merge(self::ALLOWED_COLUMNS, ['manager', 'team_leader', 'sales_agent', 'creator']))],
+            'sort' => ['sometimes', 'string', Rule::in(array_merge(self::ALLOWED_COLUMNS, ['manager', 'team_leader', 'sales_agent', 'csr', 'creator']))],
             'order' => ['sometimes', 'string', Rule::in(['asc', 'desc'])],
             'columns' => ['sometimes', 'array'],
-            'columns.*' => ['string', Rule::in(array_merge(self::ALLOWED_COLUMNS, ['manager', 'team_leader', 'sales_agent', 'creator']))],
+            'columns.*' => ['string', Rule::in(array_merge(self::ALLOWED_COLUMNS, ['manager', 'team_leader', 'sales_agent', 'csr', 'creator']))],
             'q' => ['sometimes', 'nullable', 'string', 'max:200'],
             'company_name' => ['sometimes', 'nullable', 'string', 'max:200'],
             'account_number' => ['sometimes', 'nullable', 'string', 'max:100'],
@@ -87,6 +90,9 @@ class CustomerSupportApiController extends Controller
             $eagerLoad['manager'] = fn ($q) => $q->select('id', 'name');
             $eagerLoad['teamLeader'] = fn ($q) => $q->select('id', 'name');
             $eagerLoad['salesAgent'] = fn ($q) => $q->select('id', 'name');
+        }
+        if (in_array('csr', $columns, true) || in_array('csr_id', $columns, true)) {
+            $eagerLoad['csrUser'] = fn ($q) => $q->select('id', 'name');
         }
         if (! empty($eagerLoad)) {
             $dataQuery->with($eagerLoad);
@@ -144,7 +150,7 @@ class CustomerSupportApiController extends Controller
 
     private function resolveColumns($user, ?array $requestColumns): array
     {
-        $allAllowed = array_merge(self::ALLOWED_COLUMNS, ['manager', 'team_leader', 'sales_agent', 'creator']);
+        $allAllowed = array_merge(self::ALLOWED_COLUMNS, ['manager', 'team_leader', 'sales_agent', 'csr', 'creator']);
         if (! empty($requestColumns)) {
             $allowed = array_intersect($requestColumns, $allAllowed);
             return array_values(array_unique(array_merge(self::BASE_COLUMNS, $allowed)));
@@ -230,6 +236,11 @@ class CustomerSupportApiController extends Controller
                 ->orderBy("{$alias}.name", $direction);
             return;
         }
+        if ($sort === 'csr') {
+            $query->leftJoin('users as csr_users', 'customer_support_submissions.csr_id', '=', 'csr_users.id')
+                ->orderBy('csr_users.name', $direction);
+            return;
+        }
         $query->orderBy('customer_support_submissions.' . $sort, $direction);
     }
 
@@ -239,6 +250,7 @@ class CustomerSupportApiController extends Controller
         $map = [
             'submitted_at' => 'customer_support_submissions.submitted_at',
             'created_at' => 'customer_support_submissions.created_at',
+            'updated_at' => 'customer_support_submissions.updated_at',
             'created_by' => 'customer_support_submissions.created_by',
             'creator' => 'customer_support_submissions.created_by',
             'issue_category' => 'customer_support_submissions.issue_category',
@@ -253,6 +265,17 @@ class CustomerSupportApiController extends Controller
             'team_leader' => 'customer_support_submissions.team_leader_id',
             'sales_agent_id' => 'customer_support_submissions.sales_agent_id',
             'sales_agent' => 'customer_support_submissions.sales_agent_id',
+            'csr_id' => 'customer_support_submissions.csr_id',
+            'csr' => 'customer_support_submissions.csr_id',
+            'csr_name' => 'customer_support_submissions.csr_name',
+            'ticket_number' => 'customer_support_submissions.ticket_number',
+            'workflow_status' => 'customer_support_submissions.workflow_status',
+            'completion_date' => 'customer_support_submissions.completion_date',
+            'trouble_ticket' => 'customer_support_submissions.trouble_ticket',
+            'activity' => 'customer_support_submissions.activity',
+            'pending' => 'customer_support_submissions.pending',
+            'resolution_remarks' => 'customer_support_submissions.resolution_remarks',
+            'internal_remarks' => 'customer_support_submissions.internal_remarks',
         ];
         foreach ($columns as $col) {
             if ($col === 'id' || $col === 'status') {
@@ -284,6 +307,11 @@ class CustomerSupportApiController extends Controller
                 $out['sales_agent'] = $row->salesAgent?->name ?? null;
                 continue;
             }
+            if ($col === 'csr' || $col === 'csr_id') {
+                $out['csr_id'] = $row->csr_id;
+                $out['csr'] = $row->csrUser?->name ?? $row->csr_name ?? null;
+                continue;
+            }
             if ($col === 'creator') {
                 $out['creator'] = $row->creator?->name ?? null;
                 continue;
@@ -293,8 +321,12 @@ class CustomerSupportApiController extends Controller
                 $out['attachments'] = is_array($att) ? count($att) : 0;
                 continue;
             }
-            if (in_array($col, ['submitted_at', 'created_at'], true)) {
+            if (in_array($col, ['submitted_at', 'created_at', 'updated_at'], true)) {
                 $out[$col] = $row->$col ? $row->$col->format('d/M/Y H:i') : null;
+                continue;
+            }
+            if ($col === 'completion_date') {
+                $out[$col] = $row->completion_date ? $row->completion_date->format('d/M/Y') : null;
                 continue;
             }
             $out[$col] = $row->$col ?? null;
@@ -358,7 +390,7 @@ class CustomerSupportApiController extends Controller
     {
         $this->authorize('viewAny', CustomerSupportSubmission::class);
 
-        $allAllowed = array_merge(self::ALLOWED_COLUMNS, ['manager', 'team_leader', 'sales_agent', 'creator']);
+        $allAllowed = array_merge(self::ALLOWED_COLUMNS, ['manager', 'team_leader', 'sales_agent', 'csr', 'creator']);
         $data = $request->validate([
             'visible_columns' => ['required', 'array', 'min:1'],
             'visible_columns.*' => ['string', Rule::in($allAllowed)],
@@ -380,17 +412,18 @@ class CustomerSupportApiController extends Controller
 
         $categories = CustomerSupportController::issueCategories();
         $rules = [
-            'issue_category' => ['required', 'string', Rule::in($categories)],
-            'company_name' => ['required', 'string', 'max:255'],
+            'issue_category' => ['sometimes', 'required', 'string', Rule::in($categories)],
+            'company_name' => ['sometimes', 'required', 'string', 'max:255'],
             'account_number' => ['sometimes', 'nullable', 'string', 'max:100'],
-            'contact_number' => ['required', 'string', 'max:50'],
-            'issue_description' => ['required', 'string', 'max:5000'],
-            'manager_id' => ['required', 'integer', 'min:1', 'exists:users,id'],
-            'team_leader_id' => ['required', 'integer', 'min:1', 'exists:users,id'],
-            'sales_agent_id' => ['required', 'integer', 'min:1', 'exists:users,id'],
+            'contact_number' => ['sometimes', 'required', 'string', 'max:50'],
+            'issue_description' => ['sometimes', 'required', 'string', 'max:5000'],
+            'manager_id' => ['sometimes', 'required', 'integer', 'min:1', 'exists:users,id'],
+            'team_leader_id' => ['sometimes', 'required', 'integer', 'min:1', 'exists:users,id'],
+            'sales_agent_id' => ['sometimes', 'required', 'integer', 'min:1', 'exists:users,id'],
             'status' => ['sometimes', 'string', Rule::in(CustomerSupportSubmission::STATUSES)],
             'ticket_number' => ['sometimes', 'nullable', 'string', 'max:100'],
             'csr_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'csr_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'workflow_status' => ['sometimes', 'nullable', 'string', Rule::in(CustomerSupportSubmission::WORKFLOW_STATUSES)],
             'completion_date' => ['sometimes', 'nullable', 'date'],
             'trouble_ticket' => ['sometimes', 'nullable', 'string', 'max:255'],

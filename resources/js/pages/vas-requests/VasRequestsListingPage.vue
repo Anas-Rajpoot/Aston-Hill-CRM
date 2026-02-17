@@ -3,9 +3,11 @@
  * VAS Requests listing – same design as Field / Lead / Customer Support.
  */
 import { ref, onMounted, watch, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import vasRequestsApi from '@/services/vasRequestsApi'
 
+const router = useRouter()
 const auth = useAuthStore()
 let listAbortController = null
 const { loadBootstrap: loadCachedBootstrap, invalidate: invalidateFilterCache } = useFilterCache('vas-requests')
@@ -331,6 +333,10 @@ const canBulkAssign = (() => {
     return name === 'superadmin' || name === 'back_office' || name === 'backoffice'
   })
 })()
+
+function goToResubmit(row) {
+  if (row?.id) router.push(`/vas-requests/${row.id}/resubmit`)
+}
 
 async function loadBackOfficeOptions() {
   const res = await vasRequestsApi.getBackOfficeOptions()

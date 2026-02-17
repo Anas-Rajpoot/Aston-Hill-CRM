@@ -34,7 +34,7 @@ class CustomerSupportSubmission extends Model
         'internal_remarks',
     ];
 
-    const STATUSES = ['draft', 'submitted'];
+    const STATUSES = ['draft', 'submitted', 'approved', 'rejected'];
 
     const WORKFLOW_STATUSES = ['open', 'in_progress', 'pending', 'resolved', 'closed'];
 

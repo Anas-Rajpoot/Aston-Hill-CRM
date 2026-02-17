@@ -27,10 +27,38 @@ const FIELD_LABELS = {
   status: 'Status',
 }
 
+function formatAttachmentNames(arr) {
+  if (!Array.isArray(arr)) return null
+  const names = arr
+    .map((item) => (typeof item === 'object' && item !== null) ? (item.file_name || item.original_name || item.name || item.label || null) : null)
+    .filter(Boolean)
+  return names.length > 0 ? names.join(', ') : null
+}
+
 function formatAuditVal(v) {
   if (v == null || v === '') return '(empty)'
-  if (typeof v === 'object') return JSON.stringify(v)
-  return String(v)
+  if (Array.isArray(v)) {
+    const names = formatAttachmentNames(v)
+    if (names) return names
+    return JSON.stringify(v)
+  }
+  if (typeof v === 'object') {
+    if (v.file_name || v.original_name || v.name) return v.file_name || v.original_name || v.name
+    return JSON.stringify(v)
+  }
+  const s = String(v)
+  if (s.startsWith('[') || s.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(s)
+      if (Array.isArray(parsed)) {
+        const names = formatAttachmentNames(parsed)
+        if (names) return names
+      } else if (typeof parsed === 'object' && parsed !== null && (parsed.file_name || parsed.original_name || parsed.name)) {
+        return parsed.file_name || parsed.original_name || parsed.name
+      }
+    } catch { /* not JSON */ }
+  }
+  return s
 }
 
 function getFieldLabel(key, backendLabels) {

@@ -80,6 +80,13 @@ const COMMON_LABELS = {
   field_status: 'Field Status',
   field_executive_id: 'Field Agent',
   csr_id: 'Customer Support Representative',
+  csr_name: 'CSR Name',
+  ticket_number: 'Ticket ID',
+  trouble_ticket: 'Trouble Ticket',
+  pending: 'Pending With',
+  resolution_remarks: 'Resolution Remarks',
+  internal_remarks: 'Internal Remarks',
+  contact_number: 'Contact Number',
   created_by: 'Created By',
   service_type: 'Service Type',
   creator: 'Created By',
@@ -87,6 +94,10 @@ const COMMON_LABELS = {
   request_description: 'Request Description',
   department_id: 'Department',
   team_id: 'Team',
+  attachments: 'Attachments',
+  documents: 'Documents',
+  files: 'Files',
+  uploaded_files: 'Uploaded Files',
 }
 
 function formatDateTime(iso) {
@@ -108,10 +119,47 @@ function prettyField(name, backendLabel) {
     .replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
+function formatAttachmentNames(arr) {
+  if (!Array.isArray(arr)) return null
+  const names = arr
+    .map((item) => {
+      if (typeof item === 'object' && item !== null) {
+        return item.file_name || item.original_name || item.name || item.label || null
+      }
+      return null
+    })
+    .filter(Boolean)
+  return names.length > 0 ? names.join(', ') : null
+}
+
 function formatVal(v) {
   if (v == null || v === '') return '(empty)'
-  if (typeof v === 'object') return JSON.stringify(v)
+  if (Array.isArray(v)) {
+    const attachmentDisplay = formatAttachmentNames(v)
+    if (attachmentDisplay) return attachmentDisplay
+    return JSON.stringify(v)
+  }
+  if (typeof v === 'object') {
+    if (v.file_name || v.original_name || v.name) {
+      return v.file_name || v.original_name || v.name
+    }
+    return JSON.stringify(v)
+  }
   const s = String(v)
+  // Try parsing JSON strings that might be attachment arrays
+  if (s.startsWith('[') || s.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(s)
+      if (Array.isArray(parsed)) {
+        const attachmentDisplay = formatAttachmentNames(parsed)
+        if (attachmentDisplay) return attachmentDisplay
+      } else if (typeof parsed === 'object' && parsed !== null) {
+        if (parsed.file_name || parsed.original_name || parsed.name) {
+          return parsed.file_name || parsed.original_name || parsed.name
+        }
+      }
+    } catch { /* not JSON, continue */ }
+  }
   if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) {
     return formatDateTime(s)
   }

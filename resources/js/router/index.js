@@ -46,6 +46,7 @@ const routes = [
       { path: 'customer-support', component: () => import('@/pages/customer-support/CustomerSupportListingPage.vue') },
       { path: 'customer-support/:id', component: () => import('@/pages/customer-support/CustomerSupportDetailPage.vue') },
       { path: 'customer-support/:id/edit', component: () => import('@/pages/customer-support/CustomerSupportEditPage.vue') },
+      { path: 'customer-support/:id/resubmit', component: () => import('@/pages/customer-support/CustomerSupportResubmitPage.vue'), name: 'cs-resubmit' },
       { path: 'vas-requests', component: () => import('@/pages/vas-requests/VasRequestsListingPage.vue') },
       { path: 'vas-requests/:id/edit', component: () => import('@/pages/vas-requests/VasRequestEditPage.vue'), name: 'vas-request-edit' },
       { path: 'vas-requests/:id/resubmit', component: () => import('@/pages/vas-requests/VasRequestResubmitPage.vue'), name: 'vas-request-resubmit' },

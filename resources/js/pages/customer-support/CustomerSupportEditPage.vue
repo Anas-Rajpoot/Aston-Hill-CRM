@@ -30,6 +30,8 @@ const id = computed(() => {
   return p != null ? Number(p) : null
 })
 
+const isResubmit = computed(() => route.query.resubmit === '1')
+
 const { errors, generalMessage, setErrors, clearErrors, getError } = useFormErrors()
 
 const form = ref({

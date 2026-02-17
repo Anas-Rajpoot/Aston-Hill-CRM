@@ -14,6 +14,8 @@ const router = useRouter()
 
 const loading = ref(true)
 const submission = ref(null)
+const audits = ref([])
+const auditsLoading = ref(false)
 
 const id = computed(() => {
   const p = route.params.id
@@ -64,6 +66,36 @@ async function downloadAttachment(index) {
   }
 }
 
+const FIELD_LABELS = {
+  issue_category: 'Issue Category',
+  company_name: 'Company Name',
+  account_number: 'Account Number',
+  contact_number: 'Contact Number',
+  issue_description: 'Issue Description',
+  status: 'Status',
+  manager_id: 'Manager',
+  team_leader_id: 'Team Leader',
+  sales_agent_id: 'Sales Agent',
+  csr_id: 'CSR',
+  csr_name: 'CSR Name',
+  ticket_number: 'Ticket ID',
+  workflow_status: 'SLA Status',
+  completion_date: 'Completion Date',
+  trouble_ticket: 'Trouble Ticket',
+  activity: 'Activity',
+  pending: 'Pending With',
+  resolution_remarks: 'Resolution Remarks',
+  internal_remarks: 'Internal Remarks',
+  submitted_at: 'Submitted At',
+  back_office_executive_id: 'Back Office Executive',
+  attachments: 'Attachments',
+}
+
+function fieldLabel(name, row) {
+  if (row?.field_label) return row.field_label
+  return FIELD_LABELS[name] || name?.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || '—'
+}
+
 async function load() {
   if (!id.value) return
   loading.value = true
@@ -75,6 +107,20 @@ async function load() {
     submission.value = null
   } finally {
     loading.value = false
+  }
+  loadAudits()
+}
+
+async function loadAudits() {
+  if (!id.value) return
+  auditsLoading.value = true
+  try {
+    const res = await customerSupportApi.getAudits(id.value)
+    audits.value = res?.data ?? []
+  } catch {
+    audits.value = []
+  } finally {
+    auditsLoading.value = false
   }
 }
 
@@ -232,6 +278,41 @@ onMounted(() => {
                 <label class="block text-xs font-medium text-gray-500">Created At</label>
                 <div class="mt-1 text-sm font-medium text-gray-800">{{ formatDateTime(submission.created_at) }}</div>
               </div>
+            </div>
+          </section>
+
+          <!-- Change History -->
+          <section class="mb-6">
+            <h2 class="mb-3 text-sm font-semibold text-gray-900">Change History</h2>
+            <p class="mb-3 text-xs text-gray-500">All field changes with previous value, new value, date/time and who made the change.</p>
+            <div v-if="auditsLoading" class="flex justify-center py-6">
+              <svg class="h-6 w-6 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            </div>
+            <div v-else-if="audits.length === 0" class="rounded-lg border border-gray-200 bg-gray-50 py-6 text-center text-sm text-gray-500">No changes recorded yet.</div>
+            <div v-else class="overflow-x-auto rounded-lg border border-gray-200">
+              <table class="min-w-full text-left text-sm">
+                <thead class="border-b border-gray-200 bg-gray-100">
+                  <tr>
+                    <th class="px-4 py-2 font-semibold text-gray-900">Field</th>
+                    <th class="px-4 py-2 font-semibold text-gray-900">Old Value</th>
+                    <th class="px-4 py-2 font-semibold text-gray-900">New Value</th>
+                    <th class="px-4 py-2 font-semibold text-gray-900">Date &amp; Time</th>
+                    <th class="px-4 py-2 font-semibold text-gray-900">Changed By</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 bg-white">
+                  <tr v-for="a in audits" :key="a.id" class="hover:bg-gray-50/50">
+                    <td class="whitespace-nowrap px-4 py-2 font-medium text-gray-800">{{ fieldLabel(a.field_name, a) }}</td>
+                    <td class="max-w-[200px] truncate px-4 py-2 text-red-500 line-through" :title="a.old_value">{{ a.old_value ?? '(empty)' }}</td>
+                    <td class="max-w-[200px] truncate px-4 py-2 text-green-600" :title="a.new_value">{{ a.new_value ?? '(empty)' }}</td>
+                    <td class="whitespace-nowrap px-4 py-2 text-gray-600">{{ a.changed_at ? formatDateTime(a.changed_at) : '—' }}</td>
+                    <td class="whitespace-nowrap px-4 py-2 text-gray-600">{{ a.changed_by_name ?? '—' }}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </section>
 
