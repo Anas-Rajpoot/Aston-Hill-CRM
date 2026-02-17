@@ -18,6 +18,9 @@ return [
         'sales_agents' => 'Sales Agents',
         'attendance' => 'Attendance',
 
+        // Teams
+        'teams' => 'Teams',
+
         // Submissions
         'submissions' => 'My Submissions',
         'submission_details' => 'Submission Details',
@@ -96,6 +99,18 @@ return [
     */
 
     'structure' => [
+        'teams' => [
+            'label' => 'Teams',
+            'icon' => 'team',
+            'permissions' => [
+                ['key' => 'list', 'label' => 'View Teams List', 'priority' => 'high'],
+                ['key' => 'view', 'label' => 'View Team Details', 'priority' => 'high'],
+                ['key' => 'create', 'label' => 'Create Teams', 'priority' => 'high'],
+                ['key' => 'edit', 'label' => 'Edit Teams', 'priority' => 'high'],
+                ['key' => 'delete', 'label' => 'Delete Teams', 'priority' => 'high'],
+                ['key' => 'manage_members', 'label' => 'Manage Team Members', 'priority' => 'high'],
+            ],
+        ],
         'dashboard' => [
             'label' => 'Dashboard',
             'icon' => 'dashboard',

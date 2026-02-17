@@ -7,11 +7,15 @@ import clientsApi from '@/services/clientsApi'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import OrderStatusTable from '@/components/order-status/OrderStatusTable.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
-import Pagination from '@/components/Pagination.vue'
+import api from '@/lib/axios'
+import { useAuthStore } from '@/stores/auth'
 
+const auth = useAuthStore()
+const TABLE_MODULE = 'order-status'
+const perPageOptions = ref([10, 20, 25, 50, 100])
 const loading = ref(true)
 const orders = ref([])
-const meta = ref({ current_page: 1, last_page: 1, per_page: 15, total: 0 })
+const meta = ref({ current_page: 1, last_page: 1, per_page: auth.defaultTablePageSize || 25, total: 0 })
 const sort = ref('submitted_at')
 const order = ref('desc')
 const columnModalVisible = ref(false)
@@ -136,7 +140,24 @@ function onPageChange(page) {
   load()
 }
 
-onMounted(() => {
+async function onPerPageChange(e) {
+  const val = Number(e.target.value)
+  meta.value.per_page = val
+  meta.value.current_page = 1
+  load()
+  try { await api.post(`/table-preferences/${TABLE_MODULE}`, { per_page: val }) } catch { /* silent */ }
+}
+
+async function loadTablePreference() {
+  try {
+    const { data } = await api.get(`/table-preferences/${TABLE_MODULE}`)
+    if (data.per_page) meta.value.per_page = Number(data.per_page)
+    if (Array.isArray(data.options) && data.options.length) perPageOptions.value = data.options
+  } catch { /* use system default */ }
+}
+
+onMounted(async () => {
+  await loadTablePreference()
   load()
 })
 </script>
@@ -188,18 +209,6 @@ onMounted(() => {
               @keyup.enter="applyFilters"
             />
           </div>
-          <div class="min-w-[140px] max-w-[200px] flex-1">
-            <label for="os-wo" class="mb-0.5 block text-xs text-gray-700">Work Order</label>
-            <input
-              id="os-wo"
-              v-model="filters.wo_number"
-              type="text"
-              placeholder="Work order..."
-              class="w-full rounded border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-700 placeholder-gray-400 focus:border-green-500 focus:ring-1 focus:ring-green-500"
-              :disabled="loading"
-              @keyup.enter="applyFilters"
-            />
-          </div>
           <div class="flex flex-1 flex-wrap items-center gap-2">
             <button
               type="button"
@@ -220,33 +229,44 @@ onMounted(() => {
             >
               Clear
             </button>
+            <div class="ml-auto flex items-center gap-2">
             <button
               type="button"
-              class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-              :class="advancedFiltersOpen && 'ring-1 ring-green-500 border-green-500'"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
               @click="advancedFiltersOpen = !advancedFiltersOpen"
             >
-              <svg class="mr-1.5 h-4 w-4 transition-transform" :class="advancedFiltersOpen && 'rotate-90'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-              </svg>
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
               Advanced Filters
             </button>
             <button
               type="button"
-              class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
               @click="columnModalVisible = true"
             >
               Customize Columns
-              <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
               </svg>
             </button>
+            </div>
           </div>
         </div>
 
-        <!-- Advanced filters panel (Work Order Status, Activation Date From, Activation Date To) -->
+        <!-- Advanced filters panel (Work Order, Work Order Status, Activation Date From, Activation Date To) -->
         <div v-show="advancedFiltersOpen" class="mt-4 border-t border-gray-200 pt-4">
           <div class="flex flex-wrap items-end gap-4">
+            <div class="min-w-[140px] max-w-[200px]">
+              <label for="os-wo" class="mb-0.5 block text-xs text-gray-700">Work Order</label>
+              <input
+                id="os-wo"
+                v-model="filters.wo_number"
+                type="text"
+                placeholder="Work order..."
+                class="w-full rounded border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-700 placeholder-gray-400 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                :disabled="loading"
+                @keyup.enter="applyFilters"
+              />
+            </div>
             <div class="min-w-[140px] max-w-[200px]">
               <label for="os-status" class="mb-0.5 block text-xs text-gray-700">Work Order Status</label>
               <select
@@ -287,7 +307,7 @@ onMounted(() => {
       </div>
 
       <!-- Table -->
-      <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div class="overflow-hidden rounded-lg border-2 border-black bg-white shadow-sm">
         <OrderStatusTable
           :columns="visibleColumns"
           :data="orders"
@@ -296,24 +316,29 @@ onMounted(() => {
           :loading="loading"
           @sort="onSort"
         />
-        <div
-          class="flex flex-wrap items-center gap-4 border-t border-gray-200 bg-white px-4 py-3"
-          :class="meta.last_page > 1 ? 'justify-between' : 'justify-start'"
-        >
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
           <p class="text-sm text-gray-600">
-            Showing {{ meta.total ? (meta.current_page - 1) * meta.per_page + 1 : 0 }} to
-            {{ Math.min(meta.current_page * meta.per_page, meta.total) }} of {{ meta.total }} entries
+            Showing {{ meta.total ? ((meta.current_page - 1) * meta.per_page) + 1 : 0 }}
+            to {{ Math.min(meta.current_page * meta.per_page, meta.total) }}
+            of {{ meta.total }} entries
           </p>
-          <Pagination
-            v-if="meta.last_page > 1"
-            :meta="{
-              prev_page_url: meta.current_page > 1 ? '#' : null,
-              next_page_url: meta.current_page < meta.last_page ? '#' : null,
-              current_page: meta.current_page,
-              last_page: meta.last_page,
-            }"
-            @change="onPageChange"
-          />
+          <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2 text-sm text-gray-600">
+              <span class="whitespace-nowrap font-medium">Number of rows</span>
+              <select
+                :value="meta.per_page"
+                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                @change="onPerPageChange"
+              >
+                <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button type="button" :disabled="meta.current_page <= 1" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50" @click="onPageChange(meta.current_page - 1)">Previous</button>
+              <span class="rounded-md border border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-700">Page {{ meta.current_page }} of {{ meta.last_page }}</span>
+              <button type="button" :disabled="meta.current_page >= meta.last_page" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50" @click="onPageChange(meta.current_page + 1)">Next</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -21,7 +21,7 @@ const emit = defineEmits(['close'])
 const SKIP_FIELDS = ['updated_at', 'created_at', 'deleted_at', 'id', 'remember_token', '_method', '_token', 'payload']
 
 const COMMON_LABELS = {
-  step: 'Wizard Step',
+  step: 'Submission Step',
   submitted_at: 'Submitted At',
   status: 'Status',
   status_changed_at: 'Status Changed At',
@@ -39,6 +39,8 @@ const COMMON_LABELS = {
   category_name: 'Service Category',
   type: 'Service Type',
   type_name: 'Service Type',
+  service_category_id: 'Service Category',
+  service_type_id: 'Service Type',
   product: 'Product',
   offer: 'Offer',
   mrc_aed: 'MRC (AED)',
@@ -53,6 +55,7 @@ const COMMON_LABELS = {
   manager: 'Manager',
   manager_id: 'Manager',
   back_office_executive_id: 'Back Office Executive',
+  executive_id: 'Back Office Executive',
   executive: 'Back Office Executive',
   call_verification: 'Call Verification',
   pending_from_sales: 'Pending From Sales',
@@ -75,10 +78,15 @@ const COMMON_LABELS = {
   contract_period: 'Contract Period',
   activation_date: 'Activation Date',
   field_status: 'Field Status',
-  field_executive_id: 'Field Executive',
+  field_executive_id: 'Field Agent',
+  csr_id: 'Customer Support Representative',
+  created_by: 'Created By',
   service_type: 'Service Type',
   creator: 'Created By',
   activity: 'Activity',
+  request_description: 'Request Description',
+  department_id: 'Department',
+  team_id: 'Team',
 }
 
 function formatDateTime(iso) {
@@ -89,7 +97,8 @@ function formatDateTime(iso) {
   return `${pad(d.getDate())}-${months[d.getMonth()]}-${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
-function prettyField(name) {
+function prettyField(name, backendLabel) {
+  if (backendLabel) return backendLabel
   if (!name) return '—'
   if (props.fieldLabels[name]) return props.fieldLabels[name]
   if (COMMON_LABELS[name]) return COMMON_LABELS[name]
@@ -130,6 +139,7 @@ function normalise(v) {
 function expandAuditRow(a) {
   const oldObj = tryParseJson(a.old_value)
   const newObj = tryParseJson(a.new_value)
+  const backendLabel = a.field_label || null
 
   if (oldObj && newObj && typeof oldObj === 'object' && typeof newObj === 'object'
       && !Array.isArray(oldObj) && !Array.isArray(newObj)) {
@@ -143,7 +153,7 @@ function expandAuditRow(a) {
         changes.push({ field: prettyField(key), oldVal: oldObj[key], newVal: newObj[key] })
       }
     }
-    return changes.length ? changes : [{ field: prettyField(a.field_name), oldVal: '(no visible changes)', newVal: '(no visible changes)' }]
+    return changes.length ? changes : [{ field: prettyField(a.field_name, backendLabel), oldVal: '(no visible changes)', newVal: '(no visible changes)' }]
   }
 
   if (newObj && typeof newObj === 'object' && !Array.isArray(newObj) && !oldObj) {
@@ -154,7 +164,7 @@ function expandAuditRow(a) {
         changes.push({ field: prettyField(key), oldVal: null, newVal: val })
       }
     }
-    return changes.length ? changes : [{ field: prettyField(a.field_name), oldVal: null, newVal: '(set)' }]
+    return changes.length ? changes : [{ field: prettyField(a.field_name, backendLabel), oldVal: null, newVal: '(set)' }]
   }
 
   if (oldObj && typeof oldObj === 'object' && !Array.isArray(oldObj) && !newObj) {
@@ -165,12 +175,12 @@ function expandAuditRow(a) {
         changes.push({ field: prettyField(key), oldVal: val, newVal: null })
       }
     }
-    return changes.length ? changes : [{ field: prettyField(a.field_name), oldVal: '(removed)', newVal: null }]
+    return changes.length ? changes : [{ field: prettyField(a.field_name, backendLabel), oldVal: '(removed)', newVal: null }]
   }
 
   if (SKIP_FIELDS.includes(a.field_name)) return []
 
-  return [{ field: prettyField(a.field_name), oldVal: a.old_value, newVal: a.new_value }]
+  return [{ field: prettyField(a.field_name, backendLabel), oldVal: a.old_value, newVal: a.new_value }]
 }
 
 const auditLog = ref([])
@@ -237,7 +247,7 @@ watch(
   <Teleport to="body">
     <div
       v-if="visible"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-gray-500/50 p-4"
+      class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-gray-500/50 p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="record-history-title"
@@ -328,12 +338,12 @@ watch(
       <!-- Change Details overlay -->
       <div
         v-if="selectedEntry"
-        class="fixed inset-0 z-[60] flex items-center justify-center bg-gray-500/50 p-4"
+        class="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-gray-500/50 p-4"
         role="dialog"
         aria-modal="true"
         @click.self="closeChangeDetails"
       >
-        <div class="w-full max-w-lg rounded-lg bg-white shadow-xl">
+        <div class="w-full max-w-lg max-h-[90vh] flex flex-col rounded-lg bg-white shadow-xl">
           <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
             <h3 class="text-lg font-semibold text-gray-900">Change Details</h3>
             <button type="button" class="rounded p-1 text-gray-400 hover:bg-gray-100" aria-label="Close" @click="closeChangeDetails">

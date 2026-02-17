@@ -31,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             '2fa_or_superadmin' => \App\Http\Middleware\EnsureTwoFactorVerified::class,
             'etag.cache' => \App\Http\Middleware\EtagCache::class,
+            'api.cache' => \App\Http\Middleware\ApiCacheHeaders::class,
             'role' => RoleMiddleware::class,
             'permission' => PermissionMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,

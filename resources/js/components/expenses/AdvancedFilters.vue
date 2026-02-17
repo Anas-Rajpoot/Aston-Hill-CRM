@@ -92,17 +92,6 @@ const createdToDisplay = computed({
           />
         </div>
         <div>
-          <label class="mb-1 block text-xs font-medium text-gray-600">Product Category</label>
-          <select
-            v-model="filters.product_category"
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            :disabled="loading"
-          >
-            <option value="">All Categories</option>
-            <option v-for="c in filterOptions.categories" :key="c.value" :value="c.value">{{ c.label }}</option>
-          </select>
-        </div>
-        <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Added By</label>
           <select
             v-if="filterOptions.added_by_users?.length"

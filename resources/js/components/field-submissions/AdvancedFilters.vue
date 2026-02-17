@@ -29,7 +29,6 @@ const activeCount = computed(() => {
   let n = 0
   if (f.q) n++
   if (f.company_name) n++
-  if (f.product) n++
   if (f.emirates) n++
   if (f.from || f.to) n++
   if (f.submitted_from || f.submitted_to) n++
@@ -89,16 +88,6 @@ const submittedToDisplay = computed({
             v-model="filters.company_name"
             type="text"
             placeholder="Company..."
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            :disabled="loading"
-          />
-        </div>
-        <div>
-          <label class="mb-0.5 block text-xs font-medium text-gray-600">Product</label>
-          <input
-            v-model="filters.product"
-            type="text"
-            placeholder="Product..."
             class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           />

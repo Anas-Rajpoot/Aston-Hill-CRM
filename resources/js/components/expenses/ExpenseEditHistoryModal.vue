@@ -33,18 +33,28 @@ function formatAuditVal(v) {
   return String(v)
 }
 
+function getFieldLabel(key, backendLabels) {
+  if (backendLabels && backendLabels[key]) return backendLabels[key]
+  if (FIELD_LABELS[key]) return FIELD_LABELS[key]
+  return key
+    .replace(/_id$/, '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
 function getChangesFromAudit(a) {
   const changes = []
-  const skipKeys = ['updated_at', 'created_at']
+  const skipKeys = ['updated_at', 'created_at', 'id']
+  const labels = a.field_labels || {}
   if (a.action === 'created' && a.new_values) {
     for (const [key, val] of Object.entries(a.new_values)) {
       if (skipKeys.includes(key)) continue
-      changes.push({ field: FIELD_LABELS[key] ?? key, oldVal: null, newVal: val })
+      changes.push({ field: getFieldLabel(key, labels), oldVal: null, newVal: val })
     }
   } else if (a.action === 'deleted' && a.old_values) {
     for (const [key, val] of Object.entries(a.old_values)) {
       if (skipKeys.includes(key)) continue
-      changes.push({ field: FIELD_LABELS[key] ?? key, oldVal: val, newVal: null })
+      changes.push({ field: getFieldLabel(key, labels), oldVal: val, newVal: null })
     }
   } else if (a.action === 'updated' && (a.old_values || a.new_values)) {
     const keys = new Set([...(Object.keys(a.old_values || {})), ...(Object.keys(a.new_values || {}))])
@@ -53,7 +63,7 @@ function getChangesFromAudit(a) {
       const oldVal = a.old_values?.[key]
       const newVal = a.new_values?.[key]
       if (oldVal !== newVal) {
-        changes.push({ field: FIELD_LABELS[key] ?? key, oldVal, newVal })
+        changes.push({ field: getFieldLabel(key, labels), oldVal, newVal })
       }
     }
   }
@@ -129,7 +139,7 @@ watch(
   <Teleport to="body">
     <div
       v-if="visible"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-gray-500/50 p-4"
+      class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-gray-500/50 p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="edit-history-title"
@@ -219,19 +229,19 @@ watch(
       <!-- Change Details modal (overlay on top of Edit History) -->
       <div
         v-if="selectedEntry"
-        class="fixed inset-0 z-[60] flex items-center justify-center bg-gray-500/50 p-4"
+        class="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-gray-500/50 p-4"
         role="dialog"
         aria-modal="true"
         @click.self="closeChangeDetails"
       >
-        <div class="w-full max-w-lg rounded-lg bg-white shadow-xl">
+        <div class="w-full max-w-lg max-h-[90vh] flex flex-col rounded-lg bg-white shadow-xl">
           <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
             <h3 class="text-lg font-semibold text-gray-900">Change Details</h3>
             <button type="button" class="rounded p-1 text-gray-400 hover:bg-gray-100" aria-label="Close" @click="closeChangeDetails">
               <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           </div>
-          <div class="px-6 py-4 space-y-4">
+          <div class="px-6 py-4 space-y-4 overflow-y-auto flex-1 min-h-0">
             <dl class="grid grid-cols-1 gap-2 text-sm">
               <div><dt class="font-medium text-gray-500">Modified By</dt><dd class="text-gray-900">{{ selectedEntry.user_name }}</dd></div>
               <div v-if="selectedEntry.user_role"><dt class="font-medium text-gray-500">Role</dt><dd class="text-gray-900">{{ selectedEntry.user_role }}</dd></div>

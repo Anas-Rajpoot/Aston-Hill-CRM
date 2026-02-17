@@ -108,8 +108,8 @@ const leadSubmissionsApi = {
   },
 
   // ─── Listing (optimized, < 1s) ───────────────────────────────────────────
-  async index(params = {}) {
-    const { data } = await api.get('/lead-submissions', { params })
+  async index(params = {}, options = {}) {
+    const { data } = await api.get('/lead-submissions', { params, signal: options.signal })
     return data
   },
 

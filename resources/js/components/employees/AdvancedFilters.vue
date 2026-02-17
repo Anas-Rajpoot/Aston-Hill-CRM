@@ -1,7 +1,7 @@
 <script setup>
 /**
- * Advanced filters: Search, Name, Email, Manager, Team Leader, date ranges.
- * Status, Department, Role are in the top filter bar only.
+ * Advanced filters: Search, Name, Email, Manager, Team Leader, Role, date ranges.
+ * Status, Department are in the top filter bar only.
  * Date display: dd-mm-yyyy.
  */
 import { computed } from 'vue'
@@ -15,6 +15,7 @@ const props = defineProps({
     default: () => ({
       managers: [],
       team_leaders: [],
+      roles: [],
     }),
   },
   loading: { type: Boolean, default: false },
@@ -28,6 +29,7 @@ const activeCount = computed(() => {
   if (f.q) n++
   if (f.name) n++
   if (f.email) n++
+  if (f.role) n++
   if (f.manager_id || f.team_leader_id) n++
   if (f.joining_from || f.joining_to) n++
   if (f.terminate_from || f.terminate_to) n++
@@ -99,6 +101,17 @@ const terminateToDisplay = computed({
             class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           />
+        </div>
+        <div>
+          <label class="mb-0.5 block text-xs font-medium text-gray-600">Role</label>
+          <select
+            v-model="filters.role"
+            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            :disabled="loading"
+          >
+            <option value="">All Roles</option>
+            <option v-for="r in filterOptions.roles" :key="r.value || r" :value="r.value || r">{{ r.label || r }}</option>
+          </select>
         </div>
         <div>
           <label class="mb-0.5 block text-xs font-medium text-gray-600">Manager</label>

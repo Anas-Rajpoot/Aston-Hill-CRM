@@ -1,7 +1,8 @@
 <script setup>
 /**
- * Advanced filters for Cisco Extensions: Extension, Landline Number, Gateway, User Name, Assigned To,
- * Manager, Team Leader, Status, Usage, Created Date From/To. Dates: dd-mm-yyyy.
+ * Advanced filters for Cisco Extensions: Extension, Gateway, User Name, Assigned To,
+ * Manager, Team Leader, Usage, Created Date From/To. Dates: dd-mm-yyyy.
+ * (Status and Landline Number are in general filters and should not be duplicated here.)
  */
 import { computed } from 'vue'
 import { toDdMmYyyy, fromDdMmYyyy } from '@/lib/dateFormat'
@@ -44,7 +45,7 @@ const createdToDisplay = computed({
     <div v-show="visible" class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
       <div class="border-b border-gray-100 bg-gray-50 px-4 py-2">
         <p class="text-xs font-medium text-gray-600">All filters</p>
-        <p class="text-xs text-gray-500">Extension, Landline Number, Gateway, User Name, Assigned To, Manager, Team Leader, Status, Usage, Created Date From/To</p>
+        <p class="text-xs text-gray-500">Extension, Gateway, User Name, Assigned To, Manager, Team Leader, Usage, Created Date From/To</p>
       </div>
       <div class="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4">
         <div>
@@ -53,16 +54,6 @@ const createdToDisplay = computed({
             v-model="filters.extension"
             type="text"
             placeholder="Search extension..."
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            :disabled="loading"
-          />
-        </div>
-        <div>
-          <label class="mb-1 block text-xs font-medium text-gray-600">Landline Number</label>
-          <input
-            v-model="filters.landline_number"
-            type="text"
-            placeholder="Search landline..."
             class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           />
@@ -117,17 +108,6 @@ const createdToDisplay = computed({
             class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           />
-        </div>
-        <div>
-          <label class="mb-1 block text-xs font-medium text-gray-600">Status</label>
-          <select
-            v-model="filters.status"
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            :disabled="loading"
-          >
-            <option value="">All Statuses</option>
-            <option v-for="s in filterOptions.statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
-          </select>
         </div>
       </div>
 

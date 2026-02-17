@@ -22,10 +22,12 @@ const toastType = ref('success')
 const toastMsg  = ref('')
 function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
 
+const TABLE_MODULE = 'users'
+const perPageOptions = ref([10, 20, 25, 50, 100])
 const users = ref([])
 const roles = ref([])
 const stats = ref({ total: 0, active: 0, inactive: 0, pending: 0 })
-const pagination = ref({ current_page: 1, last_page: 1, per_page: 10, total: 0 })
+const pagination = ref({ current_page: 1, last_page: 1, per_page: auth.defaultTablePageSize || 25, total: 0 })
 const filterOptions = ref({ statuses: [], roles: [] })
 const allColumns = ref([])
 const visibleColumns = ref(['id', 'name', 'email', 'phone', 'country', 'roles', 'status', 'last_login_at', 'created_at'])
@@ -86,6 +88,8 @@ const addUserForm = ref({
 const addUserRolesDropdownOpen = ref(false)
 const addUserLoading = ref(false)
 const addUserError = ref('')
+const addUserFieldErrors = ref({})
+const addUserSuccess = ref(false)
 const addUserCountries = ref([])
 const addUserRolesDropdownRef = ref(null)
 const ADD_USER_DEPARTMENTS = [
@@ -294,26 +298,23 @@ function goToPage(page) {
   load()
 }
 
-const paginationPages = computed(() => {
-  const cur = pagination.value.current_page
-  const last = pagination.value.last_page
-  if (last <= 1) return []
-  if (last <= 7) return Array.from({ length: last }, (_, i) => i + 1)
-  const pages = []
-  if (cur <= 4) {
-    for (let i = 1; i <= 5; i++) pages.push(i)
-    pages.push('...')
-    pages.push(last)
-  } else if (cur >= last - 3) {
-    pages.push(1, '...')
-    for (let i = last - 4; i <= last; i++) pages.push(i)
-  } else {
-    pages.push(1, '...')
-    for (let i = cur - 1; i <= cur + 1; i++) pages.push(i)
-    pages.push('...', last)
-  }
-  return pages
-})
+async function onPerPageChange(event) {
+  const newPerPage = Number(event.target.value)
+  pagination.value.per_page = newPerPage
+  pagination.value.current_page = 1
+  try {
+    await api.post(`/table-preferences/${TABLE_MODULE}`, { per_page: newPerPage })
+  } catch { /* silent */ }
+  load()
+}
+
+async function loadTablePreference() {
+  try {
+    const { data } = await api.get(`/table-preferences/${TABLE_MODULE}`)
+    if (data.per_page) pagination.value.per_page = Number(data.per_page)
+    if (Array.isArray(data.options) && data.options.length) perPageOptions.value = data.options
+  } catch { /* use system default */ }
+}
 
 function toggleSelectAll() {
   if (selectedIds.value.length === users.value.length) selectedIds.value = []
@@ -442,13 +443,26 @@ function fromDetailResetPassword() {
   }
 }
 
+function formatRoleNameForAdd(name) {
+  if (!name) return ''
+  return name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
 const assignableRolesForAdd = computed(() => {
-  const list = roles.value ?? []
-  return list.filter((r) => (r?.name ?? '').toLowerCase() !== 'superadmin')
+  const list = (roles.value ?? []).filter((r) => (r?.name ?? '').toLowerCase() !== 'superadmin')
+  const seen = new Map()
+  for (const r of list) {
+    if (!r?.id) continue
+    const key = (r.name ?? '').toLowerCase().replace(/[\s_-]+/g, '')
+    if (!seen.has(key)) seen.set(key, r)
+  }
+  return Array.from(seen.values())
 })
 
 async function openAddUserModal() {
   addUserError.value = ''
+  addUserFieldErrors.value = {}
+  addUserSuccess.value = false
   addUserForm.value = {
     name: '',
     email: '',
@@ -474,6 +488,8 @@ async function openAddUserModal() {
 function closeAddUserModal() {
   addUserModalOpen.value = false
   addUserError.value = ''
+  addUserFieldErrors.value = {}
+  addUserSuccess.value = false
   addUserRolesDropdownOpen.value = false
 }
 
@@ -490,39 +506,31 @@ function hasAddUserRole(roleId) {
 
 async function submitAddUser() {
   addUserError.value = ''
+  addUserFieldErrors.value = {}
+  addUserSuccess.value = false
+
   const f = addUserForm.value
-  if (!f.name?.trim()) {
-    addUserError.value = 'Full name is required.'
-    return
-  }
-  if (!f.email?.trim()) {
-    addUserError.value = 'Email address is required.'
-    return
-  }
+  const errs = {}
+
+  if (!f.name?.trim()) errs.name = 'Full name is required.'
+  if (!f.email?.trim()) errs.email = 'Email address is required.'
   if (!f.phone?.trim()) {
-    addUserError.value = 'Phone number is required.'
+    errs.phone = 'Phone number is required.'
+  } else if (!/^[+]?[\d\s()-]+$/.test(f.phone.trim())) {
+    errs.phone = 'Phone number must contain only digits, +, spaces, ( ) or -.'
+  }
+  if (!f.country) errs.country = 'Please select a country.'
+  if (!f.department) errs.department = 'Please select a department.'
+  if (!(f.roles?.length)) errs.roles = 'Please assign at least one role.'
+  if (!f.password || f.password.length < 8) errs.password = 'Password must be at least 8 characters.'
+  if (f.password && f.password !== f.password_confirmation) errs.password_confirmation = 'Password and confirmation do not match.'
+
+  if (Object.keys(errs).length) {
+    addUserFieldErrors.value = errs
+    addUserError.value = 'Please fix the highlighted errors below.'
     return
   }
-  if (!f.country) {
-    addUserError.value = 'Please select a country.'
-    return
-  }
-  if (!f.department) {
-    addUserError.value = 'Please select a department.'
-    return
-  }
-  if (!(f.roles?.length)) {
-    addUserError.value = 'Please assign at least one role.'
-    return
-  }
-  if (!f.password || f.password.length < 8) {
-    addUserError.value = 'Password must be at least 8 characters.'
-    return
-  }
-  if (f.password !== f.password_confirmation) {
-    addUserError.value = 'Password and confirmation do not match.'
-    return
-  }
+
   addUserLoading.value = true
   try {
     await usersApi.store({
@@ -536,13 +544,27 @@ async function submitAddUser() {
       password: f.password,
       password_confirmation: f.password_confirmation,
     })
-    closeAddUserModal()
-    toast('success', 'User created successfully.')
-    load()
+    addUserSuccess.value = true
+    addUserError.value = ''
+    addUserFieldErrors.value = {}
+    setTimeout(() => {
+      closeAddUserModal()
+      toast('success', 'User created successfully.')
+      load()
+    }, 1500)
   } catch (e) {
     const msg = e?.response?.data?.message
-    const errs = e?.response?.data?.errors
-    addUserError.value = msg || (errs ? Object.values(errs).flat().join(' ') : 'Failed to create user.')
+    const serverErrs = e?.response?.data?.errors
+    if (serverErrs) {
+      const mapped = {}
+      for (const [key, msgs] of Object.entries(serverErrs)) {
+        mapped[key] = Array.isArray(msgs) ? msgs[0] : msgs
+      }
+      addUserFieldErrors.value = mapped
+      addUserError.value = msg || 'Please fix the highlighted errors below.'
+    } else {
+      addUserError.value = msg || 'Failed to create user. Please try again.'
+    }
   } finally {
     addUserLoading.value = false
   }
@@ -611,8 +633,10 @@ const columnLabels = {
 const editableFields = ['name', 'email', 'phone', 'country', 'status', 'employee_number', 'department', 'extension', 'joining_date', 'terminate_date']
 
 onMounted(() => {
-  loadFilters()
-  loadColumns().then(() => load())
+  loadTablePreference().then(() => {
+    loadFilters()
+    loadColumns().then(() => load())
+  })
   document.addEventListener('click', handleClickOutside)
   if (route.query.updated) {
     toast('success', `${route.query.updated} updated successfully.`)
@@ -743,14 +767,15 @@ watch(addUserRolesDropdownOpen, (open) => {
       <div class="ml-auto flex flex-wrap items-center gap-2 pl-6">
         <button
           type="button"
-          class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
           @click="filtersVisible = !filtersVisible"
         >
-          {{ filtersVisible ? 'Hide' : 'Advance' }} Filters
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+          Advanced Filters
         </button>
         <button
           type="button"
-          class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
           @click="columnModalVisible = true"
         >
           Customize columns
@@ -792,7 +817,7 @@ watch(addUserRolesDropdownOpen, (open) => {
     </div>
 
     <!-- Table: sortable + editable -->
-    <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-x-auto">
+    <div class="rounded-xl border-2 border-black bg-white shadow-sm overflow-x-auto">
       <div v-if="loading" class="flex justify-center items-center py-16">
         <svg class="animate-spin h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
@@ -800,8 +825,8 @@ watch(addUserRolesDropdownOpen, (open) => {
         </svg>
       </div>
       <div v-else>
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead class="bg-gray-50">
+        <table class="min-w-full">
+          <thead class="bg-gray-50 border-b-2 border-black">
             <tr>
               <th class="w-10 px-4 py-3">
                 <input
@@ -826,8 +851,8 @@ watch(addUserRolesDropdownOpen, (open) => {
               <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600">Actions</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-100 bg-white">
-            <tr v-for="user in users" :key="user.id" class="hover:bg-gray-50">
+          <tbody class="bg-white">
+            <tr v-for="user in users" :key="user.id" class="border-b border-black hover:bg-gray-50">
               <td class="px-4 py-3">
                 <input
                   type="checkbox"
@@ -965,35 +990,35 @@ watch(addUserRolesDropdownOpen, (open) => {
                 </div>
               </td>
             </tr>
-            <tr v-if="!loading && users.length === 0">
+            <tr v-if="!loading && users.length === 0" class="border-b border-black">
               <td :colspan="visibleColumns.length + 2" class="px-4 py-12 text-center text-sm text-gray-500">No users found.</td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <div class="border-t border-gray-200 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
         <p class="text-sm text-gray-600">
-          Showing {{ pagination.total === 0 ? 0 : (pagination.current_page - 1) * pagination.per_page + 1 }} to
-          {{ Math.min(pagination.current_page * pagination.per_page, pagination.total) }} of {{ pagination.total }}
+          Showing {{ pagination.total ? ((pagination.current_page - 1) * pagination.per_page) + 1 : 0 }}
+          to {{ Math.min(pagination.current_page * pagination.per_page, pagination.total) }}
+          of {{ pagination.total }} entries
         </p>
-        <div v-if="pagination.last_page > 1" class="flex items-center gap-1">
-          <button type="button" class="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50" :disabled="pagination.current_page <= 1" @click="goToPage(1)">First</button>
-          <button type="button" class="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50" :disabled="pagination.current_page <= 1" @click="goToPage(pagination.current_page - 1)">Prev</button>
-          <template v-for="p in paginationPages" :key="p">
-            <span v-if="p === '...'" class="px-2 text-gray-400">...</span>
-            <button
-              v-else
-              type="button"
-              class="rounded border px-3 py-1.5 text-sm min-w-[2.25rem]"
-              :class="p === pagination.current_page ? 'border-green-600 bg-green-50 text-green-700 font-medium' : 'border-gray-300 hover:bg-gray-50'"
-              @click="goToPage(p)"
+        <div class="flex items-center gap-4">
+          <div class="flex items-center gap-2 text-sm text-gray-600">
+            <span class="whitespace-nowrap font-medium">Number of rows</span>
+            <select
+              :value="pagination.per_page"
+              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              @change="onPerPageChange"
             >
-              {{ p }}
-            </button>
-          </template>
-          <button type="button" class="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50" :disabled="pagination.current_page >= pagination.last_page" @click="goToPage(pagination.current_page + 1)">Next</button>
-          <button type="button" class="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50" :disabled="pagination.current_page >= pagination.last_page" @click="goToPage(pagination.last_page)">Last</button>
+              <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
+            </select>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <button type="button" :disabled="pagination.current_page <= 1" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50" @click="goToPage(pagination.current_page - 1)">Previous</button>
+            <span class="rounded-md border border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-700">Page {{ pagination.current_page }} of {{ pagination.last_page }}</span>
+            <button type="button" :disabled="pagination.current_page >= pagination.last_page" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50" @click="goToPage(pagination.current_page + 1)">Next</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1017,7 +1042,7 @@ watch(addUserRolesDropdownOpen, (open) => {
           aria-labelledby="add-user-modal-title"
           @click.self="closeAddUserModal"
         >
-          <div class="w-full max-w-2xl my-8 rounded-xl bg-white shadow-xl border border-gray-200 overflow-hidden">
+          <div class="w-full max-w-2xl my-8 max-h-[90vh] flex flex-col rounded-xl bg-white shadow-xl border border-gray-200 overflow-hidden">
             <div class="flex items-center gap-3 border-b border-gray-200 px-6 py-4">
               <button
                 type="button"
@@ -1034,8 +1059,29 @@ watch(addUserRolesDropdownOpen, (open) => {
                 <p class="text-sm text-gray-500 mt-0.5">Create a new user account and assign roles</p>
               </div>
             </div>
-            <form @submit.prevent="submitAddUser" class="p-6 space-y-6">
-              <p v-if="addUserError" class="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{{ addUserError }}</p>
+            <form @submit.prevent="submitAddUser" class="flex-1 min-h-0 flex flex-col overflow-hidden">
+              <div class="overflow-y-auto flex-1 min-h-0 p-6 space-y-6 relative">
+              <!-- Loading overlay -->
+              <div v-if="addUserLoading" class="absolute inset-0 z-20 flex items-center justify-center bg-white/80 rounded-b-xl">
+                <div class="flex flex-col items-center gap-3">
+                  <svg class="h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <span class="text-sm font-medium text-gray-600">Creating user...</span>
+                </div>
+              </div>
+
+              <!-- Success message -->
+              <div v-if="addUserSuccess" class="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700 flex items-center gap-2">
+                <svg class="h-5 w-5 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                User created successfully! Redirecting...
+              </div>
+
+              <!-- Error message -->
+              <p v-if="addUserError && !addUserSuccess" class="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{{ addUserError }}</p>
 
               <section>
                 <h3 class="flex items-center gap-2 text-sm font-semibold text-gray-900 mb-4">
@@ -1051,9 +1097,11 @@ watch(addUserRolesDropdownOpen, (open) => {
                       id="add-user-name"
                       v-model="addUserForm.name"
                       type="text"
-                      class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      class="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      :class="addUserFieldErrors.name ? 'border-red-400 bg-red-50' : 'border-gray-300'"
                       placeholder="Enter full name"
                     />
+                    <p v-if="addUserFieldErrors.name" class="mt-1 text-xs text-red-600">{{ addUserFieldErrors.name }}</p>
                   </div>
                   <div>
                     <label for="add-user-email" class="block text-sm font-medium text-gray-700 mb-1">Email Address <span class="text-red-500">*</span></label>
@@ -1061,9 +1109,11 @@ watch(addUserRolesDropdownOpen, (open) => {
                       id="add-user-email"
                       v-model="addUserForm.email"
                       type="email"
-                      class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      class="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      :class="addUserFieldErrors.email ? 'border-red-400 bg-red-50' : 'border-gray-300'"
                       placeholder="Enter email address"
                     />
+                    <p v-if="addUserFieldErrors.email" class="mt-1 text-xs text-red-600">{{ addUserFieldErrors.email }}</p>
                   </div>
                   <div>
                     <label for="add-user-phone" class="block text-sm font-medium text-gray-700 mb-1">Phone Number <span class="text-red-500">*</span></label>
@@ -1071,31 +1121,37 @@ watch(addUserRolesDropdownOpen, (open) => {
                       id="add-user-phone"
                       v-model="addUserForm.phone"
                       type="text"
-                      class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                      placeholder="Enter phone number"
+                      class="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      :class="addUserFieldErrors.phone ? 'border-red-400 bg-red-50' : 'border-gray-300'"
+                      placeholder="Enter phone number (digits only)"
                     />
+                    <p v-if="addUserFieldErrors.phone" class="mt-1 text-xs text-red-600">{{ addUserFieldErrors.phone }}</p>
                   </div>
                   <div>
                     <label for="add-user-country" class="block text-sm font-medium text-gray-700 mb-1">Country <span class="text-red-500">*</span></label>
                     <select
                       id="add-user-country"
                       v-model="addUserForm.country"
-                      class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      class="w-full rounded-lg border bg-white px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      :class="addUserFieldErrors.country ? 'border-red-400 bg-red-50' : 'border-gray-300'"
                     >
                       <option value="">Select country</option>
                       <option v-for="c in addUserCountries" :key="c.id" :value="c.code || c.name">{{ c.name }}</option>
                     </select>
+                    <p v-if="addUserFieldErrors.country" class="mt-1 text-xs text-red-600">{{ addUserFieldErrors.country }}</p>
                   </div>
                   <div>
                     <label for="add-user-department" class="block text-sm font-medium text-gray-700 mb-1">Department <span class="text-red-500">*</span></label>
                     <select
                       id="add-user-department"
                       v-model="addUserForm.department"
-                      class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      class="w-full rounded-lg border bg-white px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      :class="addUserFieldErrors.department ? 'border-red-400 bg-red-50' : 'border-gray-300'"
                     >
                       <option value="">Select department</option>
                       <option v-for="d in ADD_USER_DEPARTMENTS" :key="d.value" :value="d.value">{{ d.label }}</option>
                     </select>
+                    <p v-if="addUserFieldErrors.department" class="mt-1 text-xs text-red-600">{{ addUserFieldErrors.department }}</p>
                   </div>
                   <div>
                     <label for="add-user-status" class="block text-sm font-medium text-gray-700 mb-1">Account Status</label>
@@ -1122,32 +1178,47 @@ watch(addUserRolesDropdownOpen, (open) => {
                   <label class="block text-sm font-medium text-gray-700 mb-1">Assigned Roles <span class="text-red-500">*</span></label>
                   <button
                     type="button"
-                    class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-left text-sm flex items-center justify-between focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    class="w-full rounded-lg border bg-white px-3 py-2 text-left text-sm flex items-center justify-between focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    :class="addUserFieldErrors.roles ? 'border-red-400 bg-red-50' : 'border-gray-300'"
                     @click="addUserRolesDropdownOpen = !addUserRolesDropdownOpen"
                   >
-                    <span class="text-gray-500">
-                      {{ addUserForm.roles.length ? assignableRolesForAdd.filter(r => addUserForm.roles.includes(r.id)).map(r => r.name).join(', ') : 'Select roles to assign' }}
+                    <span :class="addUserForm.roles.length ? 'text-gray-900' : 'text-gray-500'" class="truncate">
+                      {{ addUserForm.roles.length ? assignableRolesForAdd.filter(r => addUserForm.roles.includes(r.id)).map(r => formatRoleNameForAdd(r.name)).join(', ') : 'Select roles to assign' }}
                     </span>
-                    <svg class="h-4 w-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="h-4 w-4 text-gray-400 shrink-0 transition-transform" :class="addUserRolesDropdownOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                     </svg>
                   </button>
+                  <p v-if="addUserFieldErrors.roles" class="mt-1 text-xs text-red-600">{{ addUserFieldErrors.roles }}</p>
                   <div
                     v-show="addUserRolesDropdownOpen"
-                    class="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto"
+                    class="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg"
                   >
-                    <button
-                      v-for="r in assignableRolesForAdd"
-                      :key="r.id"
-                      type="button"
-                      class="w-full px-3 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
-                      :class="hasAddUserRole(r.id) ? 'bg-blue-50 text-blue-800' : 'text-gray-700'"
-                      @click="toggleAddUserRole(r)"
-                    >
-                      <span v-if="hasAddUserRole(r.id)" class="text-blue-600">✓</span>
-                      {{ r.name }}
-                    </button>
-                    <p v-if="!assignableRolesForAdd.length" class="px-3 py-2 text-sm text-gray-500">No roles available.</p>
+                    <div class="max-h-48 overflow-y-auto">
+                      <button
+                        v-for="r in assignableRolesForAdd"
+                        :key="r.id"
+                        type="button"
+                        class="w-full px-3 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                        :class="hasAddUserRole(r.id) ? 'bg-blue-50 text-blue-800' : 'text-gray-700'"
+                        @click="toggleAddUserRole(r)"
+                      >
+                        <span class="w-4 h-4 flex items-center justify-center shrink-0 rounded border" :class="hasAddUserRole(r.id) ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-300'">
+                          <svg v-if="hasAddUserRole(r.id)" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
+                        </span>
+                        {{ formatRoleNameForAdd(r.name) }}
+                      </button>
+                      <p v-if="!assignableRolesForAdd.length" class="px-3 py-2 text-sm text-gray-500">No roles available.</p>
+                    </div>
+                    <div class="border-t border-gray-200 px-3 py-2 flex justify-end">
+                      <button
+                        type="button"
+                        class="rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        @click="addUserRolesDropdownOpen = false"
+                      >
+                        Done
+                      </button>
+                    </div>
                   </div>
                 </div>
               </section>
@@ -1166,10 +1237,12 @@ watch(addUserRolesDropdownOpen, (open) => {
                       id="add-user-password"
                       v-model="addUserForm.password"
                       type="password"
-                      class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      class="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      :class="addUserFieldErrors.password ? 'border-red-400 bg-red-50' : 'border-gray-300'"
                       placeholder="Enter password"
                     />
-                    <p class="mt-1 text-xs text-gray-500">Minimum 8 characters</p>
+                    <p v-if="addUserFieldErrors.password" class="mt-1 text-xs text-red-600">{{ addUserFieldErrors.password }}</p>
+                    <p v-else class="mt-1 text-xs text-gray-500">Minimum 8 characters</p>
                   </div>
                   <div>
                     <label for="add-user-password-confirm" class="block text-sm font-medium text-gray-700 mb-1">Confirm Password <span class="text-red-500">*</span></label>
@@ -1177,30 +1250,41 @@ watch(addUserRolesDropdownOpen, (open) => {
                       id="add-user-password-confirm"
                       v-model="addUserForm.password_confirmation"
                       type="password"
-                      class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      class="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      :class="addUserFieldErrors.password_confirmation ? 'border-red-400 bg-red-50' : 'border-gray-300'"
                       placeholder="Confirm password"
                     />
+                    <p v-if="addUserFieldErrors.password_confirmation" class="mt-1 text-xs text-red-600">{{ addUserFieldErrors.password_confirmation }}</p>
                   </div>
                 </div>
               </section>
+              </div>
 
-              <div class="flex items-center justify-end gap-3 pt-2 border-t border-gray-200">
+              <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
                 <button
                   type="button"
                   class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                  :disabled="addUserLoading || addUserSuccess"
                   @click="closeAddUserModal"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  :disabled="addUserLoading"
+                  :disabled="addUserLoading || addUserSuccess"
                   class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-70"
                 >
-                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg v-if="addUserLoading" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <svg v-else-if="addUserSuccess" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                  <svg v-else class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
-                  {{ addUserLoading ? 'Creating…' : 'Create User' }}
+                  {{ addUserLoading ? 'Creating...' : addUserSuccess ? 'Created!' : 'Create User' }}
                 </button>
               </div>
             </form>
@@ -1214,7 +1298,7 @@ watch(addUserRolesDropdownOpen, (open) => {
       <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition ease-in duration-150" leave-from-class="opacity-100" leave-to-class="opacity-0">
         <div
           v-if="userToDeactivate"
-          class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/30 backdrop-blur-sm p-4"
+          class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-gray-900/30 backdrop-blur-sm p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="deactivate-modal-title"
@@ -1266,7 +1350,7 @@ watch(addUserRolesDropdownOpen, (open) => {
       <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition ease-in duration-150" leave-from-class="opacity-100" leave-to-class="opacity-0">
         <div
           v-if="userToResetPassword"
-          class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/30 backdrop-blur-sm p-4"
+          class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-gray-900/30 backdrop-blur-sm p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="reset-password-modal-title"
@@ -1318,13 +1402,13 @@ watch(addUserRolesDropdownOpen, (open) => {
       <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition ease-in duration-150" leave-from-class="opacity-100" leave-to-class="opacity-0">
         <div
           v-if="detailUser !== null || detailLoading"
-          class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/30 backdrop-blur-sm p-4"
+          class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-gray-900/30 backdrop-blur-sm p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="user-detail-modal-title"
           @click.self="closeUserDetail"
         >
-          <div class="w-full max-w-lg rounded-xl bg-white shadow-xl border border-gray-200 overflow-hidden">
+          <div class="w-full max-w-lg max-h-[90vh] flex flex-col rounded-xl bg-white shadow-xl border border-gray-200 overflow-hidden">
             <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
               <h2 id="user-detail-modal-title" class="text-lg font-bold text-gray-900">User Details</h2>
               <button
@@ -1347,77 +1431,79 @@ watch(addUserRolesDropdownOpen, (open) => {
             </div>
             <p v-else-if="detailError" class="px-6 py-6 text-sm text-red-600">{{ detailError }}</p>
             <template v-else-if="detailUser">
-              <div class="px-6 py-5">
-                <div class="flex items-start gap-4">
-                  <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-blue-600 text-lg font-semibold text-white">
-                    {{ getInitials(detailUser.name) }}
+              <div class="overflow-y-auto flex-1 min-h-0">
+                <div class="px-6 py-5">
+                  <div class="flex items-start gap-4">
+                    <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-blue-600 text-lg font-semibold text-white">
+                      {{ getInitials(detailUser.name) }}
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <p class="font-semibold text-gray-900">{{ detailUser.name }}</p>
+                      <p class="text-sm text-gray-500">User ID: {{ userIdDisplay(detailUser.id) }}</p>
+                    </div>
+                    <span
+                      class="shrink-0 rounded-full px-3 py-1 text-xs font-medium"
+                      :class="statusBadgeClass(detailUser.status)"
+                    >
+                      {{ statusLabel(detailUser.status) }}
+                    </span>
                   </div>
-                  <div class="min-w-0 flex-1">
-                    <p class="font-semibold text-gray-900">{{ detailUser.name }}</p>
-                    <p class="text-sm text-gray-500">User ID: {{ userIdDisplay(detailUser.id) }}</p>
-                  </div>
-                  <span
-                    class="shrink-0 rounded-full px-3 py-1 text-xs font-medium"
-                    :class="statusBadgeClass(detailUser.status)"
-                  >
-                    {{ statusLabel(detailUser.status) }}
-                  </span>
                 </div>
-              </div>
-              <div class="border-t border-gray-100 px-6 py-4">
-                <h3 class="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900">
-                  <svg class="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                  Basic Information
-                </h3>
-                <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                  <div>
-                    <dt class="text-gray-500">Full Name</dt>
-                    <dd class="font-medium text-gray-900">{{ detailUser.name ?? '—' }}</dd>
+                <div class="border-t border-gray-100 px-6 py-4">
+                  <h3 class="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900">
+                    <svg class="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    Basic Information
+                  </h3>
+                  <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                    <div>
+                      <dt class="text-gray-500">Full Name</dt>
+                      <dd class="font-medium text-gray-900">{{ detailUser.name ?? '—' }}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-gray-500">Status</dt>
+                      <dd class="font-medium text-gray-900">{{ statusLabel(detailUser.status) }}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-gray-500">Last Login</dt>
+                      <dd class="text-gray-700">{{ formatDetailDateTime(detailUser.last_login_at) }}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-gray-500">Created Date</dt>
+                      <dd class="text-gray-700">{{ formatDetailDateTime(detailUser.created_at) }}</dd>
+                    </div>
+                    <div class="col-span-2">
+                      <dt class="text-gray-500">Email</dt>
+                      <dd class="text-gray-700">{{ detailUser.email ?? '—' }}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-gray-500">Phone Number</dt>
+                      <dd class="text-gray-700">{{ detailUser.phone ?? '—' }}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-gray-500">Country</dt>
+                      <dd class="text-gray-700">{{ detailUser.country ?? '—' }}</dd>
+                    </div>
+                  </dl>
+                </div>
+                <div class="border-t border-gray-100 px-6 py-4">
+                  <h3 class="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900">
+                    <svg class="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                    Assigned Roles
+                  </h3>
+                  <div class="flex flex-wrap gap-2">
+                    <span
+                      v-for="role in (detailUser.roles || []).map(r => typeof r === 'string' ? r : r.name)"
+                      :key="role"
+                      class="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800"
+                    >
+                      {{ role }}
+                    </span>
+                    <span v-if="!(detailUser.roles || []).length" class="text-sm text-gray-500">No roles assigned</span>
                   </div>
-                  <div>
-                    <dt class="text-gray-500">Status</dt>
-                    <dd class="font-medium text-gray-900">{{ statusLabel(detailUser.status) }}</dd>
-                  </div>
-                  <div>
-                    <dt class="text-gray-500">Last Login</dt>
-                    <dd class="text-gray-700">{{ formatDetailDateTime(detailUser.last_login_at) }}</dd>
-                  </div>
-                  <div>
-                    <dt class="text-gray-500">Created Date</dt>
-                    <dd class="text-gray-700">{{ formatDetailDateTime(detailUser.created_at) }}</dd>
-                  </div>
-                  <div class="col-span-2">
-                    <dt class="text-gray-500">Email</dt>
-                    <dd class="text-gray-700">{{ detailUser.email ?? '—' }}</dd>
-                  </div>
-                  <div>
-                    <dt class="text-gray-500">Phone Number</dt>
-                    <dd class="text-gray-700">{{ detailUser.phone ?? '—' }}</dd>
-                  </div>
-                  <div>
-                    <dt class="text-gray-500">Country</dt>
-                    <dd class="text-gray-700">{{ detailUser.country ?? '—' }}</dd>
-                  </div>
-                </dl>
-              </div>
-              <div class="border-t border-gray-100 px-6 py-4">
-                <h3 class="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900">
-                  <svg class="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                  </svg>
-                  Assigned Roles
-                </h3>
-                <div class="flex flex-wrap gap-2">
-                  <span
-                    v-for="role in (detailUser.roles || []).map(r => typeof r === 'string' ? r : r.name)"
-                    :key="role"
-                    class="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800"
-                  >
-                    {{ role }}
-                  </span>
-                  <span v-if="!(detailUser.roles || []).length" class="text-sm text-gray-500">No roles assigned</span>
                 </div>
               </div>
               <div class="flex flex-wrap items-center gap-3 border-t border-gray-200 px-6 py-4">
@@ -1462,7 +1548,7 @@ watch(addUserRolesDropdownOpen, (open) => {
       <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition ease-in duration-150" leave-from-class="opacity-100" leave-to-class="opacity-0">
         <div
           v-if="historyUserId"
-          class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 p-4"
+          class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-gray-900/50 p-4"
           role="dialog"
           aria-modal="true"
           @click.self="closeHistory"
@@ -1493,11 +1579,11 @@ watch(addUserRolesDropdownOpen, (open) => {
                 </thead>
                 <tbody>
                   <tr v-for="log in historyLogs" :key="log.id" class="border-b border-gray-100">
-                    <td class="py-2 text-gray-700">{{ log.field_name }}</td>
-                    <td class="py-2 text-gray-600">{{ log.old_value ?? '—' }}</td>
-                    <td class="py-2 text-gray-600">{{ log.new_value ?? '—' }}</td>
+                    <td class="py-2 font-medium text-gray-700">{{ log.field_label || log.field_name }}</td>
+                    <td class="py-2 text-gray-600">{{ log.old_value ?? '(empty)' }}</td>
+                    <td class="py-2 text-gray-600">{{ log.new_value ?? '(empty)' }}</td>
                     <td class="py-2 text-gray-600">{{ log.changed_at ? formatDateTime(log.changed_at) : '—' }}</td>
-                    <td class="py-2 text-gray-600">{{ log.changed_by ?? '—' }}</td>
+                    <td class="py-2 text-gray-600">{{ log.changed_by_name || log.changed_by || '—' }}</td>
                   </tr>
                   <tr v-if="!historyLoading && historyLogs.length === 0">
                     <td colspan="5" class="py-8 text-center text-gray-500">No history recorded.</td>

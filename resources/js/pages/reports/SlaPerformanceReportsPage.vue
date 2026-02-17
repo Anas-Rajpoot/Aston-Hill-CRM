@@ -7,8 +7,12 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import api from '@/lib/axios'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
-import Pagination from '@/components/Pagination.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
+const TABLE_MODULE = 'sla-performance-reports'
+const perPageOptions = ref([10, 20, 25, 50, 100])
 
 /* ───── Loading & filter state ───── */
 const loading = ref(true)
@@ -29,7 +33,7 @@ const insights = ref([])
 const breachSort = ref('submitted_date')
 const breachOrder = ref('desc')
 const breachPage = ref(1)
-const breachPerPage = ref(10)
+const breachPerPage = ref(authStore.defaultTablePageSize || 25)
 const columnModalVisible = ref(false)
 
 const ALL_BREACH_COLUMNS = [
@@ -126,9 +130,11 @@ function onBreachPageChange(page) {
   breachPage.value = page
 }
 
-function onBreachPerPageChange(e) {
-  breachPerPage.value = Number(e.target.value)
+async function onBreachPerPageChange(e) {
+  const val = Number(e.target.value)
+  breachPerPage.value = val
   breachPage.value = 1
+  try { await api.post(`/table-preferences/${TABLE_MODULE}`, { per_page: val }) } catch { /* silent */ }
 }
 
 function onSaveBreachColumns(cols) {
@@ -210,8 +216,20 @@ function exportReport() {
   }
 }
 
+/* ───── Load user table preference ───── */
+async function loadTablePreference() {
+  try {
+    const { data } = await api.get(`/table-preferences/${TABLE_MODULE}`)
+    if (data.per_page) breachPerPage.value = Number(data.per_page)
+    if (Array.isArray(data.options) && data.options.length) perPageOptions.value = data.options
+  } catch { /* use system default */ }
+}
+
 /* ───── Init ───── */
-onMounted(() => loadData())
+onMounted(async () => {
+  await loadTablePreference()
+  loadData()
+})
 </script>
 
 <template>
@@ -219,8 +237,10 @@ onMounted(() => loadData())
     <!-- Header -->
     <div class="flex flex-wrap items-start justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900">SLA Performance Report</h1>
-        <Breadcrumbs class="mt-1" />
+        <div class="flex flex-wrap items-baseline gap-2">
+          <h1 class="text-2xl font-bold text-gray-900">SLA Performance Report</h1>
+          <Breadcrumbs />
+        </div>
         <p class="text-sm text-gray-500 mt-1">Monitor and analyze Service Level Agreement compliance across all operations.</p>
       </div>
     </div>
@@ -234,7 +254,7 @@ onMounted(() => loadData())
           @click="filtersVisible = !filtersVisible"
         >
           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-          {{ filtersVisible ? 'Hide Filters' : 'Show Filters' }}
+          Advanced Filters
         </button>
         <template v-if="filtersVisible">
           <div class="flex items-center gap-2">
@@ -320,14 +340,14 @@ onMounted(() => loadData())
     </div>
 
     <!-- Department-wise SLA Performance -->
-    <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+    <div class="rounded-xl border-2 border-black bg-white shadow-sm overflow-hidden">
       <div class="px-5 py-4 border-b border-gray-200">
         <h2 class="text-lg font-semibold text-gray-900">Department-wise SLA Performance</h2>
         <p class="text-sm text-gray-500 mt-0.5">Compliance rates by department</p>
       </div>
       <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead class="bg-gray-50">
+        <table class="min-w-full">
+          <thead class="bg-gray-50 border-b-2 border-black">
             <tr>
               <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
               <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Total Requests</th>
@@ -338,14 +358,14 @@ onMounted(() => loadData())
               <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Response Time</th>
             </tr>
           </thead>
-          <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-if="loading">
+          <tbody class="bg-white">
+            <tr v-if="loading" class="border-b border-black">
               <td colspan="7" class="px-5 py-8 text-center text-gray-400">Loading…</td>
             </tr>
-            <tr v-else-if="!departments.length">
+            <tr v-else-if="!departments.length" class="border-b border-black">
               <td colspan="7" class="px-5 py-8 text-center text-gray-400">No data available</td>
             </tr>
-            <tr v-else v-for="dept in departments" :key="dept.name" class="hover:bg-gray-50">
+            <tr v-else v-for="dept in departments" :key="dept.name" class="border-b border-black hover:bg-gray-50">
               <td class="px-5 py-3">
                 <div class="flex items-center gap-3">
                   <div class="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100">
@@ -476,14 +496,14 @@ onMounted(() => loadData())
               </th>
             </tr>
           </thead>
-          <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-if="loading">
+          <tbody class="bg-white">
+            <tr v-if="loading" class="border-b border-black">
               <td :colspan="activeBreachColumns.length" class="px-4 py-12 text-center text-gray-400">Loading…</td>
             </tr>
-            <tr v-else-if="!paginatedBreaches.length">
+            <tr v-else-if="!paginatedBreaches.length" class="border-b border-black">
               <td :colspan="activeBreachColumns.length" class="px-4 py-12 text-center text-gray-400">No breaches found</td>
             </tr>
-            <tr v-else v-for="(row, idx) in paginatedBreaches" :key="idx" class="hover:bg-gray-50 transition-colors">
+            <tr v-else v-for="(row, idx) in paginatedBreaches" :key="idx" class="border-b border-black hover:bg-gray-50 transition-colors">
               <td v-for="col in activeBreachColumns" :key="col.key" class="px-4 py-2.5 text-sm whitespace-nowrap">
                 <template v-if="col.key === 'priority'">
                   <span :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', priorityBadgeClass(row.priority)]">{{ row.priority }}</span>
@@ -503,36 +523,45 @@ onMounted(() => loadData())
         </table>
       </div>
       <!-- Pagination -->
-      <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 bg-white px-4 py-3">
-        <div class="flex items-center gap-3">
-          <p class="text-sm text-gray-600">
-            Showing {{ breachTotal ? ((breachPage - 1) * breachPerPage) + 1 : 0 }}
-            to {{ Math.min(breachPage * breachPerPage, breachTotal) }}
-            of {{ breachTotal }} entries
-          </p>
-          <div class="flex items-center gap-1.5 text-sm text-gray-600">
-            <span>Number of pages</span>
+      <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
+        <!-- Left: entries info -->
+        <p class="text-sm text-gray-600">
+          Showing {{ breachTotal ? ((breachPage - 1) * breachPerPage) + 1 : 0 }}
+          to {{ Math.min(breachPage * breachPerPage, breachTotal) }}
+          of {{ breachTotal }} entries
+        </p>
+
+        <!-- Right: Number of rows + Previous / Page X of Y / Next -->
+        <div class="flex items-center gap-4">
+          <div class="flex items-center gap-2 text-sm text-gray-600">
+            <span class="whitespace-nowrap font-medium">Number of rows</span>
             <select
               :value="breachPerPage"
-              class="rounded border border-gray-300 px-2 py-1 text-sm"
+              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
               @change="onBreachPerPageChange"
             >
-              <option :value="10">10</option>
-              <option :value="20">20</option>
-              <option :value="50">50</option>
+              <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
             </select>
           </div>
+
+          <div class="flex items-center gap-1.5">
+            <button
+              type="button"
+              :disabled="breachPage <= 1"
+              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              @click="onBreachPageChange(breachPage - 1)"
+            >Previous</button>
+            <span class="rounded-md border border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-700">
+              Page {{ breachPage }} of {{ breachLastPage }}
+            </span>
+            <button
+              type="button"
+              :disabled="breachPage >= breachLastPage"
+              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              @click="onBreachPageChange(breachPage + 1)"
+            >Next</button>
+          </div>
         </div>
-        <Pagination
-          v-if="breachLastPage > 1"
-          :meta="{
-            prev_page_url: breachPage > 1 ? '#' : null,
-            next_page_url: breachPage < breachLastPage ? '#' : null,
-            current_page: breachPage,
-            last_page: breachLastPage,
-          }"
-          @change="onBreachPageChange"
-        />
       </div>
     </div>
 

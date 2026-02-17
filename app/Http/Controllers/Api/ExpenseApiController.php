@@ -18,6 +18,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ExpenseApiController extends Controller
 {
+    use \App\Traits\ResolvesAuditDisplayValues;
+
     private const MODULE = 'expenses';
 
     private const ALLOWED_COLUMNS = [
@@ -514,6 +516,9 @@ class ExpenseApiController extends Controller
                     'created_at' => $a->created_at?->toIso8601String(),
                 ];
             });
+
+        $audits = $this->resolveObjectBasedAuditValues($audits);
+
         return response()->json(['data' => $audits]);
     }
 

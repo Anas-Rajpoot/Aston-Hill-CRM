@@ -11,14 +11,17 @@
  */
 import { ref, onMounted } from 'vue'
 import api from '@/lib/axios'
+import { useAuthStore } from '@/stores/auth'
 
-const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
+const PAGE_SIZE_OPTIONS = [10, 20, 25, 50, 100]
 
 // In-memory cache so navigating back to the same page doesn't re-fetch
 const cache = {}
 
 export function useTablePageSize(module) {
-  const perPage = ref(cache[module] ?? 10)
+  const authStore = useAuthStore()
+  const systemDefault = authStore.defaultTablePageSize || 25
+  const perPage = ref(cache[module] ?? systemDefault)
   const perPageOptions = PAGE_SIZE_OPTIONS
   const perPageReady = ref(!!cache[module])
 
@@ -30,7 +33,7 @@ export function useTablePageSize(module) {
     }
     try {
       const { data } = await api.get(`/table-preferences/${module}`)
-      perPage.value = data.per_page ?? 10
+      perPage.value = Number(data.per_page) || systemDefault
       cache[module] = perPage.value
     } catch {
       // silent — use fallback

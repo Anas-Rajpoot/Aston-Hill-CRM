@@ -142,9 +142,9 @@ function goToClient(row) {
       </div>
     </div>
 
-    <table class="min-w-full border border-gray-200 border-collapse">
+    <table class="min-w-full border-2 border-black border-collapse">
       <thead>
-        <tr class="border-b border-gray-200 bg-green-600">
+        <tr class="border-b-2 border-black bg-green-600">
           <th
             v-for="col in columns"
             :key="col"
@@ -174,7 +174,7 @@ function goToClient(row) {
         </tr>
       </thead>
       <tbody class="bg-white">
-        <tr v-if="!loading && !data.length" class="border-b border-gray-200 bg-white">
+        <tr v-if="!loading && !data.length" class="border-b border-black bg-white">
           <td :colspan="columns.length" class="px-4 py-12 text-center text-gray-500">
             No orders found.
           </td>
@@ -182,7 +182,7 @@ function goToClient(row) {
         <tr
           v-for="(row, rowIndex) in data"
           :key="row.id"
-          class="border-b border-gray-200 bg-white hover:bg-gray-50/50"
+          class="border-b border-black bg-white hover:bg-gray-50/50"
         >
           <td
             v-for="col in columns"

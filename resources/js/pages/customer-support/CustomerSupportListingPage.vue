@@ -2,15 +2,20 @@
 /**
  * Customer Support Requests listing – same design as Field / Lead Submissions.
  */
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { useAuthStore } from '@/stores/auth'
 import customerSupportApi from '@/services/customerSupportApi'
+import api from '@/lib/axios'
+import AssignModal from '@/components/AssignModal.vue'
 import FiltersBar from '@/components/customer-support/FiltersBar.vue'
 import AdvancedFilters from '@/components/customer-support/AdvancedFilters.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import CustomerSupportTable from '@/components/customer-support/CustomerSupportTable.vue'
-import Pagination from '@/components/Pagination.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import RecordHistoryModal from '@/components/RecordHistoryModal.vue'
+import Toast from '@/components/Toast.vue'
+import { debounce } from '@/composables/useApiRequest'
+import { useFilterCache } from '@/composables/useFilterCache'
 
 const historyModalVisible = ref(false)
 const historyRecordId = ref(null)
@@ -30,6 +35,9 @@ async function fetchSupportAudits(id) {
   return await customerSupportApi.getAudits(id)
 }
 
+const auth = useAuthStore()
+let listAbortController = null
+const { loadBootstrap: loadCachedBootstrap, invalidate: invalidateFilterCache } = useFilterCache('customer-support')
 const loading = ref(true)
 const filterOptions = ref({
   statuses: [],
@@ -39,7 +47,9 @@ const filterOptions = ref({
   sales_agents: [],
 })
 const submissions = ref([])
-const meta = ref({ current_page: 1, last_page: 1, per_page: 15, total: 0 })
+const TABLE_MODULE = 'customer-support'
+const meta = ref({ current_page: 1, last_page: 1, per_page: auth.defaultTablePageSize || 25, total: 0 })
+const perPageOptions = ref([10, 20, 25, 50, 100])
 const allColumns = ref([])
 const visibleColumns = ref([
   'id', 'submitted_at', 'issue_category', 'company_name', 'account_number', 'contact_number',
@@ -50,6 +60,26 @@ const order = ref('desc')
 const advancedVisible = ref(false)
 const columnModalVisible = ref(false)
 const exportLoading = ref(false)
+
+const assignModalVisible = ref(false)
+const assignRow = ref(null)
+const assignBulkIds = ref([])
+const selectedIds = ref([])
+const bulkAssignMessage = ref('')
+
+const showToast = ref(false)
+const toastType = ref('success')
+const toastMsg = ref('')
+function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
+
+const canBulkAssign = (() => {
+  const roles = auth.user?.roles ?? []
+  if (!Array.isArray(roles)) return false
+  return roles.some((r) => {
+    const name = typeof r === 'string' ? r : r?.name
+    return name === 'superadmin' || name === 'customer_support_representative' || name === 'support_manager'
+  })
+})()
 
 const filters = ref({
   q: '',
@@ -153,11 +183,19 @@ async function onExport() {
 
 async function load() {
   window.scrollTo(0, 0)
+  // Cancel any in-flight list request before starting a new one
+  if (listAbortController) listAbortController.abort()
+  listAbortController = new AbortController()
+  const { signal } = listAbortController
+
   loading.value = true
   try {
-    const data = await customerSupportApi.index(buildParams())
+    const data = await customerSupportApi.index(buildParams(), { signal })
     submissions.value = data.data ?? []
     meta.value = data.meta ?? meta.value
+  } catch (err) {
+    if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') return
+    throw err
   } finally {
     loading.value = false
     window.scrollTo(0, 0)
@@ -271,10 +309,118 @@ function onPageChange(page) {
   load()
 }
 
-onMounted(() => {
-  loadFilters()
-  loadColumns()
+async function onPerPageChange(e) {
+  const val = Number(e.target.value)
+  meta.value.per_page = val
+  meta.value.current_page = 1
   load()
+  try { await api.post(`/table-preferences/${TABLE_MODULE}`, { per_page: val }) } catch { /* silent */ }
+}
+
+async function loadTablePreference() {
+  try {
+    const { data } = await api.get(`/table-preferences/${TABLE_MODULE}`)
+    if (data.per_page) meta.value.per_page = Number(data.per_page)
+    if (Array.isArray(data.options) && data.options.length) perPageOptions.value = data.options
+  } catch { /* use system default */ }
+}
+
+function openAssignModal(row) {
+  if (!row) return
+  assignRow.value = row
+  assignBulkIds.value = []
+  assignModalVisible.value = true
+}
+
+function openBulkAssign() {
+  bulkAssignMessage.value = ''
+  if (selectedIds.value.length === 0) {
+    bulkAssignMessage.value = 'Please select at least one row.'
+    return
+  }
+  assignRow.value = null
+  assignBulkIds.value = [...selectedIds.value]
+  assignModalVisible.value = true
+}
+
+function onAssignModalClose() {
+  assignModalVisible.value = false
+  assignRow.value = null
+  assignBulkIds.value = []
+}
+
+function onAssignModalSaved() {
+  toast('success', 'CSR assigned successfully.')
+  assignRow.value = null
+  assignBulkIds.value = []
+  selectedIds.value = []
+  load()
+}
+
+async function loadCsrOptions() {
+  const res = await customerSupportApi.getCsrOptions()
+  return res?.csrs ?? []
+}
+
+async function onAssignSingle(row, csrId) {
+  await customerSupportApi.assignCsr(row.id, csrId)
+}
+
+async function onAssignBulk(ids, csrId) {
+  await customerSupportApi.bulkAssign(ids, { csr_id: csrId })
+}
+
+watch(selectedIds, (ids) => {
+  if (ids && ids.length > 0) bulkAssignMessage.value = ''
+}, { deep: true })
+
+// Debounced search: waits 400ms after user stops typing before hitting API
+const debouncedSearch = debounce(() => {
+  meta.value.current_page = 1
+  load()
+}, 400)
+
+// Watch the search query field to trigger debounced load
+watch(() => filters.value.q, (newVal, oldVal) => {
+  if (newVal !== oldVal) debouncedSearch()
+})
+
+// Cleanup on unmount
+onUnmounted(() => {
+  if (listAbortController) listAbortController.abort()
+  debouncedSearch.cancel()
+})
+
+onMounted(async () => {
+  // Try aggregated bootstrap endpoint (1 request instead of 4+)
+  const bootstrapResult = await loadCachedBootstrap(buildParams())
+  if (bootstrapResult) {
+    const fd = bootstrapResult.filters ?? {}
+    const team = bootstrapResult.team_options ?? {}
+    const csr = bootstrapResult.csr_options ?? {}
+    filterOptions.value = {
+      statuses: fd.statuses ?? [],
+      issue_categories: fd.issue_categories ?? [],
+      managers: team.managers ?? [],
+      team_leaders: team.team_leaders ?? [],
+      sales_agents: team.sales_agents ?? [],
+      csrs: csr.csrs ?? [],
+    }
+    const cd = bootstrapResult.columns ?? {}
+    if (cd.all_columns) allColumns.value = cd.all_columns
+    if (cd.visible_columns) visibleColumns.value = cd.visible_columns ?? visibleColumns.value
+    const pd = bootstrapResult.page ?? {}
+    submissions.value = pd.data ?? []
+    meta.value = pd.meta ?? meta.value
+    loading.value = false
+    // No separate loadFilters() needed - bootstrap has everything
+  } else {
+    // Fallback: individual requests (parallel)
+    await loadTablePreference()
+    loadFilters()
+    loadColumns()
+    load()
+  }
 })
 </script>
 
@@ -286,12 +432,22 @@ onMounted(() => {
           <h1 class="text-xl font-semibold text-gray-900 leading-tight">Customer Support Requests</h1>
           <Breadcrumbs />
         </div>
-        <button
-          type="button"
-          class="inline-flex items-center rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70 disabled:cursor-wait"
-          :disabled="loading || exportLoading"
-          @click="onExport"
-        >
+        <div class="flex flex-wrap items-center gap-2">
+          <button
+            v-if="canBulkAssign"
+            type="button"
+            class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            title="Bulk Assign"
+            @click="openBulkAssign"
+          >
+            Bulk Assign
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70 disabled:cursor-wait"
+            :disabled="loading || exportLoading"
+            @click="onExport"
+          >
           <svg
             v-if="exportLoading"
             class="mr-1.5 h-4 w-4 animate-spin"
@@ -313,6 +469,15 @@ onMounted(() => {
           </svg>
           {{ exportLoading ? 'Exporting...' : 'Export' }}
         </button>
+        </div>
+      </div>
+
+      <div
+        v-if="bulkAssignMessage"
+        class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"
+        role="alert"
+      >
+        {{ bulkAssignMessage }}
       </div>
 
       <FiltersBar
@@ -325,10 +490,11 @@ onMounted(() => {
         <template #after-reset>
           <button
             type="button"
-            class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
             @click="advancedVisible = !advancedVisible"
           >
-            {{ advancedVisible ? 'Hide' : 'Advanced' }} Filters
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+            Advanced Filters
           </button>
           <button
             type="button"
@@ -352,7 +518,7 @@ onMounted(() => {
         @reset="resetFilters"
       />
 
-      <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div class="overflow-hidden rounded-lg border-2 border-black bg-white shadow-sm">
         <CustomerSupportTable
           :columns="visibleColumns"
           :data="submissions"
@@ -362,27 +528,36 @@ onMounted(() => {
           :current-page="meta.current_page"
           :per-page="meta.per_page"
           :edit-options="filterOptions"
+          :can-bulk-assign="canBulkAssign"
+          v-model:selected-ids="selectedIds"
           @sort="onSort"
           @update-cell="onUpdateCell"
+          @open-assign="openAssignModal"
           @view-history="openHistoryModal"
         />
-        <div
-          class="flex flex-wrap items-center gap-4 border-t border-black bg-white px-4 py-3"
-          :class="meta.last_page > 1 ? 'justify-between' : 'justify-start'"
-        >
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
           <p class="text-sm text-gray-600">
-            Showing {{ meta.total ? ((meta.current_page - 1) * meta.per_page) + 1 : 0 }} to {{ Math.min(meta.current_page * meta.per_page, meta.total) }} of {{ meta.total }} results
+            Showing {{ meta.total ? ((meta.current_page - 1) * meta.per_page) + 1 : 0 }}
+            to {{ Math.min(meta.current_page * meta.per_page, meta.total) }}
+            of {{ meta.total }} entries
           </p>
-          <Pagination
-            v-if="meta.last_page > 1"
-            :meta="{
-              prev_page_url: meta.current_page > 1 ? '#' : null,
-              next_page_url: meta.current_page < meta.last_page ? '#' : null,
-              current_page: meta.current_page,
-              last_page: meta.last_page,
-            }"
-            @change="onPageChange"
-          />
+          <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2 text-sm text-gray-600">
+              <span class="whitespace-nowrap font-medium">Number of rows</span>
+              <select
+                :value="meta.per_page"
+                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                @change="onPerPageChange"
+              >
+                <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button type="button" :disabled="meta.current_page <= 1" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50" @click="onPageChange(meta.current_page - 1)">Previous</button>
+              <span class="rounded-md border border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-700">Page {{ meta.current_page }} of {{ meta.last_page }}</span>
+              <button type="button" :disabled="meta.current_page >= meta.last_page" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50" @click="onPageChange(meta.current_page + 1)">Next</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -403,5 +578,21 @@ onMounted(() => {
       :fetch-fn="fetchSupportAudits"
       @close="closeHistoryModal"
     />
+
+    <AssignModal
+      :visible="assignModalVisible"
+      :row="assignRow"
+      :bulk-ids="assignBulkIds"
+      title="Assign to CSR"
+      bulk-title="Assign {count} request(s) to CSR"
+      select-label="Select CSR"
+      :load-options="loadCsrOptions"
+      :on-assign-single="onAssignSingle"
+      :on-assign-bulk="onAssignBulk"
+      @close="onAssignModalClose"
+      @saved="onAssignModalSaved"
+    />
+
+    <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />
   </div>
 </template>

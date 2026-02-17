@@ -436,7 +436,7 @@ onMounted(() => fetchList(1))
     </Transition>
 
     <!-- ═══ Table ═══ -->
-    <section class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+    <section class="rounded-xl border-2 border-black bg-white shadow-sm overflow-hidden">
       <!-- Skeleton -->
       <div v-if="loading && !rows.length" class="divide-y divide-gray-100">
         <div class="grid grid-cols-8 gap-4 px-6 py-3 bg-gray-50"><SkeletonBox v-for="i in 8" :key="i" width="75%" height="14px" /></div>
@@ -448,8 +448,8 @@ onMounted(() => fetchList(1))
       <!-- Loaded -->
       <div v-else class="overflow-x-auto">
         <table class="min-w-full text-sm">
-          <thead>
-            <tr class="border-b border-gray-200 bg-gray-50 text-left">
+          <thead class="border-b-2 border-black">
+            <tr class="bg-gray-50 text-left">
               <th
                 v-for="col in activeColumns"
                 :key="col.key"
@@ -468,8 +468,8 @@ onMounted(() => fetchList(1))
               <th class="px-4 py-3 font-semibold text-gray-600">Actions</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-100">
-            <tr v-for="ann in rows" :key="ann.id" class="hover:bg-gray-50/50 transition-colors" :class="{ 'opacity-60': ann.status === 'disabled' }">
+          <tbody>
+            <tr v-for="ann in rows" :key="ann.id" class="border-b border-black hover:bg-gray-50/50 transition-colors" :class="{ 'opacity-60': ann.status === 'disabled' }">
               <!-- Title (editable on double-click) -->
               <td v-if="visibleColumns.includes('title')" class="px-6 py-3.5 max-w-[260px]" @dblclick="startEditAnn(ann)">
                 <template v-if="editingAnnId === ann.id">
@@ -568,31 +568,31 @@ onMounted(() => fetchList(1))
                 </div>
               </td>
             </tr>
-            <tr v-if="!rows.length && !loading"><td colspan="8" class="px-6 py-12 text-center text-sm text-gray-400">No announcements found.</td></tr>
+            <tr v-if="!rows.length && !loading" class="border-b border-black"><td colspan="8" class="px-6 py-12 text-center text-sm text-gray-400">No announcements found.</td></tr>
           </tbody>
         </table>
       </div>
 
       <!-- Pagination -->
-      <div class="px-6 py-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3 text-sm">
-        <span class="text-gray-500">Showing {{ meta.from || 0 }} to {{ meta.to || 0 }} of {{ meta.total }} entries</span>
-        <div class="flex items-center gap-3">
-          <div class="flex items-center gap-2">
-            <span class="text-gray-500 whitespace-nowrap">Number of rows</span>
-            <select :value="perPage" class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm min-w-[85px] focus:border-green-500 focus:ring-1 focus:ring-green-500" @change="e => { setPerPage(e.target.value); fetchList(1) }">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
+        <p class="text-sm text-gray-600">
+          Showing {{ meta.from ?? 0 }} to {{ meta.to ?? 0 }} of {{ meta.total }} entries
+        </p>
+        <div class="flex items-center gap-4">
+          <div class="flex items-center gap-2 text-sm text-gray-600">
+            <span class="whitespace-nowrap font-medium">Number of rows</span>
+            <select
+              :value="perPage"
+              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              @change="e => { setPerPage(e.target.value); fetchList(1) }"
+            >
               <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
             </select>
           </div>
-          <div class="flex gap-1">
-            <button :disabled="meta.current_page <= 1" class="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium disabled:opacity-40 hover:bg-gray-50" @click="fetchList(meta.current_page - 1)">Previous</button>
-            <template v-for="p in meta.last_page" :key="p">
-              <button
-                class="min-w-[32px] rounded px-2 py-1.5 text-sm font-medium transition-colors"
-                :class="p === meta.current_page ? 'bg-green-600 text-white' : 'border border-gray-300 hover:bg-gray-50 text-gray-700'"
-                @click="fetchList(p)"
-              >{{ p }}</button>
-            </template>
-            <button :disabled="meta.current_page >= meta.last_page" class="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium disabled:opacity-40 hover:bg-gray-50" @click="fetchList(meta.current_page + 1)">Next</button>
+          <div class="flex items-center gap-1.5">
+            <button type="button" :disabled="meta.current_page <= 1" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50" @click="fetchList(meta.current_page - 1)">Previous</button>
+            <span class="rounded-md border border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-700">Page {{ meta.current_page }} of {{ meta.last_page }}</span>
+            <button type="button" :disabled="meta.current_page >= meta.last_page" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50" @click="fetchList(meta.current_page + 1)">Next</button>
           </div>
         </div>
       </div>

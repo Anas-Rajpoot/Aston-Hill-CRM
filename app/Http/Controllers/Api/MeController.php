@@ -39,6 +39,7 @@ class MeController extends Controller
                 'email' => $user->email,
                 'roles' => $resolved['roles'],
                 'timezone' => $prefs->timezone ?? 'Asia/Dubai',
+                'default_table_page_size' => (int) ($prefs->default_table_page_size ?? 25),
                 'session' => [
                     'timeout_minutes'         => (int) $security->auto_logout_after_minutes,
                     'warning_enabled'         => (bool) $prefs->session_warning_before_logout,

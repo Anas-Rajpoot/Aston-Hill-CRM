@@ -11,8 +11,8 @@ import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import { toDdMmYyyy } from '@/lib/dateFormat'
 import ClientTable from '@/components/clients/ClientTable.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
-import Pagination from '@/components/Pagination.vue'
 import Toast from '@/components/Toast.vue'
+import api from '@/lib/axios'
 
 const route = useRoute()
 const router = useRouter()
@@ -73,8 +73,10 @@ const toastMsg  = ref('')
 function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
 
 // Products & Services
+const TABLE_MODULE = 'client-profile-products'
+const perPageOptions = ref([10, 20, 25, 50, 100])
 const products = ref([])
-const productsMeta = ref({})
+const productsMeta = ref({ per_page: auth.defaultTablePageSize || 25 })
 const productsLoading = ref(false)
 const productsSort = ref('submitted_at')
 const productsOrder = ref('desc')
@@ -163,7 +165,7 @@ async function loadProducts() {
   try {
     const res = await clientsApi.products(id.value, {
       page: productsMeta.value.current_page || 1,
-      per_page: 10,
+      per_page: productsMeta.value.per_page || auth.defaultTablePageSize || 25,
       sort: productsSort.value,
       order: productsOrder.value,
     })
@@ -180,6 +182,29 @@ function onProductsSort({ sort, order }) {
   productsSort.value = sort
   productsOrder.value = order
   loadProducts()
+}
+
+function onProductsPageChange(page) {
+  productsMeta.value.current_page = page
+  loadProducts()
+}
+
+async function onProductsPerPageChange(event) {
+  const newPerPage = Number(event.target.value)
+  productsMeta.value.per_page = newPerPage
+  productsMeta.value.current_page = 1
+  try {
+    await api.post(`/table-preferences/${TABLE_MODULE}`, { per_page: newPerPage })
+  } catch { /* silent */ }
+  loadProducts()
+}
+
+async function loadTablePreference() {
+  try {
+    const { data } = await api.get(`/table-preferences/${TABLE_MODULE}`)
+    if (data.per_page) productsMeta.value.per_page = Number(data.per_page)
+    if (Array.isArray(data.options) && data.options.length) perPageOptions.value = data.options
+  } catch { /* use system default */ }
 }
 
 async function loadColumns() {
@@ -300,13 +325,15 @@ function removeAddress(index) {
 }
 
 onMounted(() => {
-  loadClient().then(() => {
-    if (activeTab.value === 'products-services') {
-      loadProducts()
-      loadColumns()
-    } else if (activeTab.value === 'vas-requests') loadVasRequests()
-    else if (activeTab.value === 'customer-support') loadCustomerSupport()
-    else if (activeTab.value === 'alerts') loadAlerts()
+  loadTablePreference().then(() => {
+    loadClient().then(() => {
+      if (activeTab.value === 'products-services') {
+        loadProducts()
+        loadColumns()
+      } else if (activeTab.value === 'vas-requests') loadVasRequests()
+      else if (activeTab.value === 'customer-support') loadCustomerSupport()
+      else if (activeTab.value === 'alerts') loadAlerts()
+    })
   })
 })
 </script>
@@ -737,22 +764,29 @@ onMounted(() => {
                   @sort="onProductsSort"
                 />
               </div>
-              <div v-if="productsMeta.total > 0" class="flex justify-between border-t border-gray-200 pt-2">
+              <div v-if="productsMeta.total > 0" class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 bg-white px-4 py-3">
                 <p class="text-sm text-gray-600">
-                  Showing {{ ((productsMeta.current_page || 1) - 1) * (productsMeta.per_page || 10) + 1 }} to
-                  {{ Math.min((productsMeta.current_page || 1) * (productsMeta.per_page || 10), productsMeta.total) }} of
-                  {{ productsMeta.total }} entries
+                  Showing {{ productsMeta.total ? ((productsMeta.current_page || 1) - 1) * (productsMeta.per_page || auth.defaultTablePageSize || 25) + 1 : 0 }}
+                  to {{ Math.min((productsMeta.current_page || 1) * (productsMeta.per_page || auth.defaultTablePageSize || 25), productsMeta.total) }}
+                  of {{ productsMeta.total }} entries
                 </p>
-                <Pagination
-                  v-if="(productsMeta.last_page || 1) > 1"
-                  :meta="{
-                    prev_page_url: (productsMeta.current_page || 1) > 1 ? '#' : null,
-                    next_page_url: (productsMeta.current_page || 1) < (productsMeta.last_page || 1) ? '#' : null,
-                    current_page: productsMeta.current_page || 1,
-                    last_page: productsMeta.last_page || 1,
-                  }"
-                  @change="(p) => { productsMeta.current_page = p; loadProducts() }"
-                />
+                <div class="flex items-center gap-4">
+                  <div class="flex items-center gap-2 text-sm text-gray-600">
+                    <span class="whitespace-nowrap font-medium">Number of rows</span>
+                    <select
+                      :value="productsMeta.per_page || auth.defaultTablePageSize || 25"
+                      class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                      @change="onProductsPerPageChange"
+                    >
+                      <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
+                    </select>
+                  </div>
+                  <div class="flex items-center gap-1.5">
+                    <button type="button" :disabled="(productsMeta.current_page || 1) <= 1" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50" @click="onProductsPageChange((productsMeta.current_page || 1) - 1)">Previous</button>
+                    <span class="rounded-md border border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-700">Page {{ productsMeta.current_page || 1 }} of {{ productsMeta.last_page || 1 }}</span>
+                    <button type="button" :disabled="(productsMeta.current_page || 1) >= (productsMeta.last_page || 1)" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50" @click="onProductsPageChange((productsMeta.current_page || 1) + 1)">Next</button>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -907,10 +941,10 @@ onMounted(() => {
         <!-- Audit history modal -->
         <div
           v-if="auditModalVisible"
-          class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4"
           @click.self="auditModalVisible = false"
         >
-          <div class="max-h-[80vh] w-full max-w-2xl overflow-hidden rounded-lg bg-white shadow-xl">
+          <div class="max-h-[80vh] w-full max-w-2xl flex flex-col overflow-hidden rounded-lg bg-white shadow-xl">
             <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3">
               <h3 class="text-lg font-semibold text-gray-900">Change History</h3>
               <button
@@ -932,11 +966,19 @@ onMounted(() => {
                   :key="a.id"
                   class="rounded border border-gray-200 bg-gray-50 p-3 text-sm"
                 >
-                  <p class="font-medium text-gray-700">{{ a.field_name }}</p>
-                  <p class="text-gray-600">Old: {{ a.old_value ?? '—' }}</p>
-                  <p class="text-gray-600">New: {{ a.new_value ?? '—' }}</p>
-                  <p class="mt-1 text-xs text-gray-500">
-                    {{ new Date(a.changed_at).toLocaleString() }} by {{ a.changed_by ?? '—' }}
+                  <p class="font-medium text-gray-700">{{ a.field_label || a.field_name }}</p>
+                  <div class="mt-1 grid grid-cols-2 gap-2">
+                    <div class="rounded bg-red-50 px-3 py-2">
+                      <p class="text-xs font-medium text-gray-500">Before</p>
+                      <p class="text-gray-900">{{ a.old_value ?? '(empty)' }}</p>
+                    </div>
+                    <div class="rounded bg-green-50 px-3 py-2">
+                      <p class="text-xs font-medium text-gray-500">After</p>
+                      <p class="text-gray-900">{{ a.new_value ?? '(empty)' }}</p>
+                    </div>
+                  </div>
+                  <p class="mt-1.5 text-xs text-gray-500">
+                    {{ new Date(a.changed_at).toLocaleString() }} by {{ a.changed_by_name || a.changed_by || '—' }}
                   </p>
                 </div>
               </div>

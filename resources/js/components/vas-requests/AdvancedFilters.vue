@@ -32,7 +32,6 @@ const activeCount = computed(() => {
   if (f.account_number) n++
   if (f.company_name) n++
   // request_type only in FiltersBar, not here
-  if (f.status) n++
   if (f.from || f.to) n++
   if (f.submitted_from || f.submitted_to) n++
   if (f.sales_agent_id || f.team_leader_id || f.manager_id) n++
@@ -105,17 +104,6 @@ const submittedToDisplay = computed({
             class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           />
-        </div>
-        <div>
-          <label class="mb-0.5 block text-xs font-medium text-gray-600">Status</label>
-          <select
-            v-model="filters.status"
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            :disabled="loading"
-          >
-            <option value="">All</option>
-            <option v-for="s in filterOptions.statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
-          </select>
         </div>
         <div>
           <label class="mb-0.5 block text-xs font-medium text-gray-600">Created From</label>

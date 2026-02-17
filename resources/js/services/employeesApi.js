@@ -31,4 +31,9 @@ export default {
     })
     return data
   },
+
+  async getAudits(userId) {
+    const { data } = await api.get(`/users/${userId}/audit-log`)
+    return data
+  },
 }

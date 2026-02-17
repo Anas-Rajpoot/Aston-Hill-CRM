@@ -27,9 +27,13 @@ const props = defineProps({
   perPage: { type: Number, default: 15 },
   /** Options for dropdowns: issue_categories, statuses, managers, team_leaders, sales_agents. */
   editOptions: { type: Object, default: () => ({}) },
+  /** Whether user can bulk assign (shows checkboxes and Assign button). */
+  canBulkAssign: { type: Boolean, default: false },
+  /** Selected row IDs for bulk assign. */
+  selectedIds: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['sort', 'updateCell', 'viewHistory'])
+const emit = defineEmits(['sort', 'updateCell', 'viewHistory', 'openAssign', 'update:selectedIds'])
 
 const auth = useAuthStore()
 const canInlineEdit = computed(() => {
@@ -41,6 +45,26 @@ const canInlineEdit = computed(() => {
 
 function rowNumber(index) {
   return (props.currentPage - 1) * props.perPage + index + 1
+}
+
+const selectedSet = computed(() => new Set((props.selectedIds || []).map(String)))
+const allRowIds = computed(() => props.data.map((r) => r.id))
+const isAllSelected = computed(() => allRowIds.value.length > 0 && allRowIds.value.every((id) => selectedSet.value.has(String(id))))
+
+function toggleSelectAll() {
+  if (isAllSelected.value) {
+    emit('update:selectedIds', [])
+  } else {
+    emit('update:selectedIds', [...allRowIds.value])
+  }
+}
+
+function toggleRow(id) {
+  const idStr = String(id)
+  const next = new Set(selectedSet.value)
+  if (next.has(idStr)) next.delete(idStr)
+  else next.add(idStr)
+  emit('update:selectedIds', Array.from(next).map(Number))
 }
 
 const columnLabels = {
@@ -214,9 +238,19 @@ function statusBadgeClass(status) {
       </div>
     </div>
 
-    <table class="min-w-full border border-gray-400 border-collapse">
+    <table class="min-w-full border-2 border-black border-collapse">
       <thead>
-        <tr class="border-b border-gray-400 bg-green-600">
+        <tr class="border-b-2 border-black bg-green-600">
+          <th v-if="canBulkAssign" class="w-10 px-3 py-3 text-left">
+            <input
+              type="checkbox"
+              class="rounded border-gray-300"
+              aria-label="Select all"
+              :checked="isAllSelected"
+              :indeterminate="selectedSet.size > 0 && !isAllSelected"
+              @change="toggleSelectAll"
+            />
+          </th>
           <th
             v-for="col in columns"
             :key="col"
@@ -249,16 +283,24 @@ function statusBadgeClass(status) {
         </tr>
       </thead>
       <tbody class="bg-white">
-        <tr v-if="!loading && !data.length" class="border-b border-gray-400 bg-white">
-          <td :colspan="columns.length + 1" class="px-4 py-12 text-center text-gray-500">
+        <tr v-if="!loading && !data.length" class="border-b border-black bg-white">
+          <td :colspan="columns.length + (canBulkAssign ? 2 : 1)" class="px-4 py-12 text-center text-gray-500">
             No customer support requests found.
           </td>
         </tr>
         <tr
           v-for="(row, rowIndex) in data"
           :key="row.id"
-          class="border-b border-gray-400 bg-white hover:bg-gray-50/50"
+          class="border-b border-black bg-white hover:bg-gray-50/50"
         >
+          <td v-if="canBulkAssign" class="w-10 px-3 py-3">
+            <input
+              type="checkbox"
+              class="rounded border-gray-300"
+              :checked="selectedSet.has(String(row.id))"
+              @change="toggleRow(row.id)"
+            />
+          </td>
           <td
             v-for="col in columns"
             :key="col"
@@ -361,6 +403,17 @@ function statusBadgeClass(status) {
           </td>
           <td class="whitespace-nowrap px-4 py-3 text-right">
             <div class="inline-flex items-center gap-2">
+              <button
+                v-if="canBulkAssign"
+                type="button"
+                class="rounded-full p-1.5 text-purple-600 hover:bg-purple-50"
+                title="Assign to CSR"
+                @click="$emit('openAssign', row)"
+              >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+              </button>
               <button
                 type="button"
                 class="rounded-full p-1.5 text-blue-600 hover:bg-blue-50"

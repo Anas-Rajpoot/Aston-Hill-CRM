@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import usersApi from '@/services/usersApi'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
@@ -19,14 +19,61 @@ const roles = ref([])
 const loading = ref(false)
 const error = ref('')
 const successMessage = ref('')
+const rolesDropdownOpen = ref(false)
+const rolesDropdownRef = ref(null)
+
+function formatRoleName(name) {
+  if (!name) return ''
+  return name
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+const assignableRoles = computed(() => {
+  const list = (roles.value ?? []).filter((r) => (r?.name ?? '').toLowerCase() !== 'superadmin')
+  const seen = new Map()
+  for (const r of list) {
+    if (!r?.id) continue
+    const key = (r.name ?? '').toLowerCase().replace(/[\s_-]+/g, '')
+    if (!seen.has(key)) seen.set(key, r)
+  }
+  return Array.from(seen.values())
+})
+
+const selectedRolesLabel = computed(() => {
+  const ids = form.value.roles
+  if (!ids.length) return 'Select roles to assign'
+  return assignableRoles.value
+    .filter((r) => ids.includes(r.id))
+    .map((r) => formatRoleName(r.name))
+    .join(', ')
+})
+
+function toggleRole(roleId) {
+  const ids = form.value.roles
+  const idx = ids.indexOf(roleId)
+  if (idx >= 0) ids.splice(idx, 1)
+  else ids.push(roleId)
+}
+
+function onClickOutside(e) {
+  if (rolesDropdownRef.value && !rolesDropdownRef.value.contains(e.target)) {
+    rolesDropdownOpen.value = false
+  }
+}
 
 onMounted(async () => {
+  document.addEventListener('mousedown', onClickOutside)
   try {
     const { data } = await usersApi.index({ per_page: 1, page: 1 })
     roles.value = data.roles ?? []
   } catch {
     roles.value = []
   }
+})
+
+onUnmounted(() => {
+  document.removeEventListener('mousedown', onClickOutside)
 })
 
 const save = async () => {
@@ -104,11 +151,11 @@ const save = async () => {
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-2">Assign Roles</label>
         <div class="border rounded-xl p-3 bg-gray-50 space-y-2">
-          <label v-for="r in roles.filter((x) => x.name !== 'superadmin')" :key="r.id" class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer">
+          <label v-for="r in assignableRoles" :key="r.id" class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer">
             <input v-model="form.roles" type="checkbox" :value="r.id" class="rounded border-gray-300" />
-            <span>{{ r.name }}</span>
+            <span>{{ formatRoleName(r.name) }}</span>
           </label>
-          <p v-if="!roles.filter((x) => x.name !== 'superadmin').length" class="text-sm text-gray-500">No roles available.</p>
+          <p v-if="!assignableRoles.length" class="text-sm text-gray-500">No roles available.</p>
         </div>
       </div>
 

@@ -3,18 +3,22 @@
 namespace Database\Seeders;
 
 use App\Models\Role;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Spatie\Permission\PermissionRegistrar;
 
 class RoleSeeder extends Seeder
 {
     /**
      * Run the database seeds.
-     * All roles from the Role Assignment UI (except Super Admin) with descriptions.
-     * Superadmin is created without description so it exists but is not shown in assignable list.
+     *
+     * All roles use the 'web' guard exclusively.
+     * Sanctum uses stateful session auth (web guard), so a separate
+     * 'sanctum' guard for roles is unnecessary and causes duplication.
      */
     public function run(): void
     {
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
         $roles = [
             [
                 'name' => 'superadmin',
@@ -54,27 +58,26 @@ class RoleSeeder extends Seeder
             ],
         ];
 
-        $guards = ['web', 'sanctum'];
-
         foreach ($roles as $role) {
-            $name = $role['name'];
-            $description = $role['description'] ?? null;
-            foreach ($guards as $guard) {
-                Role::firstOrCreate(
-                    [
-                        'name' => $name,
-                        'guard_name' => $guard,
-                    ],
-                    [
-                        'description' => $description,
-                        'status' => 'active',
-                    ]
-                );
-            }
-            // Update description for existing roles (firstOrCreate only sets it on create)
-            if ($description !== null) {
-                Role::where('name', $name)->update(['description' => $description]);
+            Role::firstOrCreate(
+                [
+                    'name' => $role['name'],
+                    'guard_name' => 'web',
+                ],
+                [
+                    'description' => $role['description'],
+                    'status' => 'active',
+                ]
+            );
+
+            // Update description for existing roles (firstOrCreate only sets on create)
+            if ($role['description'] !== null) {
+                Role::where('name', $role['name'])
+                    ->where('guard_name', 'web')
+                    ->update(['description' => $role['description']]);
             }
         }
+
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 }

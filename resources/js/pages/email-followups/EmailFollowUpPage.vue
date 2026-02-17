@@ -9,17 +9,19 @@ import FiltersBar from '@/components/email-followups/FiltersBar.vue'
 import AdvancedFilters from '@/components/email-followups/AdvancedFilters.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import EmailFollowUpTable from '@/components/email-followups/EmailFollowUpTable.vue'
-import Pagination from '@/components/Pagination.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import api from '@/lib/axios'
 
 const auth = useAuthStore()
+const TABLE_MODULE = 'email-followups'
+const perPageOptions = ref([10, 20, 25, 50, 100])
 const addedByName = ref('')
 const loading = ref(true)
 const submitLoading = ref(false)
 const exportLoading = ref(false)
 const filterOptions = ref({ statuses: [], categories: [] })
 const submissions = ref([])
-const meta = ref({ current_page: 1, last_page: 1, per_page: 15, total: 0 })
+const meta = ref({ current_page: 1, last_page: 1, per_page: auth.defaultTablePageSize || 25, total: 0 })
 const allColumns = ref([])
 const visibleColumns = ref(['id', 'email_date', 'subject', 'category', 'request_from', 'sent_to', 'creator', 'status', 'status_date'])
 const sort = ref('email_date')
@@ -142,6 +144,22 @@ function onPageChange(page) {
   load()
 }
 
+async function onPerPageChange(e) {
+  const val = Number(e.target.value)
+  meta.value.per_page = val
+  meta.value.current_page = 1
+  load()
+  try { await api.post(`/table-preferences/${TABLE_MODULE}`, { per_page: val }) } catch { /* silent */ }
+}
+
+async function loadTablePreference() {
+  try {
+    const { data } = await api.get(`/table-preferences/${TABLE_MODULE}`)
+    if (data.per_page) meta.value.per_page = Number(data.per_page)
+    if (Array.isArray(data.options) && data.options.length) perPageOptions.value = data.options
+  } catch { /* use system default */ }
+}
+
 function clearForm() {
   form.value = {
     email_date: '',
@@ -225,7 +243,8 @@ async function onExport() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await loadTablePreference()
   addedByName.value = auth.user?.name ?? ''
   loadFilters()
   loadColumns()
@@ -355,10 +374,11 @@ onMounted(() => {
         <template #after-reset>
           <button
             type="button"
-            class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
             @click="advancedVisible = !advancedVisible"
           >
-            {{ advancedVisible ? 'Hide' : 'Show' }} Filters
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+            Advanced Filters
           </button>
           <button
             type="button"
@@ -379,7 +399,7 @@ onMounted(() => {
         @reset="resetFilters"
       />
 
-      <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div class="overflow-hidden rounded-xl border-2 border-black bg-white shadow-sm">
         <EmailFollowUpTable
           :columns="visibleColumns"
           :data="submissions"
@@ -392,23 +412,29 @@ onMounted(() => {
           @sort="onSort"
           @update-cell="onUpdateCell"
         />
-        <div
-          class="flex flex-wrap items-center gap-4 border-t border-gray-400 bg-white px-4 py-3"
-          :class="meta.last_page > 1 ? 'justify-between' : 'justify-start'"
-        >
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
           <p class="text-sm text-gray-600">
-            Showing {{ meta.total ? ((meta.current_page - 1) * meta.per_page) + 1 : 0 }} to {{ Math.min(meta.current_page * meta.per_page, meta.total) }} of {{ meta.total }} results
+            Showing {{ meta.total ? ((meta.current_page - 1) * meta.per_page) + 1 : 0 }}
+            to {{ Math.min(meta.current_page * meta.per_page, meta.total) }}
+            of {{ meta.total }} entries
           </p>
-          <Pagination
-            v-if="meta.last_page > 1"
-            :meta="{
-              prev_page_url: meta.current_page > 1 ? '#' : null,
-              next_page_url: meta.current_page < meta.last_page ? '#' : null,
-              current_page: meta.current_page,
-              last_page: meta.last_page,
-            }"
-            @change="onPageChange"
-          />
+          <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2 text-sm text-gray-600">
+              <span class="whitespace-nowrap font-medium">Number of rows</span>
+              <select
+                :value="meta.per_page"
+                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                @change="onPerPageChange"
+              >
+                <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button type="button" :disabled="meta.current_page <= 1" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50" @click="onPageChange(meta.current_page - 1)">Previous</button>
+              <span class="rounded-md border border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-700">Page {{ meta.current_page }} of {{ meta.last_page }}</span>
+              <button type="button" :disabled="meta.current_page >= meta.last_page" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50" @click="onPageChange(meta.current_page + 1)">Next</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

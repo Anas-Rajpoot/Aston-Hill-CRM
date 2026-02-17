@@ -13,6 +13,7 @@ class VasRequestController extends Controller
         $this->authorize('viewAny', VasRequestSubmission::class);
 
         $q = VasRequestSubmission::query()
+            ->visibleTo($request->user())
             ->with(['creator','salesAgent','teamLeader','manager','backOfficeExecutive']);
 
         if ($request->filled('q')) {
@@ -67,7 +68,6 @@ class VasRequestController extends Controller
 
         $vas->update([
             'status' => 'approved',
-            'approved_at' => now(),
         ]);
 
         return response()->json(['message' => 'VAS request approved successfully']);
@@ -83,7 +83,6 @@ class VasRequestController extends Controller
 
         $vas->update([
             'status' => 'rejected',
-            'rejected_at' => now(),
         ]);
 
         return response()->json(['message' => 'VAS request rejected successfully']);

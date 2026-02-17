@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\FieldSubmissionController;
 use App\Models\FieldSubmission;
 use App\Models\FieldSubmissionAudit;
+use App\Models\SystemAuditLog;
 use App\Models\User;
 use App\Models\UserColumnPreference;
 use App\Traits\StoresFieldSubmissionDocuments;
@@ -20,6 +22,7 @@ use Illuminate\Validation\Rule;
  */
 class FieldSubmissionApiController extends Controller
 {
+    use \App\Traits\ResolvesAuditDisplayValues;
     use StoresFieldSubmissionDocuments;
 
     private const MODULE = 'field_submissions';
@@ -78,10 +81,7 @@ class FieldSubmissionApiController extends Controller
         $sort = $validated['sort'] ?? 'created_at';
         $order = $validated['order'] ?? 'desc';
 
-        $baseQuery = FieldSubmission::query()->visibleTo($user);
-        $this->applyFilters($baseQuery, $validated);
-        $total = $baseQuery->count();
-
+        // Single data query with sort, select, eager load, then paginate.
         $dataQuery = FieldSubmission::query()->visibleTo($user);
         $this->applyFilters($dataQuery, $validated);
         $this->applySort($dataQuery, $sort, $order);
@@ -108,6 +108,14 @@ class FieldSubmissionApiController extends Controller
         $offset = ($page - 1) * $perPage;
         $items = $dataQuery->skip($offset)->take($perPage)->get()->map(function ($row) use ($columns) {
             return $this->formatRow($row, $columns);
+        });
+
+        // Cache the count for 30s to avoid expensive COUNT(*) on every paginate/filter.
+        $countCacheKey = 'field_count_' . $user->id . '_' . md5(json_encode($validated));
+        $total = Cache::remember($countCacheKey, 30, function () use ($user, $validated) {
+            $cq = FieldSubmission::query()->visibleTo($user);
+            $this->applyFilters($cq, $validated);
+            return $cq->count();
         });
 
         $lastPage = $total > 0 ? (int) ceil($total / $perPage) : 1;
@@ -326,33 +334,38 @@ class FieldSubmissionApiController extends Controller
     {
         $this->authorize('viewAny', FieldSubmission::class);
 
-        $products = FieldSubmission::query()
-            ->whereNotNull('product')
-            ->where('product', '!=', '')
-            ->distinct()
-            ->pluck('product')
-            ->filter()
-            ->sort()
-            ->values()
-            ->take(50)
-            ->all();
+        $userId = request()->user()->id;
+        $data = \App\Services\SubmissionCacheService::rememberMeta('field', 'filters', $userId, function () {
+            $products = FieldSubmission::query()
+                ->whereNotNull('product')
+                ->where('product', '!=', '')
+                ->distinct()
+                ->pluck('product')
+                ->filter()
+                ->sort()
+                ->values()
+                ->take(50)
+                ->all();
 
-        $emirates = FieldSubmission::query()
-            ->whereNotNull('emirates')
-            ->where('emirates', '!=', '')
-            ->distinct()
-            ->pluck('emirates')
-            ->filter()
-            ->sort()
-            ->values()
-            ->take(30)
-            ->all();
+            $emirates = FieldSubmission::query()
+                ->whereNotNull('emirates')
+                ->where('emirates', '!=', '')
+                ->distinct()
+                ->pluck('emirates')
+                ->filter()
+                ->sort()
+                ->values()
+                ->take(30)
+                ->all();
 
-        return response()->json([
-            'statuses' => array_map(fn ($s) => ['value' => $s, 'label' => ucfirst($s)], FieldSubmission::STATUSES),
-            'products' => array_values($products),
-            'emirates' => array_values($emirates),
-        ]);
+            return [
+                'statuses' => array_map(fn ($s) => ['value' => $s, 'label' => ucfirst($s)], FieldSubmission::STATUSES),
+                'products' => array_values($products),
+                'emirates' => array_values($emirates),
+            ];
+        });
+
+        return response()->json($data);
     }
 
     public function columns(Request $request): JsonResponse
@@ -752,7 +765,9 @@ class FieldSubmissionApiController extends Controller
                 'changed_at' => $audit->changed_at?->toIso8601String(),
                 'changed_by' => $audit->changedByUser?->name ?? '—',
             ];
-        })->values()->all();
+        });
+
+        $items = $this->resolveAuditDisplayValues($items)->values()->all();
 
         return response()->json([
             'data' => $items,
@@ -793,6 +808,129 @@ class FieldSubmissionApiController extends Controller
             ];
         });
 
+        $data = $this->resolveAuditDisplayValues($data);
+
         return response()->json(['data' => $data]);
+    }
+
+    /**
+     * GET /api/field-submissions/field-agent-options
+     * Returns list of field agents for the assign modal.
+     * Accessible by superadmin, field roles, or any user who can view field submissions.
+     */
+    public function fieldAgentOptions(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $allowed = $user->roles()->whereIn('name', ['superadmin', 'field_agent', 'field_operations_head', 'manager', 'team_leader'])->exists()
+            || $user->can('viewAny', FieldSubmission::class);
+        if (! $allowed) {
+            abort(403, 'Unauthorized.');
+        }
+
+        $agents = User::whereHas('roles', fn ($q) => $q->where('name', 'field_agent'))
+            ->where('status', 'approved')
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name]);
+
+        return response()->json([
+            'agents' => $agents->values()->all(),
+        ]);
+    }
+
+    /**
+     * POST /api/field-submissions/bulk-assign
+     * Assign one field agent to multiple field submissions.
+     * Only superadmin, field_operations_head, or field_agent role.
+     */
+    public function bulkAssign(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user->hasRole('superadmin') && ! $user->hasRole('field_agent') && ! $user->hasRole('field_operations_head')) {
+            abort(403, 'Only superadmin, field operations head, or field agent can bulk assign.');
+        }
+
+        $data = $request->validate([
+            'submission_ids' => ['required', 'array', 'min:1'],
+            'submission_ids.*' => ['integer', 'exists:field_submissions,id'],
+            'field_executive_id' => ['required', 'integer', 'exists:users,id'],
+        ]);
+
+        $ids = $data['submission_ids'];
+        $agentId = $data['field_executive_id'];
+
+        $updated = FieldSubmission::query()
+            ->whereIn('id', $ids)
+            ->visibleTo($user)
+            ->update(['field_executive_id' => $agentId]);
+
+        try {
+            SystemAuditLog::record(
+                'field_submission.bulk_assigned',
+                null,
+                ['submission_ids' => $ids, 'assigned_to' => $agentId, 'count' => count($ids)],
+                $user->id,
+                'field_submission'
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        return response()->json([
+            'message' => "Assigned {$updated} submission(s) to field agent.",
+            'updated_count' => $updated,
+        ]);
+    }
+
+    /**
+     * Aggregated bootstrap: filters + columns + team/agent options + first-page data in one request.
+     * Eliminates 5+ sequential API calls (filters, columns, team-options, field-agent-options, index).
+     */
+    public function bootstrap(Request $request): JsonResponse
+    {
+        $filtersResponse = $this->filters($request);
+        $filtersData = json_decode($filtersResponse->getContent(), true);
+
+        $columnsResponse = $this->columns($request);
+        $columnsData = json_decode($columnsResponse->getContent(), true);
+
+        $indexResponse = $this->index($request);
+        $indexData = json_decode($indexResponse->getContent(), true);
+
+        // Include team options (cached in FieldSubmissionController for 5 min)
+        $teamData = [];
+        try {
+            $teamResponse = app(FieldSubmissionController::class)->teamOptions($request);
+            $teamData = json_decode($teamResponse->getContent(), true) ?? [];
+        } catch (\Throwable $e) {
+            // silent - team options are optional for listing
+        }
+
+        // Include field agent options (for assign modal)
+        $fieldAgentData = [];
+        $user = $request->user();
+        if ($user->hasRole('superadmin') || $user->hasRole('field_agent') || $user->hasRole('field_operations_head')) {
+            try {
+                $agents = User::whereHas('roles', fn ($q) => $q->where('name', 'field_agent'))
+                    ->where('status', 'approved')
+                    ->orderBy('name')
+                    ->get(['id', 'name'])
+                    ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name]);
+
+                $fieldAgentData = [
+                    'agents' => $agents->values()->all(),
+                ];
+            } catch (\Throwable $e) {
+                // silent
+            }
+        }
+
+        return response()->json([
+            'filters' => $filtersData,
+            'columns' => $columnsData,
+            'page' => $indexData,
+            'team_options' => $teamData,
+            'field_agent_options' => $fieldAgentData,
+        ]);
     }
 }

@@ -74,9 +74,11 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
 
     // Field submissions
     Route::get('/field-submissions/team-options', [FieldSubmissionController::class, 'teamOptions']);
+    Route::get('/field-submissions/field-agent-options', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'fieldAgentOptions']);
+    Route::post('/field-submissions/bulk-assign', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'bulkAssign']);
     Route::post('/field-submissions', [FieldSubmissionController::class, 'store']);
-    Route::get('/field-submissions', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'index']);
-    Route::get('/field-submissions/filters', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'filters']);
+    Route::get('/field-submissions', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'index'])->middleware('api.cache:10,20');
+    Route::get('/field-submissions/filters', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'filters'])->middleware('api.cache:60,120');
     Route::get('/field-submissions/edit-options', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'editOptions']);
     Route::get('/field-submissions/columns', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'columns']);
     Route::post('/field-submissions/columns', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'saveColumns']);
@@ -97,9 +99,11 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
 
     // Customer support
     Route::get('/customer-support/team-options', [CustomerSupportController::class, 'teamOptions']);
+    Route::get('/customer-support/csr-options', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'csrOptions']);
+    Route::post('/customer-support/bulk-assign', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'bulkAssign']);
     Route::post('/customer-support', [CustomerSupportController::class, 'store']);
-    Route::get('/customer-support', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'index']);
-    Route::get('/customer-support/filters', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'filters']);
+    Route::get('/customer-support', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'index'])->middleware('api.cache:10,20');
+    Route::get('/customer-support/filters', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'filters'])->middleware('api.cache:60,120');
     Route::get('/customer-support/columns', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'columns']);
     Route::get('/customer-support/edit-options', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'editOptions']);
     Route::post('/customer-support/columns', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'saveColumns']);
@@ -111,6 +115,8 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
         ->whereNumber('customerSupportSubmission');
     Route::get('/customer-support/{customerSupportSubmission}/attachments/{index}/download', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'downloadAttachment'])
         ->whereNumber(['customerSupportSubmission', 'index']);
+    Route::patch('/customer-support/{customerSupportSubmission}/assign-csr', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'assignCsr'])
+        ->whereNumber('customerSupportSubmission');
     Route::patch('/customer-support/{customerSupportSubmission}', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'patch'])
         ->whereNumber('customerSupportSubmission');
 
@@ -136,8 +142,8 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::get('/vas-requests/team-options', [VasRequestController::class, 'teamOptions']);
     Route::get('/vas-requests/document-schema', [VasRequestController::class, 'documentSchemaResponse']);
     Route::post('/vas-requests/step-1', [VasRequestController::class, 'storeStep1']);
-    Route::get('/vas-requests', [\App\Http\Controllers\Api\VasRequestApiController::class, 'index']);
-    Route::get('/vas-requests/filters', [\App\Http\Controllers\Api\VasRequestApiController::class, 'filters']);
+    Route::get('/vas-requests', [\App\Http\Controllers\Api\VasRequestApiController::class, 'index'])->middleware('api.cache:10,20');
+    Route::get('/vas-requests/filters', [\App\Http\Controllers\Api\VasRequestApiController::class, 'filters'])->middleware('api.cache:60,120');
     Route::get('/vas-requests/columns', [\App\Http\Controllers\Api\VasRequestApiController::class, 'columns']);
     Route::post('/vas-requests/columns', [\App\Http\Controllers\Api\VasRequestApiController::class, 'saveColumns']);
     Route::get('/vas-requests/back-office-options', [\App\Http\Controllers\Api\VasRequestApiController::class, 'backOfficeOptions']);
@@ -152,8 +158,8 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::post('/vas-requests/{vasRequest}/submit', [VasRequestController::class, 'submit']);
 
     // Lead submissions (specific routes before {lead})
-    Route::get('/lead-submissions', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'index']);
-    Route::get('/lead-submissions/filters', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'filters']);
+    Route::get('/lead-submissions', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'index'])->middleware('api.cache:10,20');
+    Route::get('/lead-submissions/filters', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'filters'])->middleware('api.cache:60,120');
     Route::get('/lead-submissions/columns', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'columns']);
     Route::post('/lead-submissions/columns', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'saveColumns']);
     Route::get('/lead-submissions/back-office-options', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'backOfficeOptions']);
@@ -266,6 +272,22 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::put('/verifiers/{verifier}', [\App\Http\Controllers\Api\VerifierApiController::class, 'update'])->whereNumber('verifier');
     Route::delete('/verifiers/{verifier}', [\App\Http\Controllers\Api\VerifierApiController::class, 'destroy'])->whereNumber('verifier');
 
+    // Teams
+    Route::get('/teams', [\App\Http\Controllers\Api\TeamController::class, 'index']);
+    Route::get('/teams/filters', [\App\Http\Controllers\Api\TeamController::class, 'filters']);
+    Route::get('/teams/columns', [\App\Http\Controllers\Api\TeamController::class, 'columns']);
+    Route::post('/teams/columns', [\App\Http\Controllers\Api\TeamController::class, 'saveColumns']);
+    Route::get('/teams/available-members', [\App\Http\Controllers\Api\TeamController::class, 'availableMembers']);
+    Route::post('/teams/bulk-delete', [\App\Http\Controllers\Api\TeamController::class, 'bulkDelete']);
+    Route::post('/teams/bulk-status', [\App\Http\Controllers\Api\TeamController::class, 'bulkStatusChange']);
+    Route::post('/teams', [\App\Http\Controllers\Api\TeamController::class, 'store']);
+    Route::get('/teams/{team}', [\App\Http\Controllers\Api\TeamController::class, 'show'])->whereNumber('team');
+    Route::put('/teams/{team}', [\App\Http\Controllers\Api\TeamController::class, 'update'])->whereNumber('team');
+    Route::delete('/teams/{team}', [\App\Http\Controllers\Api\TeamController::class, 'destroy'])->whereNumber('team');
+    Route::get('/teams/{team}/members', [\App\Http\Controllers\Api\TeamController::class, 'members'])->whereNumber('team');
+    Route::post('/teams/{team}/members', [\App\Http\Controllers\Api\TeamController::class, 'addMembers'])->whereNumber('team');
+    Route::delete('/teams/{team}/members/{member}', [\App\Http\Controllers\Api\TeamController::class, 'removeMember'])->whereNumber(['team', 'member']);
+
     // Users (list, show, update, delete, create – super admin / authorized)
     Route::get('/users', [UserController::class, 'index']);
     Route::get('/users/filters', [UserController::class, 'filters']);
@@ -371,11 +393,17 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::delete('/library/documents/{document}', [\App\Http\Controllers\Api\LibraryDocumentController::class, 'destroy']);
     Route::get('/library/documents', [\App\Http\Controllers\Api\LibraryDocumentController::class, 'index']);
 
+    // Aggregated bootstrap endpoints (reduce 3-4 requests to 1 per page)
+    Route::get('/lead-submissions/bootstrap', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'bootstrap'])->middleware('api.cache:15,30');
+    Route::get('/field-submissions/bootstrap', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'bootstrap'])->middleware('api.cache:15,30');
+    Route::get('/customer-support/bootstrap', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'bootstrap'])->middleware('api.cache:15,30');
+    Route::get('/vas-requests/bootstrap', [\App\Http\Controllers\Api\VasRequestApiController::class, 'bootstrap'])->middleware('api.cache:15,30');
+
     // Reports (stats for Lead and Field Operations report pages)
-    Route::get('/reports/lead-stats', [ReportsApiController::class, 'leadStats']);
-    Route::get('/reports/field-stats', [ReportsApiController::class, 'fieldStats']);
-    Route::get('/reports/vas-stats', [ReportsApiController::class, 'vasStats']);
-    Route::get('/reports/sla-performance', [ReportsApiController::class, 'slaPerformance']);
+    Route::get('/reports/lead-stats', [ReportsApiController::class, 'leadStats'])->middleware('api.cache:15,30');
+    Route::get('/reports/field-stats', [ReportsApiController::class, 'fieldStats'])->middleware('api.cache:15,30');
+    Route::get('/reports/vas-stats', [ReportsApiController::class, 'vasStats'])->middleware('api.cache:15,30');
+    Route::get('/reports/sla-performance', [ReportsApiController::class, 'slaPerformance'])->middleware('api.cache:30,60');
 
     // Datatable
     Route::get('/datatable/{module}', [DataTableController::class, 'index']);

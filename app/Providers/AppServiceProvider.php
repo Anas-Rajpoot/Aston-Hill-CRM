@@ -24,6 +24,7 @@ use App\Observers\FieldSubmissionObserver;
 use App\Observers\LeadSubmissionObserver;
 use App\Observers\VasRequestSubmissionObserver;
 use App\Observers\CustomerSupportSubmissionObserver;
+use App\Observers\SubmissionCacheObserver;
 use App\Observers\UserObserver;
 use App\Repositories\Contracts\LeadSubmissionRepositoryInterface;
 use App\Repositories\Eloquent\LeadSubmissionRepository;
@@ -54,6 +55,12 @@ class AppServiceProvider extends ServiceProvider
         CustomerSupportSubmission::observe(CustomerSupportSubmissionObserver::class);
         Client::observe(ClientObserver::class);
         User::observe(UserObserver::class);
+
+        // Cache invalidation observers (flush tag-based cache on model events)
+        LeadSubmission::observe(SubmissionCacheObserver::class);
+        FieldSubmission::observe(SubmissionCacheObserver::class);
+        CustomerSupportSubmission::observe(SubmissionCacheObserver::class);
+        VasRequestSubmission::observe(SubmissionCacheObserver::class);
         Gate::policy(LeadSubmission::class, LeadSubmissionPolicy::class);
         Gate::policy(Client::class, ClientPolicy::class);
         Gate::policy(FieldSubmission::class, FieldSubmissionPolicy::class);

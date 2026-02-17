@@ -52,18 +52,29 @@ async function markRead(id) {
   } catch { /* silent */ }
 }
 
+function schedulePoll() {
+  if (pollTimer) clearTimeout(pollTimer)
+  pollTimer = setTimeout(async () => {
+    if (!document.hidden) await pollNotifications()
+    schedulePoll()
+  }, 60_000)
+}
+
 onMounted(() => {
-  pollNotifications()
-  pollTimer = setInterval(pollNotifications, 30_000) // poll every 30s
+  // Defer initial poll so it doesn't block page-load API calls on single-threaded server
+  pollTimer = setTimeout(async () => {
+    await pollNotifications()
+    schedulePoll()
+  }, 5_000)
 })
 onUnmounted(() => {
-  if (pollTimer) clearInterval(pollTimer)
+  if (pollTimer) clearTimeout(pollTimer)
 })
 </script>
 
 <template>
   <header class="h-16 flex items-center justify-between px-6 bg-white border-b border-gray-200 shadow-sm">
-    <h1 class="text-lg font-semibold text-gray-800 truncate">CRM Pro Operations Hub</h1>
+    <h1 class="text-lg font-semibold text-gray-800 truncate">Aston Hill</h1>
 
     <div class="flex items-center gap-3">
       <!-- Notification bell (only visible when web notifications enabled) -->

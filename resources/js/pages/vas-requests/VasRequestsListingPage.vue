@@ -2,26 +2,30 @@
 /**
  * VAS Requests listing – same design as Field / Lead / Customer Support.
  */
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, onUnmounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import vasRequestsApi from '@/services/vasRequestsApi'
 
 const auth = useAuthStore()
+let listAbortController = null
+const { loadBootstrap: loadCachedBootstrap, invalidate: invalidateFilterCache } = useFilterCache('vas-requests')
 import FiltersBar from '@/components/vas-requests/FiltersBar.vue'
 import AdvancedFilters from '@/components/vas-requests/AdvancedFilters.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import VasRequestTable from '@/components/vas-requests/VasRequestTable.vue'
-import AssignBackOfficeModal from '@/components/vas-requests/AssignBackOfficeModal.vue'
-import Pagination from '@/components/Pagination.vue'
+import AssignModal from '@/components/AssignModal.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import api from '@/lib/axios'
 import Toast from '@/components/Toast.vue'
 import RecordHistoryModal from '@/components/RecordHistoryModal.vue'
+import { debounce } from '@/composables/useApiRequest'
+import { useFilterCache } from '@/composables/useFilterCache'
 
 const loading = ref(true)
 const selectedSubmissionIds = ref([])
 const bulkAssignMessage = ref('')
 const assignModalVisible = ref(false)
-const assignVasRow = ref(null)
+const assignRow = ref(null)
 const assignBulkIds = ref([])
 const loadError = ref(null)
 
@@ -57,7 +61,9 @@ const filterOptions = ref({
   executives: [],
 })
 const submissions = ref([])
-const meta = ref({ current_page: 1, last_page: 1, per_page: 15, total: 0 })
+const TABLE_MODULE = 'vas-requests-listing'
+const meta = ref({ current_page: 1, last_page: 1, per_page: auth.defaultTablePageSize || 25, total: 0 })
+const perPageOptions = ref([10, 20, 25, 50, 100])
 const allColumns = ref([])
 const visibleColumns = ref([
   'id', 'submitted_at', 'request_type', 'account_number', 'company_name',
@@ -168,13 +174,19 @@ async function onExport() {
 
 async function load() {
   window.scrollTo(0, 0)
+  // Cancel any in-flight list request before starting a new one
+  if (listAbortController) listAbortController.abort()
+  listAbortController = new AbortController()
+  const { signal } = listAbortController
+
   loading.value = true
   loadError.value = null
   try {
-    const data = await vasRequestsApi.index(buildParams())
+    const data = await vasRequestsApi.index(buildParams(), { signal })
     submissions.value = data.data ?? []
     meta.value = data.meta ?? meta.value
   } catch (err) {
+    if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') return
     const msg = err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to load VAS requests.'
     loadError.value = msg
     submissions.value = []
@@ -295,6 +307,22 @@ function onPageChange(page) {
   load()
 }
 
+async function onPerPageChange(e) {
+  const val = Number(e.target.value)
+  meta.value.per_page = val
+  meta.value.current_page = 1
+  load()
+  try { await api.post(`/table-preferences/${TABLE_MODULE}`, { per_page: val }) } catch { /* silent */ }
+}
+
+async function loadTablePreference() {
+  try {
+    const { data } = await api.get(`/table-preferences/${TABLE_MODULE}`)
+    if (data.per_page) meta.value.per_page = Number(data.per_page)
+    if (Array.isArray(data.options) && data.options.length) perPageOptions.value = data.options
+  } catch { /* use system default */ }
+}
+
 const canBulkAssign = (() => {
   const roles = auth.user?.roles ?? []
   if (!Array.isArray(roles)) return false
@@ -340,10 +368,53 @@ watch(selectedSubmissionIds, (ids) => {
   if (ids && ids.length > 0) bulkAssignMessage.value = ''
 }, { deep: true })
 
-onMounted(() => {
-  loadFilters()
-  loadColumns()
+// Debounced search: waits 400ms after user stops typing before hitting API
+const debouncedSearch = debounce(() => {
+  meta.value.current_page = 1
   load()
+}, 400)
+
+// Watch the search query field to trigger debounced load
+watch(() => filters.value.q, (newVal, oldVal) => {
+  if (newVal !== oldVal) debouncedSearch()
+})
+
+// Cleanup on unmount
+onUnmounted(() => {
+  if (listAbortController) listAbortController.abort()
+  debouncedSearch.cancel()
+})
+
+onMounted(async () => {
+  // Try aggregated bootstrap endpoint (1 request instead of 4+)
+  const bootstrapResult = await loadCachedBootstrap(buildParams())
+  if (bootstrapResult) {
+    const fd = bootstrapResult.filters ?? {}
+    const team = bootstrapResult.team_options ?? {}
+    const bo = bootstrapResult.back_office_options ?? {}
+    filterOptions.value = {
+      statuses: fd.statuses ?? [],
+      request_types: fd.request_types ?? [],
+      managers: team.managers ?? [],
+      team_leaders: team.team_leaders ?? [],
+      sales_agents: team.sales_agents ?? [],
+      executives: bo.executives ?? [],
+    }
+    const cd = bootstrapResult.columns ?? {}
+    if (cd.all_columns) allColumns.value = cd.all_columns
+    if (cd.visible_columns) visibleColumns.value = cd.visible_columns ?? visibleColumns.value
+    const pd = bootstrapResult.page ?? {}
+    submissions.value = pd.data ?? []
+    meta.value = pd.meta ?? meta.value
+    loading.value = false
+    // No separate loadFilters() needed - bootstrap has everything
+  } else {
+    // Fallback: individual requests (parallel)
+    await loadTablePreference()
+    loadFilters()
+    loadColumns()
+    load()
+  }
 })
 </script>
 
@@ -404,10 +475,11 @@ onMounted(() => {
         <template #after-reset>
           <button
             type="button"
-            class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
             @click="advancedVisible = !advancedVisible"
           >
-            {{ advancedVisible ? 'Hide' : 'Advanced' }} Filters
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+            Advanced Filters
           </button>
           <button
             type="button"
@@ -439,7 +511,7 @@ onMounted(() => {
         <span class="block mt-1 text-xs">Set APP_DEBUG=true in .env to see the server error, or check storage/logs/laravel.log.</span>
       </div>
 
-      <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div class="overflow-hidden rounded-lg border-2 border-black bg-white shadow-sm">
         <VasRequestTable
           :columns="visibleColumns"
           :data="submissions"
@@ -455,23 +527,29 @@ onMounted(() => {
           @open-assign="openAssignModal"
           @view-history="openHistoryModal"
         />
-        <div
-          class="flex flex-wrap items-center gap-4 border-t border-black bg-white px-4 py-3"
-          :class="meta.last_page > 1 ? 'justify-between' : 'justify-start'"
-        >
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
           <p class="text-sm text-gray-600">
-            Showing {{ meta.total ? ((meta.current_page - 1) * meta.per_page) + 1 : 0 }} to {{ Math.min(meta.current_page * meta.per_page, meta.total) }} of {{ meta.total }} results
+            Showing {{ meta.total ? ((meta.current_page - 1) * meta.per_page) + 1 : 0 }}
+            to {{ Math.min(meta.current_page * meta.per_page, meta.total) }}
+            of {{ meta.total }} entries
           </p>
-          <Pagination
-            v-if="meta.last_page > 1"
-            :meta="{
-              prev_page_url: meta.current_page > 1 ? '#' : null,
-              next_page_url: meta.current_page < meta.last_page ? '#' : null,
-              current_page: meta.current_page,
-              last_page: meta.last_page,
-            }"
-            @change="onPageChange"
-          />
+          <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2 text-sm text-gray-600">
+              <span class="whitespace-nowrap font-medium">Number of rows</span>
+              <select
+                :value="meta.per_page"
+                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                @change="onPerPageChange"
+              >
+                <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button type="button" :disabled="meta.current_page <= 1" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50" @click="onPageChange(meta.current_page - 1)">Previous</button>
+              <span class="rounded-md border border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-700">Page {{ meta.current_page }} of {{ meta.last_page }}</span>
+              <button type="button" :disabled="meta.current_page >= meta.last_page" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50" @click="onPageChange(meta.current_page + 1)">Next</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -484,10 +562,16 @@ onMounted(() => {
       @save="onSaveColumns"
     />
 
-    <AssignBackOfficeModal
+    <AssignModal
       :visible="assignModalVisible"
-      :vas="assignVasRow"
-      :bulk-vas-ids="assignBulkIds"
+      :row="assignRow"
+      :bulk-ids="assignBulkIds"
+      title="Assign to Back Office Executive"
+      bulk-title="Assign {count} request(s) to Back Office"
+      select-label="Select Back Office Executive"
+      :load-options="loadBackOfficeOptions"
+      :on-assign-single="onAssignSingle"
+      :on-assign-bulk="onAssignBulk"
       @close="onAssignModalClose"
       @saved="onAssignModalSaved"
     />

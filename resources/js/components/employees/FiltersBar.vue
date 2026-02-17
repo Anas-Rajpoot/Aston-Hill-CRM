@@ -37,18 +37,6 @@ const emit = defineEmits(['apply', 'reset'])
       </option>
     </select>
 
-    <label class="sr-only">Role</label>
-    <select
-      v-model="filters.role"
-      class="min-w-[160px] rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
-      :disabled="loading"
-    >
-      <option value="">Role</option>
-      <option v-for="r in filterOptions.roles" :key="r.value" :value="r.value">
-        {{ r.label }}
-      </option>
-    </select>
-
     <div class="ml-2 flex flex-wrap items-center gap-2">
       <button
         type="button"

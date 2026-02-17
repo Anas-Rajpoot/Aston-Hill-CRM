@@ -8,8 +8,8 @@ export default {
     return api.post('/field-submissions', { ...data, submit })
   },
 
-  async index(params = {}) {
-    const { data } = await api.get('/field-submissions', { params })
+  async index(params = {}, options = {}) {
+    const { data } = await api.get('/field-submissions', { params, signal: options.signal })
     return data
   },
   async filters() {
@@ -42,6 +42,19 @@ export default {
       `/field-submissions/${fieldSubmissionId}/assign-field-technician`,
       { field_executive_id: fieldExecutiveId }
     )
+    return data
+  },
+
+  async getFieldAgentOptions() {
+    const { data } = await api.get('/field-submissions/field-agent-options')
+    return data
+  },
+
+  async bulkAssign(submissionIds, payload) {
+    const { data } = await api.post('/field-submissions/bulk-assign', {
+      submission_ids: submissionIds,
+      field_executive_id: payload.field_executive_id,
+    })
     return data
   },
 

@@ -19,11 +19,12 @@ use Throwable;
 
 class VasRequestApiController extends Controller
 {
+    use \App\Traits\ResolvesAuditDisplayValues;
     private const MODULE = 'vas_request_submissions';
 
     private const ALLOWED_COLUMNS = [
-        'id', 'submitted_at', 'created_at', 'created_by', 'approved_at',
-        'request_type', 'account_number', 'company_name', 'description',
+        'id', 'submitted_at', 'created_at', 'created_by',
+        'request_type', 'account_number', 'contact_number', 'company_name', 'request_description', 'additional_notes',
         'manager_id', 'team_leader_id', 'sales_agent_id', 'back_office_executive_id',
         'status',
     ];
@@ -79,6 +80,8 @@ class VasRequestApiController extends Controller
             'manager_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'team_leader_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'sales_agent_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'back_office_executive_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'card_filter' => ['sometimes', 'nullable', 'string', Rule::in(['all', 'pending', 'completed_today'])],
         ]);
 
         $user = $request->user();
@@ -88,12 +91,10 @@ class VasRequestApiController extends Controller
         $sort = $validated['sort'] ?? 'submitted_at';
         $order = $validated['order'] ?? 'desc';
 
-        $baseQuery = VasRequestSubmission::query();
-        $this->applyFilters($baseQuery, $validated);
-        $total = $baseQuery->count();
-
-        $dataQuery = VasRequestSubmission::query();
+        // Single data query with sort, select, eager load, then paginate.
+        $dataQuery = VasRequestSubmission::query()->visibleTo($user);
         $this->applyFilters($dataQuery, $validated);
+        $this->applyCardFilter($dataQuery, $validated['card_filter'] ?? null);
         $this->applySort($dataQuery, $sort, $order);
 
         $selectColumns = $this->buildSelectColumns($columns);
@@ -116,6 +117,15 @@ class VasRequestApiController extends Controller
         $offset = ($page - 1) * $perPage;
         $items = $dataQuery->skip($offset)->take($perPage)->get()->map(function ($row) use ($columns) {
             return $this->formatRow($row, $columns);
+        });
+
+        // Cache the count for 30s to avoid expensive COUNT(*) on every paginate/filter.
+        $countCacheKey = 'vas_count_' . $user->id . '_' . md5(json_encode($validated));
+        $total = Cache::remember($countCacheKey, 30, function () use ($user, $validated) {
+            $cq = VasRequestSubmission::query()->visibleTo($user);
+            $this->applyFilters($cq, $validated);
+            $this->applyCardFilter($cq, $validated['card_filter'] ?? null);
+            return $cq->count();
         });
 
         $lastPage = $total > 0 ? (int) ceil($total / $perPage) : 1;
@@ -189,13 +199,40 @@ class VasRequestApiController extends Controller
         if (! empty($validated['sales_agent_id'])) {
             $query->where('sales_agent_id', $validated['sales_agent_id']);
         }
+        if (! empty($validated['back_office_executive_id'])) {
+            $query->where('back_office_executive_id', $validated['back_office_executive_id']);
+        }
         if (! empty($validated['q'])) {
             $term = '%' . addcslashes($validated['q'], '%_\\') . '%';
             $query->where(function ($q) use ($term) {
                 $q->where('company_name', 'like', $term)
                     ->orWhere('account_number', 'like', $term)
-                    ->orWhere('description', 'like', $term);
+                    ->orWhere('request_description', 'like', $term);
             });
+        }
+    }
+
+    /**
+     * Scope VAS queries by user role.
+     * Super admin / vas.view.all → all records.
+     * Back office → assigned to them.
+     * Others → created by them or assigned as sales agent / team leader / manager.
+     */
+    /**
+     * Apply card-level quick filter (from KPI card clicks).
+     */
+    private function applyCardFilter($query, ?string $cardFilter): void
+    {
+        if (! $cardFilter || $cardFilter === 'all') {
+            return;
+        }
+
+        if ($cardFilter === 'pending') {
+            $query->whereIn('status', ['draft', 'submitted']);
+        } elseif ($cardFilter === 'completed_today') {
+            $todayStart = now()->startOfDay()->toDateTimeString();
+            $todayEnd = now()->endOfDay()->toDateTimeString();
+            $query->where('status', 'approved')->whereBetween('updated_at', [$todayStart, $todayEnd]);
         }
     }
 
@@ -224,13 +261,14 @@ class VasRequestApiController extends Controller
         $map = [
             'submitted_at' => "{$t}.submitted_at",
             'created_at' => "{$t}.created_at",
-            'approved_at' => "{$t}.approved_at",
             'created_by' => "{$t}.created_by",
             'creator' => "{$t}.created_by",
             'request_type' => "{$t}.request_type",
             'account_number' => "{$t}.account_number",
+            'contact_number' => "{$t}.contact_number",
             'company_name' => "{$t}.company_name",
-            'description' => "{$t}.description",
+            'request_description' => "{$t}.request_description",
+            'additional_notes' => "{$t}.additional_notes",
             'manager_id' => "{$t}.manager_id",
             'manager' => "{$t}.manager_id",
             'team_leader_id' => "{$t}.team_leader_id",
@@ -285,7 +323,7 @@ class VasRequestApiController extends Controller
                 $out['creator'] = $row->creator?->name ?? null;
                 continue;
             }
-            if (in_array($col, ['submitted_at', 'created_at', 'approved_at'], true)) {
+            if (in_array($col, ['submitted_at', 'created_at'], true)) {
                 $out[$col] = $row->$col ? $row->$col->format('d/M/Y H:i') : null;
                 continue;
             }
@@ -298,22 +336,27 @@ class VasRequestApiController extends Controller
     {
         $this->authorize('viewAny', VasRequestSubmission::class);
 
-        $requestTypes = VasRequestController::requestTypes();
-        $types = array_map(fn ($t) => ['value' => $t, 'label' => $t], $requestTypes);
+        $userId = request()->user()->id;
+        $data = \App\Services\SubmissionCacheService::rememberMeta('vas', 'filters', $userId, function () {
+            $requestTypes = VasRequestController::requestTypes();
+            $types = array_map(fn ($t) => ['value' => $t, 'label' => $t], $requestTypes);
 
-        $teamOptions = app(FieldSubmissionController::class)->teamOptions(request());
-        $teamData = $teamOptions->getData(true);
-        $managers = $teamData['managers'] ?? [];
-        $teamLeaders = $teamData['team_leaders'] ?? [];
-        $salesAgents = $teamData['sales_agents'] ?? [];
+            $teamOptions = app(FieldSubmissionController::class)->teamOptions(request());
+            $teamData = $teamOptions->getData(true);
+            $managers = $teamData['managers'] ?? [];
+            $teamLeaders = $teamData['team_leaders'] ?? [];
+            $salesAgents = $teamData['sales_agents'] ?? [];
 
-        return response()->json([
-            'request_types' => array_values($types),
-            'statuses' => array_map(fn ($s) => ['value' => $s, 'label' => ucfirst($s)], VasRequestSubmission::STATUSES),
-            'managers' => $managers,
-            'team_leaders' => $teamLeaders,
-            'sales_agents' => $salesAgents,
-        ]);
+            return [
+                'request_types' => array_values($types),
+                'statuses' => array_map(fn ($s) => ['value' => $s, 'label' => ucfirst($s)], VasRequestSubmission::STATUSES),
+                'managers' => $managers,
+                'team_leaders' => $teamLeaders,
+                'sales_agents' => $salesAgents,
+            ];
+        });
+
+        return response()->json($data);
     }
 
     public function columns(Request $request): JsonResponse
@@ -370,7 +413,7 @@ class VasRequestApiController extends Controller
             'request_type' => ['sometimes', 'string', Rule::in($types)],
             'account_number' => ['sometimes', 'nullable', 'string', 'max:100'],
             'company_name' => ['sometimes', 'string', 'max:255'],
-            'description' => ['sometimes', 'nullable', 'string', 'max:5000'],
+            'request_description' => ['sometimes', 'nullable', 'string', 'max:5000'],
             'manager_id' => ['sometimes', 'nullable', 'exists:users,id'],
             'team_leader_id' => ['sometimes', 'nullable', 'exists:users,id'],
             'sales_agent_id' => ['sometimes', 'nullable', 'exists:users,id'],
@@ -385,7 +428,7 @@ class VasRequestApiController extends Controller
 
         $vasRequest->load(['manager:id,name', 'teamLeader:id,name', 'salesAgent:id,name', 'backOfficeExecutive:id,name', 'creator:id,name']);
         $columns = array_merge(
-            ['id', 'submitted_at', 'created_at', 'request_type', 'account_number', 'company_name', 'description', 'manager', 'team_leader', 'sales_agent', 'executive', 'status', 'creator'],
+            ['id', 'submitted_at', 'created_at', 'request_type', 'account_number', 'company_name', 'request_description', 'manager', 'team_leader', 'sales_agent', 'executive', 'status', 'creator'],
             array_keys($data)
         );
         $columns = array_unique($columns);
@@ -401,15 +444,19 @@ class VasRequestApiController extends Controller
     /**
      * GET /api/vas-requests/back-office-options
      * Same back office executives list as lead submissions (for assign modal).
+     * Accessible by superadmin, back_office, or any user who can view VAS requests.
      */
     public function backOfficeOptions(Request $request): JsonResponse
     {
         $user = $request->user();
-        if (! $user->hasRole('superadmin') && ! $user->hasRole('back_office') && ! $user->hasRole('backoffice')) {
+        $allowed = $user->roles()->whereIn('name', ['superadmin', 'back_office', 'manager', 'team_leader'])->exists()
+            || $user->can('viewAny', VasRequestSubmission::class);
+        if (! $allowed) {
             abort(403, 'Unauthorized.');
         }
 
-        $executives = User::role('back_office')
+        $executives = User::whereHas('roles', fn ($q) => $q->where('name', 'back_office'))
+            ->where('status', 'approved')
             ->orderBy('name')
             ->get(['id', 'name'])
             ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name]);
@@ -484,6 +531,60 @@ class VasRequestApiController extends Controller
             ];
         });
 
+        $data = $this->resolveAuditDisplayValues($data);
+
         return response()->json(['data' => $data]);
+    }
+
+    /**
+     * Aggregated bootstrap: filters + columns + team/BO options + first-page data in one request.
+     * Eliminates 5+ sequential API calls (filters, columns, team-options, back-office-options, index).
+     */
+    public function bootstrap(Request $request): JsonResponse
+    {
+        $filtersResponse = $this->filters($request);
+        $filtersData = json_decode($filtersResponse->getContent(), true);
+
+        $columnsResponse = $this->columns($request);
+        $columnsData = json_decode($columnsResponse->getContent(), true);
+
+        $indexResponse = $this->index($request);
+        $indexData = json_decode($indexResponse->getContent(), true);
+
+        // Include team options (cached in FieldSubmissionController for 5 min)
+        $teamData = [];
+        try {
+            $teamResponse = app(FieldSubmissionController::class)->teamOptions($request);
+            $teamData = json_decode($teamResponse->getContent(), true) ?? [];
+        } catch (\Throwable $e) {
+            // silent - team options are optional for listing
+        }
+
+        // Include back office options (for assign modal)
+        $boData = [];
+        $user = $request->user();
+        if ($user->hasRole('superadmin') || $user->hasRole('back_office') || $user->hasRole('backoffice')) {
+            try {
+                $executives = User::whereHas('roles', fn ($q) => $q->where('name', 'back_office'))
+                    ->where('status', 'approved')
+                    ->orderBy('name')
+                    ->get(['id', 'name'])
+                    ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name]);
+
+                $boData = [
+                    'executives' => $executives->values()->all(),
+                ];
+            } catch (\Throwable $e) {
+                // silent
+            }
+        }
+
+        return response()->json([
+            'filters' => $filtersData,
+            'columns' => $columnsData,
+            'page' => $indexData,
+            'team_options' => $teamData,
+            'back_office_options' => $boData,
+        ]);
     }
 }

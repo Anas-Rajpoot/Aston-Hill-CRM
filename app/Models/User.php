@@ -15,6 +15,13 @@ class User extends Authenticatable
     use HasFactory, Notifiable, HasRoles, HasApiTokens;
 
     /**
+     * Force Spatie Permission to always resolve roles/permissions against the 'web' guard.
+     * All roles exist only under the 'web' guard. Sanctum uses stateful session auth
+     * (web guard) so a separate 'sanctum' guard for roles is unnecessary.
+     */
+    protected $guard_name = 'web';
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
@@ -28,6 +35,7 @@ class User extends Authenticatable
         'employee_number', 'department', 'extension', 'joining_date', 'terminate_date',
         'must_change_password', 'password_changed_at', 'locked_until', 'failed_login_attempts',
         'active_session_token',
+        'team_id', 'reports_to',
     ];
 
     /**
@@ -78,4 +86,18 @@ class User extends Authenticatable
         return $this->belongsTo(User::class, 'team_leader_id');
     }
 
+    public function team()
+    {
+        return $this->belongsTo(\App\Models\Team::class, 'team_id');
     }
+
+    public function reportsTo()
+    {
+        return $this->belongsTo(User::class, 'reports_to');
+    }
+
+    public function directReports()
+    {
+        return $this->hasMany(User::class, 'reports_to');
+    }
+}

@@ -11,7 +11,7 @@ class LeadSubmission extends Model
         'account_number','company_name','authorized_signatory_name','contact_number_gsm',
         'alternate_contact_number','email','address','emirate','location_coordinates',
         'product','offer','mrc_aed','quantity','ae_domain','gaid',
-        'sales_agent_id','team_leader_id','manager_id','executive_id','service_category_id','service_type_id',
+        'sales_agent_id','team_leader_id','manager_id','team_id','executive_id','service_category_id','service_type_id',
         'payload','submitted_at','submission_type','remarks','approved_at','rejected_at','approved_by','rejected_by',
         'call_verification','pending_from_sales','documents_verification','submission_date_from',
         'back_office_notes','activity','back_office_account','work_order','du_status','completion_date','du_remarks','additional_note',
@@ -103,28 +103,32 @@ class LeadSubmission extends Model
         return $this->belongsTo(User::class, 'executive_id');
     }
 
-    /** Apply visibility based on user permissions (view.all | view.assigned | view.created). */
+    public function team()
+    {
+        return $this->belongsTo(\App\Models\Team::class, 'team_id');
+    }
+
+    /**
+     * Apply RBAC visibility scope:
+     *  - Super Admin / lead.view.all  → ALL records
+     *  - Back Office                  → ALL records (they process assigned + unassigned)
+     *  - Manager                      → own + team hierarchy members' records
+     *  - Team Leader                  → own + direct team members' records
+     *  - Sales Agent                  → only assigned-to or created-by them
+     */
     public function scopeVisibleTo($q, User $user)
     {
         if ($user->can('lead.view.all')) {
             return $q;
         }
-        $userId = (int) $user->id;
-        $hasCreated = $user->can('lead.view.created');
-        $hasAssigned = $user->can('lead.view.assigned');
-        if (!$hasCreated && !$hasAssigned) {
-            return $q->whereRaw('1 = 0');
+
+        // Back office sees ALL lead submissions (assigned + unassigned)
+        if ($user->hasRole('back_office')) {
+            return $q;
         }
-        $q->where(function ($w) use ($hasCreated, $hasAssigned, $userId) {
-            if ($hasCreated) {
-                $w->orWhere('created_by', $userId);
-            }
-            if ($hasAssigned) {
-                $w->orWhere('sales_agent_id', $userId)
-                    ->orWhere('team_leader_id', $userId)
-                    ->orWhere('manager_id', $userId);
-            }
-        });
+
+        \App\Services\TeamHierarchyService::scopeSubmissionsForUser($q, $user, ['executive_id']);
+
         return $q;
     }
 

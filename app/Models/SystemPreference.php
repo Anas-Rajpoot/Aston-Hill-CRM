@@ -65,7 +65,7 @@ class SystemPreference extends Model
         'reports',
         'settings',
     ];
-    public const PAGE_SIZES = [10, 25, 50, 100];
+    public const PAGE_SIZES = [10, 20, 25, 50, 100];
 
     /**
      * Get the singleton row (id = 1), cached.

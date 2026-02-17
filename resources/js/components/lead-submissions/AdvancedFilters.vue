@@ -17,6 +17,7 @@ const props = defineProps({
       managers: [],
       teamLeaders: [],
       salesAgents: [],
+      types: [],
     }),
   },
   loading: { type: Boolean, default: false },
@@ -124,6 +125,17 @@ const updatedToDisplay = computed({
           >
             <option value="">All Products</option>
             <option v-for="p in filterOptions.products" :key="p" :value="p">{{ p }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="mb-0.5 block text-xs font-medium text-gray-600">Service Type</label>
+          <select
+            v-model="filters.service_type_id"
+            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            :disabled="loading"
+          >
+            <option :value="null">All Types</option>
+            <option v-for="t in filterOptions.types" :key="t.id" :value="t.id">{{ t.name }}</option>
           </select>
         </div>
         <div>

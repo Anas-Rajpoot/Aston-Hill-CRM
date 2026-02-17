@@ -22,6 +22,8 @@ use Spatie\Permission\PermissionRegistrar;
 
 class UserController extends Controller
 {
+    use \App\Traits\ResolvesAuditDisplayValues;
+
     private const MODULE = 'users';
 
     private const ALLOWED_COLUMNS = [
@@ -77,7 +79,7 @@ class UserController extends Controller
                 ->keyBy('user_id');
         }
 
-        $roles = Role::orderBy('name')->get(['id', 'name', 'description']);
+        $roles = Role::where('guard_name', 'web')->orderBy('name')->get(['id', 'name', 'description']);
         $statsQuery = User::query()
             ->when(! $requestUser->hasRole('superadmin'), fn ($q) => $q->whereDoesntHave('roles', fn ($r) => $r->where('name', 'superadmin')));
         $stats = [
@@ -204,7 +206,7 @@ class UserController extends Controller
         $user = $request->user();
         $baseQuery = User::query()
             ->when(! $user->hasRole('superadmin'), fn ($q) => $q->whereDoesntHave('roles', fn ($r) => $r->where('name', 'superadmin')));
-        $roles = Role::orderBy('name')->get(['id', 'name'])->map(fn ($r) => ['value' => $r->name, 'label' => $r->name])->all();
+        $roles = Role::where('guard_name', 'web')->orderBy('name')->get(['id', 'name'])->map(fn ($r) => ['value' => $r->name, 'label' => $r->name])->all();
 
         return response()->json([
             'statuses' => [
@@ -259,7 +261,7 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'confirmed', new \App\Rules\MeetsPasswordPolicy],
-            'phone' => ['nullable', 'string', 'max:15'],
+            'phone' => ['nullable', 'string', 'max:20', 'regex:/^[+]?[\d\s()\-]+$/'],
             'country' => ['nullable', 'string', 'max:100'],
             'roles' => ['nullable', 'array'],
             'roles.*' => ['exists:roles,id'],
@@ -359,7 +361,7 @@ class UserController extends Controller
         $user->load('roles:id,name');
         $lastLog = UserLoginLog::where('user_id', $user->id)->orderByDesc('login_at')->first();
         $user->last_login_at = $lastLog?->login_at ? (is_object($lastLog->login_at) ? $lastLog->login_at->format('c') : (string) $lastLog->login_at) : null;
-        $roles = Role::orderBy('name')->get(['id', 'name', 'description']);
+        $roles = Role::where('guard_name', 'web')->orderBy('name')->get(['id', 'name', 'description']);
         $mappings = TeamRoleMapping::allMappings();
         $managerRoleId = TeamRoleMapping::roleIdFor('manager');
         $teamLeaderRoleId = TeamRoleMapping::roleIdFor('team_leader');
@@ -434,7 +436,7 @@ class UserController extends Controller
             $teamLeaders = $teamLeaderRole
                 ? User::role($teamLeaderRole)->where('status', 'approved')->where('id', '!=', $user->id)->orderBy('name')->get(['id', 'name', 'email', 'manager_id'])
                 : collect();
-            $roles = Role::orderBy('name')->get(['id', 'name', 'description']);
+            $roles = Role::where('guard_name', 'web')->orderBy('name')->get(['id', 'name', 'description']);
             return [
                 'roles' => $roles,
                 'managers' => $managers,
@@ -458,7 +460,7 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,' . $user->id],
-            'phone' => ['nullable', 'string', 'max:15'],
+            'phone' => ['nullable', 'string', 'max:20', 'regex:/^[+]?[\d\s()\-]+$/'],
             'country' => ['nullable', 'string', 'max:100'],
             'cnic_number' => ['nullable', 'string', 'max:20'],
             'additional_notes' => ['nullable', 'string', 'max:2000'],
@@ -654,8 +656,11 @@ class UserController extends Controller
                 'old_value' => $log->old_value,
                 'new_value' => $log->new_value,
                 'changed_at' => $log->changed_at?->toIso8601String(),
-                'changed_by' => $log->changedByUser?->name,
+                'changed_by' => $log->changed_by,
+                'changed_by_name' => $log->changedByUser?->name ?? '—',
             ]);
+
+        $logs = $this->resolveAuditDisplayValues($logs);
 
         return response()->json(['data' => $logs]);
     }

@@ -15,6 +15,8 @@ use Illuminate\Validation\Rule;
 
 class ExtensionsApiController extends Controller
 {
+    use \App\Traits\ResolvesAuditDisplayValues;
+
     private const MODULE = 'cisco_extensions';
 
     private const ALLOWED_COLUMNS = [
@@ -545,6 +547,8 @@ class ExtensionsApiController extends Controller
                     'created_at' => $a->created_at?->toIso8601String(),
                 ];
             });
+
+        $audits = $this->resolveObjectBasedAuditValues($audits);
 
         return response()->json(['data' => $audits]);
     }

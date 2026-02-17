@@ -328,11 +328,11 @@ onMounted(() => {
       <div class="flex items-center gap-2">
         <button
           type="button"
-          class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
           @click="filtersOpen = !filtersOpen"
         >
-          <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-          {{ filtersOpen ? 'Hide Filters' : 'Advanced Filters' }}
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+          Advanced Filters
           <span v-if="activeFilterCount && !filtersOpen" class="ml-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-xs text-white font-bold">{{ activeFilterCount }}</span>
         </button>
         <button
@@ -414,11 +414,11 @@ onMounted(() => {
     </Transition>
 
     <!-- ═══ Table ═══ -->
-    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div class="bg-white rounded-xl border-2 border-black overflow-hidden">
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
-          <thead>
-            <tr class="border-b border-gray-200 bg-gray-50/80">
+          <thead class="border-b-2 border-black">
+            <tr class="bg-gray-50/80">
               <th
                 v-for="col in activeColumns"
                 :key="col.key"
@@ -436,10 +436,10 @@ onMounted(() => {
               </th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-100">
+          <tbody>
             <!-- Loading skeleton -->
             <template v-if="loading">
-              <tr v-for="i in perPage" :key="'sk-' + i">
+              <tr v-for="i in perPage" :key="'sk-' + i" class="border-b border-black">
                 <td v-for="j in activeColumns.length" :key="j" class="px-4 py-3.5"><SkeletonBox class="h-4 w-full" /></td>
               </tr>
             </template>
@@ -449,7 +449,7 @@ onMounted(() => {
               <tr
                 v-for="log in rows"
                 :key="log.id"
-                class="hover:bg-gray-50/70 transition-colors cursor-pointer"
+                class="border-b border-black hover:bg-gray-50/70 transition-colors cursor-pointer"
                 @click="openDetail(log)"
               >
                 <td
@@ -474,7 +474,7 @@ onMounted(() => {
                   <template v-else>{{ cellValue(log, col.key) }}</template>
                 </td>
               </tr>
-              <tr v-if="!rows.length">
+              <tr v-if="!rows.length" class="border-b border-black">
                 <td :colspan="activeColumns.length" class="px-6 py-12 text-center text-sm text-gray-400">No audit logs found.</td>
               </tr>
             </template>
@@ -483,29 +483,26 @@ onMounted(() => {
       </div>
 
       <!-- Footer: pagination -->
-      <div class="border-t border-gray-200 px-5 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <span class="text-sm text-gray-500">Showing {{ meta.from ?? 0 }} to {{ meta.to ?? 0 }} of {{ meta.total }} entries</span>
-        <div class="flex items-center gap-3">
-          <label class="flex items-center gap-2 text-sm text-gray-500">
-            Number of rows
-            <select :value="perPage" class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm min-w-[85px] focus:border-green-500 focus:ring-1 focus:ring-green-500" @change="e => { setPerPage(e.target.value); fetchList(1) }">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
+        <p class="text-sm text-gray-600">
+          Showing {{ meta.from ?? 0 }} to {{ meta.to ?? 0 }} of {{ meta.total }} entries
+        </p>
+        <div class="flex items-center gap-4">
+          <div class="flex items-center gap-2 text-sm text-gray-600">
+            <span class="whitespace-nowrap font-medium">Number of rows</span>
+            <select
+              :value="perPage"
+              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              @change="e => { setPerPage(e.target.value); fetchList(1) }"
+            >
               <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
             </select>
-          </label>
-          <button :disabled="meta.current_page <= 1" class="rounded-md border border-gray-300 bg-white px-3.5 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition" @click="fetchList(meta.current_page - 1)">Previous</button>
-          <div class="flex items-center gap-1">
-            <template v-for="pg in visiblePages" :key="pg">
-              <span v-if="pg === '...'" class="px-1 text-sm text-gray-400">…</span>
-              <button
-                v-else
-                type="button"
-                class="min-w-[34px] rounded-md px-2.5 py-1.5 text-sm font-medium transition"
-                :class="pg === meta.current_page ? 'bg-green-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'"
-                @click="fetchList(pg)"
-              >{{ pg }}</button>
-            </template>
           </div>
-          <button :disabled="meta.current_page >= meta.last_page" class="rounded-md border border-gray-300 bg-white px-3.5 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition" @click="fetchList(meta.current_page + 1)">Next</button>
+          <div class="flex items-center gap-1.5">
+            <button type="button" :disabled="meta.current_page <= 1" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50" @click="fetchList(meta.current_page - 1)">Previous</button>
+            <span class="rounded-md border border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-700">Page {{ meta.current_page }} of {{ meta.last_page }}</span>
+            <button type="button" :disabled="meta.current_page >= meta.last_page" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50" @click="fetchList(meta.current_page + 1)">Next</button>
+          </div>
         </div>
       </div>
     </div>

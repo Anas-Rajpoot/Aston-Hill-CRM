@@ -128,9 +128,9 @@ function goToDetail(row) {
       </div>
     </div>
 
-    <table class="min-w-full border border-gray-400 border-collapse">
+    <table class="min-w-full border-2 border-black border-collapse">
       <thead>
-        <tr class="border-b border-gray-400 bg-green-600">
+        <tr class="border-b-2 border-black bg-green-600">
           <th
             v-for="col in columns"
             :key="col"
@@ -163,7 +163,7 @@ function goToDetail(row) {
         </tr>
       </thead>
       <tbody class="bg-white">
-        <tr v-if="!loading && !data.length" class="border-b border-gray-400 bg-white">
+        <tr v-if="!loading && !data.length" class="border-b border-black bg-white">
           <td :colspan="columns.length + 1" class="px-4 py-12 text-center text-gray-500">
             No clients found.
           </td>
@@ -171,7 +171,7 @@ function goToDetail(row) {
         <tr
           v-for="(row, rowIndex) in data"
           :key="row.id"
-          class="border-b border-gray-400 bg-white hover:bg-gray-50/50 cursor-pointer"
+          class="border-b border-black bg-white hover:bg-gray-50/50 cursor-pointer"
           @click="goToDetail(row)"
         >
           <td

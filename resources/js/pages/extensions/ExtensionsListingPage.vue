@@ -12,8 +12,8 @@ import AddExtensionModal from '@/components/extensions/AddExtensionModal.vue'
 import EditExtensionModal from '@/components/extensions/EditExtensionModal.vue'
 import ViewExtensionModal from '@/components/extensions/ViewExtensionModal.vue'
 import ExtensionsTable from '@/components/extensions/ExtensionsTable.vue'
-import Pagination from '@/components/Pagination.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import api from '@/lib/axios'
 import Toast from '@/components/Toast.vue'
 
 const route = useRoute()
@@ -34,7 +34,9 @@ const filterOptions = ref({
   usage_options: [],
 })
 const extensions = ref([])
-const meta = ref({ current_page: 1, last_page: 1, per_page: 15, total: 0 })
+const meta = ref({ current_page: 1, last_page: 1, per_page: auth.defaultTablePageSize || 25, total: 0 })
+const TABLE_MODULE = 'extensions'
+const perPageOptions = ref([10, 20, 25, 50, 100])
 const allColumns = ref([])
 const visibleColumns = ref([
   'id', 'extension', 'landline_number', 'gateway', 'username', 'password',
@@ -114,7 +116,7 @@ async function load() {
   try {
     const { data } = await extensionsApi.index(buildParams())
     extensions.value = data.data ?? []
-    meta.value = data.meta ?? { current_page: 1, last_page: 1, per_page: 15, total: 0 }
+    meta.value = data.meta ?? { current_page: 1, last_page: 1, per_page: auth.defaultTablePageSize || 25, total: 0 }
   } catch (e) {
     loadError.value = e?.response?.data?.message || 'Failed to load extensions.'
     extensions.value = []
@@ -191,6 +193,22 @@ function onSort({ sort: s, order: o }) {
 function onPageChange(page) {
   meta.value.current_page = page
   load()
+}
+
+async function onPerPageChange(e) {
+  const val = Number(e.target.value)
+  meta.value.per_page = val
+  meta.value.current_page = 1
+  load()
+  try { await api.post(`/table-preferences/${TABLE_MODULE}`, { per_page: val }) } catch { /* silent */ }
+}
+
+async function loadTablePreference() {
+  try {
+    const { data } = await api.get(`/table-preferences/${TABLE_MODULE}`)
+    if (data.per_page) meta.value.per_page = Number(data.per_page)
+    if (Array.isArray(data.options) && data.options.length) perPageOptions.value = data.options
+  } catch { /* use system default */ }
 }
 
 async function onSaveColumns(cols) {
@@ -345,6 +363,25 @@ function closeHistoryModal() {
   historyAuditLog.value = []
 }
 
+function getEntryChanges(entry) {
+  const skipKeys = ['updated_at', 'created_at', 'id', 'deleted_at']
+  const labels = entry.field_labels || {}
+  const changes = []
+  const oldV = entry.old_values || {}
+  const newV = entry.new_values || {}
+  const keys = new Set([...Object.keys(oldV), ...Object.keys(newV)])
+  for (const key of keys) {
+    if (skipKeys.includes(key)) continue
+    const ov = oldV[key]
+    const nv = newV[key]
+    if (String(ov ?? '') !== String(nv ?? '')) {
+      const label = labels[key] || key.replace(/_id$/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+      changes.push({ label, oldVal: ov, newVal: nv })
+    }
+  }
+  return changes
+}
+
 async function fetchAuditLog(id) {
   historyLoading.value = true
   try {
@@ -358,6 +395,7 @@ async function fetchAuditLog(id) {
 }
 
 onMounted(async () => {
+  await loadTablePreference()
   loadFilters()
   loadColumns()
   loadAssignableEmployees()
@@ -543,17 +581,15 @@ onMounted(async () => {
         <div class="ml-auto flex items-center gap-2">
           <button
             type="button"
-            class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
             @click="advancedVisible = !advancedVisible"
           >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
             Advanced Filters
-            <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
           </button>
           <button
             type="button"
-            class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
             @click="columnModalVisible = true"
           >
             Customize Columns
@@ -574,7 +610,7 @@ onMounted(async () => {
         @reset="resetFilters"
       />
 
-      <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div class="overflow-hidden rounded-xl border-2 border-black bg-white shadow-sm">
         <ExtensionsTable
           :columns="visibleColumns"
           :data="extensions"
@@ -592,23 +628,29 @@ onMounted(async () => {
           @view="openViewModal"
           @edit="openEditModal"
         />
-        <div
-          class="flex flex-wrap items-center gap-4 border-t border-gray-200 bg-white px-4 py-3"
-          :class="meta.last_page > 1 ? 'justify-between' : 'justify-start'"
-        >
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
           <p class="text-sm text-gray-600">
-            Showing {{ meta.total ? (meta.current_page - 1) * meta.per_page + 1 : 0 }} to {{ Math.min(meta.current_page * meta.per_page, meta.total) }} of {{ meta.total }} results
+            Showing {{ meta.total ? ((meta.current_page - 1) * meta.per_page) + 1 : 0 }}
+            to {{ Math.min(meta.current_page * meta.per_page, meta.total) }}
+            of {{ meta.total }} entries
           </p>
-          <Pagination
-            v-if="meta.last_page > 1"
-            :meta="{
-              prev_page_url: meta.current_page > 1 ? '#' : null,
-              next_page_url: meta.current_page < meta.last_page ? '#' : null,
-              current_page: meta.current_page,
-              last_page: meta.last_page,
-            }"
-            @change="onPageChange"
-          />
+          <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2 text-sm text-gray-600">
+              <span class="whitespace-nowrap font-medium">Number of rows</span>
+              <select
+                :value="meta.per_page"
+                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                @change="onPerPageChange"
+              >
+                <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button type="button" :disabled="meta.current_page <= 1" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50" @click="onPageChange(meta.current_page - 1)">Previous</button>
+              <span class="rounded-md border border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-700">Page {{ meta.current_page }} of {{ meta.last_page }}</span>
+              <button type="button" :disabled="meta.current_page >= meta.last_page" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50" @click="onPageChange(meta.current_page + 1)">Next</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -651,7 +693,7 @@ onMounted(async () => {
     <Teleport to="body">
       <div
         v-if="extensionToDelete"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-gray-500/50 p-4"
+        class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-gray-500/50 p-4"
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-delete-title"
@@ -703,7 +745,7 @@ onMounted(async () => {
     <Teleport to="body">
       <div
         v-if="historyModalExtension"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-gray-500/50 p-4"
+        class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-gray-500/50 p-4"
         role="dialog"
         aria-modal="true"
         aria-labelledby="history-modal-title"
@@ -746,13 +788,24 @@ onMounted(async () => {
                   <span class="text-gray-500">by {{ entry.user_name }}</span>
                   <span class="text-gray-400">– {{ entry.created_at ? new Date(entry.created_at).toLocaleString() : '' }}</span>
                 </div>
-                <div v-if="entry.old_values && Object.keys(entry.old_values).length" class="mt-2 text-gray-600">
-                  <span class="font-medium">Old:</span>
-                  <pre class="mt-0.5 overflow-x-auto rounded bg-white p-2 text-xs">{{ JSON.stringify(entry.old_values, null, 2) }}</pre>
-                </div>
-                <div v-if="entry.new_values && Object.keys(entry.new_values).length" class="mt-2 text-gray-600">
-                  <span class="font-medium">New:</span>
-                  <pre class="mt-0.5 overflow-x-auto rounded bg-white p-2 text-xs">{{ JSON.stringify(entry.new_values, null, 2) }}</pre>
+                <div v-if="getEntryChanges(entry).length" class="mt-3 space-y-2">
+                  <div
+                    v-for="(c, ci) in getEntryChanges(entry)"
+                    :key="ci"
+                    class="text-sm"
+                  >
+                    <p class="mb-1 font-medium text-gray-700">{{ c.label }}</p>
+                    <div class="grid grid-cols-2 gap-2">
+                      <div class="rounded bg-red-50 px-3 py-2">
+                        <p class="text-xs font-medium text-gray-500">Before</p>
+                        <p class="text-gray-900 break-all">{{ c.oldVal ?? '(empty)' }}</p>
+                      </div>
+                      <div class="rounded bg-green-50 px-3 py-2">
+                        <p class="text-xs font-medium text-gray-500">After</p>
+                        <p class="text-gray-900 break-all">{{ c.newVal ?? '(empty)' }}</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </li>
             </ul>

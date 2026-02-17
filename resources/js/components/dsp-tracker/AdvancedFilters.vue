@@ -2,7 +2,7 @@
 /**
  * Advanced filters for DSP Tracker: Activity Number, Account Number, Request Type,
  * Appointment Date From/To, Product, SO Number, Rejection Reason, Verifier Name.
- * (Request Status and Company Name are in general filters.)
+ * (Request Status and Company Name are in general filters and should not be duplicated here.)
  * Dates: dd-mm-yyyy.
  */
 import { computed } from 'vue'
@@ -38,7 +38,7 @@ const appointmentDateToDisplay = computed({
     <div v-show="visible" class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
       <div class="border-b border-gray-100 bg-gray-50 px-4 py-2">
         <p class="text-xs font-medium text-gray-600">All filters</p>
-        <p class="text-xs text-gray-500">Activity Number, Company Name, Account Number, Request Type, Appointment Date, Product, SO Number, Request Status, Rejection Reason, Verifier Name</p>
+        <p class="text-xs text-gray-500">Activity Number, Account Number, Request Type, Appointment Date, Product, SO Number, Rejection Reason, Verifier Name</p>
       </div>
       <div class="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4">
         <div>
@@ -47,16 +47,6 @@ const appointmentDateToDisplay = computed({
             v-model="filters.activity_number"
             type="text"
             placeholder="Search activity number..."
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            :disabled="loading"
-          />
-        </div>
-        <div>
-          <label class="mb-1 block text-xs font-medium text-gray-600">Company Name</label>
-          <input
-            v-model="filters.company_name"
-            type="text"
-            placeholder="Search company..."
             class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           />

@@ -186,7 +186,7 @@ class EmployeeApiController extends Controller
                 ->when(! $user->hasRole('superadmin'), fn ($q) => $q->whereDoesntHave('roles', fn ($r) => $r->where('name', 'superadmin')));
 
             $departments = (clone $baseQuery)->whereNotNull('department')->distinct()->pluck('department')->map(fn ($d) => ['value' => $d, 'label' => $d])->values()->all();
-            $roles = Role::orderBy('name')->get(['id', 'name'])->unique('name')->values()->map(fn ($r) => [
+            $roles = Role::where('guard_name', 'web')->orderBy('name')->get(['id', 'name'])->unique('name')->values()->map(fn ($r) => [
                 'value' => $r->name,
                 'label' => self::formatRoleNameForDisplay($r->name),
             ])->all();

@@ -7,6 +7,8 @@ use App\Http\Controllers\CustomerSupportController;
 use App\Http\Controllers\FieldSubmissionController;
 use App\Models\CustomerSupportSubmission;
 use App\Models\CustomerSupportSubmissionAudit;
+use App\Models\SystemAuditLog;
+use App\Models\User;
 use App\Models\UserColumnPreference;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,6 +20,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 class CustomerSupportApiController extends Controller
 {
+    use \App\Traits\ResolvesAuditDisplayValues;
     private const MODULE = 'customer_support_submissions';
 
     private const ALLOWED_COLUMNS = [
@@ -68,11 +71,8 @@ class CustomerSupportApiController extends Controller
         $sort = $validated['sort'] ?? 'submitted_at';
         $order = $validated['order'] ?? 'desc';
 
-        $baseQuery = CustomerSupportSubmission::query();
-        $this->applyFilters($baseQuery, $validated);
-        $total = $baseQuery->count();
-
-        $dataQuery = CustomerSupportSubmission::query();
+        // Single data query with sort, select, eager load, then paginate.
+        $dataQuery = CustomerSupportSubmission::query()->visibleTo($user);
         $this->applyFilters($dataQuery, $validated);
         $this->applySort($dataQuery, $sort, $order);
 
@@ -95,6 +95,14 @@ class CustomerSupportApiController extends Controller
         $offset = ($page - 1) * $perPage;
         $items = $dataQuery->skip($offset)->take($perPage)->get()->map(function ($row) use ($columns) {
             return $this->formatRow($row, $columns);
+        });
+
+        // Cache the count for 30s to avoid expensive COUNT(*) on every paginate/filter.
+        $countCacheKey = 'cs_count_' . $user->id . '_' . md5(json_encode($validated));
+        $total = Cache::remember($countCacheKey, 30, function () use ($user, $validated) {
+            $cq = CustomerSupportSubmission::query()->visibleTo($user);
+            $this->applyFilters($cq, $validated);
+            return $cq->count();
         });
 
         $lastPage = $total > 0 ? (int) ceil($total / $perPage) : 1;
@@ -298,22 +306,27 @@ class CustomerSupportApiController extends Controller
     {
         $this->authorize('viewAny', CustomerSupportSubmission::class);
 
-        $categories = CustomerSupportController::issueCategories();
-        $issueCategories = array_map(fn ($c) => ['value' => $c, 'label' => $c], $categories);
+        $userId = request()->user()->id;
+        $data = \App\Services\SubmissionCacheService::rememberMeta('customer-support', 'filters', $userId, function () {
+            $categories = CustomerSupportController::issueCategories();
+            $issueCategories = array_map(fn ($c) => ['value' => $c, 'label' => $c], $categories);
 
-        $teamOptions = app(FieldSubmissionController::class)->teamOptions(request());
-        $teamData = $teamOptions->getData(true);
-        $managers = $teamData['managers'] ?? [];
-        $teamLeaders = $teamData['team_leaders'] ?? [];
-        $salesAgents = $teamData['sales_agents'] ?? [];
+            $teamOptions = app(FieldSubmissionController::class)->teamOptions(request());
+            $teamData = $teamOptions->getData(true);
+            $managers = $teamData['managers'] ?? [];
+            $teamLeaders = $teamData['team_leaders'] ?? [];
+            $salesAgents = $teamData['sales_agents'] ?? [];
 
-        return response()->json([
-            'issue_categories' => array_values($issueCategories),
-            'statuses' => array_map(fn ($s) => ['value' => $s, 'label' => ucfirst($s)], CustomerSupportSubmission::STATUSES),
-            'managers' => $managers,
-            'team_leaders' => $teamLeaders,
-            'sales_agents' => $salesAgents,
-        ]);
+            return [
+                'issue_categories' => array_values($issueCategories),
+                'statuses' => array_map(fn ($s) => ['value' => $s, 'label' => ucfirst($s)], CustomerSupportSubmission::STATUSES),
+                'managers' => $managers,
+                'team_leaders' => $teamLeaders,
+                'sales_agents' => $salesAgents,
+            ];
+        });
+
+        return response()->json($data);
     }
 
     public function columns(Request $request): JsonResponse
@@ -470,6 +483,8 @@ class CustomerSupportApiController extends Controller
             ];
         });
 
+        $data = $this->resolveAuditDisplayValues($data);
+
         return response()->json(['data' => $data]);
     }
 
@@ -536,6 +551,164 @@ class CustomerSupportApiController extends Controller
 
         return response()->file($fullPath, [
             'Content-Disposition' => 'attachment; filename="' . addslashes($filename) . '"',
+        ]);
+    }
+
+    /**
+     * GET /api/customer-support/csr-options
+     * Returns list of CSR users for the assign modal.
+     * Accessible by superadmin, CSR, support_manager, or any user who can view CS submissions.
+     */
+    public function csrOptions(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $allowed = $user->roles()->whereIn('name', ['superadmin', 'customer_support_representative', 'support_manager', 'manager', 'team_leader'])->exists()
+            || $user->can('viewAny', CustomerSupportSubmission::class);
+        if (! $allowed) {
+            abort(403, 'Unauthorized.');
+        }
+
+        $csrs = User::whereHas('roles', fn ($q) => $q->where('name', 'customer_support_representative'))
+            ->where('status', 'approved')
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name]);
+
+        return response()->json([
+            'csrs' => $csrs->values()->all(),
+        ]);
+    }
+
+    /**
+     * POST /api/customer-support/bulk-assign
+     * Assign one CSR to multiple customer support submissions.
+     * Only superadmin, support_manager, or customer_support_representative role.
+     */
+    public function bulkAssign(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user->hasRole('superadmin') && ! $user->hasRole('customer_support_representative') && ! $user->hasRole('support_manager')) {
+            abort(403, 'Only superadmin, support manager, or CSR can bulk assign.');
+        }
+
+        $data = $request->validate([
+            'submission_ids' => ['required', 'array', 'min:1'],
+            'submission_ids.*' => ['integer', 'exists:customer_support_submissions,id'],
+            'csr_id' => ['required', 'integer', 'exists:users,id'],
+        ]);
+
+        $ids = $data['submission_ids'];
+        $csrId = $data['csr_id'];
+
+        // Get the CSR user name for the csr_name field
+        $csrUser = User::find($csrId);
+        $csrName = $csrUser ? $csrUser->name : null;
+
+        $updated = CustomerSupportSubmission::query()
+            ->whereIn('id', $ids)
+            ->visibleTo($user)
+            ->update([
+                'csr_id' => $csrId,
+                'csr_name' => $csrName,
+            ]);
+
+        try {
+            SystemAuditLog::record(
+                'customer_support.bulk_assigned',
+                null,
+                ['submission_ids' => $ids, 'assigned_to' => $csrId, 'count' => count($ids)],
+                $user->id,
+                'customer_support'
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        return response()->json([
+            'message' => "Assigned {$updated} request(s) to CSR.",
+            'updated_count' => $updated,
+        ]);
+    }
+
+    /**
+     * PATCH /api/customer-support/{id}/assign-csr
+     * Assign a CSR to a single customer support submission.
+     */
+    public function assignCsr(Request $request, CustomerSupportSubmission $customerSupportSubmission): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user->hasRole('superadmin') && ! $user->hasRole('customer_support_representative') && ! $user->hasRole('support_manager')) {
+            abort(403, 'Unauthorized.');
+        }
+
+        $data = $request->validate([
+            'csr_id' => ['required', 'integer', 'exists:users,id'],
+        ]);
+
+        $csrUser = User::find($data['csr_id']);
+
+        $customerSupportSubmission->update([
+            'csr_id' => $data['csr_id'],
+            'csr_name' => $csrUser ? $csrUser->name : null,
+        ]);
+
+        return response()->json([
+            'id' => $customerSupportSubmission->id,
+            'message' => 'CSR assigned.',
+            'csr_id' => $data['csr_id'],
+            'csr_name' => $csrUser?->name,
+        ]);
+    }
+
+    /**
+     * Aggregated bootstrap: filters + columns + team/CSR options + first-page data in one request.
+     * Eliminates 5+ sequential API calls (filters, columns, team-options, csr-options, index).
+     */
+    public function bootstrap(Request $request): JsonResponse
+    {
+        $filtersResponse = $this->filters($request);
+        $filtersData = json_decode($filtersResponse->getContent(), true);
+
+        $columnsResponse = $this->columns($request);
+        $columnsData = json_decode($columnsResponse->getContent(), true);
+
+        $indexResponse = $this->index($request);
+        $indexData = json_decode($indexResponse->getContent(), true);
+
+        // Include team options (cached in FieldSubmissionController for 5 min)
+        $teamData = [];
+        try {
+            $teamResponse = app(FieldSubmissionController::class)->teamOptions($request);
+            $teamData = json_decode($teamResponse->getContent(), true) ?? [];
+        } catch (\Throwable $e) {
+            // silent - team options are optional for listing
+        }
+
+        // Include CSR options (for assign modal)
+        $csrData = [];
+        $user = $request->user();
+        if ($user->hasRole('superadmin') || $user->hasRole('customer_support_representative') || $user->hasRole('support_manager')) {
+            try {
+                $csrs = User::whereHas('roles', fn ($q) => $q->where('name', 'customer_support_representative'))
+                    ->where('status', 'approved')
+                    ->orderBy('name')
+                    ->get(['id', 'name'])
+                    ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name]);
+
+                $csrData = [
+                    'csrs' => $csrs->values()->all(),
+                ];
+            } catch (\Throwable $e) {
+                // silent
+            }
+        }
+
+        return response()->json([
+            'filters' => $filtersData,
+            'columns' => $columnsData,
+            'page' => $indexData,
+            'team_options' => $teamData,
+            'csr_options' => $csrData,
         ]);
     }
 }

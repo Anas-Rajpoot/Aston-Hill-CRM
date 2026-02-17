@@ -39,14 +39,13 @@ const navItems = [
   { to: '/personal-notes', label: 'Personal Notes' },
   { to: '/email-followups', label: 'Email Follow Up' },
   { to: '/reports', label: 'Reports' },
+  { to: '/teams', label: 'Teams' },
 ]
 
 const superAdminOnly = [
   { to: '/users', label: 'Users', show: () => userHasRole('superadmin') },
   { to: '/roles', label: 'Roles', show: () => userHasRole('superadmin') },
   { to: '/permissions', label: 'Permissions', show: () => userHasRole('superadmin') },
-  { to: '/lead-submissions/audit-log', label: 'Lead Submission Changes', show: () => userHasRole('superadmin') },
-  { to: '/field-submissions/audit-log', label: 'Field Submission Changes', show: () => userHasRole('superadmin') },
 ]
 
 const isActive = (to) => {
@@ -59,7 +58,7 @@ const isActive = (to) => {
   <aside class="w-64 h-screen flex flex-col flex-shrink-0 overflow-hidden bg-gray-900 text-gray-200">
     <!-- Logo / Title -->
     <div class="h-16 flex items-center px-4 border-b border-gray-700">
-      <span class="text-lg font-semibold text-white truncate">CRM Pro Operations Hub</span>
+      <span class="text-lg font-semibold text-white truncate">Aston Hill</span>
     </div>
 
     <!-- Main nav: custom scrollbar for dark theme -->

@@ -22,6 +22,7 @@ use Illuminate\Validation\Rule;
 
 class ClientApiController extends Controller
 {
+    use \App\Traits\ResolvesAuditDisplayValues;
     private const MODULE = 'clients';
 
     private const ALLOWED_COLUMNS = [
@@ -808,6 +809,7 @@ class ClientApiController extends Controller
 
         $accountNumber = $client->account_number;
         $query = \App\Models\VasRequestSubmission::query()
+            ->visibleTo($request->user())
             ->when($accountNumber !== null && $accountNumber !== '', fn ($q) => $q->where('account_number', $accountNumber))
             ->when(empty($accountNumber), fn ($q) => $q->whereRaw('1 = 0'));
 
@@ -855,6 +857,7 @@ class ClientApiController extends Controller
 
         $accountNumber = $client->account_number;
         $query = \App\Models\CustomerSupportSubmission::query()
+            ->visibleTo($request->user())
             ->when($accountNumber !== null && $accountNumber !== '', fn ($q) => $q->where('account_number', $accountNumber))
             ->when(empty($accountNumber), fn ($q) => $q->whereRaw('1 = 0'));
 
@@ -914,8 +917,11 @@ class ClientApiController extends Controller
             'old_value' => $a->old_value,
             'new_value' => $a->new_value,
             'changed_at' => $a->changed_at->toIso8601String(),
-            'changed_by' => $a->changedByUser?->name,
+            'changed_by' => $a->changed_by,
+            'changed_by_name' => $a->changedByUser?->name ?? '—',
         ]);
+
+        $items = $this->resolveAuditDisplayValues($items);
 
         return response()->json([
             'data' => $items,

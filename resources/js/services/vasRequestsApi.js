@@ -25,8 +25,8 @@ export default {
     return api.get('/vas-requests', { params })
   },
 
-  async index(params = {}) {
-    const { data } = await api.get('/vas-requests', { params })
+  async index(params = {}, options = {}) {
+    const { data } = await api.get('/vas-requests', { params, signal: options.signal })
     return data
   },
   async filters() {

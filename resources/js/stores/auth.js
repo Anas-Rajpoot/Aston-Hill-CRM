@@ -69,6 +69,7 @@ export const useAuthStore = defineStore('auth', {
     user: null,
     token: null,
     timezone: 'Asia/Dubai',
+    defaultTablePageSize: 25,
     session: {
       timeout_minutes: 120,
       warning_enabled: false,
@@ -119,6 +120,7 @@ export const useAuthStore = defineStore('auth', {
             permissions: cached.permissions ?? [],
           }
           if (cached.timezone) this.timezone = cached.timezone
+          if (cached.defaultTablePageSize) this.defaultTablePageSize = Number(cached.defaultTablePageSize) || 25
           if (cached.session) this.session = { ...this.session, ...cached.session }
           this.passwordAction = cached.password_action ?? null
           this._lastFetchedAt = Date.now()
@@ -130,13 +132,14 @@ export const useAuthStore = defineStore('auth', {
           const roles = Array.isArray(u.roles) ? u.roles.map((r) => (typeof r === 'string' ? r : r?.name)).filter(Boolean) : []
           this.user = { id: u.id, name: u.name, email: u.email, roles, permissions: data.permissions ?? [] }
           if (data.timezone) this.timezone = data.timezone
+          if (data.default_table_page_size) this.defaultTablePageSize = Number(data.default_table_page_size) || 25
           if (data.session) {
             this.session = { ...this.session, ...data.session }
             setForceLogoutFlag(!!data.session.force_logout_on_close)
           }
           this.passwordAction = data.password_action ?? null
           this._lastFetchedAt = Date.now()
-          setBootstrapInStorage({ user: this.user, permissions: this.user.permissions, timezone: this.timezone, session: this.session, password_action: this.passwordAction })
+          setBootstrapInStorage({ user: this.user, permissions: this.user.permissions, timezone: this.timezone, defaultTablePageSize: this.defaultTablePageSize, session: this.session, password_action: this.passwordAction })
           return
         } catch {
           if (this.user) return
@@ -145,6 +148,7 @@ export const useAuthStore = defineStore('auth', {
         const roles = Array.isArray(data.roles) ? data.roles.map((r) => (typeof r === 'string' ? r : r?.name)).filter(Boolean) : []
         this.user = { ...data, roles, permissions: [] }
         if (data.timezone) this.timezone = data.timezone
+        if (data.default_table_page_size) this.defaultTablePageSize = Number(data.default_table_page_size) || 25
         if (data.session) this.session = { ...this.session, ...data.session }
         this.passwordAction = data.password_action ?? null
         this._lastFetchedAt = Date.now()
@@ -163,8 +167,7 @@ export const useAuthStore = defineStore('auth', {
     async login(credentials, options = {}) {
       this.loading = true
       try {
-        const hasCsrfFromPage = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
-        if (!options.token && !hasCsrfFromPage) {
+        if (!options.token) {
           await web.get('/sanctum/csrf-cookie')
         }
         const headers = options.token ? { 'X-Request-Token': 'true' } : {}

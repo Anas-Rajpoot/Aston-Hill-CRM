@@ -10,7 +10,6 @@ import attendanceLogApi from '@/services/attendanceLogApi'
 import { useAuthStore } from '@/stores/auth'
 import { toDdMmYyyy, fromDdMmYyyy, formatDateDdMmYyyy } from '@/lib/dateFormat'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
-import Pagination from '@/components/Pagination.vue'
 import FiltersBar from '@/components/attendance/FiltersBar.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import Toast from '@/components/Toast.vue'
@@ -392,10 +391,11 @@ onMounted(() => {
           <template #after-reset>
             <button
               type="button"
-              class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
               @click="advancedVisible = !advancedVisible"
             >
-              {{ advancedVisible ? 'Hide' : 'Advanced' }} Filters
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+              Advanced Filters
             </button>
             <button
               type="button"
@@ -466,7 +466,7 @@ onMounted(() => {
         </div>
 
         <!-- Table: green header, white body, borders like other tables -->
-        <div class="overflow-hidden rounded-lg border border-gray-400 bg-white shadow-sm">
+        <div class="overflow-hidden rounded-lg border-2 border-black bg-white shadow-sm">
           <div class="relative overflow-x-auto">
             <div
               v-if="loading"
@@ -478,12 +478,12 @@ onMounted(() => {
               </svg>
             </div>
             <table class="min-w-full border-collapse">
-              <thead class="bg-green-700">
+              <thead class="bg-green-700 border-b-2 border-black">
                 <tr>
                   <th
                     v-for="col in visibleColumns"
                     :key="col"
-                    class="whitespace-nowrap border-b border-gray-400 px-4 py-3 text-left text-sm font-bold uppercase tracking-wider text-white"
+                    class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold uppercase tracking-wider text-white"
                   >
                     <button
                       v-if="sortable(col)"
@@ -498,20 +498,20 @@ onMounted(() => {
                     </button>
                     <span v-else class="font-bold text-white">{{ columnLabel(col) }}</span>
                   </th>
-                  <th v-if="canForceLogout" class="whitespace-nowrap border-b border-gray-400 px-4 py-3 text-right text-sm font-bold uppercase tracking-wider text-white">Actions</th>
+                  <th v-if="canForceLogout" class="whitespace-nowrap px-4 py-3 text-right text-sm font-bold uppercase tracking-wider text-white">Actions</th>
                 </tr>
               </thead>
               <tbody class="bg-white">
-                <tr v-if="!loading && !logs.length" class="border-b border-gray-400">
+                <tr v-if="!loading && !logs.length" class="border-b border-black">
                   <td :colspan="visibleColumns.length + (canForceLogout ? 1 : 0)" class="px-4 py-12 text-center text-sm text-gray-500">No attendance records found.</td>
                 </tr>
                 <tr
                   v-for="row in logs"
                   :key="row.id"
-                  class="border-b border-gray-400 bg-white hover:bg-gray-50/50"
+                  class="border-b border-black bg-white hover:bg-gray-50/50"
                   :class="rowClass(row)"
                 >
-                  <td v-for="col in visibleColumns" :key="col" class="whitespace-nowrap border-gray-400 px-4 py-3 text-sm text-gray-900">
+                  <td v-for="col in visibleColumns" :key="col" class="whitespace-nowrap border-black px-4 py-3 text-sm text-gray-900">
                     <template v-if="col === 'login_date'">
                       {{ formatLoginDateDisplay(row.login_date) }}
                     </template>
@@ -536,7 +536,7 @@ onMounted(() => {
                       {{ row[col] }}
                     </template>
                   </td>
-                  <td v-if="canForceLogout" class="whitespace-nowrap border-gray-400 px-4 py-3 text-right">
+                  <td v-if="canForceLogout" class="whitespace-nowrap border-black px-4 py-3 text-right">
                     <button
                       v-if="row.status === 'logged_in' || row.status === 'missing_logout'"
                       type="button"
@@ -552,30 +552,43 @@ onMounted(() => {
             </table>
           </div>
 
-          <div class="flex flex-wrap items-center gap-4 border-t border-gray-400 bg-white px-4 py-3">
+          <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
+            <!-- Left: entries info -->
             <p class="text-sm text-gray-600">
               Showing {{ meta.total ? (meta.current_page - 1) * meta.per_page + 1 : 0 }} to {{ Math.min(meta.current_page * meta.per_page, meta.total) }} of {{ meta.total }} entries
             </p>
-            <div class="flex items-center gap-2">
-              <span class="text-sm text-gray-600">Per page</span>
-              <select
-                :value="perPage"
-                class="rounded border border-gray-300 px-2 py-1 text-sm"
-                @change="onPerPageChange"
-              >
-                <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
-              </select>
+
+            <!-- Right: Number of rows + Previous / Page X of Y / Next -->
+            <div class="flex items-center gap-4">
+              <div class="flex items-center gap-2 text-sm text-gray-600">
+                <span class="whitespace-nowrap font-medium">Number of rows</span>
+                <select
+                  :value="perPage"
+                  class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  @change="onPerPageChange"
+                >
+                  <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
+                </select>
+              </div>
+
+              <div class="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  :disabled="meta.current_page <= 1"
+                  class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  @click="onPageChange(meta.current_page - 1)"
+                >Previous</button>
+                <span class="rounded-md border border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-700">
+                  Page {{ meta.current_page }} of {{ meta.last_page }}
+                </span>
+                <button
+                  type="button"
+                  :disabled="meta.current_page >= meta.last_page"
+                  class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  @click="onPageChange(meta.current_page + 1)"
+                >Next</button>
+              </div>
             </div>
-            <Pagination
-              v-if="meta.last_page > 1"
-              :meta="{
-                prev_page_url: meta.current_page > 1 ? '#' : null,
-                next_page_url: meta.current_page < meta.last_page ? '#' : null,
-                current_page: meta.current_page,
-                last_page: meta.last_page,
-              }"
-              @change="onPageChange"
-            />
           </div>
         </div>
       </template>
@@ -602,7 +615,7 @@ onMounted(() => {
       >
         <div
           v-if="forceLogoutConfirmRow"
-          class="fixed inset-0 z-50 flex items-center justify-center bg-gray-500/50 p-4"
+          class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-gray-500/50 p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="force-logout-title"

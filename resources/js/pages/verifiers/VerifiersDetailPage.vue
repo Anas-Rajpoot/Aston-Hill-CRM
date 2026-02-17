@@ -538,10 +538,10 @@ onMounted(() => load())
     </div>
 
     <!-- Table -->
-    <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+    <div class="rounded-xl border-2 border-black bg-white shadow-sm overflow-hidden">
       <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead class="bg-gray-50">
+        <table class="min-w-full">
+          <thead class="bg-gray-50 border-b-2 border-black">
             <tr>
               <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 tracking-wider w-14">no.</th>
               <th
@@ -568,14 +568,14 @@ onMounted(() => load())
               <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 tracking-wider w-24">Actions</th>
             </tr>
           </thead>
-          <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-if="loading" class="bg-gray-50">
+          <tbody class="bg-white">
+            <tr v-if="loading" class="border-b border-black bg-gray-50">
               <td colspan="5" class="px-4 py-8 text-center text-gray-500">Loading...</td>
             </tr>
-            <tr v-else-if="!list.length">
+            <tr v-else-if="!list.length" class="border-b border-black">
               <td colspan="5" class="px-4 py-8 text-center text-gray-500">No verifiers found.</td>
             </tr>
-            <tr v-for="(row, idx) in list" :key="row.id" class="hover:bg-gray-50">
+            <tr v-for="(row, idx) in list" :key="row.id" class="border-b border-black hover:bg-gray-50">
               <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ fromEntry + idx }}</td>
               <td
                 class="px-4 py-3 text-sm text-gray-900"
@@ -665,53 +665,34 @@ onMounted(() => load())
         </table>
       </div>
       <!-- Pagination -->
-      <div class="px-4 py-3 border-t border-gray-200 bg-gray-50 flex flex-wrap items-center justify-between gap-2">
-        <div class="text-sm text-gray-600">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
+        <p class="text-sm text-gray-600">
           Showing {{ fromEntry }} to {{ toEntry }} of {{ meta.total }} entries
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <select
-            :value="perPage"
-            class="rounded border border-gray-300 text-sm py-1.5 pl-3 pr-8 min-w-[4.5rem]"
-            @change="(e) => { setPerPage(Number(e.target.value)); load(1) }"
-          >
-            <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
-          </select>
-          <span class="text-sm text-gray-500">per page</span>
-          <button
-            type="button"
-            :disabled="meta.current_page <= 1"
-            class="rounded border border-gray-300 px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100"
-            @click="goPage(meta.current_page - 1)"
-          >
-            Previous
-          </button>
-          <button
-            v-for="p in meta.last_page"
-            :key="p"
-            type="button"
-            :class="Number(p) === meta.current_page ? 'bg-green-600 text-white' : 'border border-gray-300 hover:bg-gray-100'"
-            class="rounded px-3 py-1.5 text-sm min-w-[2.5rem]"
-            @click="goPage(Number(p))"
-          >
-            {{ p }}
-          </button>
-          <button
-            type="button"
-            :disabled="meta.current_page >= meta.last_page"
-            class="rounded border border-gray-300 px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-100"
-            @click="goPage(meta.current_page + 1)"
-          >
-            Next
-          </button>
+        </p>
+        <div class="flex items-center gap-4">
+          <div class="flex items-center gap-2 text-sm text-gray-600">
+            <span class="whitespace-nowrap font-medium">Number of rows</span>
+            <select
+              :value="perPage"
+              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              @change="(e) => { setPerPage(Number(e.target.value)); load(1) }"
+            >
+              <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
+            </select>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <button type="button" :disabled="meta.current_page <= 1" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50" @click="goPage(meta.current_page - 1)">Previous</button>
+            <span class="rounded-md border border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-700">Page {{ meta.current_page }} of {{ meta.last_page }}</span>
+            <button type="button" :disabled="meta.current_page >= meta.last_page" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50" @click="goPage(meta.current_page + 1)">Next</button>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Add Verifier modal popup -->
     <Teleport to="body">
-      <div v-if="showAddModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" @click.self="closeAddModal">
-        <div class="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden" @click.stop>
+      <div v-if="showAddModal" class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4 bg-black/50" @click.self="closeAddModal">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden" @click.stop>
           <div class="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
             <h3 class="text-lg font-semibold text-gray-900">Add New Verifier</h3>
             <button
@@ -726,7 +707,7 @@ onMounted(() => load())
               </svg>
             </button>
           </div>
-          <div class="px-6 py-5">
+          <div class="px-6 py-5 overflow-y-auto flex-1 min-h-0">
             <div v-if="addError" class="mb-4 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{{ addError }}</div>
             <div class="space-y-4">
               <div>
@@ -782,7 +763,7 @@ onMounted(() => load())
 
     <!-- Verifier Details popup -->
     <Teleport to="body">
-      <div v-if="showDetailModal && selectedVerifier" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" @click.self="closeDetailModal">
+      <div v-if="showDetailModal && selectedVerifier" class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4 bg-black/50" @click.self="closeDetailModal">
         <div class="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" @click.stop>
           <div class="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
             <h3 class="text-lg font-semibold text-gray-900">Verifier Details</h3>
@@ -897,8 +878,8 @@ onMounted(() => load())
 
     <!-- Edit Verifier modal (same design as Add New Verifier, with pre-filled values) -->
     <Teleport to="body">
-      <div v-if="showEditModal" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50" @click.self="closeEditModal">
-        <div class="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden" @click.stop>
+      <div v-if="showEditModal" class="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto p-4 bg-black/50" @click.self="closeEditModal">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden" @click.stop>
           <div class="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
             <h3 class="text-lg font-semibold text-gray-900">Edit Verifier</h3>
             <button
@@ -913,7 +894,7 @@ onMounted(() => load())
               </svg>
             </button>
           </div>
-          <div class="px-6 py-5">
+          <div class="px-6 py-5 overflow-y-auto flex-1 min-h-0">
             <div v-if="editError" class="mb-4 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{{ editError }}</div>
             <div class="space-y-4">
               <div>
@@ -969,7 +950,7 @@ onMounted(() => load())
 
     <!-- Delete Verifier confirmation modal (only for users with delete permission) -->
     <Teleport to="body">
-      <div v-if="showDeleteModal && verifierToDelete" class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50" @click.self="closeDeleteModal">
+      <div v-if="showDeleteModal && verifierToDelete" class="fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto p-4 bg-black/50" @click.self="closeDeleteModal">
         <div class="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden" @click.stop>
           <div class="px-6 pt-6 pb-4">
             <div class="flex gap-3">

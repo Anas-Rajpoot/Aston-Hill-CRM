@@ -8,9 +8,13 @@ import { ref, computed, watch, onMounted } from 'vue'
 import api from '@/lib/axios'
 import fieldSubmissionsApi from '@/services/fieldSubmissionsApi'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
-import Pagination from '@/components/Pagination.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import { toDdMonYyyyLower } from '@/lib/dateFormat'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
+const TABLE_MODULE = 'field-operations-reports'
+const perPageOptions = ref([10, 20, 25, 50, 100])
 
 /* ───── Loading states ───── */
 const loading = ref(true)
@@ -41,10 +45,11 @@ const filters = ref({
   emirates: '',
   field_executive_id: '',
 })
+const advancedVisible = ref(false)
 
 /* ───── Table data ───── */
 const tableData = ref([])
-const tableMeta = ref({ current_page: 1, last_page: 1, per_page: 15, total: 0 })
+const tableMeta = ref({ current_page: 1, last_page: 1, per_page: authStore.defaultTablePageSize || 25, total: 0 })
 const sort = ref('created_at')
 const order = ref('desc')
 
@@ -52,11 +57,11 @@ const order = ref('desc')
 const columnModalVisible = ref(false)
 const allColumns = ref([])
 const visibleColumns = ref([
-  'id', 'company_name', 'field_agent', 'field_status', 'meeting_date',
+  'company_name', 'field_agent', 'field_status', 'meeting_date',
   'emirates', 'sla_status',
 ])
 const defaultVisibleColumns = [
-  'id', 'company_name', 'field_agent', 'field_status', 'meeting_date',
+  'company_name', 'field_agent', 'field_status', 'meeting_date',
   'emirates', 'sla_status',
 ]
 
@@ -157,7 +162,7 @@ async function loadTable() {
   try {
     const data = await fieldSubmissionsApi.index(params.value)
     tableData.value = data.data ?? []
-    tableMeta.value = data.meta ?? { current_page: 1, last_page: 1, per_page: 15, total: 0 }
+    tableMeta.value = data.meta ?? { current_page: 1, last_page: 1, per_page: authStore.defaultTablePageSize || 25, total: 0 }
   } catch {
     tableData.value = []
   } finally {
@@ -212,10 +217,12 @@ function onPageChange(page) {
   tableMeta.value.current_page = page
 }
 
-function onPerPageChange(e) {
-  tableMeta.value.per_page = Number(e.target.value)
+async function onPerPageChange(e) {
+  const val = Number(e.target.value)
+  tableMeta.value.per_page = val
   tableMeta.value.current_page = 1
   loadTable()
+  try { await api.post(`/table-preferences/${TABLE_MODULE}`, { per_page: val }) } catch { /* silent */ }
 }
 
 watch(() => tableMeta.value.current_page, () => loadTable())
@@ -223,13 +230,37 @@ watch(() => tableMeta.value.current_page, () => loadTable())
 /* ───── Column customization ───── */
 async function onSaveColumns(cols) {
   try {
-    await fieldSubmissionsApi.saveColumns(cols)
-    visibleColumns.value = cols
+    const filtered = cols.filter((c) => c !== 'id')
+    await fieldSubmissionsApi.saveColumns(filtered)
+    visibleColumns.value = filtered
     tableMeta.value.current_page = 1
     loadTable()
   } catch {
     /* silent */
   }
+}
+
+/* ───── Advanced filter count ───── */
+const activeFilterCount = computed(() => {
+  let count = 0
+  if (filters.value.from) count++
+  if (filters.value.to) count++
+  if (filters.value.submitted_from) count++
+  if (filters.value.submitted_to) count++
+  if (filters.value.field_executive_id) count++
+  return count
+})
+
+/* ───── Truncate helper ───── */
+function truncate(val, len = 30) {
+  if (!val) return '—'
+  const s = String(val)
+  return s.length > len ? s.slice(0, len) + '…' : s
+}
+
+/* ───── Row number helper ───── */
+function rowNumber(idx) {
+  return (tableMeta.value.current_page - 1) * tableMeta.value.per_page + idx + 1
 }
 
 /* ───── Format helpers ───── */
@@ -271,11 +302,7 @@ const agentBarColors = ['bg-emerald-500', 'bg-blue-500', 'bg-amber-500', 'bg-ind
 const maxStatusCount = computed(() => Math.max(1, ...(stats.value.by_status || []).map((s) => s.count)))
 const maxAgentCount = computed(() => Math.max(1, ...(stats.value.by_agent_workload || []).map((a) => a.count)))
 
-/* ───── Print & Export ───── */
-function printReport() {
-  window.print()
-}
-
+/* ───── Export ───── */
 function escapeCsv(val) {
   if (val == null) return ''
   const s = String(val)
@@ -309,10 +336,19 @@ async function exportExcel() {
   }
 }
 
+/* ───── Load user table preference ───── */
+async function loadTablePreference() {
+  try {
+    const { data } = await api.get(`/table-preferences/${TABLE_MODULE}`)
+    if (data.per_page) tableMeta.value.per_page = Number(data.per_page)
+    if (Array.isArray(data.options) && data.options.length) perPageOptions.value = data.options
+  } catch { /* use system default */ }
+}
+
 /* ───── Init ───── */
 onMounted(async () => {
   loading.value = true
-  await Promise.all([loadFilterOptions(), loadColumns()])
+  await Promise.all([loadFilterOptions(), loadColumns(), loadTablePreference()])
   await Promise.all([loadStats(), loadTable()])
   loading.value = false
 })
@@ -323,19 +359,13 @@ onMounted(async () => {
     <!-- Header -->
     <div class="flex flex-wrap items-start justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900">Field Operations Reports</h1>
-        <Breadcrumbs class="mt-1" />
+        <div class="flex flex-wrap items-baseline gap-2">
+          <h1 class="text-2xl font-bold text-gray-900">Field Operations Reports</h1>
+          <Breadcrumbs />
+        </div>
         <p class="text-sm text-gray-500 mt-1">Track field meetings, agent workload, and completion rates.</p>
       </div>
       <div class="flex gap-2">
-        <button
-          type="button"
-          class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          @click="printReport"
-        >
-          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2h-2m-4-1v8m0 0l-4-4m4 4l4-4" /></svg>
-          Print
-        </button>
         <button
           type="button"
           class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-70 disabled:cursor-wait"
@@ -344,7 +374,7 @@ onMounted(async () => {
         >
           <svg v-if="exportLoading" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
           <svg v-else class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-          {{ exportLoading ? 'Exporting…' : 'Export to Excel' }}
+          {{ exportLoading ? 'Exporting…' : 'Export' }}
         </button>
       </div>
     </div>
@@ -408,45 +438,6 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- Filters -->
-    <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="text-sm font-semibold text-gray-900">Filters</h3>
-        <button type="button" class="text-sm text-green-600 hover:text-green-700 font-medium" @click="resetFilters">Reset All</button>
-      </div>
-      <div class="flex flex-wrap items-end gap-4">
-        <div>
-          <label class="block text-xs font-medium text-gray-500 mb-1">Date From</label>
-          <input v-model="filters.from" type="date" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-40 focus:ring-green-500 focus:border-green-500" />
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-500 mb-1">Date To</label>
-          <input v-model="filters.to" type="date" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-40 focus:ring-green-500 focus:border-green-500" />
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-500 mb-1">Field Agent</label>
-          <input v-model="filters.field_executive_id" type="text" placeholder="Search agent…" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-40 focus:ring-green-500 focus:border-green-500" />
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-500 mb-1">Status</label>
-          <select v-model="filters.status" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-40 focus:ring-green-500 focus:border-green-500">
-            <option value="">All Status</option>
-            <option v-for="s in filterOptions.statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-500 mb-1">Emirates</label>
-          <select v-model="filters.emirates" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-40 focus:ring-green-500 focus:border-green-500">
-            <option value="">All Emirates</option>
-            <option v-for="e in filterOptions.emirates" :key="e.value" :value="e.value">{{ e.label }}</option>
-          </select>
-        </div>
-        <div class="ml-auto">
-          <button type="button" class="rounded-lg bg-green-600 px-5 py-2 text-sm font-medium text-white hover:bg-green-700" @click="applyFilters">Apply</button>
-        </div>
-      </div>
-    </div>
-
     <!-- Charts row -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- Status Distribution -->
@@ -498,15 +489,38 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- Table Section -->
-    <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-      <!-- Table header bar -->
-      <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-gray-200 bg-gray-50">
-        <h2 class="text-base font-semibold text-gray-900">Field Submissions Details</h2>
-        <div class="flex items-center gap-2">
+    <!-- Filters Section (below charts) -->
+    <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div class="flex flex-wrap items-end gap-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-500 mb-1">Status</label>
+          <select v-model="filters.status" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-44 focus:ring-green-500 focus:border-green-500">
+            <option value="">All Status</option>
+            <option v-for="s in filterOptions.statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-500 mb-1">Emirates</label>
+          <select v-model="filters.emirates" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-44 focus:ring-green-500 focus:border-green-500">
+            <option value="">All Emirates</option>
+            <option v-for="e in filterOptions.emirates" :key="e.value" :value="e.value">{{ e.label }}</option>
+          </select>
+        </div>
+        <button type="button" class="rounded-lg bg-green-600 px-5 py-2 text-sm font-medium text-white hover:bg-green-700" @click="applyFilters">Apply</button>
+        <button type="button" class="rounded-lg border border-gray-300 bg-white px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="resetFilters">Reset</button>
+        <div class="ml-auto flex items-center gap-2">
           <button
             type="button"
-            class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            @click="advancedVisible = !advancedVisible"
+          >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+            Advanced Filters
+            <span v-if="activeFilterCount > 0" class="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-600 text-[10px] font-bold text-white">{{ activeFilterCount }}</span>
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
             @click="columnModalVisible = true"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
@@ -515,15 +529,51 @@ onMounted(async () => {
         </div>
       </div>
 
+      <!-- Advanced Filters -->
+      <div v-if="advancedVisible" class="mt-4 pt-4 border-t border-gray-200">
+        <div class="flex flex-wrap items-end gap-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Date From</label>
+            <input v-model="filters.from" type="date" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-40 focus:ring-green-500 focus:border-green-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Date To</label>
+            <input v-model="filters.to" type="date" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-40 focus:ring-green-500 focus:border-green-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Submitted From</label>
+            <input v-model="filters.submitted_from" type="date" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-40 focus:ring-green-500 focus:border-green-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Submitted To</label>
+            <input v-model="filters.submitted_to" type="date" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-40 focus:ring-green-500 focus:border-green-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Field Agent ID</label>
+            <input v-model="filters.field_executive_id" type="text" placeholder="Agent ID" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-36 focus:ring-green-500 focus:border-green-500" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table Section -->
+    <div class="rounded-xl border-2 border-black bg-white shadow-sm overflow-hidden">
+      <!-- Table header bar -->
+      <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b-2 border-black bg-white">
+        <h2 class="text-base font-semibold text-gray-900">Field Submissions Details</h2>
+        <p class="text-sm text-gray-500">{{ tableMeta.total }} records</p>
+      </div>
+
       <!-- Table -->
       <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead class="bg-gray-50">
+        <table class="min-w-full">
+          <thead class="bg-white">
             <tr>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b-2 border-black">#</th>
               <th
                 v-for="col in activeColumns"
                 :key="col.key"
-                class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 transition-colors"
+                class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-50 transition-colors border-b-2 border-black"
                 @click="onSort(col.key)"
               >
                 <div class="flex items-center gap-1">
@@ -539,18 +589,19 @@ onMounted(async () => {
               </th>
             </tr>
           </thead>
-          <tbody class="bg-white divide-y divide-gray-200">
+          <tbody class="bg-white">
             <tr v-if="tableLoading">
-              <td :colspan="activeColumns.length" class="px-4 py-12 text-center text-gray-400">
+              <td :colspan="activeColumns.length + 1" class="px-4 py-12 text-center text-gray-400 border-b border-black">
                 <svg class="mx-auto h-6 w-6 animate-spin text-gray-400 mb-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
                 Loading…
               </td>
             </tr>
             <tr v-else-if="!tableData.length">
-              <td :colspan="activeColumns.length" class="px-4 py-12 text-center text-gray-400">No records found</td>
+              <td :colspan="activeColumns.length + 1" class="px-4 py-12 text-center text-gray-400 border-b border-black">No records found</td>
             </tr>
-            <tr v-else v-for="row in tableData" :key="row.id" class="hover:bg-gray-50 transition-colors">
-              <td v-for="col in activeColumns" :key="col.key" class="px-4 py-2.5 text-sm whitespace-nowrap">
+            <tr v-else v-for="(row, idx) in tableData" :key="row.id" class="hover:bg-gray-50 transition-colors">
+              <td class="px-4 py-2.5 text-sm text-gray-500 whitespace-nowrap border-b border-black">{{ rowNumber(idx) }}</td>
+              <td v-for="col in activeColumns" :key="col.key" class="px-4 py-2.5 text-sm whitespace-nowrap border-b border-black">
                 <!-- Status badge (field_status) -->
                 <template v-if="col.key === 'field_status' || col.key === 'status'">
                   <span :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', statusBadgeClass(row[col.key])]">
@@ -563,9 +614,12 @@ onMounted(async () => {
                     {{ row.sla_status || '—' }}
                   </span>
                 </template>
-                <!-- Company name (bold) -->
+                <!-- Company name (truncated with tooltip) -->
                 <template v-else-if="col.key === 'company_name'">
-                  <span class="font-medium text-gray-900">{{ row.company_name || '—' }}</span>
+                  <span
+                    class="font-medium text-gray-900 cursor-default"
+                    :title="row.company_name || ''"
+                  >{{ truncate(row.company_name, 30) }}</span>
                 </template>
                 <!-- Default cell -->
                 <template v-else>
@@ -578,39 +632,45 @@ onMounted(async () => {
       </div>
 
       <!-- Pagination footer -->
-      <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 bg-white px-4 py-3">
-        <div class="flex items-center gap-3">
-          <p class="text-sm text-gray-600">
-            Showing {{ tableMeta.total ? ((tableMeta.current_page - 1) * tableMeta.per_page) + 1 : 0 }}
-            to {{ Math.min(tableMeta.current_page * tableMeta.per_page, tableMeta.total) }}
-            of {{ tableMeta.total }} entries
-          </p>
-          <div class="flex items-center gap-1.5 text-sm text-gray-600">
-            <span>Number of pages</span>
+      <div class="flex flex-wrap items-center justify-between gap-3 border-t-2 border-black bg-white px-4 py-3">
+        <!-- Left: entries info -->
+        <p class="text-sm text-gray-600">
+          Showing {{ tableMeta.total ? ((tableMeta.current_page - 1) * tableMeta.per_page) + 1 : 0 }}
+          to {{ Math.min(tableMeta.current_page * tableMeta.per_page, tableMeta.total) }}
+          of {{ tableMeta.total }} entries
+        </p>
+
+        <!-- Right: Number of rows + Previous / Page X of Y / Next -->
+        <div class="flex items-center gap-4">
+          <div class="flex items-center gap-2 text-sm text-gray-600">
+            <span class="whitespace-nowrap font-medium">Number of rows</span>
             <select
               :value="tableMeta.per_page"
-              class="rounded border border-gray-300 px-2 py-1 text-sm focus:ring-green-500 focus:border-green-500"
+              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
               @change="onPerPageChange"
             >
-              <option :value="10">10</option>
-              <option :value="15">15</option>
-              <option :value="20">20</option>
-              <option :value="25">25</option>
-              <option :value="50">50</option>
-              <option :value="100">100</option>
+              <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
             </select>
           </div>
+
+          <div class="flex items-center gap-1.5">
+            <button
+              type="button"
+              :disabled="tableMeta.current_page <= 1"
+              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              @click="onPageChange(tableMeta.current_page - 1)"
+            >Previous</button>
+            <span class="rounded-md border border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-700">
+              Page {{ tableMeta.current_page }} of {{ tableMeta.last_page }}
+            </span>
+            <button
+              type="button"
+              :disabled="tableMeta.current_page >= tableMeta.last_page"
+              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              @click="onPageChange(tableMeta.current_page + 1)"
+            >Next</button>
+          </div>
         </div>
-        <Pagination
-          v-if="tableMeta.last_page > 1"
-          :meta="{
-            prev_page_url: tableMeta.current_page > 1 ? '#' : null,
-            next_page_url: tableMeta.current_page < tableMeta.last_page ? '#' : null,
-            current_page: tableMeta.current_page,
-            last_page: tableMeta.last_page,
-          }"
-          @change="onPageChange"
-        />
       </div>
     </div>
 

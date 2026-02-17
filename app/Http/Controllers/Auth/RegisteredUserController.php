@@ -67,7 +67,7 @@ class RegisteredUserController extends Controller
             'password_changed_at' => now(),
         ]);
 
-        User::role('superadmin')->each(function ($admin) use ($user) {
+        User::whereHas('roles', fn ($q) => $q->where('name', 'superadmin'))->each(function ($admin) use ($user) {
             $admin->notify(new NewUserApprovalNotification($user));
         });
 

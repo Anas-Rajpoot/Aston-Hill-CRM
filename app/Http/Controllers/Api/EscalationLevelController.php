@@ -42,7 +42,7 @@ class EscalationLevelController extends Controller
         $data = $levels->map(fn ($lvl) => $this->formatLevel($lvl));
 
         // Fetch all system roles for the Recipient Type dropdown
-        $roles = Role::orderBy('name')->get()->map(fn ($r) => [
+        $roles = Role::where('guard_name', 'web')->orderBy('name')->get()->map(fn ($r) => [
             'value' => $r->name,
             'label' => ucwords(str_replace('_', ' ', $r->name)),
         ]);

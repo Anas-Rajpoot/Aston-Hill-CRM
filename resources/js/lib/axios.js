@@ -1,6 +1,12 @@
 import axios from 'axios'
 
 const csrfToken = () => {
+  // Prefer the XSRF-TOKEN cookie (set/refreshed by /sanctum/csrf-cookie)
+  const cookieMatch = document.cookie.match(/XSRF-TOKEN=([^;]+)/)
+  if (cookieMatch) {
+    return decodeURIComponent(cookieMatch[1])
+  }
+  // Fall back to meta tag (set during initial server-rendered page load)
   const meta = document.querySelector('meta[name="csrf-token"]')
   return meta ? meta.getAttribute('content') : null
 }

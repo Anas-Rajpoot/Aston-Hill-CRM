@@ -20,6 +20,7 @@ class FieldSubmission extends Model
         'manager_id',
         'team_leader_id',
         'sales_agent_id',
+        'team_id',
         'field_executive_id',
         'meeting_date',
         'field_status',
@@ -70,6 +71,11 @@ class FieldSubmission extends Model
         return $this->belongsTo(User::class, 'sales_agent_id');
     }
 
+    public function team()
+    {
+        return $this->belongsTo(\App\Models\Team::class, 'team_id');
+    }
+
     public function fieldExecutive()
     {
         return $this->belongsTo(User::class, 'field_executive_id');
@@ -88,8 +94,8 @@ class FieldSubmission extends Model
     /**
      * Visibility scope:
      * - Users with field_head.list see ALL submissions.
-     * - Other users see submissions they created or are assigned to (as field executive,
-     *   sales agent, team leader, or manager).
+     * - Field agents see ALL submissions (they process assigned + unassigned).
+     * - Other users see submissions they created, are assigned to, or belong to their team hierarchy.
      */
     public function scopeVisibleTo($query, User $user)
     {
@@ -97,14 +103,17 @@ class FieldSubmission extends Model
             return $query;
         }
 
-        $userId = (int) $user->id;
+        // Field agents see ALL field submissions (assigned + unassigned)
+        if ($user->hasRole('field_agent')) {
+            return $query;
+        }
 
-        return $query->where(function ($q) use ($userId) {
-            $q->where('created_by', $userId)
-              ->orWhere('field_executive_id', $userId)
-              ->orWhere('sales_agent_id', $userId)
-              ->orWhere('team_leader_id', $userId)
-              ->orWhere('manager_id', $userId);
-        });
+        \App\Services\TeamHierarchyService::scopeSubmissionsForUser(
+            $query,
+            $user,
+            ['field_executive_id']
+        );
+
+        return $query;
     }
 }

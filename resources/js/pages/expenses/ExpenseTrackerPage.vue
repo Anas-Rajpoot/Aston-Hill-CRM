@@ -45,7 +45,7 @@ const summary = ref({
   approved: 0,
 })
 const expenses = ref([])
-const meta = ref({ current_page: 1, last_page: 1, per_page: 15, total: 0 })
+const meta = ref({ current_page: 1, last_page: 1, per_page: auth.defaultTablePageSize || 25, total: 0 })
 const allColumns = ref([])
 const visibleColumns = ref([
   'status', 'expense_date', 'product_category', 'product_description', 'invoice_number', 'vat_amount',
@@ -124,7 +124,7 @@ async function load() {
       expensesApi.summary(),
     ])
     expenses.value = listRes.data?.data ?? []
-    meta.value = listRes.data?.meta ?? { current_page: 1, last_page: 1, per_page: 15, total: 0 }
+    meta.value = listRes.data?.meta ?? { current_page: 1, last_page: 1, per_page: auth.defaultTablePageSize || 25, total: 0 }
     summary.value = summaryRes.data ?? summary.value
   } catch (e) {
     loadError.value = e?.response?.data?.message || 'Failed to load expenses.'
@@ -231,11 +231,6 @@ function onPerPageChange(e) {
   meta.value.current_page = 1
   load()
 }
-const pageNumbers = computed(() => {
-  const n = meta.value.last_page || 1
-  return Array.from({ length: n }, (_, i) => i + 1)
-})
-
 async function onSaveColumns(cols) {
   try {
     await expensesApi.saveColumns(cols)
@@ -506,17 +501,15 @@ onMounted(() => {
           <div class="flex gap-2 ml-auto">
             <button
               type="button"
-              class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
               @click="advancedVisible = !advancedVisible"
             >
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
               Advanced Filters
-              <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-              </svg>
             </button>
             <button
               type="button"
-              class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
               @click="columnModalVisible = true"
             >
               Customize Columns
@@ -537,7 +530,7 @@ onMounted(() => {
         @reset="resetFilters"
       />
 
-      <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div class="overflow-hidden rounded-lg border-2 border-black bg-white shadow-sm">
         <ExpenseTable
           :columns="visibleColumns"
           :data="expenses"
@@ -558,48 +551,42 @@ onMounted(() => {
           @view-history="openHistoryModal"
           @delete="openDeleteConfirm"
         />
-        <div class="flex flex-wrap items-center gap-4 border-t border-gray-200 bg-white px-4 py-3">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
+          <!-- Left: entries info -->
           <p class="text-sm text-gray-600">
             Showing {{ meta.total ? (meta.current_page - 1) * perPage + 1 : 0 }} to {{ Math.min(meta.current_page * perPage, meta.total) }} of {{ meta.total }} entries
           </p>
-          <div class="flex items-center gap-2">
-            <label for="expense-per-page" class="text-sm text-gray-600">Number of rows</label>
-            <select
-              id="expense-per-page"
-              :value="perPage"
-              class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm min-w-[85px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
-              @change="onPerPageChange"
-            >
-              <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
-            </select>
-          </div>
-          <div v-if="meta.last_page > 1" class="ml-auto flex items-center gap-1">
-            <button
-              type="button"
-              class="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-              :disabled="meta.current_page <= 1"
-              @click="onPageChange(meta.current_page - 1)"
-            >
-              Previous
-            </button>
-            <button
-              v-for="p in pageNumbers"
-              :key="p"
-              type="button"
-              class="min-w-[2rem] rounded border px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
-              :class="p === meta.current_page ? 'border-green-600 bg-green-600 text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'"
-              :disabled="p === meta.current_page"
-              @click="onPageChange(p)"
-            >
-              {{ p }}
-            </button>
-            <button
-              type="button"
-              class="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-              :disabled="meta.current_page >= meta.last_page"
-              @click="onPageChange(meta.current_page + 1)"
-            >
-              Next
+
+          <!-- Right: Number of rows + Previous / Page X of Y / Next -->
+          <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2 text-sm text-gray-600">
+              <span class="whitespace-nowrap font-medium">Number of rows</span>
+              <select
+                id="expense-per-page"
+                :value="perPage"
+                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                @change="onPerPageChange"
+              >
+                <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </div>
+
+            <div class="flex items-center gap-1.5">
+              <button
+                type="button"
+                :disabled="meta.current_page <= 1"
+                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                @click="onPageChange(meta.current_page - 1)"
+              >Previous</button>
+              <span class="rounded-md border border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-700">
+                Page {{ meta.current_page }} of {{ meta.last_page }}
+              </span>
+              <button
+                type="button"
+                :disabled="meta.current_page >= meta.last_page"
+                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                @click="onPageChange(meta.current_page + 1)"
+              >Next
             </button>
           </div>
         </div>
@@ -650,7 +637,7 @@ onMounted(() => {
     <Teleport to="body">
       <div
         v-if="expenseToDelete"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-gray-500/50 p-4"
+        class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-gray-500/50 p-4"
         role="dialog"
         aria-modal="true"
         @click.self="closeDeleteConfirm"

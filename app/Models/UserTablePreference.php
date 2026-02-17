@@ -10,7 +10,7 @@ class UserTablePreference extends Model
     protected $fillable = ['user_id', 'module', 'per_page'];
     protected $casts    = ['per_page' => 'integer'];
 
-    public const ALLOWED = [10, 20, 50, 100];
+    public const ALLOWED = [10, 20, 25, 50, 100];
     private const CACHE_TTL = 3600; // 1 hour
 
     /**

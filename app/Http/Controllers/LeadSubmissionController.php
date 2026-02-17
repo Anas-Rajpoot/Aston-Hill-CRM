@@ -58,12 +58,9 @@ class LeadSubmissionController extends Controller
     /** DATATABLE ENDPOINT */
     public function datatable(Request $request)
     {
-        $q = LeadSubmission::query()->with(['creator:id,name,email','category:id,name','type:id,name']);
-
-        // Your restriction logic belongs here:
-        if (!$request->user()->hasRole('superadmin') && !$request->user()->can('lead.view.all')) {
-            $q->where('created_by', $request->user()->id);
-        }
+        $q = LeadSubmission::query()
+            ->visibleTo($request->user())
+            ->with(['creator:id,name,email','category:id,name','type:id,name']);
 
         // Filters
         if ($request->filled('status')) {

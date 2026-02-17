@@ -22,7 +22,7 @@ const props = defineProps({
   selectedIds: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['sort', 'update:selectedIds', 'deactivate', 'activate', 'showMessage'])
+const emit = defineEmits(['sort', 'update:selectedIds', 'deactivate', 'activate', 'showMessage', 'viewHistory'])
 
 const COLUMN_LABELS = {
   id: 'ID',
@@ -134,7 +134,7 @@ function goToEdit(row) {
 }
 
 function goToHistory(row) {
-  if (row?.id) router.push({ path: '/login-logs', query: { user_id: row.id } })
+  if (row?.id) emit('viewHistory', row)
 }
 
 function onDeactivate(row) {
@@ -206,9 +206,9 @@ function onCheckboxCellClick(row) {
       </div>
     </div>
 
-    <table class="min-w-full border border-gray-400 border-collapse">
+    <table class="min-w-full border-2 border-black border-collapse">
       <thead>
-        <tr class="border-b border-gray-400 bg-green-600">
+        <tr class="border-b-2 border-black bg-green-600">
           <th class="w-10 px-3 py-3 text-left">
             <input
               type="checkbox"
@@ -242,13 +242,13 @@ function onCheckboxCellClick(row) {
         </tr>
       </thead>
       <tbody class="bg-white">
-        <tr v-if="!loading && !data.length" class="border-b border-gray-400 bg-white">
+        <tr v-if="!loading && !data.length" class="border-b border-black bg-white">
           <td :colspan="columns.length + 2" class="px-4 py-12 text-center text-gray-500">No employees found.</td>
         </tr>
         <tr
           v-for="(row, rowIndex) in data"
           :key="row.id"
-          class="border-b border-gray-400 bg-white hover:bg-gray-50/50"
+          class="border-b border-black bg-white hover:bg-gray-50/50"
         >
           <td
             class="w-10 px-3 py-3"

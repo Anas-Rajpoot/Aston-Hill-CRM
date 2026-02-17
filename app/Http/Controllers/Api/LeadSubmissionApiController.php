@@ -24,6 +24,7 @@ use Illuminate\Validation\Rule;
  */
 class LeadSubmissionApiController extends Controller
 {
+    use \App\Traits\ResolvesAuditDisplayValues;
     private const MODULE = 'lead_submissions';
 
     /** Whitelist of allowed columns for SELECT (prevents SQL injection / unauthorized exposure). */
@@ -88,13 +89,7 @@ class LeadSubmissionApiController extends Controller
         $sort = $validated['sort'] ?? 'submitted_at';
         $order = $validated['order'] ?? 'desc';
 
-        // Base query: visibility + filters only (no joins). Used for fast count.
-        $baseQuery = LeadSubmission::query()->visibleTo($user);
-        $this->applyFilters($baseQuery, $validated);
-
-        $total = $baseQuery->count();
-
-        // Data query: add sort (with joins), select, eager load, then skip/take.
+        // Single data query with sort, select, eager load, then paginate.
         $dataQuery = LeadSubmission::query()->visibleTo($user);
         $this->applyFilters($dataQuery, $validated);
         $this->applySort($dataQuery, $sort, $order);
@@ -126,6 +121,15 @@ class LeadSubmissionApiController extends Controller
 
         $offset = ($page - 1) * $perPage;
         $leads = $dataQuery->skip($offset)->take($perPage)->get();
+
+        // Cache the count for 30s to avoid expensive COUNT(*) on every paginate/filter.
+        // Build a cache key from user + filter params so it varies correctly.
+        $countCacheKey = 'lead_count_' . $user->id . '_' . md5(json_encode($validated));
+        $total = Cache::remember($countCacheKey, 30, function () use ($user, $validated) {
+            $cq = LeadSubmission::query()->visibleTo($user);
+            $this->applyFilters($cq, $validated);
+            return $cq->count();
+        });
 
         $items = $leads->map(function ($lead) use ($columns) {
             return $this->formatLeadRow($lead, $columns);
@@ -370,38 +374,43 @@ class LeadSubmissionApiController extends Controller
     {
         $this->authorize('viewAny', LeadSubmission::class);
 
-        $categories = ServiceCategory::where('is_active', true)
-            ->orderBy('name')
-            ->get(['id', 'name']);
+        $userId = request()->user()->id;
+        $data = \App\Services\SubmissionCacheService::rememberMeta('leads', 'filters', $userId, function () {
+            $categories = ServiceCategory::where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name']);
 
-        $types = ServiceType::where('is_active', true)
-            ->orderBy('name')
-            ->get(['id', 'name', 'service_category_id']);
+            $types = ServiceType::where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'service_category_id']);
 
-        $products = LeadSubmission::query()
-            ->whereNotNull('product')
-            ->where('product', '!=', '')
-            ->distinct()
-            ->pluck('product')
-            ->filter()
-            ->sort()
-            ->values()
-            ->take(50)
-            ->all();
+            $products = LeadSubmission::query()
+                ->whereNotNull('product')
+                ->where('product', '!=', '')
+                ->distinct()
+                ->pluck('product')
+                ->filter()
+                ->sort()
+                ->values()
+                ->take(50)
+                ->all();
 
-        return response()->json([
-            'categories' => $categories,
-            'types' => $types,
-            'statuses' => [
-                ['value' => 'submitted', 'label' => 'Submitted'],
-                ['value' => 'rejected', 'label' => 'Rejected'],
-                ['value' => 'pending_for_ata', 'label' => 'Pending for ATA'],
-                ['value' => 'pending_for_finance', 'label' => 'Pending for Finance'],
-                ['value' => 'pending_from_sales', 'label' => 'pending for sales'],
-                ['value' => 'unassigned', 'label' => 'Unassigned'],
-            ],
-            'products' => $products,
-        ]);
+            return [
+                'categories' => $categories,
+                'types' => $types,
+                'statuses' => [
+                    ['value' => 'submitted', 'label' => 'Submitted'],
+                    ['value' => 'rejected', 'label' => 'Rejected'],
+                    ['value' => 'pending_for_ata', 'label' => 'Pending for ATA'],
+                    ['value' => 'pending_for_finance', 'label' => 'Pending for Finance'],
+                    ['value' => 'pending_from_sales', 'label' => 'pending for sales'],
+                    ['value' => 'unassigned', 'label' => 'Unassigned'],
+                ],
+                'products' => $products,
+            ];
+        });
+
+        return response()->json($data);
     }
 
     /**
@@ -504,16 +513,20 @@ class LeadSubmissionApiController extends Controller
 
     /**
      * GET /api/lead-submissions/back-office-options
-     * Options for back office edit form (executives). Only superadmin or backoffice.
+     * Options for back office edit form (executives).
+     * Accessible by superadmin, back_office, or any user who can view lead submissions.
      */
     public function backOfficeOptions(Request $request): JsonResponse
     {
         $user = $request->user();
-        if (! $user->hasRole('superadmin') && ! $user->hasRole('back_office')) {
+        $allowed = $user->roles()->whereIn('name', ['superadmin', 'back_office', 'manager', 'team_leader'])->exists()
+            || $user->can('viewAny', LeadSubmission::class);
+        if (! $allowed) {
             abort(403, 'Unauthorized.');
         }
 
-        $executives = User::role('back_office')
+        $executives = User::whereHas('roles', fn ($q) => $q->where('name', 'back_office'))
+            ->where('status', 'approved')
             ->orderBy('name')
             ->get(['id', 'name'])
             ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name]);
@@ -563,7 +576,9 @@ class LeadSubmissionApiController extends Controller
                 'changed_at' => $audit->changed_at?->toIso8601String(),
                 'changed_by' => $audit->user?->name ?? '—',
             ];
-        })->values()->all();
+        });
+
+        $items = $this->resolveAuditDisplayValues($items)->values()->all();
 
         return response()->json([
             'data' => $items,
@@ -603,6 +618,8 @@ class LeadSubmissionApiController extends Controller
                 'changed_by_name' => $audit->user?->name ?? '—',
             ];
         });
+
+        $data = $this->resolveAuditDisplayValues($data);
 
         return response()->json(['data' => $data]);
     }
@@ -751,5 +768,61 @@ class LeadSubmissionApiController extends Controller
         }
 
         return response()->json(['message' => 'Documents added.']);
+    }
+
+    /**
+     * Aggregated bootstrap: filters + columns + team/BO options + first-page data in one request.
+     * Eliminates 5+ sequential API calls (filters, columns, team-options, back-office-options, index).
+     */
+    public function bootstrap(Request $request): JsonResponse
+    {
+        $filtersResponse = $this->filters($request);
+        $filtersData = json_decode($filtersResponse->getContent(), true);
+
+        $columnsResponse = $this->columns($request);
+        $columnsData = json_decode($columnsResponse->getContent(), true);
+
+        $indexResponse = $this->index($request);
+        $indexData = json_decode($indexResponse->getContent(), true);
+
+        // Include team options (cached in FieldSubmissionController for 5 min)
+        $teamData = [];
+        try {
+            $teamResponse = app(\App\Http\Controllers\FieldSubmissionController::class)->teamOptions($request);
+            $teamData = json_decode($teamResponse->getContent(), true) ?? [];
+        } catch (\Throwable $e) {
+            // silent - team options are optional for listing
+        }
+
+        // Include back office options for any authenticated user (data is not sensitive)
+        $boData = [];
+        $user = $request->user();
+        if ($user) {
+            try {
+                $executives = User::whereHas('roles', fn ($q) => $q->where('name', 'back_office'))
+                    ->where('status', 'approved')
+                    ->orderBy('name')
+                    ->get(['id', 'name'])
+                    ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name]);
+
+                $boData = [
+                    'executives' => $executives->values()->all(),
+                    'call_verification_options' => [['value' => 'Verified', 'label' => 'Verified'], ['value' => 'Not Verified', 'label' => 'Not Verified']],
+                    'pending_from_sales_options' => [['value' => 'UnAssigned', 'label' => 'UnAssigned'], ['value' => 'Assigned', 'label' => 'Assigned']],
+                    'documents_verification_options' => [['value' => 'Verified', 'label' => 'Verified'], ['value' => 'Not Verified', 'label' => 'Not Verified']],
+                    'du_status_options' => [['value' => 'Submitted', 'label' => 'Submitted'], ['value' => 'In Progress', 'label' => 'In Progress'], ['value' => 'Completed', 'label' => 'Completed']],
+                ];
+            } catch (\Throwable $e) {
+                // silent
+            }
+        }
+
+        return response()->json([
+            'filters' => $filtersData,
+            'columns' => $columnsData,
+            'page' => $indexData,
+            'team_options' => $teamData,
+            'back_office_options' => $boData,
+        ]);
     }
 }

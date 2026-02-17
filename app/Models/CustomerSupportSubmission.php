@@ -19,6 +19,8 @@ class CustomerSupportSubmission extends Model
         'manager_id',
         'team_leader_id',
         'sales_agent_id',
+        'team_id',
+        'csr_id',
         'status',
         'submitted_at',
         'ticket_number',
@@ -75,5 +77,36 @@ class CustomerSupportSubmission extends Model
     public function salesAgent()
     {
         return $this->belongsTo(User::class, 'sales_agent_id');
+    }
+
+    public function team()
+    {
+        return $this->belongsTo(\App\Models\Team::class, 'team_id');
+    }
+
+    public function csrUser()
+    {
+        return $this->belongsTo(User::class, 'csr_id');
+    }
+
+    /**
+     * Apply RBAC visibility scope:
+     *  - Super Admin                         → ALL records
+     *  - CSR (customer_support_representative) → ALL records (they process assigned + unassigned)
+     *  - Support Manager                     → ALL records
+     *  - Manager                             → own + team hierarchy members' records
+     *  - Team Leader                         → own + direct team members' records
+     *  - Sales Agent                         → only assigned-to or created-by them
+     */
+    public function scopeVisibleTo($q, User $user)
+    {
+        // CSR and support managers see ALL customer support submissions
+        if ($user->hasRole('customer_support_representative') || $user->hasRole('support_manager')) {
+            return $q;
+        }
+
+        \App\Services\TeamHierarchyService::scopeSubmissionsForUser($q, $user, ['csr_id']);
+
+        return $q;
     }
 }

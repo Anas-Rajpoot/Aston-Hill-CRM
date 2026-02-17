@@ -29,7 +29,7 @@ class UserController extends Controller
         ->latest()
         ->paginate(10);
 
-        $roles = Role::orderBy('name')->get();
+        $roles = Role::where('guard_name', 'web')->orderBy('name')->get();
 
         return view('users.index', compact('users', 'roles'));
 
@@ -39,13 +39,13 @@ class UserController extends Controller
 
     public function show(User $user)
     {
-        $roles = Role::orderBy('name')->get();
+        $roles = Role::where('guard_name', 'web')->orderBy('name')->get();
         return view('users.show', compact('user', 'roles'));
     }
 
     public function edit(User $user)
     {
-        $roles = Role::orderBy('name')->get();
+        $roles = Role::where('guard_name', 'web')->orderBy('name')->get();
         return view('users.edit', compact('user', 'roles'));
     }
 

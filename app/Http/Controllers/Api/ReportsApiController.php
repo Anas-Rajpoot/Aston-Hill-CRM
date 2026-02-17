@@ -194,6 +194,7 @@ class ReportsApiController extends Controller
     /**
      * GET /api/reports/vas-stats
      * KPIs for VAS Reports: total, pending, completed_today, sla_compliance_pct.
+     * Super admin sees all; back office sees assigned; others see own submissions.
      */
     public function vasStats(Request $request): JsonResponse
     {
@@ -207,21 +208,27 @@ class ReportsApiController extends Controller
             'status' => ['sometimes', 'nullable', 'string', \Illuminate\Validation\Rule::in(VasRequestSubmission::STATUSES)],
             'request_type' => ['sometimes', 'nullable', 'string', 'max:150'],
             'q' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'company_name' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'account_number' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'manager_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'team_leader_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'sales_agent_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'back_office_executive_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
         ]);
 
-        $query = VasRequestSubmission::query();
+        $query = VasRequestSubmission::query()->visibleTo($request->user());
         $this->applyVasFilters($query, $validated);
 
         $total = (clone $query)->count();
         $pending = (clone $query)->whereIn('status', ['draft', 'submitted'])->count();
         $todayStart = now()->startOfDay()->toDateTimeString();
         $todayEnd = now()->endOfDay()->toDateTimeString();
-        $completedToday = (clone $query)->where('status', 'approved')->whereBetween('approved_at', [$todayStart, $todayEnd])->count();
+        $completedToday = (clone $query)->where('status', 'approved')->whereBetween('updated_at', [$todayStart, $todayEnd])->count();
 
         $slaDays = (int) config('modules.vas_request_submissions.sla_days', 7);
-        $approvedQuery = (clone $query)->where('status', 'approved')->whereNotNull('submitted_at')->whereNotNull('approved_at');
+        $approvedQuery = (clone $query)->where('status', 'approved')->whereNotNull('submitted_at');
         $approvedTotal = $approvedQuery->count();
-        $withinSla = (clone $approvedQuery)->whereRaw("DATEDIFF(approved_at, submitted_at) <= ?", [$slaDays])->count();
+        $withinSla = (clone $approvedQuery)->whereRaw("DATEDIFF(updated_at, submitted_at) <= ?", [$slaDays])->count();
         $slaCompliancePct = $approvedTotal > 0 ? round(100 * $withinSla / $approvedTotal, 1) : 0;
 
         return response()->json([
@@ -447,6 +454,10 @@ class ReportsApiController extends Controller
 
     /* ──── SLA helpers ──────────────────────────────────────────────── */
 
+    /**
+     * Fetch submission rows for a module with consistent RBAC via model scopes.
+     * Uses the same visibleTo() scope as listing pages for all 4 types.
+     */
     private function fetchModuleRows(string $moduleKey, $user, ?Carbon $from, ?Carbon $to): \Illuminate\Support\Collection
     {
         switch ($moduleKey) {
@@ -463,35 +474,16 @@ class ReportsApiController extends Controller
                               'field_executive_id', 'sales_agent_id', 'team_leader_id', 'manager_id']);
                 break;
             case 'customer_support_requests':
-                $q = CustomerSupportSubmission::query()
+                $q = CustomerSupportSubmission::query()->visibleTo($user)
                     ->whereNotNull('submitted_at')->where('status', '!=', 'draft')
                     ->select(['id', 'submitted_at', 'workflow_status', 'completion_date', 'updated_at',
                               'created_by', 'sales_agent_id', 'team_leader_id', 'manager_id']);
-                if (!$user->hasRole('superadmin')) {
-                    $uid = (int) $user->id;
-                    $q->where(function ($w) use ($uid) {
-                        $w->where('created_by', $uid)
-                          ->orWhere('sales_agent_id', $uid)
-                          ->orWhere('team_leader_id', $uid)
-                          ->orWhere('manager_id', $uid);
-                    });
-                }
                 break;
             case 'vas_requests':
-                $q = VasRequestSubmission::query()
+                $q = VasRequestSubmission::query()->visibleTo($user)
                     ->whereNotNull('submitted_at')->where('status', '!=', 'draft')
-                    ->select(['id', 'submitted_at', 'status', 'approved_at', 'rejected_at', 'created_by',
+                    ->select(['id', 'submitted_at', 'status', 'updated_at', 'created_by',
                               'sales_agent_id', 'team_leader_id', 'manager_id', 'back_office_executive_id']);
-                if (!$user->hasRole('superadmin')) {
-                    $uid = (int) $user->id;
-                    $q->where(function ($w) use ($uid) {
-                        $w->where('created_by', $uid)
-                          ->orWhere('sales_agent_id', $uid)
-                          ->orWhere('team_leader_id', $uid)
-                          ->orWhere('manager_id', $uid)
-                          ->orWhere('back_office_executive_id', $uid);
-                    });
-                }
                 break;
             default:
                 return collect();
@@ -517,8 +509,9 @@ class ReportsApiController extends Controller
                 }
                 return null;
             case 'vas_requests':
-                if ($row->status === 'approved') return $row->approved_at ?? null;
-                if ($row->status === 'rejected') return $row->rejected_at ?? null;
+                if (in_array($row->status, ['approved', 'rejected'])) {
+                    return $row->updated_at ?? null;
+                }
                 return null;
             default:
                 return null;
@@ -698,12 +691,32 @@ class ReportsApiController extends Controller
         if (! empty($validated['request_type'])) {
             $query->where('request_type', $validated['request_type']);
         }
+        if (! empty($validated['company_name'])) {
+            $term = '%' . addcslashes($validated['company_name'], '%_\\') . '%';
+            $query->where('company_name', 'like', $term);
+        }
+        if (! empty($validated['account_number'])) {
+            $term = '%' . addcslashes($validated['account_number'], '%_\\') . '%';
+            $query->where('account_number', 'like', $term);
+        }
+        if (! empty($validated['manager_id'])) {
+            $query->where('manager_id', $validated['manager_id']);
+        }
+        if (! empty($validated['team_leader_id'])) {
+            $query->where('team_leader_id', $validated['team_leader_id']);
+        }
+        if (! empty($validated['sales_agent_id'])) {
+            $query->where('sales_agent_id', $validated['sales_agent_id']);
+        }
+        if (! empty($validated['back_office_executive_id'])) {
+            $query->where('back_office_executive_id', $validated['back_office_executive_id']);
+        }
         if (! empty($validated['q'])) {
             $term = '%' . addcslashes($validated['q'], '%_\\') . '%';
             $query->where(function ($q) use ($term) {
                 $q->where('company_name', 'like', $term)
                     ->orWhere('account_number', 'like', $term)
-                    ->orWhere('description', 'like', $term);
+                    ->orWhere('request_description', 'like', $term);
             });
         }
     }

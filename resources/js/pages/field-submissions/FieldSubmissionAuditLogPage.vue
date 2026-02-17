@@ -2,19 +2,21 @@
 /**
  * Field Submission Change History – super admin only. Lists who changed what, when.
  */
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import fieldSubmissionsApi from '@/services/fieldSubmissionsApi'
+import api from '@/lib/axios'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
-import Pagination from '@/components/Pagination.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
 const loading = ref(true)
 const items = ref([])
-const meta = ref({ current_page: 1, last_page: 1, per_page: 20, total: 0 })
+const meta = ref({ current_page: 1, last_page: 1, per_page: auth.defaultTablePageSize || 25, total: 0 })
 const filterSubmissionId = ref('')
+const TABLE_MODULE = 'field-audit-log'
+const perPageOptions = [10, 20, 25, 50, 100]
 
 const isSuperAdmin = () => (auth.user?.roles ?? []).includes('superadmin')
 
@@ -31,22 +33,38 @@ function formatDateTime(iso) {
   })
 }
 
-function fieldLabel(name) {
+function fieldLabel(name, row) {
+  if (row?.field_label) return row.field_label
   const labels = {
     company_name: 'Company Name',
     contact_number: 'Contact Number',
+    contact_number_gsm: 'Contact Number (GSM)',
     product: 'Product',
     emirates: 'Emirates',
+    emirate: 'Emirate',
     complete_address: 'Address',
+    address: 'Address',
     manager_id: 'Manager',
     team_leader_id: 'Team Leader',
     sales_agent_id: 'Sales Agent',
     field_executive_id: 'Field Agent',
+    executive_id: 'Back Office Executive',
+    back_office_executive_id: 'Back Office Executive',
+    csr_id: 'Customer Support Representative',
     meeting_date: 'Meeting Date',
     field_status: 'Field Status',
     status: 'Status',
+    step: 'Submission Step',
+    submitted_at: 'Submitted At',
+    status_changed_at: 'Status Changed At',
+    submission_type: 'Submission Type',
+    service_category_id: 'Service Category',
+    service_type_id: 'Service Type',
+    created_by: 'Created By',
+    team_id: 'Team',
+    department_id: 'Department',
   }
-  return labels[name] ?? name
+  return labels[name] ?? name.replace(/_id$/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
 async function load() {
@@ -73,6 +91,28 @@ function onPageChange(page) {
   load()
 }
 
+function onPerPageChange(e) {
+  const newPerPage = Number(e.target.value)
+  if (!perPageOptions.includes(newPerPage)) return
+  meta.value.per_page = newPerPage
+  meta.value.current_page = 1
+  load()
+  // Save preference
+  api.post(`/table-preferences/${TABLE_MODULE}`, { per_page: newPerPage }).catch(() => {})
+}
+
+async function loadTablePreference() {
+  try {
+    const { data } = await api.get(`/table-preferences/${TABLE_MODULE}`)
+    const pp = Number(data.per_page)
+    if (pp && perPageOptions.includes(pp)) {
+      meta.value.per_page = pp
+    }
+  } catch {
+    // silent — use default
+  }
+}
+
 function applyFilter() {
   meta.value.current_page = 1
   load()
@@ -83,7 +123,7 @@ onMounted(() => {
     router.replace('/field-submissions')
     return
   }
-  load()
+  loadTablePreference().then(() => load())
 })
 </script>
 
@@ -125,7 +165,7 @@ onMounted(() => {
           </button>
         </div>
 
-        <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div class="overflow-hidden rounded-lg border-2 border-black bg-white shadow-sm">
           <div
             v-if="loading"
             class="flex justify-center py-16"
@@ -171,38 +211,42 @@ onMounted(() => {
                       {{ row.company_name }}
                     </td>
                     <td class="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">
-                      {{ fieldLabel(row.field_name) }}
+                      {{ fieldLabel(row.field_name, row) }}
                     </td>
-                    <td class="max-w-[200px] truncate px-4 py-3 text-sm text-gray-700" :title="row.old_value ?? '—'">
-                      {{ row.old_value ?? '—' }}
+                    <td class="max-w-[200px] truncate px-4 py-3 text-sm text-gray-700" :title="row.old_value ?? '(empty)'">
+                      {{ row.old_value ?? '(empty)' }}
                     </td>
-                    <td class="max-w-[200px] truncate px-4 py-3 text-sm text-gray-700" :title="row.new_value ?? '—'">
-                      {{ row.new_value ?? '—' }}
+                    <td class="max-w-[200px] truncate px-4 py-3 text-sm text-gray-700" :title="row.new_value ?? '(empty)'">
+                      {{ row.new_value ?? '(empty)' }}
                     </td>
-                    <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-900">{{ row.changed_by }}</td>
+                    <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-900">{{ row.changed_by_name || row.changed_by || '—' }}</td>
                     <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{{ formatDateTime(row.changed_at) }}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
-            <div
-              class="flex flex-wrap items-center gap-4 border-t border-black bg-white px-4 py-3"
-              :class="meta.last_page > 1 ? 'justify-between' : 'justify-start'"
-            >
+            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
               <p class="text-sm text-gray-600">
                 Showing {{ meta.total ? (meta.current_page - 1) * meta.per_page + 1 : 0 }} to
-                {{ Math.min(meta.current_page * meta.per_page, meta.total) }} of {{ meta.total }} records
+                {{ Math.min(meta.current_page * meta.per_page, meta.total) }} of {{ meta.total }} entries
               </p>
-              <Pagination
-                v-if="meta.last_page > 1"
-                :meta="{
-                  prev_page_url: meta.current_page > 1 ? '#' : null,
-                  next_page_url: meta.current_page < meta.last_page ? '#' : null,
-                  current_page: meta.current_page,
-                  last_page: meta.last_page,
-                }"
-                @change="onPageChange"
-              />
+              <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2 text-sm text-gray-600">
+                  <span class="whitespace-nowrap font-medium">Number of rows</span>
+                  <select
+                    :value="meta.per_page"
+                    class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                    @change="onPerPageChange"
+                  >
+                    <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <button type="button" :disabled="meta.current_page <= 1" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50" @click="onPageChange(meta.current_page - 1)">Previous</button>
+                  <span class="rounded-md border border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-700">Page {{ meta.current_page }} of {{ meta.last_page }}</span>
+                  <button type="button" :disabled="meta.current_page >= meta.last_page" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50" @click="onPageChange(meta.current_page + 1)">Next</button>
+                </div>
+              </div>
             </div>
           </template>
         </div>

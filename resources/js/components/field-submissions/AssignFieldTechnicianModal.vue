@@ -57,7 +57,7 @@ function assign() {
         @click.self="close"
       >
         <div
-          class="w-full max-w-md overflow-hidden rounded-lg bg-white shadow-xl"
+          class="w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden rounded-lg bg-white shadow-xl"
           @click.stop
         >
           <div class="flex items-start justify-between border-b border-gray-200 px-5 py-4">
@@ -75,7 +75,7 @@ function assign() {
               </svg>
             </button>
           </div>
-          <div class="space-y-4 px-5 py-4">
+          <div class="space-y-4 px-5 py-4 overflow-y-auto flex-1 min-h-0">
             <!-- Company & Service: attractive info card (single assign) -->
             <div
               v-if="submission && !isBulk"

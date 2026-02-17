@@ -400,9 +400,9 @@ function statusBadgeClass(status) {
       </div>
     </div>
 
-    <table class="min-w-full border border-gray-400 border-collapse">
+    <table class="min-w-full border-2 border-black border-collapse">
       <thead>
-        <tr class="border-b border-gray-400 bg-green-600">
+        <tr class="border-b-2 border-black bg-green-600">
           <th class="w-10 px-3 py-3 text-left">
             <input
               type="checkbox"
@@ -445,7 +445,7 @@ function statusBadgeClass(status) {
         </tr>
       </thead>
       <tbody class="bg-white">
-        <tr v-if="!loading && !data.length" class="border-b border-gray-400 bg-white">
+        <tr v-if="!loading && !data.length" class="border-b border-black bg-white">
           <td :colspan="effectiveColumns.length + 2" class="px-4 py-12 text-center text-gray-500">
             No leads found.
           </td>
@@ -453,7 +453,7 @@ function statusBadgeClass(status) {
         <tr
           v-for="(row, rowIndex) in data"
           :key="row.id"
-          class="border-b border-gray-400 bg-white hover:bg-gray-50/50"
+          class="border-b border-black bg-white hover:bg-gray-50/50"
         >
           <td class="w-10 px-3 py-3">
             <input

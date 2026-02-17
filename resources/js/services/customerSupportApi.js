@@ -5,8 +5,8 @@ export default {
     return api.get('/customer-support/team-options')
   },
 
-  async index(params = {}) {
-    const { data } = await api.get('/customer-support', { params })
+  async index(params = {}, options = {}) {
+    const { data } = await api.get('/customer-support', { params, signal: options.signal })
     return data
   },
 
@@ -56,6 +56,26 @@ export default {
     }
     const { data } = await api.post(`/customer-support/${submissionId}/attachments`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return data
+  },
+
+  async getCsrOptions() {
+    const { data } = await api.get('/customer-support/csr-options')
+    return data
+  },
+
+  async bulkAssign(submissionIds, payload) {
+    const { data } = await api.post('/customer-support/bulk-assign', {
+      submission_ids: submissionIds,
+      csr_id: payload.csr_id,
+    })
+    return data
+  },
+
+  async assignCsr(submissionId, csrId) {
+    const { data } = await api.patch(`/customer-support/${submissionId}/assign-csr`, {
+      csr_id: csrId,
     })
     return data
   },

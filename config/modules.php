@@ -147,12 +147,14 @@ return [
             'manager' => ['label' => 'Manager', 'filter' => null, 'sortable' => true],
             'team_leader' => ['label' => 'Team Leader', 'filter' => null, 'sortable' => true],
             'sales_agent' => ['label' => 'Sales Agent', 'filter' => null, 'sortable' => true],
-            'executive' => ['label' => 'Back Office Executive', 'filter' => null, 'sortable' => true],
+            'executive' => ['label' => 'BO Executive', 'filter' => null, 'sortable' => true],
             'status' => ['label' => 'Status', 'filter' => 'select', 'sortable' => true],
+            'approved_at' => ['label' => 'Completion Date', 'filter' => 'date', 'sortable' => true],
             'creator' => ['label' => 'Created By', 'filter' => null, 'sortable' => false],
         ],
-        'default_columns' => ['id', 'submitted_at', 'request_type', 'account_number', 'company_name', 'manager', 'team_leader', 'sales_agent', 'executive', 'status', 'creator'],
+        'default_columns' => ['id', 'submitted_at', 'request_type', 'company_name', 'account_number', 'status', 'executive', 'sales_agent', 'approved_at'],
         'default_sort' => ['submitted_at', 'desc'],
+        'sla_days' => 7,
     ],
 
     'email_follow_ups' => [
