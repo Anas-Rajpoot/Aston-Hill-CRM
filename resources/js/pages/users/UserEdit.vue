@@ -354,8 +354,8 @@ onUnmounted(() => {
   <div class="space-y-6">
     <!-- Shell: always visible -->
     <div class="flex flex-wrap items-baseline gap-2">
-      <Breadcrumbs />
       <h1 class="text-2xl font-bold text-gray-900 leading-tight">Edit Employee</h1>
+      <Breadcrumbs />
     </div>
     <p class="text-sm text-gray-500">Update employee record in the system.</p>
 
@@ -462,21 +462,32 @@ onUnmounted(() => {
               </button>
               <div
                 v-if="rolesDropdownOpen"
-                class="absolute z-50 mt-1 w-full min-w-[12rem] rounded-lg border border-gray-200 bg-white py-1 shadow-lg max-h-60 overflow-auto"
+                class="absolute z-50 mt-1 w-full min-w-[12rem] rounded-lg border border-gray-200 bg-white shadow-lg flex flex-col max-h-60"
               >
-                <label
-                  v-for="r in assignableRoles"
-                  :key="r.id"
-                  class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    :checked="selectedRoleIdsSet.has(Number(r.id))"
-                    class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    @change="toggleRole(r.id)"
-                  />
-                  <span class="text-sm text-gray-700">{{ formatRoleForDisplay(r.name) }}</span>
-                </label>
+                <div class="overflow-auto flex-1 py-1">
+                  <label
+                    v-for="r in assignableRoles"
+                    :key="r.id"
+                    class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      :checked="selectedRoleIdsSet.has(Number(r.id))"
+                      class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      @change="toggleRole(r.id)"
+                    />
+                    <span class="text-sm text-gray-700">{{ formatRoleForDisplay(r.name) }}</span>
+                  </label>
+                </div>
+                <div class="border-t border-gray-200 px-3 py-2">
+                  <button
+                    type="button"
+                    class="w-full rounded-md bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700"
+                    @click.stop="rolesDropdownOpen = false"
+                  >
+                    Done
+                  </button>
+                </div>
               </div>
             </div>
             <div>

@@ -101,7 +101,9 @@ class FieldSubmissionController extends Controller
                     if (! $role) {
                         continue;
                     }
-                    $users = User::role($role)->with(['teamLeader:id,manager_id', 'manager:id'])
+                    $users = User::whereHas('roles', fn ($q) => $q->where('name', $role->name))
+                        ->where('status', 'approved')
+                        ->with(['teamLeader:id,manager_id', 'manager:id'])
                         ->orderBy('name')
                         ->get(['id', 'name', 'email', 'manager_id', 'team_leader_id']);
 
@@ -119,18 +121,15 @@ class FieldSubmissionController extends Controller
                 }
             }
 
-            // Field executives: users with field_agent role only (for assign field technician).
+            // Field executives: users with field_agent role only (guard-agnostic query).
             $fieldExecutives = collect();
             try {
-                $fieldAgentRole = \Spatie\Permission\Models\Role::where('name', 'field_agent')->first();
-                if ($fieldAgentRole) {
-                    $fieldExecutives = User::role($fieldAgentRole)->orderBy('name')->get(['id', 'name', 'email']);
-                }
+                $fieldExecutives = User::whereHas('roles', fn ($q) => $q->where('name', 'field_agent'))
+                    ->where('status', 'approved')
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'email']);
             } catch (\Throwable $e) {
                 Log::debug('Field agent role lookup: ' . $e->getMessage());
-            }
-            if ($fieldExecutives->isEmpty()) {
-                $fieldExecutives = $salesAgents;
             }
 
             return [

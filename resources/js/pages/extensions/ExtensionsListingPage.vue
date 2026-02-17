@@ -788,23 +788,16 @@ onMounted(async () => {
                   <span class="text-gray-500">by {{ entry.user_name }}</span>
                   <span class="text-gray-400">– {{ entry.created_at ? new Date(entry.created_at).toLocaleString() : '' }}</span>
                 </div>
-                <div v-if="getEntryChanges(entry).length" class="mt-3 space-y-2">
+                <div v-if="getEntryChanges(entry).length" class="mt-3 space-y-1.5">
                   <div
                     v-for="(c, ci) in getEntryChanges(entry)"
                     :key="ci"
-                    class="text-sm"
+                    class="flex flex-wrap items-center gap-1.5 text-sm"
                   >
-                    <p class="mb-1 font-medium text-gray-700">{{ c.label }}</p>
-                    <div class="grid grid-cols-2 gap-2">
-                      <div class="rounded bg-red-50 px-3 py-2">
-                        <p class="text-xs font-medium text-gray-500">Before</p>
-                        <p class="text-gray-900 break-all">{{ c.oldVal ?? '(empty)' }}</p>
-                      </div>
-                      <div class="rounded bg-green-50 px-3 py-2">
-                        <p class="text-xs font-medium text-gray-500">After</p>
-                        <p class="text-gray-900 break-all">{{ c.newVal ?? '(empty)' }}</p>
-                      </div>
-                    </div>
+                    <span class="font-medium text-gray-700">{{ c.label }}:</span>
+                    <span class="text-red-500 line-through break-all">{{ c.oldVal ?? '(empty)' }}</span>
+                    <span class="text-gray-400">&rarr;</span>
+                    <span class="text-green-600 break-all">{{ c.newVal ?? '(empty)' }}</span>
                   </div>
                 </div>
               </li>

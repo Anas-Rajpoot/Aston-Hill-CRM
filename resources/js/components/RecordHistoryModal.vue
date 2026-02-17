@@ -318,14 +318,12 @@ watch(
                   <div
                     v-for="(c, ci) in entry.preview"
                     :key="ci"
-                    class="flex flex-wrap items-center gap-1 text-sm"
+                    class="flex flex-wrap items-center gap-1.5 text-sm"
                   >
                     <span class="font-medium text-gray-700">{{ c.field }}:</span>
-                    <template v-if="c.oldVal != null && c.oldVal !== ''">
-                      <span class="text-red-600 line-through break-all">{{ formatVal(c.oldVal) }}</span>
-                      <span v-if="c.newVal != null && c.newVal !== ''" class="text-gray-400">&rarr;</span>
-                    </template>
-                    <span v-if="c.newVal != null && c.newVal !== ''" class="text-green-600 break-all">{{ formatVal(c.newVal) }}</span>
+                    <span class="text-red-500 line-through break-all">{{ formatVal(c.oldVal) }}</span>
+                    <span class="text-gray-400">&rarr;</span>
+                    <span class="text-green-600 break-all">{{ formatVal(c.newVal) }}</span>
                   </div>
                   <p v-if="entry.moreCount > 0" class="text-sm text-gray-500">+{{ entry.moreCount }} more field(s) changed</p>
                 </div>
@@ -358,19 +356,12 @@ watch(
             </dl>
             <div>
               <h4 class="mb-2 font-medium text-gray-900">Fields Changed ({{ selectedEntry.changes.length }})</h4>
-              <div class="space-y-4">
-                <div v-for="(c, ci) in selectedEntry.changes" :key="ci" class="text-sm">
-                  <p class="mb-1.5 font-medium text-gray-700">{{ c.field }}</p>
-                  <div class="grid grid-cols-2 gap-2">
-                    <div class="rounded bg-red-50 px-3 py-2 min-w-0">
-                      <p class="text-xs font-medium text-gray-600">Before</p>
-                      <p class="text-gray-900 break-all">{{ formatVal(c.oldVal) }}</p>
-                    </div>
-                    <div class="rounded bg-green-50 px-3 py-2 min-w-0">
-                      <p class="text-xs font-medium text-gray-600">After</p>
-                      <p class="text-gray-900 break-all">{{ formatVal(c.newVal) }}</p>
-                    </div>
-                  </div>
+              <div class="space-y-3">
+                <div v-for="(c, ci) in selectedEntry.changes" :key="ci" class="flex flex-wrap items-center gap-1.5 text-sm">
+                  <span class="font-medium text-gray-700">{{ c.field }}:</span>
+                  <span class="text-red-500 line-through break-all">{{ formatVal(c.oldVal) }}</span>
+                  <span class="text-gray-400">&rarr;</span>
+                  <span class="text-green-600 break-all">{{ formatVal(c.newVal) }}</span>
                 </div>
               </div>
             </div>

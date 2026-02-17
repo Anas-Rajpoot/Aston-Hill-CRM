@@ -213,10 +213,10 @@ onMounted(() => {
                     <td class="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">
                       {{ fieldLabel(row.field_name, row) }}
                     </td>
-                    <td class="max-w-[200px] truncate px-4 py-3 text-sm text-gray-700" :title="row.old_value ?? '(empty)'">
+                    <td class="max-w-[200px] truncate px-4 py-3 text-sm text-red-500 line-through" :title="row.old_value ?? '(empty)'">
                       {{ row.old_value ?? '(empty)' }}
                     </td>
-                    <td class="max-w-[200px] truncate px-4 py-3 text-sm text-gray-700" :title="row.new_value ?? '(empty)'">
+                    <td class="max-w-[200px] truncate px-4 py-3 text-sm text-green-600" :title="row.new_value ?? '(empty)'">
                       {{ row.new_value ?? '(empty)' }}
                     </td>
                     <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-900">{{ row.changed_by_name || row.changed_by || '—' }}</td>

@@ -210,13 +210,12 @@ watch(
                   <div
                     v-for="c in entry.preview"
                     :key="c.field"
-                    class="flex flex-wrap items-center gap-1 text-sm"
+                    class="flex flex-wrap items-center gap-1.5 text-sm"
                   >
                     <span class="font-medium text-gray-700">{{ c.field }}:</span>
-                    <span v-if="c.oldVal != null" class="text-red-600 line-through">{{ formatAuditVal(c.oldVal) }}</span>
-                    <span v-if="c.oldVal != null && c.newVal != null" class="text-gray-400">→</span>
-                    <span v-if="c.newVal != null" class="text-green-600">{{ formatAuditVal(c.newVal) }}</span>
-                    <span v-if="c.oldVal == null && c.newVal != null" class="text-green-600">{{ formatAuditVal(c.newVal) }}</span>
+                    <span class="text-red-500 line-through break-all">{{ formatAuditVal(c.oldVal) }}</span>
+                    <span class="text-gray-400">&rarr;</span>
+                    <span class="text-green-600 break-all">{{ formatAuditVal(c.newVal) }}</span>
                   </div>
                   <p v-if="entry.moreCount > 0" class="text-sm text-gray-500">+{{ entry.moreCount }} more field(s) changed</p>
                 </div>
@@ -249,20 +248,13 @@ watch(
               <div><dt class="font-medium text-gray-500">IP Address</dt><dd class="text-gray-900">—</dd></div>
             </dl>
             <div>
-              <h4 class="mb-2 font-medium text-gray-900">Fields Changed</h4>
-              <div class="space-y-4">
-                <div v-for="c in selectedEntry.changes" :key="c.field" class="text-sm">
-                  <p class="mb-1.5 font-medium text-gray-700">{{ c.field }}</p>
-                  <div class="grid grid-cols-2 gap-2">
-                    <div class="rounded bg-red-50 px-3 py-2">
-                      <p class="text-xs font-medium text-gray-600">Before</p>
-                      <p class="text-gray-900">{{ formatAuditVal(c.oldVal) }}</p>
-                    </div>
-                    <div class="rounded bg-green-50 px-3 py-2">
-                      <p class="text-xs font-medium text-gray-600">After</p>
-                      <p class="text-gray-900">{{ formatAuditVal(c.newVal) }}</p>
-                    </div>
-                  </div>
+              <h4 class="mb-2 font-medium text-gray-900">Fields Changed ({{ selectedEntry.changes.length }})</h4>
+              <div class="space-y-3">
+                <div v-for="c in selectedEntry.changes" :key="c.field" class="flex flex-wrap items-center gap-1.5 text-sm">
+                  <span class="font-medium text-gray-700">{{ c.field }}:</span>
+                  <span class="text-red-500 line-through break-all">{{ formatAuditVal(c.oldVal) }}</span>
+                  <span class="text-gray-400">&rarr;</span>
+                  <span class="text-green-600 break-all">{{ formatAuditVal(c.newVal) }}</span>
                 </div>
               </div>
             </div>

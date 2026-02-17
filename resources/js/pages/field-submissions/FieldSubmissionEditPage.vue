@@ -94,7 +94,7 @@ async function load() {
       managers: teamRes.managers ?? [],
       team_leaders: teamRes.team_leaders ?? [],
       sales_agents: teamRes.sales_agents ?? [],
-      field_executives: teamRes.field_executives ?? teamRes.sales_agents ?? [],
+      field_executives: teamRes.field_executives ?? [],
     }
     editOptions.value = {
       emirates: optionsRes.emirates ?? [],
@@ -169,23 +169,26 @@ async function downloadDoc(doc) {
   } catch {}
 }
 
+const serverErrors = ref({})
+
 async function submitForm() {
   if (!id.value) return
   saving.value = true
+  serverErrors.value = {}
   try {
     const payload = {
-      company_name: form.value.company_name,
-      contact_number: form.value.contact_number,
-      complete_address: form.value.complete_address,
-      product: form.value.product,
-      emirates: form.value.emirates,
+      company_name: form.value.company_name || null,
+      contact_number: form.value.contact_number || null,
+      complete_address: form.value.complete_address || null,
+      product: form.value.product || null,
+      emirates: form.value.emirates || null,
       location_coordinates: form.value.location_coordinates || null,
       additional_notes: form.value.additional_notes || null,
       special_instruction: form.value.special_instruction || null,
-      manager_id: form.value.manager_id,
-      team_leader_id: form.value.team_leader_id,
-      sales_agent_id: form.value.sales_agent_id,
-      field_executive_id: form.value.field_executive_id || null,
+      manager_id: form.value.manager_id ? Number(form.value.manager_id) : null,
+      team_leader_id: form.value.team_leader_id ? Number(form.value.team_leader_id) : null,
+      sales_agent_id: form.value.sales_agent_id ? Number(form.value.sales_agent_id) : null,
+      field_executive_id: form.value.field_executive_id ? Number(form.value.field_executive_id) : null,
       meeting_date: form.value.meeting_date || null,
       field_status: form.value.field_status || null,
       remarks_by_field_agent: form.value.remarks_by_field_agent || null,
@@ -195,6 +198,9 @@ async function submitForm() {
     await load()
     newFiles.value = []
   } catch (err) {
+    if (err.response?.status === 422 && err.response?.data?.errors) {
+      serverErrors.value = err.response.data.errors
+    }
     const msg = err.response?.data?.message || err.message || 'Failed to save.'
     alert(msg)
   } finally {
@@ -247,8 +253,9 @@ onMounted(() => {
                 v-model="form.company_name"
                 type="text"
                 required
-                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.company_name ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
               />
+              <p v-if="serverErrors.company_name" class="mt-1 text-xs text-red-600">{{ serverErrors.company_name[0] }}</p>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Contact Number <span class="text-red-500">*</span></label>
@@ -257,8 +264,9 @@ onMounted(() => {
                 type="text"
                 required
                 autocomplete="off"
-                class="contact-number-input mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                :class="['contact-number-input mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.contact_number ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
               />
+              <p v-if="serverErrors.contact_number" class="mt-1 text-xs text-red-600">{{ serverErrors.contact_number[0] }}</p>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Complete Address <span class="text-red-500">*</span></label>
@@ -266,8 +274,9 @@ onMounted(() => {
                 v-model="form.complete_address"
                 type="text"
                 required
-                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.complete_address ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
               />
+              <p v-if="serverErrors.complete_address" class="mt-1 text-xs text-red-600">{{ serverErrors.complete_address[0] }}</p>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Product <span class="text-red-500">*</span></label>
@@ -275,19 +284,21 @@ onMounted(() => {
                 v-model="form.product"
                 type="text"
                 required
-                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.product ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
               />
+              <p v-if="serverErrors.product" class="mt-1 text-xs text-red-600">{{ serverErrors.product[0] }}</p>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Emirates <span class="text-red-500">*</span></label>
               <select
                 v-model="form.emirates"
                 required
-                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.emirates ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
               >
                 <option value="">Select Emirates</option>
                 <option v-for="e in emiratesList" :key="e" :value="e">{{ e }}</option>
               </select>
+              <p v-if="serverErrors.emirates" class="mt-1 text-xs text-red-600">{{ serverErrors.emirates[0] }}</p>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Location Coordinates</label>
@@ -326,33 +337,36 @@ onMounted(() => {
             <select
               v-model="form.sales_agent_id"
               required
-              class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.sales_agent_id ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
             >
               <option :value="null">Select</option>
               <option v-for="u in filteredSalesAgents" :key="u.id" :value="u.id">{{ u.name }}</option>
             </select>
+            <p v-if="serverErrors.sales_agent_id" class="mt-1 text-xs text-red-600">{{ serverErrors.sales_agent_id[0] }}</p>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700">Team Leader Name <span class="text-red-500">*</span></label>
             <select
               v-model="form.team_leader_id"
               required
-              class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.team_leader_id ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
             >
               <option :value="null">Select</option>
               <option v-for="u in filteredTeamLeaders" :key="u.id" :value="u.id">{{ u.name }}</option>
             </select>
+            <p v-if="serverErrors.team_leader_id" class="mt-1 text-xs text-red-600">{{ serverErrors.team_leader_id[0] }}</p>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700">Manager Name <span class="text-red-500">*</span></label>
             <select
               v-model="form.manager_id"
               required
-              class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.manager_id ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
             >
               <option :value="null">Select</option>
               <option v-for="u in teamOptions.managers" :key="u.id" :value="u.id">{{ u.name }}</option>
             </select>
+            <p v-if="serverErrors.manager_id" class="mt-1 text-xs text-red-600">{{ serverErrors.manager_id[0] }}</p>
           </div>
         </div>
         <div class="mt-4 grid gap-4 sm:grid-cols-3">

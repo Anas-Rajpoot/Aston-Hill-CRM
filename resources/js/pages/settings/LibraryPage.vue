@@ -607,7 +607,7 @@ onBeforeUnmount(() => {
                   <svg class="w-4 h-4 text-gray-400 shrink-0 transition-transform" :class="rolesDropdownOpen && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                 </button>
                 <!-- Dropdown panel -->
-                <div v-if="rolesDropdownOpen" class="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
+                <div v-if="rolesDropdownOpen" class="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg flex flex-col max-h-72">
                   <!-- Select All / Deselect All -->
                   <div class="flex items-center justify-between px-3 py-2 border-b border-gray-100 bg-gray-50">
                     <label class="flex items-center gap-2 cursor-pointer select-none">
@@ -623,7 +623,7 @@ onBeforeUnmount(() => {
                     <span class="text-xs text-gray-400">{{ form.allowed_roles.length }}/{{ roles.length }}</span>
                   </div>
                   <!-- Role options -->
-                  <div class="max-h-48 overflow-y-auto py-1">
+                  <div class="max-h-48 overflow-y-auto py-1 flex-1">
                     <label
                       v-for="role in roles"
                       :key="role"
@@ -638,6 +638,16 @@ onBeforeUnmount(() => {
                       <span class="text-sm text-gray-700 capitalize">{{ role.replace(/_/g, ' ') }}</span>
                     </label>
                     <p v-if="roles.length === 0" class="text-xs text-gray-400 px-3 py-2">No roles available.</p>
+                  </div>
+                  <!-- Done button -->
+                  <div class="border-t border-gray-200 px-3 py-2">
+                    <button
+                      type="button"
+                      class="w-full rounded-md bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700"
+                      @click.stop="rolesDropdownOpen = false"
+                    >
+                      Done
+                    </button>
                   </div>
                 </div>
               </div>

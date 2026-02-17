@@ -276,6 +276,43 @@ class VasRequestController extends Controller
     }
 
     /**
+     * POST /api/vas-requests/{vasRequest}/resubmit
+     * Allows updating a rejected VAS request and re-submitting it.
+     */
+    public function resubmit(Request $request, VasRequestSubmission $vasRequest): JsonResponse
+    {
+        $this->authorize('update', $vasRequest);
+
+        if ($vasRequest->status !== 'rejected') {
+            return response()->json([
+                'message' => 'Only rejected requests can be resubmitted.',
+            ], 422);
+        }
+
+        $types = self::requestTypes();
+        $data = $request->validate([
+            'request_type' => ['required', 'string', Rule::in($types)],
+            'account_number' => ['nullable', 'string', 'max:100'],
+            'company_name' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:5000'],
+            'manager_id' => ['required', 'exists:users,id'],
+            'team_leader_id' => ['required', 'exists:users,id'],
+            'sales_agent_id' => ['required', 'exists:users,id'],
+            'back_office_executive_id' => ['nullable', 'exists:users,id'],
+        ]);
+
+        $vasRequest->update(array_merge($data, [
+            'status' => 'submitted',
+            'submitted_at' => now(),
+        ]));
+
+        return response()->json([
+            'message' => 'VAS request resubmitted successfully.',
+            'id' => $vasRequest->id,
+        ]);
+    }
+
+    /**
      * GET /api/vas-requests/{vasRequest}/documents/{document}/download
      */
     public function downloadDocument(Request $request, VasRequestSubmission $vasRequest, int $document): JsonResponse|\Symfony\Component\HttpFoundation\BinaryFileResponse

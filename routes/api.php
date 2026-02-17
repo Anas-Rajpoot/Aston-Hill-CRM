@@ -156,6 +156,7 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::patch('/vas-requests/{vasRequest}', [\App\Http\Controllers\Api\VasRequestApiController::class, 'patch'])->whereNumber('vasRequest');
     Route::post('/vas-requests/{vasRequest}/step-2', [VasRequestController::class, 'storeStep2']);
     Route::post('/vas-requests/{vasRequest}/submit', [VasRequestController::class, 'submit']);
+    Route::post('/vas-requests/{vasRequest}/resubmit', [VasRequestController::class, 'resubmit'])->whereNumber('vasRequest');
 
     // Lead submissions (specific routes before {lead})
     Route::get('/lead-submissions', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'index'])->middleware('api.cache:10,20');

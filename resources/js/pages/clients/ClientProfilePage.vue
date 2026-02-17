@@ -966,16 +966,11 @@ onMounted(() => {
                   :key="a.id"
                   class="rounded border border-gray-200 bg-gray-50 p-3 text-sm"
                 >
-                  <p class="font-medium text-gray-700">{{ a.field_label || a.field_name }}</p>
-                  <div class="mt-1 grid grid-cols-2 gap-2">
-                    <div class="rounded bg-red-50 px-3 py-2">
-                      <p class="text-xs font-medium text-gray-500">Before</p>
-                      <p class="text-gray-900">{{ a.old_value ?? '(empty)' }}</p>
-                    </div>
-                    <div class="rounded bg-green-50 px-3 py-2">
-                      <p class="text-xs font-medium text-gray-500">After</p>
-                      <p class="text-gray-900">{{ a.new_value ?? '(empty)' }}</p>
-                    </div>
+                  <div class="flex flex-wrap items-center gap-1.5">
+                    <span class="font-medium text-gray-700">{{ a.field_label || a.field_name }}:</span>
+                    <span class="text-red-500 line-through break-all">{{ a.old_value ?? '(empty)' }}</span>
+                    <span class="text-gray-400">&rarr;</span>
+                    <span class="text-green-600 break-all">{{ a.new_value ?? '(empty)' }}</span>
                   </div>
                   <p class="mt-1.5 text-xs text-gray-500">
                     {{ new Date(a.changed_at).toLocaleString() }} by {{ a.changed_by_name || a.changed_by || '—' }}

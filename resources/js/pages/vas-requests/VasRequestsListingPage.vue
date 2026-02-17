@@ -332,9 +332,22 @@ const canBulkAssign = (() => {
   })
 })()
 
+async function loadBackOfficeOptions() {
+  const res = await vasRequestsApi.getBackOfficeOptions()
+  return res?.executives ?? res?.users ?? res ?? []
+}
+
+async function onAssignSingle(row, executiveId, notes) {
+  await vasRequestsApi.assignBackOffice(row.id, { executive_id: executiveId })
+}
+
+async function onAssignBulk(ids, executiveId) {
+  await vasRequestsApi.bulkAssign(ids, { executive_id: executiveId })
+}
+
 function openAssignModal(row) {
   if (!row) return
-  assignVasRow.value = row
+  assignRow.value = row
   assignBulkIds.value = []
   assignModalVisible.value = true
 }
@@ -345,14 +358,14 @@ function openBulkAssign() {
     bulkAssignMessage.value = 'Please select at least one row.'
     return
   }
-  assignVasRow.value = null
+  assignRow.value = null
   assignBulkIds.value = [...selectedSubmissionIds.value]
   assignModalVisible.value = true
 }
 
 function onAssignModalSaved() {
   toast('success', 'VAS request assigned successfully.')
-  assignVasRow.value = null
+  assignRow.value = null
   assignBulkIds.value = []
   selectedSubmissionIds.value = []
   load()
@@ -360,7 +373,7 @@ function onAssignModalSaved() {
 
 function onAssignModalClose() {
   assignModalVisible.value = false
-  assignVasRow.value = null
+  assignRow.value = null
   assignBulkIds.value = []
 }
 
@@ -526,6 +539,7 @@ onMounted(async () => {
           @update-cell="onUpdateCell"
           @open-assign="openAssignModal"
           @view-history="openHistoryModal"
+          @resubmit="goToResubmit"
         />
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
           <p class="text-sm text-gray-600">

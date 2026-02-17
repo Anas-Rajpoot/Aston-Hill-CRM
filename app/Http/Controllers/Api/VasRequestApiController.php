@@ -23,7 +23,7 @@ class VasRequestApiController extends Controller
     private const MODULE = 'vas_request_submissions';
 
     private const ALLOWED_COLUMNS = [
-        'id', 'submitted_at', 'created_at', 'created_by',
+        'id', 'submitted_at', 'created_at', 'created_by', 'updated_at', 'approved_at', 'rejected_at',
         'request_type', 'account_number', 'contact_number', 'company_name', 'request_description', 'additional_notes',
         'manager_id', 'team_leader_id', 'sales_agent_id', 'back_office_executive_id',
         'status',
@@ -277,6 +277,9 @@ class VasRequestApiController extends Controller
             'sales_agent' => "{$t}.sales_agent_id",
             'back_office_executive_id' => "{$t}.back_office_executive_id",
             'executive' => "{$t}.back_office_executive_id",
+            'approved_at' => "{$t}.approved_at",
+            'rejected_at' => "{$t}.rejected_at",
+            'updated_at' => "{$t}.updated_at",
         ];
         foreach ($columns as $col) {
             if ($col === 'id' || $col === 'status') {
@@ -323,7 +326,7 @@ class VasRequestApiController extends Controller
                 $out['creator'] = $row->creator?->name ?? null;
                 continue;
             }
-            if (in_array($col, ['submitted_at', 'created_at'], true)) {
+            if (in_array($col, ['submitted_at', 'created_at', 'approved_at', 'rejected_at', 'updated_at'], true)) {
                 $out[$col] = $row->$col ? $row->$col->format('d/M/Y H:i') : null;
                 continue;
             }

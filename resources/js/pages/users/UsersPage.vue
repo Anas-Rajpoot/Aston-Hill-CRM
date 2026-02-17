@@ -1567,29 +1567,24 @@ watch(addUserRolesDropdownOpen, (open) => {
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
               </div>
-              <table v-else class="min-w-full text-sm">
-                <thead>
-                  <tr class="border-b border-gray-200">
-                    <th class="text-left py-2 font-medium text-gray-600">Field</th>
-                    <th class="text-left py-2 font-medium text-gray-600">Old value</th>
-                    <th class="text-left py-2 font-medium text-gray-600">New value</th>
-                    <th class="text-left py-2 font-medium text-gray-600">Date & time</th>
-                    <th class="text-left py-2 font-medium text-gray-600">Changed by</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="log in historyLogs" :key="log.id" class="border-b border-gray-100">
-                    <td class="py-2 font-medium text-gray-700">{{ log.field_label || log.field_name }}</td>
-                    <td class="py-2 text-gray-600">{{ log.old_value ?? '(empty)' }}</td>
-                    <td class="py-2 text-gray-600">{{ log.new_value ?? '(empty)' }}</td>
-                    <td class="py-2 text-gray-600">{{ log.changed_at ? formatDateTime(log.changed_at) : '—' }}</td>
-                    <td class="py-2 text-gray-600">{{ log.changed_by_name || log.changed_by || '—' }}</td>
-                  </tr>
-                  <tr v-if="!historyLoading && historyLogs.length === 0">
-                    <td colspan="5" class="py-8 text-center text-gray-500">No history recorded.</td>
-                  </tr>
-                </tbody>
-              </table>
+              <div v-else-if="!historyLogs.length" class="py-8 text-center text-sm text-gray-500">No history recorded.</div>
+              <div v-else class="space-y-3">
+                <div
+                  v-for="log in historyLogs"
+                  :key="log.id"
+                  class="rounded border border-gray-200 bg-gray-50 p-3 text-sm"
+                >
+                  <div class="flex flex-wrap items-center gap-1.5">
+                    <span class="font-medium text-gray-700">{{ log.field_label || log.field_name }}:</span>
+                    <span class="text-red-500 line-through break-all">{{ log.old_value ?? '(empty)' }}</span>
+                    <span class="text-gray-400">&rarr;</span>
+                    <span class="text-green-600 break-all">{{ log.new_value ?? '(empty)' }}</span>
+                  </div>
+                  <p class="mt-1.5 text-xs text-gray-500">
+                    {{ log.changed_at ? formatDateTime(log.changed_at) : '—' }} by {{ log.changed_by_name || log.changed_by || '—' }}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>

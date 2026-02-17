@@ -72,6 +72,11 @@ export default {
     return data
   },
 
+  async resubmit(id, payload) {
+    const { data } = await api.post(`/vas-requests/${id}/resubmit`, payload)
+    return data
+  },
+
   async getAudits(vasRequestId) {
     const { data } = await api.get(`/vas-requests/${vasRequestId}/audits`)
     return data

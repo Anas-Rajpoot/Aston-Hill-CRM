@@ -66,16 +66,23 @@ export default {
   async updateSubmission(id, payload, files = null) {
     if (files && files.length > 0) {
       const form = new FormData()
+      form.append('_method', 'PUT')
       Object.entries(payload).forEach(([k, v]) => {
-        form.append(k, v != null && v !== '' ? v : '')
+        if (v != null && v !== '') {
+          form.append(k, String(v))
+        }
       })
       files.forEach((f) => form.append('documents[]', f))
-      const { data } = await api.put(`/field-submissions/${id}`, form, {
+      const { data } = await api.post(`/field-submissions/${id}`, form, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
       return data
     }
-    const { data } = await api.put(`/field-submissions/${id}`, payload)
+    const cleaned = {}
+    for (const [k, v] of Object.entries(payload)) {
+      cleaned[k] = v
+    }
+    const { data } = await api.put(`/field-submissions/${id}`, cleaned)
     return data
   },
 

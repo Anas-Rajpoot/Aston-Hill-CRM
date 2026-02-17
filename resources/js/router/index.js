@@ -48,6 +48,7 @@ const routes = [
       { path: 'customer-support/:id/edit', component: () => import('@/pages/customer-support/CustomerSupportEditPage.vue') },
       { path: 'vas-requests', component: () => import('@/pages/vas-requests/VasRequestsListingPage.vue') },
       { path: 'vas-requests/:id/edit', component: () => import('@/pages/vas-requests/VasRequestEditPage.vue'), name: 'vas-request-edit' },
+      { path: 'vas-requests/:id/resubmit', component: () => import('@/pages/vas-requests/VasRequestResubmitPage.vue'), name: 'vas-request-resubmit' },
       { path: 'vas-requests/:id', component: () => import('@/pages/vas-requests/VasRequestDetailPage.vue'), name: 'vas-request-detail' },
       { path: 'clients', component: () => import('@/pages/clients/ClientsListingPage.vue') },
       { path: 'clients/create', component: () => import('@/pages/clients/ClientCreatePage.vue'), meta: { title: 'Add New Client' } },
