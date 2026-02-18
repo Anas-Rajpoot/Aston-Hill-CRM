@@ -98,9 +98,9 @@ onMounted(() => load())
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-white p-0">
-    <div class="mx-auto max-w-7xl bg-white px-4 sm:px-5">
-      <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
+  <div class="min-h-[calc(100vh-4rem)] p-0">
+    <div class="w-full">
+      <div class="border border-black">
         <div class="px-4 py-4 sm:px-5">
           <div class="flex flex-wrap items-center gap-3">
             <button
@@ -116,7 +116,7 @@ onMounted(() => load())
           </div>
         </div>
 
-        <div class="border-t border-gray-200" />
+        <div class="border-t border-black" />
 
         <div v-if="loading" class="flex justify-center px-4 py-16 sm:px-5">
           <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
@@ -132,7 +132,7 @@ onMounted(() => load())
         <div v-else class="px-4 py-5 sm:px-5">
           <!-- Basic Information: label: value with colon and spacing -->
           <section class="mb-6">
-            <h2 class="mb-3 border-b border-gray-200 pb-2 text-base font-semibold text-gray-900">Basic Information</h2>
+            <h2 class="mb-3 border-b border-black pb-2 text-base font-semibold text-gray-900">Basic Information</h2>
             <div class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
               <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <span class="shrink-0 text-sm font-medium text-gray-500">Request ID:</span>
@@ -171,7 +171,7 @@ onMounted(() => load())
 
           <!-- Team -->
           <section class="mb-6">
-            <h2 class="mb-3 border-b border-gray-200 pb-2 text-base font-semibold text-gray-900">Team</h2>
+            <h2 class="mb-3 border-b border-black pb-2 text-base font-semibold text-gray-900">Team</h2>
             <div class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
               <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <span class="shrink-0 text-sm font-medium text-gray-500">Sales Agent:</span>
@@ -194,13 +194,13 @@ onMounted(() => load())
 
           <!-- Documents -->
           <section class="mb-6">
-            <h2 class="mb-3 border-b border-gray-200 pb-2 text-base font-semibold text-gray-900">Documents</h2>
+            <h2 class="mb-3 border-b border-black pb-2 text-base font-semibold text-gray-900">Documents</h2>
             <div v-if="request.documents?.length">
               <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div
                   v-for="doc in request.documents"
                   :key="doc.id"
-                  class="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+                  class="flex items-center gap-3 rounded-lg border border-black p-4"
                 >
                   <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-red-50 text-red-600">
                     <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -231,7 +231,7 @@ onMounted(() => load())
 
           <!-- Created By -->
           <section class="mb-2">
-            <h2 class="mb-3 border-b border-gray-200 pb-2 text-base font-semibold text-gray-900">Created By</h2>
+            <h2 class="mb-3 border-b border-black pb-2 text-base font-semibold text-gray-900">Created By</h2>
             <div class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
               <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <span class="shrink-0 text-sm font-medium text-gray-500">Creator:</span>
@@ -245,7 +245,7 @@ onMounted(() => load())
           </section>
         </div>
 
-        <div v-if="request" class="border-t border-gray-200 px-4 py-4 text-right sm:px-5">
+        <div v-if="request" class="border-t border-black px-4 py-4 text-right sm:px-5">
           <button
             type="button"
             class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"

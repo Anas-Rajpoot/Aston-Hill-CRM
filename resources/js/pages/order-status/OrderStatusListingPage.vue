@@ -32,7 +32,6 @@ const defaultVisibleColumns = [
 
 const allOrderStatusColumns = [
   { key: 'activity', label: 'Activity' },
-  { key: 'id', label: 'ID' },
   { key: 'company_name', label: 'Company Name' },
   { key: 'account_number', label: 'Account Number' },
   { key: 'submitted_at', label: 'Activation Date' },
@@ -48,8 +47,6 @@ const allOrderStatusColumns = [
   { key: 'quantity', label: 'Quantity' },
   { key: 'other', label: 'Activity Notes' },
   { key: 'migration_numbers', label: 'Migration Numbers' },
-  { key: 'fiber', label: 'Fiber' },
-  { key: 'order_number', label: 'ACL' },
   { key: 'wo_number', label: 'Work Order' },
   { key: 'completion_date', label: 'Completion Date' },
   { key: 'payment_connection', label: 'Payment Connection' },
@@ -73,8 +70,8 @@ const filters = ref({
 
 function buildParams() {
   const f = filters.value
-  const cols = visibleColumns.value.filter((c) => c !== 'activity')
-  const columns = cols.includes('id') ? cols : ['id', ...cols]
+  const cols = visibleColumns.value.filter((c) => c !== 'activity' && c !== 'id')
+  const columns = ['id', ...cols]
   if (!columns.includes('submitted_at')) columns.push('submitted_at')
 
   const p = {
@@ -309,7 +306,7 @@ onMounted(async () => {
       <!-- Table -->
       <div class="overflow-hidden rounded-lg border-2 border-black bg-white shadow-sm">
         <OrderStatusTable
-          :columns="visibleColumns"
+          :columns="visibleColumns.filter((c) => c !== 'id' && c !== 'fiber' && c !== 'order_number')"
           :data="orders"
           :sort="sort"
           :order="order"

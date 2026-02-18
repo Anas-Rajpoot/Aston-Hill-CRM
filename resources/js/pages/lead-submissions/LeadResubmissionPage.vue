@@ -430,7 +430,7 @@ onMounted(() => {
             <div class="mt-3 space-y-3">
               <div class="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label class="block text-xs font-medium text-gray-700">Contact Number (GSM) <span class="text-red-500">*</span></label>
+                  <label class="block text-xs font-medium text-gray-700">Contact Number <span class="text-red-500">*</span></label>
                   <input
                     v-model="form.contact_number_gsm"
                     type="text"

@@ -40,7 +40,7 @@ function fieldLabel(name, row) {
     account_number: 'Account Number',
     authorized_signatory_name: 'Authorized Signatory',
     email: 'Email',
-    contact_number_gsm: 'Contact Number (GSM)',
+    contact_number_gsm: 'Contact Number',
     alternate_contact_number: 'Alternate Contact',
     address: 'Address',
     emirates: 'Emirates',

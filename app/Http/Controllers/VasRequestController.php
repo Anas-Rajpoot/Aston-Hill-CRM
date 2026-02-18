@@ -101,7 +101,7 @@ class VasRequestController extends Controller
             'account_number' => $data['account_number'],
             'contact_number' => $data['contact_number'],
             'company_name' => $data['company_name'],
-            'request_description' => $data['request_description'],
+            'description' => $data['request_description'],
             'additional_notes' => $data['additional_notes'] ?? null,
             'manager_id' => (int) $data['manager_id'],
             'team_leader_id' => (int) $data['team_leader_id'],

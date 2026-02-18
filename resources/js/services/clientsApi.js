@@ -86,4 +86,19 @@ export default {
     const { data } = await api.get(`/clients/${id}/alerts`, { params })
     return data
   },
+
+  async storeAlert(id, payload) {
+    const { data } = await api.post(`/clients/${id}/alerts`, payload)
+    return data
+  },
+
+  async updateAlert(clientId, alertId, payload) {
+    const { data } = await api.put(`/clients/${clientId}/alerts/${alertId}`, payload)
+    return data
+  },
+
+  async resolveAlert(clientId, alertId) {
+    const { data } = await api.post(`/clients/${clientId}/alerts/${alertId}/resolve`)
+    return data
+  },
 }

@@ -4,7 +4,7 @@
  * Submission/Product details, Account Ownership, Status & Notes, System Metadata.
  * Buttons: Cancel, Create Client, Create & Add Another.
  */
-import { ref, onMounted, computed, nextTick } from 'vue'
+import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import clientsApi from '@/services/clientsApi'
@@ -135,6 +135,69 @@ const createdDateLabel = computed(() => {
   const d = new Date()
   return `${d.getDate()}-${MONTH_NAMES[d.getMonth()]}-${d.getFullYear()}`
 })
+
+const settingFromChild = ref(false)
+const settingFromSalesAgent = ref(false)
+
+const filteredTeamLeaders = computed(() => {
+  const mid = form.value.manager_id
+  if (!mid) return teamOptions.value.team_leaders ?? []
+  return (teamOptions.value.team_leaders ?? []).filter((t) => String(t.manager_id) === String(mid))
+})
+
+const filteredSalesAgents = computed(() => {
+  const tlId = form.value.team_leader_id
+  if (!tlId) return teamOptions.value.sales_agents ?? []
+  return (teamOptions.value.sales_agents ?? []).filter((s) => String(s.team_leader_id) === String(tlId))
+})
+
+watch(
+  () => form.value.manager_id,
+  () => {
+    if (settingFromChild.value) {
+      nextTick(() => { settingFromChild.value = false })
+      return
+    }
+    form.value.team_leader_id = null
+    form.value.sales_agent_id = null
+  }
+)
+
+watch(
+  () => form.value.team_leader_id,
+  (tid) => {
+    if (tid) {
+      const tl = (teamOptions.value.team_leaders ?? []).find((u) => String(u.id) === String(tid))
+      if (tl?.manager_id != null) {
+        settingFromChild.value = true
+        form.value.manager_id = tl.manager_id
+        nextTick(() => { settingFromChild.value = false })
+      }
+      if (!settingFromSalesAgent.value) form.value.sales_agent_id = null
+    } else if (!settingFromChild.value) {
+      form.value.sales_agent_id = null
+    }
+  }
+)
+
+watch(
+  () => form.value.sales_agent_id,
+  (sid) => {
+    if (sid) {
+      const sa = (teamOptions.value.sales_agents ?? []).find((u) => String(u.id) === String(sid))
+      if (sa) {
+        settingFromSalesAgent.value = true
+        settingFromChild.value = true
+        if (sa.team_leader_id != null) form.value.team_leader_id = sa.team_leader_id
+        if (sa.manager_id != null) form.value.manager_id = sa.manager_id
+        nextTick(() => {
+          settingFromSalesAgent.value = false
+          settingFromChild.value = false
+        })
+      }
+    }
+  }
+)
 
 onMounted(async () => {
   try {
@@ -813,14 +876,14 @@ function closeToast() {
               <label class="block text-sm font-medium text-gray-700">Team Leader</label>
               <select v-model="form.team_leader_id" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
                 <option :value="null">Select</option>
-                <option v-for="t in teamOptions.team_leaders" :key="t.id" :value="t.id">{{ t.name }}</option>
+                <option v-for="t in filteredTeamLeaders" :key="t.id" :value="t.id">{{ t.name }}</option>
               </select>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Sales Agent Name</label>
               <select v-model="form.sales_agent_id" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
                 <option :value="null">Select</option>
-                <option v-for="s in teamOptions.sales_agents" :key="s.id" :value="s.id">{{ s.name }}</option>
+                <option v-for="s in filteredSalesAgents" :key="s.id" :value="s.id">{{ s.name }}</option>
               </select>
             </div>
             <!-- Row 2: Submission Type, Service Category, Service Type, Product Type, Address -->
@@ -836,18 +899,38 @@ function closeToast() {
               <label class="block text-sm font-medium text-gray-700">Service Category</label>
               <select v-model="form.service_category" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
                 <option value="">Select</option>
+                <option value="New Connection">New Connection</option>
+                <option value="Migration">Migration</option>
+                <option value="Upgrade">Upgrade</option>
+                <option value="Downgrade">Downgrade</option>
+                <option value="Renewal">Renewal</option>
+                <option value="Disconnection">Disconnection</option>
               </select>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Service Type</label>
               <select v-model="form.service_type" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
                 <option value="">Select</option>
+                <option value="Voice">Voice</option>
+                <option value="Internet">Internet</option>
+                <option value="IPTV">IPTV</option>
+                <option value="Managed Services">Managed Services</option>
+                <option value="Cloud">Cloud</option>
+                <option value="Security">Security</option>
               </select>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Product Type</label>
               <select v-model="form.product_type" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
                 <option value="">Select</option>
+                <option value="SIP Trunk">SIP Trunk</option>
+                <option value="PRI">PRI</option>
+                <option value="Broadband">Broadband</option>
+                <option value="Dedicated Internet">Dedicated Internet</option>
+                <option value="MPLS">MPLS</option>
+                <option value="Hosted PBX">Hosted PBX</option>
+                <option value="SD-WAN">SD-WAN</option>
+                <option value="Firewall">Firewall</option>
               </select>
             </div>
             <div>

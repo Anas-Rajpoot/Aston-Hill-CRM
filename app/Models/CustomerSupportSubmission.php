@@ -2,13 +2,17 @@
 
 namespace App\Models;
 
+use App\Traits\ResolvesClientLink;
 use Illuminate\Database\Eloquent\Model;
 
 class CustomerSupportSubmission extends Model
 {
+    use ResolvesClientLink;
+
     protected $table = 'customer_support_submissions';
 
     protected $fillable = [
+        'client_id',
         'created_by',
         'issue_category',
         'company_name',

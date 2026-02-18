@@ -331,7 +331,7 @@ const aeDomainValidation = computed(() => validateAeDomain(form.value.ae_domain)
 const validateStep1 = () => {
   const err = {}
   if (!form.value.company_name?.trim()) err.company_name = ['Company name is required.']
-  if (!form.value.contact_number_gsm?.trim()) err.contact_number_gsm = ['Contact number (GSM) is required.']
+  if (!form.value.contact_number_gsm?.trim()) err.contact_number_gsm = ['Contact number is required.']
   if (!form.value.address?.trim()) err.address = ['Complete address is required.']
   if (!form.value.emirates?.trim()) err.emirates = ['Emirates is required.']
   if (!form.value.product?.trim()) err.product = ['Product is required.']
@@ -480,7 +480,7 @@ const cancel = () => {
             />
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Contact Number (GSM) <span class="text-red-500">*</span></label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Contact Number <span class="text-red-500">*</span></label>
             <input
               v-model="form.contact_number_gsm"
               type="text"

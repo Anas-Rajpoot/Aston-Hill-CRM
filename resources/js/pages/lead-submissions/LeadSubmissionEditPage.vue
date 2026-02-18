@@ -452,7 +452,7 @@ onMounted(() => {
                   <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.email) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Contact (GSM)</label>
+                  <label class="block text-xs font-medium text-gray-500">Contact Number</label>
                   <input v-if="canEditBackOffice" v-model="form.contact_number_gsm" type="text" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm" />
                   <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.contact_number_gsm) }}</div>
                 </div>

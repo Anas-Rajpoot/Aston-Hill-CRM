@@ -35,9 +35,7 @@ const columnLabels = {
   quantity: 'Quantity',
   other: 'Other',
   migration_numbers: 'Migration Numbers',
-  fiber: 'Fiber',
-  order_number: 'ACL',
-  wo_number: 'WIO',
+  wo_number: 'Work Order',
   completion_date: 'Completion Date',
   payment_connection: 'Payment Connection',
   contract_type: 'Contract Type',
@@ -48,10 +46,10 @@ const columnLabels = {
 }
 
 const SORTABLE_COLUMNS = [
-  'id', 'company_name', 'account_number', 'submitted_at',
+  'company_name', 'account_number', 'submitted_at',
   'manager', 'team_leader', 'sales_agent', 'status',
   'service_type', 'product_type', 'product_name', 'mrc', 'quantity',
-  'fiber', 'order_number', 'wo_number', 'completion_date',
+  'wo_number', 'completion_date',
   'contract_type', 'contract_end_date', 'renewal_alert', 'creator',
 ]
 
@@ -79,7 +77,7 @@ function formatValue(row, col) {
 const TRUNCATE_LENGTH = 30
 
 function truncate(str, max = TRUNCATE_LENGTH) {
-  if (!str || typeof str !== 'string') return '—'
+  if (str == null || str === '') return '—'
   const s = String(str)
   return s.length > max ? s.slice(0, max) + '...' : s
 }
@@ -135,7 +133,7 @@ function goToDetail(row) {
             v-for="col in columns"
             :key="col"
             scope="col"
-            class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold uppercase tracking-wider text-white"
+            class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold capitalize text-white"
           >
             <button
               v-if="sortable(col)"
@@ -157,7 +155,7 @@ function goToDetail(row) {
             </button>
             <span v-else class="font-bold text-white">{{ label(col) }}</span>
           </th>
-          <th scope="col" class="whitespace-nowrap px-4 py-3 text-right text-sm font-bold uppercase tracking-wider text-white">
+          <th scope="col" class="whitespace-nowrap px-4 py-3 text-center text-sm font-bold capitalize text-white">
             Actions
           </th>
         </tr>

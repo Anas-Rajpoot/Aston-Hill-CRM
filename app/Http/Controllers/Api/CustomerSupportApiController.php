@@ -26,7 +26,7 @@ class CustomerSupportApiController extends Controller
     private const ALLOWED_COLUMNS = [
         'id', 'submitted_at', 'created_at', 'created_by',
         'ticket_number', 'issue_category', 'company_name', 'account_number', 'contact_number',
-        'issue_description', 'attachments',
+        'issue_description',
         'manager_id', 'team_leader_id', 'sales_agent_id',
         'csr_id', 'csr_name', 'status', 'workflow_status',
         'completion_date', 'updated_at',
@@ -486,6 +486,49 @@ class CustomerSupportApiController extends Controller
             'issue_categories' => CustomerSupportController::issueCategories(),
             'workflow_statuses' => array_map(fn ($v) => ['value' => $v, 'label' => ucfirst(str_replace('_', ' ', $v))], CustomerSupportSubmission::WORKFLOW_STATUSES),
             'pending_options' => array_map(fn ($v) => ['value' => $v, 'label' => $v], CustomerSupportSubmission::PENDING_OPTIONS),
+        ]);
+    }
+
+    /**
+     * POST resubmit a rejected customer support submission.
+     */
+    public function resubmit(Request $request, CustomerSupportSubmission $customerSupportSubmission): JsonResponse
+    {
+        $this->authorize('update', $customerSupportSubmission);
+
+        if ($customerSupportSubmission->status !== 'rejected') {
+            return response()->json(['message' => 'Only rejected requests can be resubmitted.'], 422);
+        }
+
+        $categories = CustomerSupportController::issueCategories();
+        $data = $request->validate([
+            'issue_category' => ['required', 'string', Rule::in($categories)],
+            'company_name' => ['required', 'string', 'max:255'],
+            'account_number' => ['nullable', 'string', 'max:100'],
+            'contact_number' => ['required', 'string', 'max:50'],
+            'issue_description' => ['required', 'string', 'max:5000'],
+            'manager_id' => ['required', 'integer', 'exists:users,id'],
+            'team_leader_id' => ['required', 'integer', 'exists:users,id'],
+            'sales_agent_id' => ['required', 'integer', 'exists:users,id'],
+            'ticket_number' => ['nullable', 'string', 'max:100'],
+            'csr_name' => ['nullable', 'string', 'max:255'],
+            'workflow_status' => ['nullable', 'string'],
+            'completion_date' => ['nullable', 'date'],
+            'trouble_ticket' => ['nullable', 'string', 'max:255'],
+            'activity' => ['nullable', 'string', 'max:255'],
+            'pending' => ['nullable', 'string', 'max:255'],
+            'resolution_remarks' => ['nullable', 'string', 'max:5000'],
+            'internal_remarks' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $customerSupportSubmission->update(array_merge($data, [
+            'status' => 'submitted',
+            'submitted_at' => now(),
+        ]));
+
+        return response()->json([
+            'message' => 'Customer support request resubmitted successfully.',
+            'id' => $customerSupportSubmission->id,
         ]);
     }
 

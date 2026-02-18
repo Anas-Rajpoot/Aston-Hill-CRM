@@ -81,11 +81,12 @@ const productsLoading = ref(false)
 const productsSort = ref('submitted_at')
 const productsOrder = ref('desc')
 const allColumns = ref([])
+const defaultColumns = ref([])
 const visibleColumns = ref([
-  'id', 'company_name', 'account_number', 'submitted_at', 'manager', 'team_leader', 'sales_agent', 'status',
+  'company_name', 'account_number', 'submitted_at', 'manager', 'team_leader', 'sales_agent', 'status',
   'service_type', 'product_type', 'address', 'product_name', 'mrc', 'quantity', 'other', 'migration_numbers',
-  'fiber', 'order_number', 'wo_number', 'completion_date', 'payment_connection', 'contract_type', 'contract_end_date',
-  'renewal_alert', 'additional_notes',
+  'wo_number', 'completion_date', 'payment_connection', 'contract_type', 'contract_end_date',
+  'renewal_alert', 'additional_notes', 'creator',
 ])
 const columnModalVisible = ref(false)
 
@@ -99,6 +100,59 @@ const csLoading = ref(false)
 const alertsList = ref([])
 const alertsMeta = ref({})
 const alertsLoading = ref(false)
+const alertFilterType = ref('')
+const alertFilterStatus = ref('')
+const alertSort = ref('expiry_date')
+const alertOrder = ref('desc')
+const showAlertModal = ref(false)
+const alertSaving = ref(false)
+const alertForm = ref({ alert_type: '', expiry_date: '', days_remaining: '', manager_id: '', status: '' })
+const alertFormErrors = ref({})
+const managerOptions = ref([])
+const showAlertAdvanced = ref(false)
+const alertAdvFilters = ref({ resolved: '', manager_id: '', expiry_from: '', expiry_to: '', created_from: '', created_to: '' })
+const alertColumnModal = ref(false)
+const alertEditingCell = ref(null)
+const alertEditValue = ref('')
+
+const ALERT_TYPE_OPTIONS = [
+  'Trade License Expiry',
+  'Establishment Card Expiry',
+  'Custom',
+]
+const ALERT_STATUS_OPTIONS = ['Active', 'Valid / Invalid', 'Resolved', 'Expired']
+
+const ALL_ALERT_COLUMNS = [
+  { key: 'alert_type', label: 'Alert Type' },
+  { key: 'company_name', label: 'Company Name' },
+  { key: 'account_number', label: 'Account Number' },
+  { key: 'expiry_date', label: 'Expiry Date' },
+  { key: 'days_remaining', label: 'Days Remaining' },
+  { key: 'manager', label: 'Manager Name' },
+  { key: 'status', label: 'Status' },
+  { key: 'created_date', label: 'Created Date' },
+  { key: 'resolved', label: 'Resolved' },
+]
+const DEFAULT_ALERT_COLS = ['alert_type', 'company_name', 'account_number', 'expiry_date', 'days_remaining', 'manager', 'status', 'created_date']
+const alertVisibleCols = ref([...DEFAULT_ALERT_COLS])
+const ALERT_SORTABLE = ['alert_type', 'company_name', 'account_number', 'expiry_date', 'days_remaining', 'status', 'created_date', 'resolved']
+const ALERT_DROPDOWN_COLS = ['alert_type', 'status']
+const ALERT_INPUT_COLS = ['days_remaining', 'expiry_date']
+const ALERT_READONLY_COLS = ['company_name', 'account_number', 'created_date', 'resolved', 'manager']
+
+function alertColLabel(key) {
+  return ALL_ALERT_COLUMNS.find(c => c.key === key)?.label || key
+}
+
+function alertAdvCount() {
+  const f = alertAdvFilters.value
+  let n = 0
+  if (f.resolved !== '') n++
+  if (f.manager_id) n++
+  if (f.expiry_from || f.expiry_to) n++
+  if (f.created_from || f.created_to) n++
+  return n
+}
 
 function displayVal(val) {
   return val != null && val !== '' ? String(val) : '—'
@@ -256,7 +310,17 @@ async function loadAlerts() {
   if (!id.value) return
   alertsLoading.value = true
   try {
-    const res = await clientsApi.alerts(id.value, { per_page: 10 })
+    const params = { per_page: 25, sort: alertSort.value, order: alertOrder.value }
+    if (alertFilterType.value) params.alert_type = alertFilterType.value
+    if (alertFilterStatus.value) params.status = alertFilterStatus.value
+    const adv = alertAdvFilters.value
+    if (adv.resolved !== '') params.resolved = adv.resolved
+    if (adv.manager_id) params.manager_id = adv.manager_id
+    if (adv.expiry_from) params.expiry_from = adv.expiry_from
+    if (adv.expiry_to) params.expiry_to = adv.expiry_to
+    if (adv.created_from) params.created_from = adv.created_from
+    if (adv.created_to) params.created_to = adv.created_to
+    const res = await clientsApi.alerts(id.value, params)
     alertsList.value = res.data ?? []
     alertsMeta.value = res.meta ?? {}
   } catch {
@@ -266,20 +330,166 @@ async function loadAlerts() {
   }
 }
 
+function applyAlertFilters() { loadAlerts() }
+
+function clearAlertFilters() {
+  alertFilterType.value = ''
+  alertFilterStatus.value = ''
+  loadAlerts()
+}
+
+function clearAlertAdvFilters() {
+  alertAdvFilters.value = { resolved: '', manager_id: '', expiry_from: '', expiry_to: '', created_from: '', created_to: '' }
+  loadAlerts()
+}
+
+function toggleAlertSort(col) {
+  if (!ALERT_SORTABLE.includes(col)) return
+  if (alertSort.value === col) {
+    alertOrder.value = alertOrder.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    alertSort.value = col
+    alertOrder.value = 'asc'
+  }
+  loadAlerts()
+}
+
+function openAlertModal() {
+  alertForm.value = { alert_type: '', expiry_date: '', days_remaining: '', manager_id: '', status: '' }
+  alertFormErrors.value = {}
+  showAlertModal.value = true
+}
+
+function onSaveAlertColumns(cols) {
+  alertVisibleCols.value = cols
+  alertColumnModal.value = false
+}
+
+function toggleAlertColumn(key) {
+  const idx = alertVisibleCols.value.indexOf(key)
+  if (idx !== -1) {
+    if (alertVisibleCols.value.length <= 1) return
+    alertVisibleCols.value.splice(idx, 1)
+  } else {
+    alertVisibleCols.value.push(key)
+  }
+}
+
+async function loadManagerOptions() {
+  try {
+    const res = await api.get('/lead-submissions/team-options')
+    const data = res?.data?.data ?? res?.data ?? {}
+    managerOptions.value = data.managers ?? []
+  } catch { /* ignore */ }
+}
+
+async function submitAlert() {
+  alertFormErrors.value = {}
+  if (!alertForm.value.alert_type) { alertFormErrors.value.alert_type = 'Alert type is required.'; return }
+  if (!alertForm.value.expiry_date) { alertFormErrors.value.expiry_date = 'Expiry date is required.'; return }
+  if (!alertForm.value.status) { alertFormErrors.value.status = 'Status is required.'; return }
+
+  alertSaving.value = true
+  try {
+    const payload = {
+      alert_type: alertForm.value.alert_type,
+      expiry_date: alertForm.value.expiry_date,
+      days_remaining: alertForm.value.days_remaining ? Number(alertForm.value.days_remaining) : null,
+      manager_id: alertForm.value.manager_id || null,
+      status: alertForm.value.status,
+    }
+    const res = await clientsApi.storeAlert(id.value, payload)
+    if (res.alert) {
+      alertsList.value.unshift(res.alert)
+    }
+    showAlertModal.value = false
+    toast('success', 'Alert created successfully.')
+  } catch (err) {
+    if (err.response?.status === 422) {
+      const e = err.response.data?.errors ?? {}
+      alertFormErrors.value = Object.fromEntries(Object.entries(e).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v]))
+    } else {
+      toast('error', 'Failed to create alert.')
+    }
+  } finally {
+    alertSaving.value = false
+  }
+}
+
+async function resolveAlert(alert) {
+  if (!confirm('Mark this alert as resolved?')) return
+  try {
+    await clientsApi.resolveAlert(id.value, alert.id)
+    alert.resolved = true
+    toast('success', 'Alert resolved successfully.')
+  } catch {
+    toast('error', 'Failed to resolve alert.')
+  }
+}
+
+function openAlertCellEdit(row, col) {
+  if (ALERT_READONLY_COLS.includes(col)) return
+  alertEditingCell.value = { rowId: row.id, col }
+  if (col === 'expiry_date') {
+    const raw = row._raw_expiry || ''
+    alertEditValue.value = raw
+  } else if (col === 'manager') {
+    alertEditValue.value = row.manager_id ?? ''
+  } else {
+    alertEditValue.value = row[col] != null ? String(row[col]) : ''
+  }
+}
+
+function isAlertEditing(rowId, col) {
+  return alertEditingCell.value?.rowId === rowId && alertEditingCell.value?.col === col
+}
+
+function cancelAlertEdit() { alertEditingCell.value = null }
+
+async function saveAlertCellEdit() {
+  if (!alertEditingCell.value) return
+  const { rowId, col } = alertEditingCell.value
+  let payload = {}
+  if (col === 'days_remaining') {
+    payload.days_remaining = alertEditValue.value === '' ? null : Number(alertEditValue.value)
+  } else if (col === 'expiry_date') {
+    payload.expiry_date = alertEditValue.value || null
+  } else if (col === 'manager') {
+    payload.manager_id = alertEditValue.value || null
+  } else {
+    payload[col] = alertEditValue.value
+  }
+  try {
+    const res = await clientsApi.updateAlert(id.value, rowId, payload)
+    if (res.alert) {
+      const idx = alertsList.value.findIndex(a => a.id === rowId)
+      if (idx !== -1) alertsList.value[idx] = res.alert
+    }
+    toast('success', 'Alert updated.')
+  } catch {
+    toast('error', 'Failed to update alert.')
+  }
+  alertEditingCell.value = null
+}
+
 watch(activeTab, (tab) => {
   if (tab === 'products-services') {
     loadProducts()
     loadColumns()
   } else if (tab === 'vas-requests') loadVasRequests()
   else if (tab === 'customer-support') loadCustomerSupport()
-  else if (tab === 'alerts') loadAlerts()
+  else if (tab === 'alerts') { loadAlerts(); loadManagerOptions() }
 })
 
 async function saveContactDetails() {
   if (!id.value) return
   contactSaveLoading.value = true
   try {
-    await clientsApi.updateContacts(id.value, { contacts: contactDraft.value })
+    const addresses = addressDraft.value.map((a) => ({
+      ...a,
+      full_address: [a.unit, a.building, a.area, a.emirates].filter(Boolean).join(', '),
+    }))
+    await clientsApi.updateContacts(id.value, { contacts: contactDraft.value, addresses })
     toast('success', 'Contact details saved successfully.')
     await loadClient()
   } catch (e) {
@@ -339,8 +549,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] py-4 px-4 sm:px-6">
-    <div class="mx-auto max-w-7xl space-y-4">
+  <div class="min-h-[calc(100vh-4rem)] bg-white p-3">
+    <div class="w-full space-y-3">
       <!-- Back + Title + Breadcrumbs -->
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -650,10 +860,10 @@ onMounted(() => {
                     <div class="sm:col-span-2">
                       <label class="block text-xs text-gray-500">Full Address</label>
                       <input
-                        v-model="a.full_address"
+                        :value="[a.unit, a.building, a.area, a.emirates].filter(Boolean).join(', ')"
                         type="text"
-                        class="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                        :readonly="!canEdit"
+                        readonly
+                        class="mt-1 w-full rounded border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-700 cursor-default"
                       />
                     </div>
                     <div>
@@ -754,7 +964,7 @@ onMounted(() => {
               </div>
               <div class="overflow-hidden rounded-lg border border-gray-200">
                 <ClientTable
-                  :columns="visibleColumns"
+                  :columns="visibleColumns.filter((c) => c !== 'id' && c !== 'fiber' && c !== 'order_number')"
                   :data="products"
                   :sort="productsSort"
                   :order="productsOrder"
@@ -881,58 +1091,311 @@ onMounted(() => {
             <!-- Alerts -->
             <div v-show="activeTab === 'alerts'" class="space-y-4">
               <div class="flex flex-wrap items-center justify-between gap-2">
-                <h2 class="text-lg font-semibold text-gray-900">Alerts</h2>
-                <button
-                  v-if="canEdit"
-                  type="button"
-                  class="inline-flex items-center rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
-                >
-                  + Add Manual Alert
+                <div>
+                  <h2 class="text-lg font-semibold text-gray-900">Alerts</h2>
+                  <p class="text-sm text-gray-600">Alerts for: {{ client?.company_name }}</p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button type="button" class="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="alertColumnModal = true">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7" /></svg>
+                    Columns
+                  </button>
+                  <button
+                    v-if="canEdit"
+                    type="button"
+                    class="inline-flex items-center gap-1 rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+                    @click="openAlertModal"
+                  >
+                    + Add Manual Alert
+                  </button>
+                </div>
+              </div>
+
+              <!-- General Filters -->
+              <div class="flex flex-wrap items-end gap-3 rounded border border-gray-200 bg-gray-50 p-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Alert Type</label>
+                  <select v-model="alertFilterType" class="rounded border border-gray-300 px-3 py-1.5 text-sm min-w-[180px]">
+                    <option value="">All Types</option>
+                    <option v-for="t in ALERT_TYPE_OPTIONS" :key="t" :value="t">{{ t }}</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Status</label>
+                  <select v-model="alertFilterStatus" class="rounded border border-gray-300 px-3 py-1.5 text-sm min-w-[200px]">
+                    <option value="">All Status</option>
+                    <option v-for="s in ALERT_STATUS_OPTIONS" :key="s" :value="s">{{ s }}</option>
+                  </select>
+                </div>
+                <button type="button" class="rounded bg-green-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-green-700" @click="applyAlertFilters">Apply</button>
+                <button type="button" class="rounded border border-gray-300 bg-white px-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100" @click="clearAlertFilters">Clear Filters</button>
+                <button type="button" class="ml-auto inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100" @click="showAlertAdvanced = !showAlertAdvanced">
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+                  Advanced Filters
+                  <svg :class="['h-3 w-3 transition-transform', showAlertAdvanced ? 'rotate-180' : '']" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                 </button>
               </div>
-              <p class="text-sm text-gray-600">Alerts For: {{ client.company_name }}</p>
+
+              <!-- Advanced Filters -->
+              <div v-show="showAlertAdvanced" class="rounded border border-gray-200 bg-gray-50 p-3">
+                <div class="flex flex-wrap items-end gap-3">
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Resolved</label>
+                    <select v-model="alertAdvFilters.resolved" class="rounded border border-gray-300 px-3 py-1.5 text-sm min-w-[140px]">
+                      <option value="">All</option>
+                      <option value="1">Yes</option>
+                      <option value="0">No</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Manager</label>
+                    <select v-model="alertAdvFilters.manager_id" class="rounded border border-gray-300 px-3 py-1.5 text-sm min-w-[180px]">
+                      <option value="">All Managers</option>
+                      <option v-for="m in managerOptions" :key="m.id" :value="m.id">{{ m.name }}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Expiry From</label>
+                    <input v-model="alertAdvFilters.expiry_from" type="date" class="rounded border border-gray-300 px-3 py-1.5 text-sm" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Expiry To</label>
+                    <input v-model="alertAdvFilters.expiry_to" type="date" class="rounded border border-gray-300 px-3 py-1.5 text-sm" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Created From</label>
+                    <input v-model="alertAdvFilters.created_from" type="date" class="rounded border border-gray-300 px-3 py-1.5 text-sm" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Created To</label>
+                    <input v-model="alertAdvFilters.created_to" type="date" class="rounded border border-gray-300 px-3 py-1.5 text-sm" />
+                  </div>
+                  <button type="button" class="rounded bg-green-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-green-700" @click="applyAlertFilters">Apply</button>
+                  <button type="button" class="rounded border border-gray-300 bg-white px-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100" @click="clearAlertAdvFilters">Clear Advanced</button>
+                </div>
+              </div>
+
+              <!-- Alerts table -->
               <div class="overflow-x-auto rounded-lg border border-gray-200">
                 <table class="min-w-full border-collapse">
                   <thead class="bg-gray-100">
                     <tr>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold text-gray-700">Alert Type</th>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold text-gray-700">Expiry Date</th>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold text-gray-700">Days Remaining</th>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold text-gray-700">Manager</th>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold text-gray-700">Status</th>
+                      <th
+                        v-for="col in alertVisibleCols"
+                        :key="col"
+                        class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold text-gray-700 select-none"
+                        :class="ALERT_SORTABLE.includes(col) ? 'cursor-pointer hover:bg-gray-200' : ''"
+                        @click="toggleAlertSort(col)"
+                      >
+                        <span class="inline-flex items-center gap-1">
+                          {{ alertColLabel(col) }}
+                          <template v-if="ALERT_SORTABLE.includes(col)">
+                            <svg v-if="alertSort === col && alertOrder === 'asc'" class="h-3.5 w-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
+                            <svg v-else-if="alertSort === col && alertOrder === 'desc'" class="h-3.5 w-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                            <svg v-else class="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
+                          </template>
+                        </span>
+                      </th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold text-gray-700">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr v-if="alertsLoading" class="bg-white">
-                      <td colspan="5" class="px-4 py-8 text-center text-gray-500">Loading…</td>
+                      <td :colspan="alertVisibleCols.length + 1" class="px-4 py-8 text-center text-gray-500">Loading…</td>
                     </tr>
                     <tr v-else-if="!alertsList.length" class="bg-white">
-                      <td colspan="5" class="px-4 py-8 text-center text-gray-500">No alerts.</td>
+                      <td :colspan="alertVisibleCols.length + 1" class="px-4 py-8 text-center text-gray-500">No alerts found.</td>
                     </tr>
                     <tr
                       v-for="row in alertsList"
                       :key="row.id"
                       class="border-b border-gray-200 bg-white hover:bg-gray-50"
                     >
-                      <td class="px-4 py-2 text-sm text-gray-900">{{ row.alert_type }}</td>
-                      <td class="px-4 py-2 text-sm text-gray-900">{{ row.expiry_date }}</td>
-                      <td class="px-4 py-2">
-                        <span
-                          v-if="row.days_remaining != null"
-                          :class="[
-                            'inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium',
-                            row.days_remaining <= 14 ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-700',
-                          ]"
-                        >
-                          {{ row.days_remaining }} days
-                        </span>
-                        <span v-else>—</span>
+                      <td
+                        v-for="col in alertVisibleCols"
+                        :key="col"
+                        class="px-4 py-2 text-sm text-gray-900"
+                        :class="!ALERT_READONLY_COLS.includes(col) ? 'cursor-pointer' : ''"
+                        @dblclick="openAlertCellEdit(row, col)"
+                      >
+                        <!-- Inline editing -->
+                        <template v-if="isAlertEditing(row.id, col)">
+                          <select
+                            v-if="ALERT_DROPDOWN_COLS.includes(col)"
+                            v-model="alertEditValue"
+                            class="w-full rounded border border-green-400 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                            @blur="saveAlertCellEdit"
+                            @keydown.enter="saveAlertCellEdit"
+                            @keydown.escape="cancelAlertEdit"
+                          >
+                            <option v-if="col === 'alert_type'" v-for="o in ALERT_TYPE_OPTIONS" :key="o" :value="o">{{ o }}</option>
+                            <option v-if="col === 'status'" v-for="o in ALERT_STATUS_OPTIONS" :key="o" :value="o">{{ o }}</option>
+                          </select>
+                          <input
+                            v-else-if="col === 'expiry_date'"
+                            v-model="alertEditValue"
+                            type="date"
+                            class="w-full rounded border border-green-400 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                            @blur="saveAlertCellEdit"
+                            @keydown.enter="saveAlertCellEdit"
+                            @keydown.escape="cancelAlertEdit"
+                          />
+                          <input
+                            v-else-if="col === 'days_remaining'"
+                            v-model="alertEditValue"
+                            type="number"
+                            min="0"
+                            class="w-full rounded border border-green-400 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                            @blur="saveAlertCellEdit"
+                            @keydown.enter="saveAlertCellEdit"
+                            @keydown.escape="cancelAlertEdit"
+                          />
+                          <input
+                            v-else
+                            v-model="alertEditValue"
+                            type="text"
+                            class="w-full rounded border border-green-400 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                            @blur="saveAlertCellEdit"
+                            @keydown.enter="saveAlertCellEdit"
+                            @keydown.escape="cancelAlertEdit"
+                          />
+                        </template>
+                        <!-- Display mode -->
+                        <template v-else>
+                          <template v-if="col === 'days_remaining'">
+                            <span
+                              v-if="row.days_remaining != null"
+                              :class="[
+                                'inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium',
+                                row.days_remaining <= 14 ? 'bg-red-100 text-red-700' : row.days_remaining <= 30 ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-700',
+                              ]"
+                            >{{ row.days_remaining }} days</span>
+                            <span v-else>—</span>
+                          </template>
+                          <template v-else-if="col === 'status'">
+                            <span
+                              :class="[
+                                'inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium',
+                                row.status === 'Active' ? 'bg-green-100 text-green-700' :
+                                row.status === 'Expired' ? 'bg-red-100 text-red-700' :
+                                row.status === 'Resolved' ? 'bg-blue-100 text-blue-700' :
+                                'bg-yellow-100 text-yellow-700',
+                              ]"
+                            >{{ row.status || '—' }}</span>
+                          </template>
+                          <template v-else-if="col === 'resolved'">
+                            <span :class="row.resolved ? 'text-green-600 font-medium' : 'text-gray-500'">{{ row.resolved ? 'Yes' : 'No' }}</span>
+                          </template>
+                          <template v-else>{{ row[col] != null && row[col] !== '' ? row[col] : '—' }}</template>
+                        </template>
                       </td>
-                      <td class="px-4 py-2 text-sm text-gray-900">{{ row.manager || '—' }}</td>
-                      <td class="px-4 py-2 text-sm text-gray-900">{{ row.status || '—' }}</td>
+                      <td class="px-4 py-2">
+                        <button
+                          v-if="!row.resolved"
+                          type="button"
+                          class="inline-flex items-center gap-1 text-sm font-medium text-green-600 hover:text-green-800"
+                          @click="resolveAlert(row)"
+                        >
+                          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                          Resolve
+                        </button>
+                        <span v-else class="inline-flex items-center gap-1 text-xs text-gray-400">
+                          <svg class="h-3.5 w-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                          Resolved
+                        </span>
+                      </td>
                     </tr>
                   </tbody>
                 </table>
+              </div>
+            </div>
+
+            <!-- Add Alert Modal -->
+            <div v-if="showAlertModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showAlertModal = false">
+              <div class="w-full max-w-lg rounded-lg bg-white shadow-xl">
+                <div class="flex items-center justify-between border-b px-5 py-3">
+                  <h3 class="text-lg font-semibold text-gray-900">Add Manual Alert</h3>
+                  <button type="button" class="text-gray-400 hover:text-gray-600 text-xl leading-none" @click="showAlertModal = false">&times;</button>
+                </div>
+                <form @submit.prevent="submitAlert" class="p-5 space-y-4">
+                  <div class="grid grid-cols-2 gap-4">
+                    <div class="col-span-2">
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Alert Type <span class="text-red-500">*</span></label>
+                      <select v-model="alertForm.alert_type" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+                        <option value="">Select type</option>
+                        <option v-for="t in ALERT_TYPE_OPTIONS" :key="t" :value="t">{{ t }}</option>
+                      </select>
+                      <p v-if="alertFormErrors.alert_type" class="mt-1 text-xs text-red-600">{{ alertFormErrors.alert_type }}</p>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+                      <input type="text" :value="client?.company_name" readonly class="w-full rounded border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-700 cursor-default" />
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Account Number</label>
+                      <input type="text" :value="client?.account_number" readonly class="w-full rounded border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-700 cursor-default" />
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Expiry Date <span class="text-red-500">*</span></label>
+                      <input v-model="alertForm.expiry_date" type="date" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+                      <p v-if="alertFormErrors.expiry_date" class="mt-1 text-xs text-red-600">{{ alertFormErrors.expiry_date }}</p>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Days Remaining</label>
+                      <input v-model="alertForm.days_remaining" type="number" min="0" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" placeholder="Auto or manual" />
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Manager</label>
+                      <select v-model="alertForm.manager_id" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+                        <option value="">Select manager</option>
+                        <option v-for="m in managerOptions" :key="m.id" :value="m.id">{{ m.name }}</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Status <span class="text-red-500">*</span></label>
+                      <select v-model="alertForm.status" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+                        <option value="">Select status</option>
+                        <option v-for="s in ALERT_STATUS_OPTIONS" :key="s" :value="s">{{ s }}</option>
+                      </select>
+                      <p v-if="alertFormErrors.status" class="mt-1 text-xs text-red-600">{{ alertFormErrors.status }}</p>
+                    </div>
+                  </div>
+                  <div class="flex justify-end gap-3 pt-2">
+                    <button type="button" class="rounded border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="showAlertModal = false">Cancel</button>
+                    <button type="submit" :disabled="alertSaving" class="rounded bg-green-600 px-5 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50">
+                      {{ alertSaving ? 'Saving…' : 'Save Alert' }}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <!-- Alert Column Customizer Modal -->
+            <div v-if="alertColumnModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="alertColumnModal = false">
+              <div class="w-full max-w-md rounded-lg bg-white shadow-xl">
+                <div class="flex items-center justify-between border-b px-5 py-3">
+                  <h3 class="text-lg font-semibold text-gray-900">Customize Columns</h3>
+                  <button type="button" class="text-gray-400 hover:text-gray-600 text-xl leading-none" @click="alertColumnModal = false">&times;</button>
+                </div>
+                <div class="p-5 space-y-3 max-h-[60vh] overflow-y-auto">
+                  <label
+                    v-for="c in ALL_ALERT_COLUMNS"
+                    :key="c.key"
+                    class="flex items-center gap-2 rounded px-2 py-1.5 hover:bg-gray-50 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      :checked="alertVisibleCols.includes(c.key)"
+                      class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                      @change="toggleAlertColumn(c.key)"
+                    />
+                    <span class="text-sm text-gray-700">{{ c.label }}</span>
+                  </label>
+                </div>
+                <div class="flex items-center justify-between border-t px-5 py-3">
+                  <button type="button" class="text-sm text-gray-500 hover:text-gray-700" @click="alertVisibleCols = [...DEFAULT_ALERT_COLS]">Reset to Default</button>
+                  <button type="button" class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700" @click="alertColumnModal = false">Done</button>
+                </div>
               </div>
             </div>
           </div>

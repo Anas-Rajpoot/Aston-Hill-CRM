@@ -35,8 +35,6 @@ const columnLabels = {
   quantity: 'Quantity',
   other: 'Activity Notes',
   migration_numbers: 'Migration Numbers',
-  fiber: 'Fiber',
-  order_number: 'ACL',
   wo_number: 'Work Order',
   completion_date: 'Completion Date',
   payment_connection: 'Payment Connection',
@@ -48,10 +46,10 @@ const columnLabels = {
 }
 
 const SORTABLE_COLUMNS = [
-  'id', 'company_name', 'account_number', 'submitted_at',
+  'company_name', 'account_number', 'submitted_at',
   'manager', 'team_leader', 'sales_agent', 'status',
   'service_type', 'product_type', 'product_name', 'mrc', 'quantity',
-  'wo_number', 'order_number', 'completion_date', 'contract_end_date', 'renewal_alert', 'creator',
+  'wo_number', 'completion_date', 'contract_end_date', 'renewal_alert', 'creator',
 ]
 
 function label(col) {
@@ -95,7 +93,7 @@ function activationDateDisplay(row) {
 const TRUNCATE_LENGTH = 40
 
 function truncate(str, max = TRUNCATE_LENGTH) {
-  if (!str || typeof str !== 'string') return '—'
+  if (str == null || str === '') return '—'
   const s = String(str)
   return s.length > max ? s.slice(0, max) + '...' : s
 }

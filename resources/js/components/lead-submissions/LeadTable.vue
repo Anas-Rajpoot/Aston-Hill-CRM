@@ -229,7 +229,7 @@ const columnLabels = {
   company_name: 'Company Name',
   authorized_signatory_name: 'Authorized Signatory',
   email: 'Email',
-  contact_number_gsm: 'Contact (GSM)',
+  contact_number_gsm: 'Contact Number',
   alternate_contact_number: 'Alternate Contact',
   address: 'Address',
   emirate: 'Emirate',

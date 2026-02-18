@@ -2,10 +2,12 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
+import { useSidebar } from '@/composables/useSidebar'
 import api from '@/lib/axios'
 
 const auth = useAuthStore()
 const router = useRouter()
+const { collapsed, toggle: toggleSidebar } = useSidebar()
 const userMenuOpen = ref(false)
 
 const primaryRole = computed(() => {
@@ -74,7 +76,19 @@ onUnmounted(() => {
 
 <template>
   <header class="h-16 flex items-center justify-between px-6 bg-white border-b border-gray-200 shadow-sm">
-    <h1 class="text-lg font-semibold text-gray-800 truncate">Aston Hill</h1>
+    <div class="flex items-center gap-3">
+      <button
+        type="button"
+        class="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+        :title="collapsed ? 'Open sidebar' : 'Close sidebar'"
+        @click="toggleSidebar"
+      >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+      <h1 class="text-lg font-semibold text-gray-800 truncate">Aston Hill</h1>
+    </div>
 
     <div class="flex items-center gap-3">
       <!-- Notification bell (only visible when web notifications enabled) -->

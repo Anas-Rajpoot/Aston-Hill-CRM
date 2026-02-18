@@ -3,18 +3,22 @@
 namespace App\Models;
 
 use App\Models\User;
+use App\Traits\ResolvesClientLink;
 use Illuminate\Database\Eloquent\Model;
 
 class VasRequestSubmission extends Model
 {
+    use ResolvesClientLink;
+
     protected $table = 'vas_request_submissions';
 
     protected $fillable = [
+        'client_id',
         'account_number',
         'contact_number',
         'company_name',
         'request_type',
-        'request_description',
+        'description',
         'additional_notes',
         'status',
         'sales_agent_id',

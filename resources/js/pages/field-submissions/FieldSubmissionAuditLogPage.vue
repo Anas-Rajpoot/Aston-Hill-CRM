@@ -38,7 +38,7 @@ function fieldLabel(name, row) {
   const labels = {
     company_name: 'Company Name',
     contact_number: 'Contact Number',
-    contact_number_gsm: 'Contact Number (GSM)',
+    contact_number_gsm: 'Contact Number',
     product: 'Product',
     emirates: 'Emirates',
     emirate: 'Emirate',

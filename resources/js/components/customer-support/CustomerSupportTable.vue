@@ -76,7 +76,6 @@ const columnLabels = {
   issue_category: 'Issue Category',
   contact_number: 'Contact Number',
   issue_description: 'Issue Description',
-  attachments: 'Attachments',
   creator: 'Submitted By',
   csr: 'CSR Name',
   manager: 'Manager',
@@ -138,7 +137,7 @@ function fullValue(row, col) {
 const TRUNCATE_COLUMNS = [
   'issue_category', 'company_name', 'account_number', 'contact_number', 'issue_description',
   'manager', 'team_leader', 'sales_agent', 'creator', 'csr', 'status',
-  'submitted_at', 'created_at', 'updated_at', 'completion_date', 'attachments',
+  'submitted_at', 'created_at', 'updated_at', 'completion_date',
   'trouble_ticket', 'activity', 'pending', 'resolution_remarks', 'internal_remarks',
   'workflow_status', 'ticket_number',
 ]
@@ -152,7 +151,7 @@ function cellTitle(row, col) {
 }
 
 const DROPDOWN_COLUMNS = ['status', 'issue_category', 'manager', 'team_leader', 'sales_agent']
-const READ_ONLY_COLUMNS = ['id', 'creator', 'submitted_at', 'created_at', 'attachments']
+const READ_ONLY_COLUMNS = ['id', 'creator', 'submitted_at', 'created_at']
 
 function isDropdownColumn(col) {
   return DROPDOWN_COLUMNS.includes(col)
@@ -301,7 +300,7 @@ function isUnassignedCsr(row) {
             v-for="col in columns"
             :key="col"
             scope="col"
-            class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold uppercase tracking-wider text-white"
+            class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold capitalize text-white"
           >
             <button
               v-if="sortable(col)"
@@ -323,7 +322,7 @@ function isUnassignedCsr(row) {
             </button>
             <span v-else class="font-bold text-white">{{ label(col) }}</span>
           </th>
-          <th scope="col" class="whitespace-nowrap px-4 py-3 text-center text-sm font-bold uppercase tracking-wider text-white">
+          <th scope="col" class="whitespace-nowrap px-4 py-3 text-center text-sm font-bold capitalize text-white">
             Actions
           </th>
         </tr>
@@ -471,44 +470,45 @@ function isUnassignedCsr(row) {
               {{ truncate(formatValue(row, col)) }}
             </template>
           </td>
-          <td class="whitespace-nowrap px-4 py-3 text-center">
-            <div class="inline-flex items-center gap-2">
-              <button
-                type="button"
-                class="rounded-full p-1.5 text-blue-600 hover:bg-blue-50"
-                title="View"
-                @click="goToView(row)"
-              >
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                class="rounded-full p-1.5 text-green-600 hover:bg-green-50"
-                title="Edit"
-                @click="goToEdit(row)"
-              >
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                class="rounded-full p-1.5 text-amber-600 hover:bg-amber-50"
-                title="View History"
-                @click="$emit('viewHistory', row)"
-              >
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </button>
-            </div>
-            <div v-if="canResubmit(row)" class="mt-1 inline-flex justify-center">
+          <td class="whitespace-nowrap px-4 py-3">
+            <div class="flex items-center justify-between gap-3">
+              <div class="inline-flex items-center gap-1">
+                <button
+                  type="button"
+                  class="rounded-full p-1.5 text-blue-600 hover:bg-blue-50"
+                  title="View"
+                  @click="goToView(row)"
+                >
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="rounded-full p-1.5 text-green-600 hover:bg-green-50"
+                  title="Edit"
+                  @click="goToEdit(row)"
+                >
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="rounded-full p-1.5 text-amber-600 hover:bg-amber-50"
+                  title="View History"
+                  @click="$emit('viewHistory', row)"
+                >
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </button>
+              </div>
               <router-link
+                v-if="canResubmit(row)"
                 :to="`/customer-support/${row.id}/resubmit`"
-                class="rounded bg-blue-800 px-2 py-1 text-xs font-medium text-white hover:bg-blue-900"
+                class="rounded bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700"
               >
                 Resubmit
               </router-link>

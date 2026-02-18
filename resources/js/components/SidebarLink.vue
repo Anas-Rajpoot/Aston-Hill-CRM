@@ -1,10 +1,18 @@
 <template>
   <router-link
     :to="to"
-    class="block px-3 py-2 rounded-md text-sm font-medium transition-colors"
-    :class="linkClasses"
+    class="group relative block rounded-md text-sm font-medium transition-colors"
+    :class="[linkClasses, collapsed ? 'flex items-center justify-center px-0 py-2' : 'px-3 py-2']"
+    :title="collapsed ? label : undefined"
   >
-    {{ label }}
+    <span v-if="collapsed" class="text-xs font-bold leading-none">{{ abbr }}</span>
+    <span v-else>{{ label }}</span>
+
+    <!-- Tooltip on hover when collapsed -->
+    <span
+      v-if="collapsed"
+      class="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap rounded bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100"
+    >{{ label }}</span>
   </router-link>
 </template>
 
@@ -15,6 +23,8 @@ import { computed, toRefs } from 'vue'
 const props = defineProps({
   to: { type: String, required: true },
   label: { type: String, default: '' },
+  abbr: { type: String, default: '' },
+  collapsed: { type: Boolean, default: false },
   dark: { type: Boolean, default: false },
   sub: { type: Boolean, default: false },
   active: { type: Boolean, default: null },

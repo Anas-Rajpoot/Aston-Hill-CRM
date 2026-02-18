@@ -5,12 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\FieldSubmissionController;
 use App\Models\Client;
-use App\Models\ClientAddress;
 use App\Models\ClientAlert;
+use App\Models\ClientAddress;
 use App\Models\ClientCompanyDetail;
 use App\Models\ClientContact;
 use App\Models\ClientCsr;
 use App\Models\SystemAuditLog;
+use App\Models\User;
 use App\Models\UserColumnPreference;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -238,6 +239,23 @@ class ClientApiController extends Controller
 
     private function formatRow(Client $row, array $columns): array
     {
+        $needsManager = in_array('manager', $columns, true) && ! $row->manager_id && $row->sales_agent_id;
+        $needsTeamLeader = in_array('team_leader', $columns, true) && ! $row->team_leader_id && $row->sales_agent_id;
+
+        if ($needsManager || $needsTeamLeader) {
+            $agent = $row->salesAgent ?? User::find($row->sales_agent_id);
+            if ($agent) {
+                if ($needsTeamLeader && $agent->team_leader_id) {
+                    $row->team_leader_id = $agent->team_leader_id;
+                    $row->setRelation('teamLeader', User::find($agent->team_leader_id));
+                }
+                if ($needsManager && $agent->manager_id) {
+                    $row->manager_id = $agent->manager_id;
+                    $row->setRelation('manager', User::find($agent->manager_id));
+                }
+            }
+        }
+
         $out = [];
         foreach ($columns as $col) {
             if ($col === 'manager') {
@@ -588,6 +606,20 @@ class ClientApiController extends Controller
 
     private function showPayload(Client $client): array
     {
+        if ($client->sales_agent_id) {
+            $agent = $client->salesAgent;
+            if ($agent) {
+                if (! $client->team_leader_id && $agent->team_leader_id) {
+                    $client->team_leader_id = $agent->team_leader_id;
+                    $client->setRelation('teamLeader', User::find($agent->team_leader_id));
+                }
+                if (! $client->manager_id && $agent->manager_id) {
+                    $client->manager_id = $agent->manager_id;
+                    $client->setRelation('manager', User::find($agent->manager_id));
+                }
+            }
+        }
+
         $companyDetail = $client->companyDetail;
         return [
             'id' => $client->id,
@@ -807,11 +839,15 @@ class ClientApiController extends Controller
     {
         $this->authorize('view', $client);
 
-        $accountNumber = $client->account_number;
+        $accountNumber = trim((string) $client->account_number);
         $query = \App\Models\VasRequestSubmission::query()
             ->visibleTo($request->user())
-            ->when($accountNumber !== null && $accountNumber !== '', fn ($q) => $q->where('account_number', $accountNumber))
-            ->when(empty($accountNumber), fn ($q) => $q->whereRaw('1 = 0'));
+            ->where(function ($q) use ($client, $accountNumber) {
+                $q->where('client_id', $client->id);
+                if ($accountNumber !== '') {
+                    $q->orWhere('account_number', $accountNumber);
+                }
+            });
 
         $query->with(['manager:id,name', 'teamLeader:id,name', 'salesAgent:id,name']);
         $query->orderByDesc('submitted_at');
@@ -848,18 +884,19 @@ class ClientApiController extends Controller
         ]);
     }
 
-    /**
-     * Customer support submissions for this client's account_number.
-     */
     public function customerSupport(Request $request, Client $client): JsonResponse
     {
         $this->authorize('view', $client);
 
-        $accountNumber = $client->account_number;
+        $accountNumber = trim((string) $client->account_number);
         $query = \App\Models\CustomerSupportSubmission::query()
             ->visibleTo($request->user())
-            ->when($accountNumber !== null && $accountNumber !== '', fn ($q) => $q->where('account_number', $accountNumber))
-            ->when(empty($accountNumber), fn ($q) => $q->whereRaw('1 = 0'));
+            ->where(function ($q) use ($client, $accountNumber) {
+                $q->where('client_id', $client->id);
+                if ($accountNumber !== '') {
+                    $q->orWhere('account_number', $accountNumber);
+                }
+            });
 
         $query->with(['manager:id,name', 'teamLeader:id,name', 'salesAgent:id,name']);
         $query->orderByDesc('submitted_at');
@@ -1115,10 +1152,38 @@ class ClientApiController extends Controller
         $this->authorize('view', $client);
 
         $query = $client->alerts()->with('manager:id,name');
-        $query->orderBy('expiry_date');
 
-        $perPage = (int) $request->input('per_page', 10);
-        $page = (int) $request->input('page', 1);
+        if ($request->filled('alert_type')) {
+            $query->where('alert_type', $request->input('alert_type'));
+        }
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+        if ($request->filled('resolved')) {
+            $query->where('resolved', $request->boolean('resolved'));
+        }
+        if ($request->filled('manager_id')) {
+            $query->where('manager_id', $request->input('manager_id'));
+        }
+        if ($request->filled('expiry_from')) {
+            $query->whereDate('expiry_date', '>=', $request->input('expiry_from'));
+        }
+        if ($request->filled('expiry_to')) {
+            $query->whereDate('expiry_date', '<=', $request->input('expiry_to'));
+        }
+        if ($request->filled('created_from')) {
+            $query->whereDate('created_date', '>=', $request->input('created_from'));
+        }
+        if ($request->filled('created_to')) {
+            $query->whereDate('created_date', '<=', $request->input('created_to'));
+        }
+
+        $sortable = ['alert_type', 'company_name', 'account_number', 'expiry_date', 'days_remaining', 'status', 'created_date', 'resolved'];
+        $sort = in_array($request->input('sort'), $sortable) ? $request->input('sort') : 'expiry_date';
+        $order = $request->input('order') === 'asc' ? 'asc' : 'desc';
+        $query->orderBy($sort, $order);
+
+        $perPage = (int) $request->input('per_page', 25);
         $paginated = $query->paginate($perPage);
 
         $items = $paginated->getCollection()->map(fn ($a) => [
@@ -1127,8 +1192,10 @@ class ClientApiController extends Controller
             'company_name' => $a->company_name,
             'account_number' => $a->account_number,
             'expiry_date' => $a->expiry_date?->format('d-M-Y'),
+            '_raw_expiry' => $a->expiry_date?->format('Y-m-d'),
             'days_remaining' => $a->days_remaining,
             'manager' => $a->manager?->name,
+            'manager_id' => $a->manager_id,
             'status' => $a->status,
             'created_date' => $a->created_date?->format('d-M-Y'),
             'resolved' => $a->resolved,
@@ -1143,5 +1210,104 @@ class ClientApiController extends Controller
                 'total' => $paginated->total(),
             ],
         ]);
+    }
+
+    public function storeAlert(Request $request, Client $client): JsonResponse
+    {
+        $this->authorize('update', $client);
+
+        $validated = $request->validate([
+            'alert_type' => ['required', 'string', 'max:80'],
+            'expiry_date' => ['required', 'date'],
+            'days_remaining' => ['nullable', 'integer', 'min:0'],
+            'manager_id' => ['nullable', 'exists:users,id'],
+            'status' => ['required', 'string', 'max:50'],
+        ]);
+
+        $alert = $client->alerts()->create([
+            'alert_type' => $validated['alert_type'],
+            'company_name' => $client->company_name,
+            'account_number' => $client->account_number,
+            'expiry_date' => $validated['expiry_date'],
+            'days_remaining' => $validated['days_remaining'] ?? null,
+            'manager_id' => $validated['manager_id'] ?? null,
+            'status' => $validated['status'],
+            'created_date' => now()->toDateString(),
+            'created_by' => $request->user()->id,
+        ]);
+
+        $alert->load('manager:id,name');
+
+        return response()->json([
+            'message' => 'Alert created successfully.',
+            'alert' => [
+                'id' => $alert->id,
+                'alert_type' => $alert->alert_type,
+                'company_name' => $alert->company_name,
+                'account_number' => $alert->account_number,
+                'expiry_date' => $alert->expiry_date?->format('d-M-Y'),
+                '_raw_expiry' => $alert->expiry_date?->format('Y-m-d'),
+                'days_remaining' => $alert->days_remaining,
+                'manager' => $alert->manager?->name,
+                'manager_id' => $alert->manager_id,
+                'status' => $alert->status,
+                'created_date' => $alert->created_date?->format('d-M-Y'),
+                'resolved' => $alert->resolved,
+            ],
+        ], 201);
+    }
+
+    public function updateAlert(Request $request, Client $client, ClientAlert $alert): JsonResponse
+    {
+        $this->authorize('update', $client);
+
+        if ((int) $alert->client_id !== (int) $client->id) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'alert_type'     => ['sometimes', 'string', 'max:80'],
+            'expiry_date'    => ['sometimes', 'date'],
+            'days_remaining' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'manager_id'     => ['sometimes', 'nullable', 'exists:users,id'],
+            'status'         => ['sometimes', 'string', 'max:50'],
+        ]);
+
+        $alert->update($validated);
+        $alert->load('manager:id,name');
+
+        return response()->json([
+            'message' => 'Alert updated.',
+            'alert' => [
+                'id'             => $alert->id,
+                'alert_type'     => $alert->alert_type,
+                'company_name'   => $alert->company_name,
+                'account_number' => $alert->account_number,
+                'expiry_date'    => $alert->expiry_date?->format('d-M-Y'),
+                '_raw_expiry'    => $alert->expiry_date?->format('Y-m-d'),
+                'days_remaining' => $alert->days_remaining,
+                'manager'        => $alert->manager?->name,
+                'manager_id'     => $alert->manager_id,
+                'status'         => $alert->status,
+                'created_date'   => $alert->created_date?->format('d-M-Y'),
+                'resolved'       => $alert->resolved,
+            ],
+        ]);
+    }
+
+    public function resolveAlert(Request $request, Client $client, ClientAlert $alert): JsonResponse
+    {
+        $this->authorize('update', $client);
+
+        if ((int) $alert->client_id !== (int) $client->id) {
+            abort(404);
+        }
+
+        $alert->update([
+            'resolved' => true,
+            'resolved_at' => now(),
+        ]);
+
+        return response()->json(['message' => 'Alert resolved successfully.']);
     }
 }

@@ -104,4 +104,24 @@ class Client extends Model
     {
         return $this->hasMany(ClientAudit::class)->orderByDesc('changed_at');
     }
+
+    public function leadSubmissions()
+    {
+        return $this->hasMany(LeadSubmission::class);
+    }
+
+    public function fieldSubmissions()
+    {
+        return $this->hasMany(FieldSubmission::class);
+    }
+
+    public function vasRequests()
+    {
+        return $this->hasMany(VasRequestSubmission::class);
+    }
+
+    public function customerSupportSubmissions()
+    {
+        return $this->hasMany(CustomerSupportSubmission::class);
+    }
 }

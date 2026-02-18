@@ -30,7 +30,7 @@ const COMMON_LABELS = {
   account_number: 'Account Number',
   authorized_signatory_name: 'Authorized Signatory',
   email: 'Email',
-  contact_number_gsm: 'Contact Number (GSM)',
+  contact_number_gsm: 'Contact Number',
   alternate_contact_number: 'Alternate Contact Number',
   address: 'Address',
   emirate: 'Emirate',

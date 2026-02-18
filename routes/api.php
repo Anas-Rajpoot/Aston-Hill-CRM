@@ -107,6 +107,8 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::get('/customer-support/columns', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'columns']);
     Route::get('/customer-support/edit-options', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'editOptions']);
     Route::post('/customer-support/columns', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'saveColumns']);
+    Route::post('/customer-support/{customerSupportSubmission}/resubmit', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'resubmit'])
+        ->whereNumber('customerSupportSubmission');
     Route::get('/customer-support/{customerSupportSubmission}', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'show'])
         ->whereNumber('customerSupportSubmission');
     Route::get('/customer-support/{customerSupportSubmission}/audits', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'audits'])
@@ -136,6 +138,9 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::put('/clients/{client}/contacts', [\App\Http\Controllers\Api\ClientApiController::class, 'updateContacts'])->whereNumber('client');
     Route::put('/clients/{client}/addresses', [\App\Http\Controllers\Api\ClientApiController::class, 'updateAddresses'])->whereNumber('client');
     Route::get('/clients/{client}/alerts', [\App\Http\Controllers\Api\ClientApiController::class, 'alerts'])->whereNumber('client');
+    Route::post('/clients/{client}/alerts', [\App\Http\Controllers\Api\ClientApiController::class, 'storeAlert'])->whereNumber('client');
+    Route::put('/clients/{client}/alerts/{alert}', [\App\Http\Controllers\Api\ClientApiController::class, 'updateAlert'])->whereNumber('client')->whereNumber('alert');
+    Route::post('/clients/{client}/alerts/{alert}/resolve', [\App\Http\Controllers\Api\ClientApiController::class, 'resolveAlert'])->whereNumber('client')->whereNumber('alert');
     Route::get('/clients/{client}', [\App\Http\Controllers\Api\ClientApiController::class, 'show'])->whereNumber('client');
 
     // VAS requests
@@ -159,6 +164,7 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::post('/vas-requests/{vasRequest}/resubmit', [VasRequestController::class, 'resubmit'])->whereNumber('vasRequest');
 
     // Lead submissions (specific routes before {lead})
+    Route::get('/lead-submissions/team-options', [FieldSubmissionController::class, 'teamOptions']);
     Route::get('/lead-submissions', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'index'])->middleware('api.cache:10,20');
     Route::get('/lead-submissions/filters', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'filters'])->middleware('api.cache:60,120');
     Route::get('/lead-submissions/columns', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'columns']);

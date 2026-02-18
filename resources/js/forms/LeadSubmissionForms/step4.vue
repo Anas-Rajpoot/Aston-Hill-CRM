@@ -143,7 +143,7 @@ function close() {
             <p class="text-sm font-medium text-gray-900">{{ truncate(lead.authorized_signatory_name) || '—' }}</p>
           </div>
           <div>
-            <p class="text-xs text-gray-500">Contact Number (GSM)</p>
+            <p class="text-xs text-gray-500">Contact Number</p>
             <p class="text-sm font-medium text-gray-900">{{ truncate(lead.contact_number_gsm) || '—' }}</p>
           </div>
           <div>

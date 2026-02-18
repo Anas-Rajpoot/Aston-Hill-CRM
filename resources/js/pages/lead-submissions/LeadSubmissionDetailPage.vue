@@ -239,7 +239,7 @@ onMounted(() => {
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.email) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Contact (GSM)</label>
+                  <label class="block text-xs font-medium text-gray-500">Contact Number</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.contact_number_gsm) }}</div>
                 </div>
                 <div>

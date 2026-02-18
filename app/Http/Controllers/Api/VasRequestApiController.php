@@ -24,7 +24,7 @@ class VasRequestApiController extends Controller
 
     private const ALLOWED_COLUMNS = [
         'id', 'submitted_at', 'created_at', 'created_by', 'updated_at', 'approved_at', 'rejected_at',
-        'request_type', 'account_number', 'contact_number', 'company_name', 'request_description', 'additional_notes',
+        'request_type', 'account_number', 'contact_number', 'company_name', 'description', 'additional_notes',
         'manager_id', 'team_leader_id', 'sales_agent_id', 'back_office_executive_id',
         'status',
     ];
@@ -267,7 +267,7 @@ class VasRequestApiController extends Controller
             'account_number' => "{$t}.account_number",
             'contact_number' => "{$t}.contact_number",
             'company_name' => "{$t}.company_name",
-            'request_description' => "{$t}.request_description",
+            'description' => "{$t}.description",
             'additional_notes' => "{$t}.additional_notes",
             'manager_id' => "{$t}.manager_id",
             'manager' => "{$t}.manager_id",
@@ -416,7 +416,7 @@ class VasRequestApiController extends Controller
             'request_type' => ['sometimes', 'string', Rule::in($types)],
             'account_number' => ['sometimes', 'nullable', 'string', 'max:100'],
             'company_name' => ['sometimes', 'string', 'max:255'],
-            'request_description' => ['sometimes', 'nullable', 'string', 'max:5000'],
+            'description' => ['sometimes', 'nullable', 'string', 'max:5000'],
             'manager_id' => ['sometimes', 'nullable', 'exists:users,id'],
             'team_leader_id' => ['sometimes', 'nullable', 'exists:users,id'],
             'sales_agent_id' => ['sometimes', 'nullable', 'exists:users,id'],
@@ -431,7 +431,7 @@ class VasRequestApiController extends Controller
 
         $vasRequest->load(['manager:id,name', 'teamLeader:id,name', 'salesAgent:id,name', 'backOfficeExecutive:id,name', 'creator:id,name']);
         $columns = array_merge(
-            ['id', 'submitted_at', 'created_at', 'request_type', 'account_number', 'company_name', 'request_description', 'manager', 'team_leader', 'sales_agent', 'executive', 'status', 'creator'],
+            ['id', 'submitted_at', 'created_at', 'request_type', 'account_number', 'company_name', 'description', 'approved_at', 'manager', 'team_leader', 'sales_agent', 'executive', 'status', 'creator'],
             array_keys($data)
         );
         $columns = array_unique($columns);

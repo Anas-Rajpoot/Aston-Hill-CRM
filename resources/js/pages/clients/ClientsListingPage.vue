@@ -43,7 +43,8 @@ const defaultColumns = ref([])
 const visibleColumns = ref([
   'company_name', 'submitted_at', 'manager', 'team_leader', 'sales_agent', 'status',
   'service_type', 'product_type', 'address', 'product_name', 'mrc', 'quantity',
-  'other', 'migration_numbers', 'fiber', 'order_number', 'wo_number',
+  'other', 'migration_numbers',
+  'wo_number',
   'completion_date', 'payment_connection', 'contract_type', 'contract_end_date',
   'renewal_alert', 'additional_notes',
 ])
@@ -78,7 +79,6 @@ function buildParams() {
 }
 
 const COLUMN_LABELS = {
-  id: 'ID',
   company_name: 'Company Name',
   account_number: 'Account Number',
   submitted_at: 'Submission Date',
@@ -94,9 +94,7 @@ const COLUMN_LABELS = {
   quantity: 'Quantity',
   other: 'Other',
   migration_numbers: 'Migration Numbers',
-  fiber: 'Fiber',
-  order_number: 'ACL',
-  wo_number: 'WIO',
+  wo_number: 'Work Order',
   completion_date: 'Completion Date',
   payment_connection: 'Payment Connection',
   contract_type: 'Contract Type',
@@ -174,6 +172,7 @@ async function loadColumns() {
     allColumns.value = data.all_columns ?? []
     visibleColumns.value = data.visible_columns ?? visibleColumns.value
     defaultColumns.value = data.default_columns ?? []
+    updateTableColumns()
   } catch {
     //
   }
@@ -213,6 +212,7 @@ async function onSaveColumns(cols) {
   try {
     await clientsApi.saveColumns(cols)
     visibleColumns.value = cols
+    updateTableColumns()
     meta.value.current_page = 1
     load()
   } catch {
@@ -247,11 +247,9 @@ function goToAddClient() {
   router.push('/clients/create')
 }
 
-/** Effective columns for table: include id for row identity; API returns it in BASE_COLUMNS. */
 const tableColumns = ref([])
 function updateTableColumns() {
-  const cols = visibleColumns.value
-  tableColumns.value = cols.includes('id') ? cols : ['id', ...cols]
+  tableColumns.value = visibleColumns.value.filter((c) => c !== 'id' && c !== 'fiber' && c !== 'order_number')
 }
 
 onMounted(() => {
@@ -265,8 +263,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-white py-6 px-4 sm:px-6">
-    <div class="mx-auto max-w-[1600px] space-y-4">
+  <div class="min-h-[calc(100vh-4rem)] bg-white p-4">
+    <div class="w-full space-y-4">
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div class="flex flex-wrap items-baseline gap-2">
           <h1 class="text-xl font-semibold text-gray-900 leading-tight">Clients</h1>
@@ -348,7 +346,7 @@ onMounted(() => {
 
       <div class="overflow-hidden rounded-lg border-2 border-black bg-white shadow-sm">
         <ClientTable
-          :columns="visibleColumns"
+          :columns="tableColumns"
           :data="clients"
           :sort="sort"
           :order="order"

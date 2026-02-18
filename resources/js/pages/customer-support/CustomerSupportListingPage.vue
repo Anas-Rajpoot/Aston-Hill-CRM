@@ -63,7 +63,7 @@ const visibleColumns = ref([
   'contact_number', 'creator', 'csr', 'status', 'workflow_status',
   'pending', 'completion_date', 'updated_at',
   'trouble_ticket', 'activity', 'resolution_remarks', 'internal_remarks',
-  'attachments', 'manager', 'team_leader', 'sales_agent',
+  'manager', 'team_leader', 'sales_agent',
 ])
 const sort = ref('submitted_at')
 const order = ref('desc')
@@ -445,14 +445,14 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-white pt-4">
+  <div class="min-h-[calc(100vh-4rem)] bg-white">
     <div class="w-full space-y-4">
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div class="flex flex-wrap items-baseline gap-2">
-          <h1 class="text-xl font-semibold text-gray-900 leading-tight">Customer Support Requests</h1>
+          <h1 class="text-xl font-semibold text-gray-900 leading-tight pl-2">Customer Support Requests</h1>
           <Breadcrumbs />
         </div>
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2 pt-2">
           <button
             v-if="canBulkAssign"
             type="button"

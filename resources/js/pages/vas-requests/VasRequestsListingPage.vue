@@ -68,7 +68,7 @@ const meta = ref({ current_page: 1, last_page: 1, per_page: auth.defaultTablePag
 const perPageOptions = ref([10, 20, 25, 50, 100])
 const allColumns = ref([])
 const visibleColumns = ref([
-  'id', 'submitted_at', 'request_type', 'account_number', 'company_name',
+  'id', 'submitted_at', 'request_type', 'account_number', 'company_name', 'description',
   'manager', 'team_leader', 'sales_agent', 'executive', 'status', 'creator',
 ])
 const sort = ref('submitted_at')

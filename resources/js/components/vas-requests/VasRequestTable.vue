@@ -57,15 +57,20 @@ const columnLabels = {
   id: '#',
   submitted_at: 'Submission Date',
   created_at: 'Created',
+  updated_at: 'Last Updated',
   request_type: 'Request Type',
   account_number: 'Account Number',
   company_name: 'Company Name',
   description: 'Description',
+  additional_notes: 'Additional Notes',
+  contact_number: 'Contact Number',
   manager: 'Manager',
   team_leader: 'Team Leader',
   sales_agent: 'Sales Agent',
   executive: 'Back Office Executive',
   status: 'Status',
+  approved_at: 'Completion Date',
+  rejected_at: 'Rejected Date',
   creator: 'Created By',
 }
 
@@ -97,7 +102,7 @@ function formatValue(row, col) {
 
 const TRUNCATE_LENGTH = 30
 function truncate(str, max = TRUNCATE_LENGTH) {
-  if (!str || typeof str !== 'string') return '—'
+  if (str == null || str === '') return '—'
   const s = String(str)
   return s.length > max ? s.slice(0, max) + '...' : s
 }
@@ -109,9 +114,9 @@ function fullValue(row, col) {
 }
 
 const TRUNCATE_COLUMNS = [
-  'request_type', 'company_name', 'account_number', 'description',
+  'request_type', 'company_name', 'account_number', 'description', 'additional_notes', 'contact_number',
   'manager', 'team_leader', 'sales_agent', 'executive', 'creator', 'status',
-  'submitted_at', 'created_at',
+  'submitted_at', 'created_at', 'updated_at', 'approved_at', 'rejected_at',
 ]
 function shouldTruncate(col) {
   return TRUNCATE_COLUMNS.includes(col)
@@ -264,7 +269,7 @@ function statusBadgeClass(status) {
             v-for="col in columns"
             :key="col"
             scope="col"
-            class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold uppercase tracking-wider text-white"
+            class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold capitalize text-white"
           >
             <button
               v-if="sortable(col)"
@@ -279,7 +284,7 @@ function statusBadgeClass(status) {
             </button>
             <span v-else class="font-bold text-white">{{ label(col) }}</span>
           </th>
-          <th scope="col" class="whitespace-nowrap px-4 py-3 text-right text-sm font-bold uppercase tracking-wider text-white">Actions</th>
+          <th scope="col" class="whitespace-nowrap px-4 py-3 text-center text-sm font-bold capitalize text-white">Actions</th>
         </tr>
       </thead>
       <tbody class="bg-white">
@@ -406,35 +411,33 @@ function statusBadgeClass(status) {
               {{ truncate(formatValue(row, col)) }}
             </template>
           </td>
-          <td class="whitespace-nowrap px-4 py-3 text-right">
-            <div class="inline-flex items-center gap-2">
-              <button type="button" class="rounded-full p-1.5 text-blue-600 hover:bg-blue-50" title="View" @click="goToView(row)">
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-              </button>
-              <button type="button" class="rounded-full p-1.5 text-green-600 hover:bg-green-50" title="Edit" @click="goToEdit(row)">
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                </svg>
-              </button>
-              <button type="button" class="rounded-full p-1.5 text-amber-600 hover:bg-amber-50" title="View History" @click="$emit('viewHistory', row)">
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </button>
-              <button
+          <td class="whitespace-nowrap px-4 py-3">
+            <div class="flex items-center justify-between gap-3">
+              <div class="inline-flex items-center gap-1">
+                <button type="button" class="rounded-full p-1.5 text-blue-600 hover:bg-blue-50" title="View" @click="goToView(row)">
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                </button>
+                <button type="button" class="rounded-full p-1.5 text-green-600 hover:bg-green-50" title="Edit" @click="goToEdit(row)">
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                </button>
+                <button type="button" class="rounded-full p-1.5 text-amber-600 hover:bg-amber-50" title="View History" @click="$emit('viewHistory', row)">
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </button>
+              </div>
+              <router-link
                 v-if="row.status === 'rejected'"
-                type="button"
-                class="rounded-full p-1.5 text-orange-600 hover:bg-orange-50"
-                title="Resubmit"
-                @click="$emit('resubmit', row)"
+                :to="`/vas-requests/${row.id}/resubmit`"
+                class="rounded bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700"
               >
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-              </button>
+                Resubmit
+              </router-link>
             </div>
           </td>
         </tr>

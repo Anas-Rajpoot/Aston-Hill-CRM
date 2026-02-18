@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class FieldSubmission extends Model
 {
     protected $fillable = [
+        'client_id',
         'created_by',
         'company_name',
         'contact_number',
@@ -74,6 +75,11 @@ class FieldSubmission extends Model
     public function team()
     {
         return $this->belongsTo(\App\Models\Team::class, 'team_id');
+    }
+
+    public function client()
+    {
+        return $this->belongsTo(\App\Models\Client::class);
     }
 
     public function fieldExecutive()

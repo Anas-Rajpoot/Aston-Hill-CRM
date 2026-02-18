@@ -3,10 +3,14 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Traits\ResolvesClientLink;
 
 class LeadSubmission extends Model
 {
+    use ResolvesClientLink;
+
     protected $fillable = [
+        'client_id',
         'created_by','updated_by','step','status','status_changed_at',
         'account_number','company_name','authorized_signatory_name','contact_number_gsm',
         'alternate_contact_number','email','address','emirate','location_coordinates',

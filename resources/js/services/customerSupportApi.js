@@ -73,6 +73,11 @@ export default {
     return data
   },
 
+  async resubmit(id, payload) {
+    const { data } = await api.post(`/customer-support/${id}/resubmit`, payload)
+    return data
+  },
+
   async assignCsr(submissionId, csrId) {
     const { data } = await api.patch(`/customer-support/${submissionId}/assign-csr`, {
       csr_id: csrId,
