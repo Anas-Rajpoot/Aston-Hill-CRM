@@ -789,7 +789,7 @@ onMounted(() => {
                       />
                     </div>
                     <div>
-                      <label class="block text-xs text-gray-500">Alternate Number</label>
+                      <label class="block text-xs text-gray-500">Alternate Contact Number</label>
                       <input
                         v-model="c.alternate_number"
                         type="text"

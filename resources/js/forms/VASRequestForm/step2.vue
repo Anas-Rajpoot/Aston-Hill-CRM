@@ -294,8 +294,7 @@ async function goNext() {
     <template v-else>
       <!-- VAS Submission Form (Document uploads) -->
       <div>
-        <h3 class="border-b border-gray-200 pb-2 text-base font-semibold text-gray-800">VAS Submission Form</h3>
-        <p class="mt-2 text-sm text-gray-600">
+        <p class="text-sm text-gray-600">
           {{ uploadedStatusText }}
         </p>
         <p class="mt-1 text-xs text-gray-500">
@@ -314,7 +313,7 @@ async function goNext() {
               </svg>
             </div>
             <div class="min-w-0 flex-1">
-              <p class="truncate text-sm font-medium text-gray-900">{{ doc.label }}</p>
+              <p class="truncate text-sm font-medium text-gray-900">{{ doc.label }} <span v-if="doc.required" class="text-red-500">*</span></p>
               <p v-if="fileErrors[doc.key]" class="mt-0.5 text-xs text-red-600">{{ fileErrors[doc.key] }}</p>
               <p v-else-if="files[doc.key]" class="mt-0.5 truncate text-xs text-gray-600" :title="files[doc.key].name">
                 {{ files[doc.key].name }}

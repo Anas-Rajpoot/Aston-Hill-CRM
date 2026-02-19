@@ -357,7 +357,7 @@ const cancel = () => window.history.back()
             </svg>
           </div>
           <div class="min-w-0 flex-1">
-            <p class="font-semibold text-gray-900 text-sm">{{ doc.label }}</p>
+            <p class="font-semibold text-gray-900 text-sm">{{ doc.label }} <span v-if="doc.required" class="text-red-500">*</span></p>
             <div v-if="getDocFiles(doc.key).length || getExistingForKey(doc.key).length" class="mt-1 flex flex-col gap-0.5">
               <template v-for="(f, idx) in getDocFiles(doc.key)" :key="'new-' + idx">
                 <span class="text-xs text-gray-600 truncate max-w-full" :title="f.name">{{ truncateFileName(f.name) }}</span>

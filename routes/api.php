@@ -97,6 +97,19 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::get('/field-submissions/{fieldSubmission}/audits', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'audits'])->whereNumber('fieldSubmission');
     Route::get('/field-submissions/audit-log', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'auditLog']);
 
+    // Special requests
+    Route::post('/special-requests', [\App\Http\Controllers\Api\SpecialRequestApiController::class, 'store']);
+    Route::get('/special-requests', [\App\Http\Controllers\Api\SpecialRequestApiController::class, 'index'])->middleware('api.cache:10,20');
+    Route::get('/special-requests/filters', [\App\Http\Controllers\Api\SpecialRequestApiController::class, 'filters'])->middleware('api.cache:60,120');
+    Route::get('/special-requests/columns', [\App\Http\Controllers\Api\SpecialRequestApiController::class, 'columns']);
+    Route::post('/special-requests/columns', [\App\Http\Controllers\Api\SpecialRequestApiController::class, 'saveColumns']);
+    Route::get('/special-requests/bootstrap', [\App\Http\Controllers\Api\SpecialRequestApiController::class, 'bootstrap'])->middleware('api.cache:15,30');
+    Route::get('/special-requests/{specialRequest}', [\App\Http\Controllers\Api\SpecialRequestApiController::class, 'show'])->whereNumber('specialRequest');
+    Route::put('/special-requests/{specialRequest}', [\App\Http\Controllers\Api\SpecialRequestApiController::class, 'update'])->whereNumber('specialRequest');
+    Route::patch('/special-requests/{specialRequest}', [\App\Http\Controllers\Api\SpecialRequestApiController::class, 'patch'])->whereNumber('specialRequest');
+    Route::get('/special-requests/{specialRequest}/audits', [\App\Http\Controllers\Api\SpecialRequestApiController::class, 'audits'])->whereNumber('specialRequest');
+    Route::get('/special-requests/{specialRequest}/documents/{document}/download', [\App\Http\Controllers\Api\SpecialRequestApiController::class, 'downloadDocument'])->whereNumber('specialRequest');
+
     // Customer support
     Route::get('/customer-support/team-options', [CustomerSupportController::class, 'teamOptions']);
     Route::get('/customer-support/csr-options', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'csrOptions']);

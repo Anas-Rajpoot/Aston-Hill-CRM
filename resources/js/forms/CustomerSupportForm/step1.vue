@@ -156,11 +156,27 @@ function isEmptyUserSelect(val) {
   return Number.isNaN(n) || n < 1
 }
 
+function validatePhone(value) {
+  if (!value) return 'Contact number is required.'
+  if (/\s/.test(value)) return 'Contact number must not contain spaces.'
+  if (!/^\d+$/.test(value)) return 'Contact number must contain only digits.'
+  if (!value.startsWith('971')) return 'Contact number must start with 971.'
+  if (value.length !== 12) return 'Contact number must be exactly 12 digits.'
+  return null
+}
+
+function onPhoneInput(field, event) {
+  const raw = event.target.value.replace(/\D/g, '')
+  form.value[field] = raw
+  clearFieldError(field)
+}
+
 function validateForm() {
   const err = {}
   if (!form.value.issue_category?.trim()) err.issue_category = ['Please select an issue category.']
   if (!form.value.company_name?.trim()) err.company_name = ['Company name is required.']
-  if (!form.value.contact_number?.trim()) err.contact_number = ['Contact number is required.']
+  const phoneErr = validatePhone(form.value.contact_number?.trim())
+  if (phoneErr) err.contact_number = [phoneErr]
   if (!form.value.issue_description?.trim()) err.issue_description = ['Issue description is required.']
   if (isEmptyUserSelect(form.value.manager_id)) err.manager_id = [`${formatTeamLabel(teamLabels.value.manager || 'manager')} is required.`]
   if (isEmptyUserSelect(form.value.team_leader_id)) err.team_leader_id = [`${formatTeamLabel(teamLabels.value.team_leader || 'team_leader')} is required.`]
@@ -243,6 +259,11 @@ function cancel() {
   if (fileInput2.value) fileInput2.value.value = ''
 }
 
+function startNewSubmission() {
+  cancel()
+  window.scrollTo(0, 0)
+}
+
 function onFileChange(slot, event) {
   const file = event.target?.files?.[0]
   if (slot === 1) form.value.attachment_1 = file || null
@@ -277,10 +298,14 @@ const selectClass = (field) =>
       </svg>
       <h3 class="text-lg font-semibold text-green-800">Request Submitted</h3>
       <p class="mt-1 text-sm text-green-600">{{ successMessage }}</p>
-    </div>
-
-    <div v-if="!successMessage">
-      <h2 class="text-2xl font-bold text-gray-800">Primary Information</h2>
+      <p class="mt-3 text-sm text-gray-600">Click the button below to start a new customer support request.</p>
+      <button
+        type="button"
+        @click="startNewSubmission"
+        class="mt-4 inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-green-700"
+      >
+        New Customer Support
+      </button>
     </div>
 
     <form v-if="!successMessage" @submit.prevent="submit" class="space-y-8">
@@ -295,9 +320,12 @@ const selectClass = (field) =>
         </ul>
       </div>
 
-      <!-- Primary Information section content -->
-      <div>
-        <div class="mt-0">
+      <!-- Primary Information -->
+      <div class="!mt-0">
+        <h3 class="text-base font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">
+          Primary Information
+        </h3>
+        <div>
           <label class="mb-2 block text-sm font-medium text-gray-700">
             Issue Category <span class="text-red-500">*</span>
           </label>
@@ -357,9 +385,10 @@ const selectClass = (field) =>
             <input
               v-model="form.contact_number"
               type="text"
-              placeholder="Enter Contact Number"
+              maxlength="12"
+              placeholder="971XXXXXXXXX"
               :class="inputClass('contact_number')"
-              @input="clearFieldError('contact_number')"
+              @input="onPhoneInput('contact_number', $event)"
             />
             <p v-if="getError('contact_number')" class="mt-1 text-sm text-red-600">{{ getError('contact_number') }}</p>
           </div>

@@ -107,8 +107,7 @@ async function submit() {
 
     <template v-else-if="request">
       <div>
-        <h2 class="text-lg font-semibold text-gray-900">VAS Submission Form</h2>
-        <h3 class="mt-4 text-base font-semibold text-gray-800">Review & Submit</h3>
+        <h3 class="text-base font-semibold text-gray-800">Review & Submit</h3>
         <p class="mt-1 text-sm text-gray-600">Please review all information before submitting.</p>
       </div>
 

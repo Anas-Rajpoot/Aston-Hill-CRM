@@ -11,6 +11,7 @@ use App\Models\FieldSubmission;
 use App\Models\LeadSubmission;
 use App\Models\VasRequestSubmission;
 use App\Models\EmailFollowUp;
+use App\Models\SpecialRequest;
 use App\Models\User;
 use App\Policies\AccountPolicy;
 use App\Policies\ClientPolicy;
@@ -19,11 +20,13 @@ use App\Policies\FieldSubmissionPolicy;
 use App\Policies\LeadSubmissionPolicy;
 use App\Policies\VasRequestPolicy;
 use App\Policies\EmailFollowUpPolicy;
+use App\Policies\SpecialRequestPolicy;
 use App\Observers\ClientObserver;
 use App\Observers\FieldSubmissionObserver;
 use App\Observers\LeadSubmissionObserver;
 use App\Observers\VasRequestSubmissionObserver;
 use App\Observers\CustomerSupportSubmissionObserver;
+use App\Observers\SpecialRequestObserver;
 use App\Observers\SubmissionCacheObserver;
 use App\Observers\UserObserver;
 use App\Repositories\Contracts\LeadSubmissionRepositoryInterface;
@@ -53,6 +56,7 @@ class AppServiceProvider extends ServiceProvider
         FieldSubmission::observe(FieldSubmissionObserver::class);
         VasRequestSubmission::observe(VasRequestSubmissionObserver::class);
         CustomerSupportSubmission::observe(CustomerSupportSubmissionObserver::class);
+        SpecialRequest::observe(SpecialRequestObserver::class);
         Client::observe(ClientObserver::class);
         User::observe(UserObserver::class);
 
@@ -67,6 +71,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(CustomerSupportSubmission::class, CustomerSupportSubmissionPolicy::class);
         Gate::policy(VasRequestSubmission::class, VasRequestPolicy::class);
         Gate::policy(EmailFollowUp::class, EmailFollowUpPolicy::class);
+        Gate::policy(SpecialRequest::class, SpecialRequestPolicy::class);
         Gate::before(function ($user, $ability) {
             return $user->hasRole('superadmin') ? true : null;
         });

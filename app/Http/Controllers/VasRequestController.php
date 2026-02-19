@@ -260,13 +260,21 @@ class VasRequestController extends Controller
         $data = $request->validate([
             'request_type' => ['required', 'string', Rule::in($types)],
             'account_number' => ['nullable', 'string', 'max:100'],
+            'contact_number' => ['nullable', 'string', 'max:50'],
             'company_name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
+            'request_description' => ['nullable', 'string', 'max:5000'],
+            'additional_notes' => ['nullable', 'string', 'max:2000'],
             'manager_id' => ['required', 'exists:users,id'],
             'team_leader_id' => ['required', 'exists:users,id'],
             'sales_agent_id' => ['required', 'exists:users,id'],
             'back_office_executive_id' => ['nullable', 'exists:users,id'],
         ]);
+
+        if (isset($data['request_description'])) {
+            $data['description'] = $data['request_description'];
+            unset($data['request_description']);
+        }
 
         $vasRequest->update($data);
         return response()->json([

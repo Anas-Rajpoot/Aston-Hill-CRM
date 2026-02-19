@@ -31,6 +31,7 @@ const navItems = [
   { to: '/field-submissions', label: 'Field Submissions', abbr: 'FS' },
   { to: '/customer-support', label: 'Customer Support', abbr: 'CS' },
   { to: '/vas-requests', label: 'VAS Requests', abbr: 'VR' },
+  { to: '/special-requests', label: 'Special Requests', abbr: 'SR' },
   { to: '/clients', label: 'Clients', abbr: 'Cl' },
   { to: '/order-status', label: 'Order Status', abbr: 'OS' },
   { to: '/dsp-tracker', label: 'DSP Tracker', abbr: 'DT' },

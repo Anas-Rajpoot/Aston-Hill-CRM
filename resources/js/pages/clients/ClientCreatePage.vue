@@ -800,7 +800,7 @@ function closeToast() {
                 <p v-if="idx === 0 && fieldErrors.contact_0_contact_number" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.contact_0_contact_number }}</p>
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700">Alternate Number</label>
+                <label class="block text-sm font-medium text-gray-700">Alternate Contact Number</label>
                 <input v-model="contact.alternate_number" type="text" placeholder="Enter alternate number" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
               </div>
               <div>

@@ -163,24 +163,23 @@ onMounted(async () => {
   <div class="min-h-[calc(100vh-4rem)] bg-white py-6 px-4 sm:px-6">
     <div class="mx-auto max-w-[1600px] space-y-4">
       <!-- Heading first, then breadcrumb -->
-      <div class="flex flex-wrap items-center gap-1">
-        <div class="flex items-center gap-3">
-          <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#B8E6D5]">
-            <svg class="h-6 w-6 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-            </svg>
-          </span>
-          <div>
+      <div class="flex items-center gap-3">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#B8E6D5]">
+          <svg class="h-6 w-6 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+          </svg>
+        </span>
+        <div>
+          <div class="flex items-center gap-2">
             <h1 class="text-2xl font-bold text-gray-900 leading-tight">Order Status</h1>
-            <p class="mt-0.5 text-sm text-gray-500">Track and monitor order status by Activity, Account Number, or Work Order.</p>
+            <Breadcrumbs />
           </div>
+          <p class="text-sm text-gray-500">Track and monitor order status by Activity, Account Number, or Work Order.</p>
         </div>
-        <Breadcrumbs />
       </div>
 
       <!-- Filters card: Activity, Account Number, Work Order + Search, Clear, Advanced Filters, Customize Columns -->
       <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-        <h3 class="mb-3 text-sm font-medium text-gray-900">Filters</h3>
         <div class="flex flex-wrap items-end gap-4">
           <div class="min-w-[140px] max-w-[200px] flex-1">
             <label for="os-activity" class="mb-0.5 block text-xs text-gray-700">Activity</label>

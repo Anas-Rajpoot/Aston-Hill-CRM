@@ -106,6 +106,15 @@ const onDraftSaved = () => {
   setTimeout(() => { draftSavedMessage.value = '' }, 3000)
 }
 
+const startNewRequest = () => {
+  submitted.value = false
+  vasRequestId.value = null
+  currentStep.value = 1
+  draftSavedMessage.value = ''
+  router.replace({ path: route.path })
+  scrollToTop()
+}
+
 const onSubmitted = () => {
   submitted.value = true
   draftSavedMessage.value = ''
@@ -123,6 +132,14 @@ const onSubmitted = () => {
       </svg>
       <h3 class="text-lg font-semibold text-green-800">VAS Request Submitted</h3>
       <p class="mt-1 text-sm text-green-600">Your VAS request has been submitted successfully.</p>
+      <p class="mt-3 text-sm text-gray-600">Click the button below to start a new VAS request.</p>
+      <button
+        type="button"
+        @click="startNewRequest"
+        class="mt-4 inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-green-700"
+      >
+        New VAS Request
+      </button>
     </div>
 
     <template v-else>
@@ -144,7 +161,7 @@ const onSubmitted = () => {
           <p class="text-sm font-medium text-gray-700">Rendering...</p>
         </div>
 
-        <Step1 v-if="currentStep === 1" @next="onStep1Next" />
+        <Step1 v-if="currentStep === 1" :vas-request-id="vasRequestId" @next="onStep1Next" />
         <Step2
           v-else-if="currentStep === 2"
           :vas-request-id="vasRequestId"

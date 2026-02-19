@@ -20,7 +20,7 @@ const form = ref({
   product: '',
   alternate_number: '',
   emirates: '',
-  location_coordinates: '25.2048, 55.2708',
+  location_coordinates: '',
   complete_address: '',
   additional_notes: '',
   special_instruction: '',
@@ -146,12 +146,44 @@ function buildPayload() {
   }
 }
 
+const onPhoneInput = (field, e) => {
+  form.value[field] = e.target.value.replace(/\D/g, '').slice(0, 12)
+  clearFieldError(field)
+}
+
+function validatePhone(value) {
+  if (!value) return null
+  if (!/^\d{12}$/.test(value)) return 'Must be exactly 12 digits with no spaces (e.g. 971XXXXXXXXX).'
+  if (!value.startsWith('971')) return 'Must start with 971.'
+  return null
+}
+
 const validateForm = () => {
   const err = {}
   if (!form.value.company_name?.trim()) err.company_name = ['Company name is required.']
-  if (!form.value.contact_number?.trim()) err.contact_number = ['Contact number is required.']
+  if (!form.value.contact_number?.trim()) {
+    err.contact_number = ['Contact number is required.']
+  } else {
+    const phoneErr = validatePhone(form.value.contact_number.trim())
+    if (phoneErr) err.contact_number = [phoneErr]
+  }
   if (!form.value.product?.trim()) err.product = ['Product is required.']
-  if (!form.value.alternate_number?.trim()) err.alternate_number = ['Alternate number is required.']
+  if (form.value.alternate_number?.trim()) {
+    const altPhoneErr = validatePhone(form.value.alternate_number.trim())
+    if (altPhoneErr) err.alternate_number = [altPhoneErr]
+  }
+  if (form.value.location_coordinates?.trim()) {
+    const coordPattern = /^-?\d{1,3}(\.\d+)?\s*,\s*-?\d{1,3}(\.\d+)?$/
+    const coords = form.value.location_coordinates.trim()
+    if (!coordPattern.test(coords)) {
+      err.location_coordinates = ['Enter valid coordinates (e.g. 25.2048, 55.2708).']
+    } else {
+      const [lat, lng] = coords.split(',').map(s => parseFloat(s.trim()))
+      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        err.location_coordinates = ['Latitude must be -90 to 90, longitude -180 to 180.']
+      }
+    }
+  }
   if (!form.value.emirates?.trim()) err.emirates = ['Emirates is required.']
   if (!form.value.complete_address?.trim()) err.complete_address = ['Complete address is required.']
   if (!form.value.manager_id) err.manager_id = [`${formatTeamLabel(teamLabels.value.manager || 'manager')} is required.`]
@@ -185,7 +217,7 @@ async function submit() {
       product: '',
       alternate_number: '',
       emirates: '',
-      location_coordinates: '25.2048, 55.2708',
+      location_coordinates: '',
       complete_address: '',
       additional_notes: '',
       special_instruction: '',
@@ -207,7 +239,7 @@ function cancel() {
     product: '',
     alternate_number: '',
     emirates: '',
-    location_coordinates: '25.2048, 55.2708',
+    location_coordinates: '',
     complete_address: '',
     additional_notes: '',
     special_instruction: '',
@@ -217,6 +249,11 @@ function cancel() {
   })
   clearErrors()
   successMessage.value = ''
+}
+
+function startNewSubmission() {
+  cancel()
+  window.scrollTo(0, 0)
 }
 
 const inputClass = (field) =>
@@ -237,13 +274,14 @@ const selectClass = (field) =>
       </svg>
       <h3 class="text-lg font-semibold text-green-800">Field Request Submitted</h3>
       <p class="mt-1 text-sm text-green-600">{{ successMessage }}</p>
-    </div>
-
-    <div v-if="!successMessage">
-      <h2 class="text-2xl font-bold text-gray-800">Field Submission Form</h2>
-      <p class="mt-1 text-sm text-gray-500">
-        Submit a request for field visit or meeting. Fields marked with <span class="text-red-500">*</span> are required.
-      </p>
+      <p class="mt-3 text-sm text-gray-600">Click the button below to start a new field submission.</p>
+      <button
+        type="button"
+        @click="startNewSubmission"
+        class="mt-4 inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-green-700"
+      >
+        New Field Submission
+      </button>
     </div>
 
     <form v-if="!successMessage" @submit.prevent="submit" class="space-y-8">
@@ -262,7 +300,7 @@ const selectClass = (field) =>
       </div>
 
       <!-- Primary Information -->
-      <div>
+      <div class="!mt-0">
         <h3 class="border-b border-gray-200 pb-2 text-base font-semibold text-gray-800">
           Primary Information
         </h3>
@@ -284,21 +322,6 @@ const selectClass = (field) =>
           </div>
           <div>
             <label class="mb-1 block text-sm font-medium text-gray-700">
-              Contact Number <span class="text-red-500">*</span>
-            </label>
-            <input
-              v-model="form.contact_number"
-              type="text"
-              placeholder="+971 XX XXX XXXX"
-              :class="inputClass('contact_number')"
-              @input="clearFieldError('contact_number')"
-            />
-            <p v-if="getError('contact_number')" class="mt-1 text-sm text-red-600">
-              {{ getError('contact_number') }}
-            </p>
-          </div>
-          <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">
               Product <span class="text-red-500">*</span>
             </label>
             <input
@@ -314,14 +337,31 @@ const selectClass = (field) =>
           </div>
           <div>
             <label class="mb-1 block text-sm font-medium text-gray-700">
-              Alternate Number <span class="text-red-500">*</span>
+              Contact Number <span class="text-red-500">*</span>
+            </label>
+            <input
+              v-model="form.contact_number"
+              type="text"
+              maxlength="12"
+              placeholder="971XXXXXXXXX"
+              :class="inputClass('contact_number')"
+              @input="onPhoneInput('contact_number', $event)"
+            />
+            <p v-if="getError('contact_number')" class="mt-1 text-sm text-red-600">
+              {{ getError('contact_number') }}
+            </p>
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-medium text-gray-700">
+              Alternate Contact Number
             </label>
             <input
               v-model="form.alternate_number"
               type="text"
-              placeholder="+971 xxx xx xx XXX"
+              maxlength="12"
+              placeholder="971XXXXXXXXX"
               :class="inputClass('alternate_number')"
-              @input="clearFieldError('alternate_number')"
+              @input="onPhoneInput('alternate_number', $event)"
             />
             <p v-if="getError('alternate_number')" class="mt-1 text-sm text-red-600">
               {{ getError('alternate_number') }}
@@ -348,9 +388,13 @@ const selectClass = (field) =>
             <input
               v-model="form.location_coordinates"
               type="text"
-              placeholder="25.2048, 55.2708"
+              placeholder="e.g. 25.2048, 55.2708"
               :class="inputClass('location_coordinates')"
+              @input="clearFieldError('location_coordinates')"
             />
+            <p v-if="getError('location_coordinates')" class="mt-1 text-sm text-red-600">
+              {{ getError('location_coordinates') }}
+            </p>
           </div>
         </div>
         <div class="mt-4 space-y-4">
@@ -374,7 +418,7 @@ const selectClass = (field) =>
             <textarea
               v-model="form.additional_notes"
               rows="2"
-              placeholder="Enter any additional notes"
+              placeholder="Enter Additional Notes"
               :class="inputClass('additional_notes')"
             />
           </div>
@@ -385,7 +429,7 @@ const selectClass = (field) =>
             <textarea
               v-model="form.special_instruction"
               rows="2"
-              placeholder="Enter any remarks or comments"
+              placeholder="Enter Special Instruction"
               :class="inputClass('special_instruction')"
             />
           </div>

@@ -172,6 +172,28 @@ return [
         'sla_days' => 7,
     ],
 
+    'special_requests' => [
+        'model' => \App\Models\SpecialRequest::class,
+        'columns' => [
+            'id' => ['label' => 'ID', 'filter' => null, 'sortable' => true],
+            'submitted_at' => ['label' => 'Submission Date', 'filter' => 'date', 'sortable' => true],
+            'created_at' => ['label' => 'Created', 'filter' => 'date', 'sortable' => true],
+            'company_name' => ['label' => 'Company Name', 'filter' => 'text', 'sortable' => true],
+            'account_number' => ['label' => 'Account Number', 'filter' => 'text', 'sortable' => true],
+            'request_type' => ['label' => 'Request Type', 'filter' => 'select', 'sortable' => true],
+            'complete_address' => ['label' => 'Complete Address', 'filter' => null, 'sortable' => false],
+            'special_instruction' => ['label' => 'Special Instruction', 'filter' => null, 'sortable' => false],
+            'sales_agent' => ['label' => 'Sales Agent', 'filter' => null, 'sortable' => true],
+            'team_leader' => ['label' => 'Team Leader', 'filter' => null, 'sortable' => true],
+            'manager' => ['label' => 'Manager', 'filter' => null, 'sortable' => true],
+            'status' => ['label' => 'Status', 'filter' => 'select', 'sortable' => true],
+            'creator' => ['label' => 'Created By', 'filter' => null, 'sortable' => false],
+            'updated_at' => ['label' => 'Last Updated', 'filter' => 'date', 'sortable' => true],
+        ],
+        'default_columns' => ['id', 'submitted_at', 'company_name', 'account_number', 'request_type', 'complete_address', 'sales_agent', 'team_leader', 'manager', 'status', 'creator', 'updated_at'],
+        'default_sort' => ['created_at', 'desc'],
+    ],
+
     'email_follow_ups' => [
         'model' => \App\Models\EmailFollowUp::class,
         'columns' => [

@@ -39,7 +39,7 @@ const form = ref({
   email: '',
   address: '',
   emirates: '',
-  location_coordinates: '25.2048, 55.2708',
+  location_coordinates: '',
   product: '',
   offer: '',
   mrc_aed: '0',
@@ -95,7 +95,7 @@ const populateForm = (draft, skipTeamWatchers = false) => {
     email: draft.email || '',
     address: draft.address || '',
     emirates: draft.emirate || '',
-    location_coordinates: draft.location_coordinates || '25.2048, 55.2708',
+    location_coordinates: draft.location_coordinates || '',
     product: draft.product || '',
     offer: draft.offer || '',
     mrc_aed: draft.mrc_aed != null ? String(Math.max(0, parseInt(draft.mrc_aed, 10) || 0)) : '0',
@@ -126,7 +126,7 @@ const resetForm = () => {
     email: '',
     address: '',
     emirates: '',
-    location_coordinates: '25.2048, 55.2708',
+    location_coordinates: '',
     product: '',
     offer: '',
     mrc_aed: '0.00',
@@ -331,7 +331,16 @@ const aeDomainValidation = computed(() => validateAeDomain(form.value.ae_domain)
 const validateStep1 = () => {
   const err = {}
   if (!form.value.company_name?.trim()) err.company_name = ['Company name is required.']
-  if (!form.value.contact_number_gsm?.trim()) err.contact_number_gsm = ['Contact number is required.']
+  if (!form.value.contact_number_gsm?.trim()) {
+    err.contact_number_gsm = ['Contact number is required.']
+  } else {
+    const phoneErr = validatePhone(form.value.contact_number_gsm.trim())
+    if (phoneErr) err.contact_number_gsm = [phoneErr]
+  }
+  if (form.value.alternate_contact_number?.trim()) {
+    const altPhoneErr = validatePhone(form.value.alternate_contact_number.trim())
+    if (altPhoneErr) err.alternate_contact_number = [altPhoneErr]
+  }
   if (!form.value.address?.trim()) err.address = ['Complete address is required.']
   if (!form.value.emirates?.trim()) err.emirates = ['Emirates is required.']
   if (!form.value.product?.trim()) err.product = ['Product is required.']
@@ -340,10 +349,34 @@ const validateStep1 = () => {
   if (!form.value.manager_id) err.manager_id = [`${formatTeamLabel(teamLabels.value.manager || 'manager')} is required.`]
   if (!form.value.team_leader_id) err.team_leader_id = [`${formatTeamLabel(teamLabels.value.team_leader || 'team_leader')} is required.`]
   if (!form.value.sales_agent_id) err.sales_agent_id = [`${formatTeamLabel(teamLabels.value.sales_agent || 'sales_agent')} is required.`]
+  if (form.value.location_coordinates?.trim()) {
+    const coordPattern = /^-?\d{1,3}(\.\d+)?\s*,\s*-?\d{1,3}(\.\d+)?$/
+    const coords = form.value.location_coordinates.trim()
+    if (!coordPattern.test(coords)) {
+      err.location_coordinates = ['Enter valid coordinates (e.g. 25.2048, 55.2708).']
+    } else {
+      const [lat, lng] = coords.split(',').map(s => parseFloat(s.trim()))
+      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        err.location_coordinates = ['Latitude must be -90 to 90, longitude -180 to 180.']
+      }
+    }
+  }
   if (form.value.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.value.email)) err.email = ['Please enter a valid email address.']
   if (form.value.mrc_aed && (isNaN(parseInt(form.value.mrc_aed, 10)) || parseInt(form.value.mrc_aed, 10) < 0)) err.mrc_aed = ['MRC must be a valid whole number (0 or more).']
   if (form.value.quantity && (parseInt(form.value.quantity, 10) < 0 || !Number.isInteger(Number(form.value.quantity)))) err.quantity = ['Quantity must be a whole number.']
   return Object.keys(err).length ? err : null
+}
+
+const onPhoneInput = (field, e) => {
+  form.value[field] = e.target.value.replace(/\D/g, '').slice(0, 12)
+  clearFieldError(field)
+}
+
+function validatePhone(value) {
+  if (!value) return null
+  if (!/^\d{12}$/.test(value)) return 'Must be exactly 12 digits with no spaces (e.g. 971XXXXXXXXX).'
+  if (!value.startsWith('971')) return 'Must start with 971.'
+  return null
 }
 
 // MRC (AED) increment/decrement – start 0, step 1, up/down inside field
@@ -443,7 +476,7 @@ const cancel = () => {
       </div>
 
       <!-- Primary Information -->
-      <div>
+      <div class="!mt-0">
         <h3 class="text-base font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">
           Primary Information
         </h3>
@@ -480,12 +513,25 @@ const cancel = () => {
             />
           </div>
           <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Product <span class="text-red-500">*</span></label>
+            <input
+              v-model="form.product"
+              type="text"
+              placeholder="Search Product"
+              :class="inputClass('product')"
+              @input="clearFieldError('product')"
+            />
+            <p v-if="getError('product')" class="mt-1 text-sm text-red-600">{{ getError('product') }}</p>
+          </div>
+          <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Contact Number <span class="text-red-500">*</span></label>
             <input
               v-model="form.contact_number_gsm"
               type="text"
-              placeholder="+971 XX XXX XXXX"
+              maxlength="12"
+              placeholder="971XXXXXXXXX"
               :class="inputClass('contact_number_gsm')"
+              @input="onPhoneInput('contact_number_gsm', $event)"
             />
             <p v-if="getError('contact_number_gsm')" class="mt-1 text-sm text-red-600">{{ getError('contact_number_gsm') }}</p>
           </div>
@@ -494,10 +540,12 @@ const cancel = () => {
             <input
               v-model="form.alternate_contact_number"
               type="text"
-              placeholder="+971 XX XXX XXXX"
+              maxlength="12"
+              placeholder="971XXXXXXXXX"
               :class="inputClass('alternate_contact_number')"
-              @input="clearFieldError('alternate_contact_number')"
+              @input="onPhoneInput('alternate_contact_number', $event)"
             />
+            <p v-if="errors?.alternate_contact_number" class="mt-1 text-xs text-red-600">{{ errors.alternate_contact_number[0] }}</p>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Email ID</label>
@@ -538,20 +586,11 @@ const cancel = () => {
             <input
               v-model="form.location_coordinates"
               type="text"
-              readonly
-              class="w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-600"
+              placeholder="e.g. 25.2048, 55.2708"
+              :class="inputClass('location_coordinates')"
+              @input="clearFieldError('location_coordinates')"
             />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Product <span class="text-red-500">*</span></label>
-            <input
-              v-model="form.product"
-              type="text"
-              placeholder="Search Product"
-              :class="inputClass('product')"
-              @input="clearFieldError('product')"
-            />
-            <p v-if="getError('product')" class="mt-1 text-sm text-red-600">{{ getError('product') }}</p>
+            <p v-if="errors?.location_coordinates" class="mt-1 text-xs text-red-600">{{ errors.location_coordinates[0] }}</p>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Offer</label>

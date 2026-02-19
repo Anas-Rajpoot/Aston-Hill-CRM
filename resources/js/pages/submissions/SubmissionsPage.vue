@@ -71,7 +71,7 @@ function onLeadNewSubmission() {
       />
 
       <!-- TAB CONTENT: one async component per tab; each shows skeleton while loading. -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 sm:p-8">
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 px-6 pb-6 pt-3 sm:px-8 sm:pb-8 sm:pt-4 !mt-0">
         <LeadSubmissionWizard
           v-if="activeTab === 'lead'"
           :key="`lead-${formKey}`"

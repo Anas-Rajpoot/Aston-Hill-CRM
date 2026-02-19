@@ -10,6 +10,9 @@ export default {
   storeStep1(data) {
     return api.post('/vas-requests/step-1', data)
   },
+  updateStep1(id, data) {
+    return api.put(`/vas-requests/${id}`, data)
+  },
   getRequest(id) {
     return api.get(`/vas-requests/${id}`)
   },

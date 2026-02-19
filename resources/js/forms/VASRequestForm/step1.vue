@@ -4,6 +4,10 @@ import api from '@/services/vasRequestsApi'
 import { useFormErrors } from '@/composables/useFormErrors'
 import { formatTeamLabel } from '@/composables/useTeamLabel'
 
+const props = defineProps({
+  vasRequestId: { type: Number, default: null },
+})
+
 const REQUEST_TYPES = [
   'Establishment Card Update',
   'Trade License Update',
@@ -127,6 +131,30 @@ onMounted(async () => {
     if (data.labels) {
       teamLabels.value = { ...teamLabels.value, ...data.labels }
     }
+
+    if (props.vasRequestId) {
+      try {
+        const res = await api.getRequest(props.vasRequestId)
+        const d = res.data
+        settingFromChild.value = true
+        settingFromSalesAgent.value = true
+        form.value = {
+          request_type: d.request_type || '',
+          account_number: d.account_number || '',
+          contact_number: d.contact_number || '',
+          company_name: d.company_name || '',
+          request_description: d.description || '',
+          additional_notes: d.additional_notes || '',
+          manager_id: d.manager_id != null ? String(d.manager_id) : '',
+          team_leader_id: d.team_leader_id != null ? String(d.team_leader_id) : '',
+          sales_agent_id: d.sales_agent_id != null ? String(d.sales_agent_id) : '',
+        }
+        nextTick(() => {
+          settingFromChild.value = false
+          settingFromSalesAgent.value = false
+        })
+      } catch (_) {}
+    }
   } catch (e) {
     setErrors(e)
   } finally {
@@ -149,11 +177,27 @@ function buildPayload() {
   }
 }
 
+function validatePhone(value) {
+  if (!value) return 'Contact number is required.'
+  if (/\s/.test(value)) return 'Contact number must not contain spaces.'
+  if (!/^\d+$/.test(value)) return 'Contact number must contain only digits.'
+  if (!value.startsWith('971')) return 'Contact number must start with 971.'
+  if (value.length !== 12) return 'Contact number must be exactly 12 digits.'
+  return null
+}
+
+function onPhoneInput(field, event) {
+  const raw = event.target.value.replace(/\D/g, '')
+  form.value[field] = raw
+  clearFieldError(field)
+}
+
 function validateForm() {
   const err = {}
   if (!form.value.request_type?.trim()) err.request_type = ['Please select a request type.']
   if (!form.value.account_number?.trim()) err.account_number = ['Account number is required.']
-  if (!form.value.contact_number?.trim()) err.contact_number = ['Contact number is required.']
+  const phoneErr = validatePhone(form.value.contact_number?.trim())
+  if (phoneErr) err.contact_number = [phoneErr]
   if (!form.value.company_name?.trim()) err.company_name = ['Company name is required.']
   if (!form.value.request_description?.trim()) err.request_description = ['Request description is required.']
   if (!form.value.manager_id) err.manager_id = [`${formatTeamLabel(teamLabels.value.manager || 'manager')} is required.`]
@@ -173,8 +217,13 @@ async function saveDraft() {
   savingDraft.value = true
   try {
     const payload = buildPayload()
-    const { data } = await api.storeStep1(payload)
-    emit('next', data.id)
+    if (props.vasRequestId) {
+      await api.updateStep1(props.vasRequestId, payload)
+      emit('next', props.vasRequestId)
+    } else {
+      const { data } = await api.storeStep1(payload)
+      emit('next', data.id)
+    }
   } catch (e) {
     setErrors(e)
   } finally {
@@ -193,8 +242,13 @@ async function nextStep() {
   saving.value = true
   try {
     const payload = buildPayload()
-    const { data } = await api.storeStep1(payload)
-    emit('next', data.id)
+    if (props.vasRequestId) {
+      await api.updateStep1(props.vasRequestId, payload)
+      emit('next', props.vasRequestId)
+    } else {
+      const { data } = await api.storeStep1(payload)
+      emit('next', data.id)
+    }
   } catch (e) {
     setErrors(e)
   } finally {
@@ -232,12 +286,9 @@ const selectClass = (field) =>
       </ul>
     </div>
 
-    <!-- VAS Submission Form title -->
-    <h2 class="text-lg font-semibold text-gray-900">VAS Submission Form</h2>
-
     <!-- Primary Information (2 columns) -->
-    <div>
-      <h3 class="border-b border-gray-200 pb-2 text-base font-semibold text-gray-800">
+    <div class="!mt-0">
+      <h3 class="text-base font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">
         Primary Information
       </h3>
       <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -275,9 +326,10 @@ const selectClass = (field) =>
           <input
             v-model="form.contact_number"
             type="text"
-            placeholder="Enter contact number"
+            maxlength="12"
+            placeholder="971XXXXXXXXX"
             :class="inputClass('contact_number')"
-            @input="clearFieldError('contact_number')"
+            @input="onPhoneInput('contact_number', $event)"
           />
           <p v-if="getError('contact_number')" class="mt-1 text-sm text-red-600">{{ getError('contact_number') }}</p>
         </div>
