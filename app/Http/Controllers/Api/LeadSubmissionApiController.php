@@ -62,6 +62,7 @@ class LeadSubmissionApiController extends Controller
             'order' => ['sometimes', 'string', Rule::in(['asc', 'desc'])],
             'columns' => ['sometimes', 'array'],
             'columns.*' => ['string', Rule::in(array_merge(self::ALLOWED_COLUMNS, ['creator', 'type', 'category', 'sales_agent', 'team_leader', 'manager', 'executive', 'submission_type', 'sla_timer']))],
+            'submission_type' => ['sometimes', 'nullable', 'string', Rule::in(['new', 'resubmission'])],
             'service_type_id' => ['sometimes', 'nullable', 'integer', 'exists:service_types,id'],
             'status' => ['sometimes', 'nullable', 'string', Rule::in(LeadSubmission::STATUSES)],
             'service_category_id' => ['sometimes', 'nullable', 'integer', 'exists:service_categories,id'],
@@ -174,6 +175,9 @@ class LeadSubmissionApiController extends Controller
     {
         if (!empty($validated['status'])) {
             $query->where('status', $validated['status']);
+        }
+        if (!empty($validated['submission_type'])) {
+            $query->where('submission_type', $validated['submission_type']);
         }
         if (!empty($validated['service_category_id'])) {
             $query->where('service_category_id', $validated['service_category_id']);

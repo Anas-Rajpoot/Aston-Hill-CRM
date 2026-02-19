@@ -35,48 +35,115 @@ function formatDateTime(iso) {
 
 function fieldLabel(name, row) {
   if (row?.field_label) return row.field_label
-  const labels = {
-    company_name: 'Company Name',
-    account_number: 'Account Number',
-    authorized_signatory_name: 'Authorized Signatory',
-    email: 'Email',
-    contact_number_gsm: 'Contact Number',
-    alternate_contact_number: 'Alternate Contact',
-    address: 'Address',
-    emirates: 'Emirates',
-    emirate: 'Emirate',
-    product: 'Product',
-    manager_id: 'Manager',
-    team_leader_id: 'Team Leader',
-    sales_agent_id: 'Sales Agent',
-    executive_id: 'Back Office Executive',
-    back_office_executive_id: 'Back Office Executive',
-    field_executive_id: 'Field Agent',
-    csr_id: 'Customer Support Representative',
-    status: 'Status',
-    step: 'Submission Step',
-    submission_date_from: 'Submission Date',
-    submitted_at: 'Submitted At',
-    status_changed_at: 'Status Changed At',
-    submission_type: 'Submission Type',
-    call_verification: 'Call Verification',
-    pending_from_sales: 'Pending From Sales',
-    documents_verification: 'Documents Verification',
-    back_office_notes: 'Back Office Notes',
-    activity: 'Activity',
-    back_office_account: 'Back Office Account',
-    work_order: 'Work Order',
-    du_status: 'DU Status',
-    completion_date: 'Completion Date',
-    du_remarks: 'DU Remarks',
-    additional_note: 'Additional Note',
-    service_category_id: 'Service Category',
-    service_type_id: 'Service Type',
-    created_by: 'Created By',
-    team_id: 'Team',
-    department_id: 'Department',
+  if (FIELD_LABELS[name]) return FIELD_LABELS[name]
+  return name.replace(/_id$/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?)?/
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+function formatAuditSingleValue(val) {
+  if (val == null || val === '') return null
+  const s = String(val)
+  if (DATE_PATTERN.test(s)) {
+    const date = new Date(s)
+    if (!Number.isNaN(date.getTime())) {
+      const day = String(date.getDate()).padStart(2, '0')
+      const mon = MONTH_NAMES[date.getMonth()]
+      const year = date.getFullYear()
+      const h = String(date.getHours()).padStart(2, '0')
+      const m = String(date.getMinutes()).padStart(2, '0')
+      return `${day}-${mon}-${year} ${h}:${m}`
+    }
   }
-  return labels[name] ?? name.replace(/_id$/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+  return s
+}
+
+const FIELD_LABELS = {
+  company_name: 'Company Name',
+  account_number: 'Account Number',
+  authorized_signatory_name: 'Authorized Signatory Name',
+  contact_number_gsm: 'Contact Number',
+  alternate_contact_number: 'Alternate Contact Number',
+  email: 'Email ID',
+  address: 'Complete Address',
+  emirate: 'Emirates',
+  location_coordinates: 'Location Coordinates',
+  service_category_id: 'Service Category',
+  service_type_id: 'Service Type',
+  product: 'Product',
+  offer: 'Offer',
+  mrc_aed: 'MRC (AED)',
+  quantity: 'Quantity',
+  ae_domain: '.ae Domain',
+  gaid: 'GAID',
+  remarks: 'Remarks',
+  manager_id: 'Manager',
+  team_leader_id: 'Team Leader',
+  sales_agent_id: 'Sales Agent',
+  executive_id: 'Executive',
+  status: 'Status',
+  submission_type: 'Request Type',
+  call_verification: 'Call Verification',
+  documents_verification: 'Documents Verification',
+  du_status: 'DU Status',
+  back_office_account: 'Account Number',
+  work_order: 'Work Order',
+  back_office_notes: 'Back Office Notes',
+  du_remarks: 'DU Remarks',
+  additional_note: 'Additional Note',
+  submission_date_from: 'Submission Date',
+  completion_date: 'Completion Date',
+  activity: 'Activity',
+  manager_name: 'Manager Name',
+  team_leader_name: 'Team Leader Name',
+  sales_agent_name: 'Sales Agent Name',
+  original_name: 'File Name',
+  doc_key: 'Document Type',
+}
+
+function prettifyKey(key) {
+  const k = String(key)
+  if (FIELD_LABELS[k]) return FIELD_LABELS[k]
+  return k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
+const AUDIT_SKIP_KEYS = ['id', 'created_at', 'updated_at', 'deleted_at', 'pivot', '_token', 'password', 'remember_token', 'user_agent', 'ip_address', 'file_path', 'mime_type']
+
+function formatAuditObject(obj) {
+  if (obj == null) return 'empty'
+  if (Array.isArray(obj)) {
+    if (obj.length === 0) return 'empty'
+    return obj.map((item) => {
+      if (typeof item === 'object' && item !== null) return formatAuditObject(item)
+      return formatAuditSingleValue(item) ?? 'empty'
+    }).join('\n')
+  }
+  if (typeof obj === 'object') {
+    const entries = Object.entries(obj).filter(([k]) => !AUDIT_SKIP_KEYS.includes(k))
+    if (entries.length === 0) return 'empty'
+    return entries.map(([k, v]) => {
+      const label = prettifyKey(k)
+      if (v != null && typeof v === 'object') return `${label}: ${formatAuditObject(v)}`
+      return `${label}: ${formatAuditSingleValue(v) ?? 'empty'}`
+    }).join('\n')
+  }
+  return formatAuditSingleValue(obj) ?? 'empty'
+}
+
+function formatAuditValue(val) {
+  if (val == null || val === '') return null
+  const s = String(val).trim()
+  if ((s.startsWith('{') && s.endsWith('}')) || (s.startsWith('[') && s.endsWith(']'))) {
+    try {
+      let parsed = JSON.parse(s)
+      if (typeof parsed === 'string') {
+        try { parsed = JSON.parse(parsed) } catch {}
+      }
+      return formatAuditObject(parsed)
+    } catch {}
+  }
+  return formatAuditSingleValue(s)
 }
 
 async function load() {
@@ -225,11 +292,11 @@ onMounted(() => {
                     <td class="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">
                       {{ fieldLabel(row.field_name, row) }}
                     </td>
-                    <td class="max-w-[200px] truncate px-4 py-3 text-sm text-red-500 line-through" :title="row.old_value ?? '(empty)'">
-                      {{ row.old_value ?? '(empty)' }}
+                    <td class="max-w-[300px] whitespace-pre-wrap break-words px-4 py-3 text-sm text-red-500">
+                      {{ row.old_value != null && row.old_value !== '' ? formatAuditValue(row.old_value) : 'empty' }}
                     </td>
-                    <td class="max-w-[200px] truncate px-4 py-3 text-sm text-green-600" :title="row.new_value ?? '(empty)'">
-                      {{ row.new_value ?? '(empty)' }}
+                    <td class="max-w-[300px] whitespace-pre-wrap break-words px-4 py-3 text-sm text-green-600">
+                      {{ row.new_value != null && row.new_value !== '' ? formatAuditValue(row.new_value) : '—' }}
                     </td>
                     <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-900">{{ row.changed_by_name || row.changed_by || '—' }}</td>
                     <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{{ formatDateTime(row.changed_at) }}</td>

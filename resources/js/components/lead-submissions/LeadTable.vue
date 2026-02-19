@@ -221,7 +221,7 @@ function saveStatusChangedAt(rowId) {
 }
 
 const columnLabels = {
-  id: '#',
+  id: 'SR',
   submitted_at: 'Lead Creation Date',
   updated_at: 'Updated',
   submission_type: 'Request Type',
@@ -230,7 +230,7 @@ const columnLabels = {
   authorized_signatory_name: 'Authorized Signatory',
   email: 'Email',
   contact_number_gsm: 'Contact Number',
-  alternate_contact_number: 'Alternate Contact',
+  alternate_contact_number: 'Alternate Contact Number',
   address: 'Address',
   emirate: 'Emirate',
   location_coordinates: 'Location Coordinates',

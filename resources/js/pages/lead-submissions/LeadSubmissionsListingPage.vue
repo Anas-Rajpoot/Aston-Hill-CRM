@@ -89,6 +89,7 @@ const filters = ref({
   q: '',
   account_number: '',
   company_name: '',
+  submission_type: '',
   service_category_id: null,
   service_type_id: null,
   status: '',
@@ -97,8 +98,6 @@ const filters = ref({
   to: '',
   submitted_from: '',
   submitted_to: '',
-  updated_from: '',
-  updated_to: '',
   mrc: '',
   quantity: '',
   sales_agent_id: null,
@@ -120,6 +119,7 @@ function buildParams() {
   if (f.q) p.q = f.q
   if (f.account_number) p.account_number = f.account_number
   if (f.company_name) p.company_name = f.company_name
+  if (f.submission_type) p.submission_type = f.submission_type
   if (f.service_category_id) p.service_category_id = f.service_category_id
   if (f.service_type_id) p.service_type_id = f.service_type_id
   if (f.status) p.status = f.status
@@ -128,8 +128,6 @@ function buildParams() {
   if (f.to) p.to = f.to
   if (f.submitted_from) p.submitted_from = f.submitted_from
   if (f.submitted_to) p.submitted_to = f.submitted_to
-  if (f.updated_from) p.updated_from = f.updated_from
-  if (f.updated_to) p.updated_to = f.updated_to
   if (f.mrc !== '' && f.mrc != null) p.mrc = f.mrc
   if (f.quantity !== '' && f.quantity != null) p.quantity = f.quantity
   if (f.sales_agent_id) p.sales_agent_id = f.sales_agent_id
@@ -148,7 +146,7 @@ const COLUMN_LABELS = {
   authorized_signatory_name: 'Authorized Signatory',
   email: 'Email',
   contact_number_gsm: 'Contact Number',
-  alternate_contact_number: 'Alternate Contact',
+  alternate_contact_number: 'Alternate Contact Number',
   address: 'Address',
   emirate: 'Emirate',
   location_coordinates: 'Location Coordinates',
@@ -310,6 +308,7 @@ function resetFilters() {
     q: '',
     account_number: '',
     company_name: '',
+    submission_type: '',
     service_category_id: null,
     service_type_id: null,
     status: '',
@@ -576,7 +575,7 @@ onMounted(async () => {
 
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-white py-3">
-    <div class="w-full space-y-3">
+    <div class="w-full space-y-3 px-4">
       <!-- Top: breadcrumbs + title (left), Bulk Assign + Export (right) -->
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div class="flex flex-wrap items-baseline gap-2">
@@ -658,7 +657,7 @@ onMounted(async () => {
         <template #after-reset>
           <button
             type="button"
-            class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            class="ml-auto inline-flex items-center gap-1.5 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
             @click="advancedVisible = !advancedVisible"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
@@ -666,11 +665,11 @@ onMounted(async () => {
           </button>
           <button
             type="button"
-            class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            class="inline-flex items-center gap-1.5 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
             @click="columnModalVisible = true"
           >
             Customize Columns
-            <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
             </svg>
           </button>

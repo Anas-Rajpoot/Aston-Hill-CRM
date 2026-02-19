@@ -89,7 +89,6 @@ return [
         'model' => \App\Models\FieldSubmission::class,
         'columns' => [
             'id' => ['label' => 'ID', 'filter' => null, 'sortable' => true],
-            'submitted_at' => ['label' => 'Submission Date', 'filter' => 'date', 'sortable' => true],
             'created_at' => ['label' => 'Created', 'filter' => 'date', 'sortable' => true],
             'company_name' => ['label' => 'Company Name', 'filter' => 'text', 'sortable' => true],
             'contact_number' => ['label' => 'Contact Number', 'filter' => 'text', 'sortable' => true],
@@ -108,7 +107,7 @@ return [
             'last_updated' => ['label' => 'Last Updated', 'filter' => 'date', 'sortable' => true],
             'creator' => ['label' => 'Created By', 'filter' => null, 'sortable' => false],
         ],
-        'default_columns' => ['submitted_at', 'company_name', 'emirates', 'product', 'sales_agent', 'team_leader', 'manager', 'field_agent', 'field_status', 'target_date', 'sla_timer', 'sla_status', 'last_updated'],
+        'default_columns' => ['created_at', 'company_name', 'contact_number', 'emirates', 'product', 'complete_address', 'sales_agent', 'team_leader', 'manager', 'field_agent', 'field_status', 'target_date', 'sla_timer', 'sla_status', 'last_updated', 'creator'],
         'default_sort' => ['created_at', 'desc'],
     ],
 

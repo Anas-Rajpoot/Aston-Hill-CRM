@@ -36,7 +36,7 @@ const meta = ref({ current_page: 1, last_page: 1, per_page: auth.defaultTablePag
 const perPageOptions = ref([10, 20, 25, 50, 100])
 const allColumns = ref([])
 const visibleColumns = ref([
-  'id', 'submitted_at', 'company_name', 'contact_number', 'product', 'emirates', 'complete_address',
+  'id', 'created_at', 'company_name', 'contact_number', 'product', 'emirates', 'complete_address',
   'sales_agent', 'team_leader', 'manager', 'field_agent', 'field_status', 'target_date', 'sla_timer', 'sla_status', 'last_updated', 'creator',
 ])
 const assignModalVisible = ref(false)
@@ -124,7 +124,6 @@ function buildParams() {
 
 const COLUMN_LABELS = {
   id: 'ID',
-  submitted_at: 'Submission Date',
   created_at: 'Created',
   company_name: 'Company Name',
   contact_number: 'Contact Number',
@@ -490,12 +489,12 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-white py-3">
+  <div class="min-h-[calc(100vh-4rem)] bg-white py-3 pr-4">
     <div class="w-full space-y-3">
       <!-- Top: breadcrumbs + title (left), Bulk Assign + Export (right) -->
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div class="flex flex-wrap items-baseline gap-2">
-          <h1 class="text-xl font-semibold text-gray-900 leading-tight">Field Submissions</h1>
+          <h1 class="text-xl font-semibold text-gray-900 leading-tight ml-4">Field Submissions</h1>
           <Breadcrumbs />
         </div>
         <div class="flex flex-wrap items-center gap-2">

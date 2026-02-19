@@ -1049,11 +1049,33 @@ if ($request->expectsJson() || $request->ajax()) {
             $fileRules["documents.{$key}"] = ['nullable', 'array'];
             $fileRules["documents.{$key}.*"] = ['file', new AllowedDocumentFile(), 'max:3072'];
         }
+        $fileRules['documents.additional'] = ['nullable', 'array'];
+        $fileRules['documents.additional.*'] = ['file', new AllowedDocumentFile(), 'max:3072'];
         $request->validate($fileRules, [
             'documents.*.*' => 'Each file must be PDF, DOC, DOCX, or EML.',
             'documents.*.*.max' => 'Each file must not exceed 3MB.',
         ]);
         $this->leadSubmissionService->saveResubmissionDocuments($request, $leadSubmission, $docKeys);
+
+        // Handle additional documents (append, don't replace)
+        $additionalFiles = $request->file('documents.additional');
+        if ($additionalFiles) {
+            $additionalFiles = is_array($additionalFiles) ? $additionalFiles : [$additionalFiles];
+            $ts = (string) time();
+            foreach ($additionalFiles as $i => $file) {
+                if ($file && $file->isValid()) {
+                    $docKey = 'additional_' . $ts . '_' . $i;
+                    $path = $file->store("leads/{$leadSubmission->id}", 'public');
+                    $leadSubmission->documents()->create([
+                        'doc_key' => $docKey,
+                        'original_name' => $file->getClientOriginalName(),
+                        'file_path' => $path,
+                        'mime_type' => $file->getClientMimeType(),
+                        'size' => $file->getSize(),
+                    ]);
+                }
+            }
+        }
 
         if (!$isDraft) {
             // Require Trade License on submit (must exist after saving uploads)

@@ -36,6 +36,65 @@ function formatDateTime(d) {
   return `${toDdMmYyyy(dateStr) || ''} ${h}:${m}`.trim() || '—'
 }
 
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?)?/
+
+function formatAuditSingleValue(val) {
+  if (val == null || val === '') return null
+  const s = String(val)
+  if (DATE_PATTERN.test(s)) {
+    const date = new Date(s)
+    if (!Number.isNaN(date.getTime())) {
+      const day = String(date.getDate()).padStart(2, '0')
+      const mon = MONTH_NAMES[date.getMonth()]
+      const year = date.getFullYear()
+      const h = String(date.getHours()).padStart(2, '0')
+      const m = String(date.getMinutes()).padStart(2, '0')
+      return `${day}-${mon}-${year} ${h}:${m}`
+    }
+  }
+  return s
+}
+
+function prettifyKey(key) {
+  return String(key).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
+const AUDIT_SKIP_KEYS = ['id', 'created_at', 'updated_at', 'deleted_at', 'pivot', '_token', 'password', 'remember_token']
+
+function formatAuditObject(obj) {
+  if (obj == null) return 'empty'
+  if (Array.isArray(obj)) {
+    if (obj.length === 0) return 'empty'
+    return obj.map((item) => {
+      if (typeof item === 'object' && item !== null) return formatAuditObject(item)
+      return formatAuditSingleValue(item) ?? 'empty'
+    }).join('\n')
+  }
+  if (typeof obj === 'object') {
+    const entries = Object.entries(obj).filter(([k]) => !AUDIT_SKIP_KEYS.includes(k))
+    if (entries.length === 0) return 'empty'
+    return entries.map(([k, v]) => {
+      const label = prettifyKey(k)
+      if (v != null && typeof v === 'object') return `${label}: ${formatAuditObject(v)}`
+      return `${label}: ${formatAuditSingleValue(v) ?? 'empty'}`
+    }).join('\n')
+  }
+  return formatAuditSingleValue(obj) ?? 'empty'
+}
+
+function formatAuditValue(val) {
+  if (val == null || val === '') return null
+  const s = String(val).trim()
+  if ((s.startsWith('{') && s.endsWith('}')) || (s.startsWith('[') && s.endsWith(']'))) {
+    try {
+      const parsed = JSON.parse(s)
+      return formatAuditObject(parsed)
+    } catch {}
+  }
+  return formatAuditSingleValue(s)
+}
+
 function formatStatus(status) {
   if (status == null || status === '') return '—'
   return String(status).charAt(0).toUpperCase() + String(status).slice(1).toLowerCase()
@@ -306,8 +365,8 @@ onMounted(() => {
                 <tbody class="divide-y divide-gray-100 bg-white">
                   <tr v-for="a in audits" :key="a.id" class="hover:bg-gray-50/50">
                     <td class="whitespace-nowrap px-4 py-2 font-medium text-gray-800">{{ fieldLabel(a.field_name, a) }}</td>
-                    <td class="max-w-[200px] truncate px-4 py-2 text-red-500 line-through" :title="a.old_value">{{ a.old_value ?? '(empty)' }}</td>
-                    <td class="max-w-[200px] truncate px-4 py-2 text-green-600" :title="a.new_value">{{ a.new_value ?? '(empty)' }}</td>
+                    <td class="max-w-[350px] whitespace-pre-wrap break-words px-4 py-2 text-gray-600">{{ a.old_value != null && a.old_value !== '' ? formatAuditValue(a.old_value) : 'empty' }}</td>
+                    <td class="max-w-[350px] whitespace-pre-wrap break-words px-4 py-2 text-gray-600">{{ a.new_value != null && a.new_value !== '' ? formatAuditValue(a.new_value) : '—' }}</td>
                     <td class="whitespace-nowrap px-4 py-2 text-gray-600">{{ a.changed_at ? formatDateTime(a.changed_at) : '—' }}</td>
                     <td class="whitespace-nowrap px-4 py-2 text-gray-600">{{ a.changed_by_name ?? '—' }}</td>
                   </tr>

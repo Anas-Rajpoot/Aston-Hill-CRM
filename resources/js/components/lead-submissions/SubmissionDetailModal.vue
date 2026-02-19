@@ -149,9 +149,9 @@ function onEditSubmission() {
               Unable to load submission. You may not have permission to view it.
             </div>
             <template v-else>
-              <!-- Basic Information -->
+              <!-- Primary Information -->
               <div class="mb-5">
-                <h3 class="mb-3 text-sm font-semibold text-gray-900">Basic Information</h3>
+                <h3 class="mb-3 text-sm font-semibold text-gray-900">Primary Information</h3>
                 <div class="grid grid-cols-2 gap-3">
                   <div>
                     <label class="block text-xs font-medium text-gray-500">Account Number</label>

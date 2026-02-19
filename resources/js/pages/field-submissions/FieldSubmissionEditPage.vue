@@ -36,13 +36,14 @@ const emiratesList = computed(() => {
 
 const form = ref({
   company_name: '',
-  contact_number: '',
-  complete_address: '',
   product: '',
+  contact_number: '',
+  alternate_number: '',
   emirates: '',
   location_coordinates: '',
-  special_instruction: '',
+  complete_address: '',
   additional_notes: '',
+  special_instruction: '',
   sales_agent_id: null,
   team_leader_id: null,
   manager_id: null,
@@ -102,13 +103,14 @@ async function load() {
     }
     form.value = {
       company_name: data.company_name ?? '',
-      contact_number: data.contact_number ?? '',
-      complete_address: data.complete_address ?? '',
       product: data.product ?? '',
+      contact_number: data.contact_number ?? '',
+      alternate_number: data.alternate_number ?? '',
       emirates: data.emirates ?? '',
       location_coordinates: data.location_coordinates ?? '',
-      special_instruction: data.special_instruction ?? '',
+      complete_address: data.complete_address ?? '',
       additional_notes: data.additional_notes ?? '',
+      special_instruction: data.special_instruction ?? '',
       sales_agent_id: data.sales_agent_id ?? null,
       team_leader_id: data.team_leader_id ?? null,
       manager_id: data.manager_id ?? null,
@@ -178,11 +180,12 @@ async function submitForm() {
   try {
     const payload = {
       company_name: form.value.company_name || null,
-      contact_number: form.value.contact_number || null,
-      complete_address: form.value.complete_address || null,
       product: form.value.product || null,
+      contact_number: form.value.contact_number || null,
+      alternate_number: form.value.alternate_number || null,
       emirates: form.value.emirates || null,
       location_coordinates: form.value.location_coordinates || null,
+      complete_address: form.value.complete_address || null,
       additional_notes: form.value.additional_notes || null,
       special_instruction: form.value.special_instruction || null,
       manager_id: form.value.manager_id ? Number(form.value.manager_id) : null,
@@ -223,11 +226,6 @@ onMounted(() => {
           <div class="flex flex-wrap items-baseline gap-2">
             <h1 class="text-xl font-semibold text-gray-900">Edit Field Submission</h1>
             <Breadcrumbs />
-            <span v-if="draftSavedAt" class="text-xs text-gray-400 flex items-center gap-1">
-              <svg v-if="draftSaving" class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="4" class="opacity-25" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-              <svg v-else class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-              Draft saved
-            </span>
           </div>
         </div>
         <div class="border-t border-gray-200" />
@@ -246,7 +244,7 @@ onMounted(() => {
         <form v-else class="px-4 py-5 sm:px-5" @submit.prevent="submitForm">
         <!-- Section 1: Primary Information -->
         <h2 class="mb-4 text-sm font-semibold text-gray-900">Primary Information</h2>
-        <div class="grid gap-4 sm:grid-cols-2">
+        <div class="grid gap-4 sm:grid-cols-3">
             <div>
               <label class="block text-sm font-medium text-gray-700">Company Name <span class="text-red-500">*</span></label>
               <input
@@ -256,6 +254,16 @@ onMounted(() => {
                 :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.company_name ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
               />
               <p v-if="serverErrors.company_name" class="mt-1 text-xs text-red-600">{{ serverErrors.company_name[0] }}</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Product <span class="text-red-500">*</span></label>
+              <input
+                v-model="form.product"
+                type="text"
+                required
+                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.product ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+              />
+              <p v-if="serverErrors.product" class="mt-1 text-xs text-red-600">{{ serverErrors.product[0] }}</p>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Contact Number <span class="text-red-500">*</span></label>
@@ -269,24 +277,14 @@ onMounted(() => {
               <p v-if="serverErrors.contact_number" class="mt-1 text-xs text-red-600">{{ serverErrors.contact_number[0] }}</p>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700">Complete Address <span class="text-red-500">*</span></label>
+              <label class="block text-sm font-medium text-gray-700">Alternate Contact Number</label>
               <input
-                v-model="form.complete_address"
+                v-model="form.alternate_number"
                 type="text"
-                required
-                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.complete_address ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+                autocomplete="off"
+                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.alternate_number ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
               />
-              <p v-if="serverErrors.complete_address" class="mt-1 text-xs text-red-600">{{ serverErrors.complete_address[0] }}</p>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Product <span class="text-red-500">*</span></label>
-              <input
-                v-model="form.product"
-                type="text"
-                required
-                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.product ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
-              />
-              <p v-if="serverErrors.product" class="mt-1 text-xs text-red-600">{{ serverErrors.product[0] }}</p>
+              <p v-if="serverErrors.alternate_number" class="mt-1 text-xs text-red-600">{{ serverErrors.alternate_number[0] }}</p>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Emirates <span class="text-red-500">*</span></label>
@@ -309,21 +307,33 @@ onMounted(() => {
                 class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
               />
             </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Remarks / Comment</label>
-              <textarea
-                v-model="form.special_instruction"
-                rows="3"
-                placeholder="Enter any remarks or comments"
-                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-              />
-            </div>
+        </div>
+        <div class="mt-4">
+            <label class="block text-sm font-medium text-gray-700">Complete Address <span class="text-red-500">*</span></label>
+            <input
+              v-model="form.complete_address"
+              type="text"
+              required
+              :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.complete_address ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+            />
+            <p v-if="serverErrors.complete_address" class="mt-1 text-xs text-red-600">{{ serverErrors.complete_address[0] }}</p>
+        </div>
+        <div class="mt-4 grid gap-4 sm:grid-cols-2">
             <div>
               <label class="block text-sm font-medium text-gray-700">Additional Notes</label>
               <textarea
                 v-model="form.additional_notes"
                 rows="3"
-                placeholder="Enter any additional notes"
+                placeholder="Enter Additional Notes"
+                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Any Special Instruction</label>
+              <textarea
+                v-model="form.special_instruction"
+                rows="3"
+                placeholder="Enter Special Instruction"
                 class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
               />
             </div>

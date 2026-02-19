@@ -288,18 +288,23 @@ const selectClass = (field) =>
           <div
             v-for="(file, index) in documentFiles"
             :key="index"
-            class="flex min-w-0 items-center gap-3 rounded-lg border border-gray-300 bg-white px-4 py-3 shadow-sm"
+            class="flex min-w-0 items-center gap-3 rounded-lg border px-4 py-3 shadow-sm"
+            :class="file ? 'border-green-300 bg-green-50' : 'border-gray-300 bg-white'"
           >
-            <div class="shrink-0 text-gray-400">
-              <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="shrink-0" :class="file ? 'text-green-600' : 'text-gray-400'">
+              <svg v-if="file" class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <svg v-else class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </div>
             <div class="min-w-0 flex-1">
-              <p class="text-sm font-medium text-gray-900 truncate">
+              <p class="text-sm font-medium truncate" :class="file ? 'text-green-800' : 'text-gray-900'">
                 {{ file ? file.name : 'Additional Document' }}
               </p>
-              <p class="text-xs text-gray-500">PDF, DOC, DOCX, EML. You can select multiple files.</p>
+              <p v-if="file" class="text-xs text-green-600 mt-0.5">{{ (file.size / 1024).toFixed(1) }} KB — File selected</p>
+              <p v-else class="text-xs text-gray-500">PDF, DOC, DOCX, EML. You can select multiple files.</p>
             </div>
             <div class="flex shrink-0 items-center gap-2">
               <label class="cursor-pointer">

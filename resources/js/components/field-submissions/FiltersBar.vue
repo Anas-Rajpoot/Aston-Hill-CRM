@@ -6,7 +6,7 @@ defineProps({
   filters: { type: Object, required: true },
   filterOptions: {
     type: Object,
-    default: () => ({ statuses: [], products: [] }),
+    default: () => ({ statuses: [], products: [], emirates: [] }),
   },
   loading: { type: Boolean, default: false },
 })
@@ -36,6 +36,16 @@ const emit = defineEmits(['apply', 'reset'])
     >
       <option value="">Product</option>
       <option v-for="p in filterOptions.products" :key="p" :value="p">{{ p }}</option>
+    </select>
+
+    <label class="sr-only">Emirates</label>
+    <select
+      v-model="filters.emirates"
+      class="min-w-[200px] rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+      :disabled="loading"
+    >
+      <option value="">Emirates</option>
+      <option v-for="e in filterOptions.emirates" :key="e" :value="e">{{ e }}</option>
     </select>
 
     <div class="ml-2 flex flex-wrap items-center gap-2">

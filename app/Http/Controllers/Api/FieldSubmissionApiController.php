@@ -33,7 +33,7 @@ class FieldSubmissionApiController extends Controller
 
     private const ALLOWED_COLUMNS = [
         'id', 'company_name', 'contact_number', 'product', 'emirates', 'complete_address',
-        'status', 'submitted_at', 'created_at', 'created_by',
+        'status', 'created_at', 'created_by',
         'manager_id', 'team_leader_id', 'sales_agent_id',
         'field_executive_id', 'field_status', 'meeting_date', 'updated_at',
     ];
@@ -281,7 +281,7 @@ class FieldSubmissionApiController extends Controller
             } elseif (in_array($col, ['submitted_at'], true)) {
                 $out[$col] = $row->$col ? $row->$col->format('d/M/Y H:i') : null;
             } elseif (in_array($col, ['created_at'], true)) {
-                $out[$col] = $row->$col ? $row->$col->format('d/M/Y') : null;
+                $out[$col] = $row->$col ? $row->$col->toIso8601String() : null;
             } else {
                 $out[$col] = $row->$col ?? null;
             }
@@ -386,6 +386,8 @@ class FieldSubmissionApiController extends Controller
             ->first();
 
         $visible = $pref?->visible_columns ?? config('modules.field_submissions.default_columns', []);
+        $validKeys = array_keys($config);
+        $visible = array_values(array_intersect($visible, $validKeys));
 
         return response()->json([
             'all_columns' => $allColumns,

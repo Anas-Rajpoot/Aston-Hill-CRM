@@ -56,8 +56,7 @@ function rowNumber(index) {
 }
 
 const columnLabels = {
-  id: '#',
-  submitted_at: 'Submission Date',
+  id: 'SR',
   created_at: 'Created',
   company_name: 'Company Name',
   contact_number: 'Contact Number',
@@ -78,7 +77,7 @@ const columnLabels = {
 }
 
 const SORTABLE_COLUMNS = [
-  'id', 'submitted_at', 'created_at', 'company_name', 'contact_number',
+  'id', 'created_at', 'company_name', 'contact_number',
   'product', 'emirates', 'status', 'field_status', 'sales_agent', 'team_leader', 'manager', 'field_agent',
   'target_date', 'sla_timer', 'sla_status', 'last_updated', 'creator',
 ]
@@ -108,9 +107,12 @@ function formatValue(row, col) {
 function formatDate(d) {
   if (!d) return '—'
   const date = new Date(d)
+  if (Number.isNaN(date.getTime())) return '—'
   const day = String(date.getDate()).padStart(2, '0')
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  return `${day}-${months[date.getMonth()]}-${date.getFullYear()}`
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${day}-${months[date.getMonth()]}-${date.getFullYear()} ${hours}:${minutes}`
 }
 
 /** Single row per cell: 30 chars + "..." and full value on hover. */
@@ -123,7 +125,7 @@ function truncate(str, max = TRUNCATE_LENGTH) {
 
 /** Full value for tooltip (title); use with truncate() for display. */
 function fullValue(row, col) {
-  if (col === 'target_date' || col === 'last_updated' || col === 'submitted_at') return row[col] ?? ''
+  if (col === 'target_date' || col === 'last_updated') return row[col] ?? ''
   if (col === 'created_at') return formatDate(row[col]) || ''
   const val = formatValue(row, col)
   if (val == null || val === '—') return ''
@@ -134,7 +136,7 @@ function fullValue(row, col) {
 const TRUNCATE_COLUMNS = [
   'company_name', 'contact_number', 'product', 'emirates', 'complete_address',
   'sales_agent', 'team_leader', 'manager', 'field_agent', 'creator',
-  'status', 'field_status', 'sla_timer', 'sla_status', 'target_date', 'last_updated', 'submitted_at', 'created_at',
+  'status', 'field_status', 'sla_timer', 'sla_status', 'target_date', 'last_updated', 'created_at',
 ]
 function shouldTruncate(col) {
   return TRUNCATE_COLUMNS.includes(col)
@@ -207,7 +209,7 @@ const inlineEditValue = ref('')
 
 /** Same as field submission form: dropdowns for select fields, input for text/date. */
 const DROPDOWN_COLUMNS = ['status', 'field_status', 'emirates', 'manager', 'team_leader', 'sales_agent', 'field_agent']
-const READ_ONLY_COLUMNS = ['id', 'sla_timer', 'sla_status', 'creator', 'submitted_at', 'created_at', 'last_updated']
+const READ_ONLY_COLUMNS = ['id', 'sla_timer', 'sla_status', 'creator', 'created_at', 'last_updated']
 
 function isDropdownColumn(col) {
   return DROPDOWN_COLUMNS.includes(col)
@@ -500,7 +502,7 @@ function isEditing(rowId, col) {
                 {{ row.sla_timer ?? '—' }}
               </span>
             </template>
-            <template v-else-if="['last_updated', 'submitted_at'].includes(col)">
+            <template v-else-if="col === 'last_updated'">
               {{ truncate(row[col] ?? '—') }}
             </template>
             <template v-else-if="col === 'sla_status'">
