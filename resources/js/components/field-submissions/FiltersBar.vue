@@ -15,11 +15,11 @@ const emit = defineEmits(['apply', 'reset'])
 </script>
 
 <template>
-  <div class="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
+  <div class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3">
     <label class="sr-only">Status</label>
     <select
       v-model="filters.status"
-      class="min-w-[200px] rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+      class="flex-1 min-w-0 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
       :disabled="loading"
     >
       <option value="">Status</option>
@@ -31,7 +31,7 @@ const emit = defineEmits(['apply', 'reset'])
     <label class="sr-only">Product</label>
     <select
       v-model="filters.product"
-      class="min-w-[200px] rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+      class="flex-1 min-w-0 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
       :disabled="loading"
     >
       <option value="">Product</option>
@@ -41,17 +41,17 @@ const emit = defineEmits(['apply', 'reset'])
     <label class="sr-only">Emirates</label>
     <select
       v-model="filters.emirates"
-      class="min-w-[200px] rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+      class="flex-1 min-w-0 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
       :disabled="loading"
     >
       <option value="">Emirates</option>
       <option v-for="e in filterOptions.emirates" :key="e" :value="e">{{ e }}</option>
     </select>
 
-    <div class="ml-2 flex flex-wrap items-center gap-2">
+    <div class="flex shrink-0 items-center gap-2">
       <button
         type="button"
-        class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+        class="inline-flex items-center rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 disabled:opacity-50"
         :disabled="loading"
         @click="$emit('apply')"
       >
@@ -62,14 +62,14 @@ const emit = defineEmits(['apply', 'reset'])
       </button>
       <button
         type="button"
-        class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        class="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
         :disabled="loading"
         @click="$emit('reset')"
       >
         Reset
       </button>
     </div>
-    <div class="ml-auto flex items-center gap-2">
+    <div class="flex shrink-0 items-center gap-2">
       <slot name="after-reset" />
     </div>
   </div>

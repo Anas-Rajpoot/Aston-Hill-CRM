@@ -11,11 +11,13 @@ use App\Models\SystemAuditLog;
 use App\Models\User;
 use App\Models\UserColumnPreference;
 use App\Rules\AllowedDocumentFile;
+use App\Jobs\BulkAssignLeadJob;
 use App\Services\LeadSubmissionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 /**
@@ -630,7 +632,7 @@ class LeadSubmissionApiController extends Controller
 
     /**
      * POST /api/lead-submissions/bulk-assign
-     * Assign one back office executive to multiple lead submissions. Only superadmin or back_office role.
+     * Dispatches a queue job for instant response. Returns a tracking_id for progress polling.
      */
     public function bulkAssign(Request $request): JsonResponse
     {
@@ -641,28 +643,50 @@ class LeadSubmissionApiController extends Controller
 
         $data = $request->validate([
             'lead_ids' => ['required', 'array', 'min:1'],
-            'lead_ids.*' => ['integer', 'exists:lead_submissions,id'],
+            'lead_ids.*' => ['integer'],
             'executive_id' => ['required', 'integer', 'exists:users,id'],
         ]);
 
-        $leadIds = $data['lead_ids'];
-        $executiveId = $data['executive_id'];
+        $ids = array_unique(array_map('intval', $data['lead_ids']));
+        $executiveId = (int) $data['executive_id'];
 
-        $updated = LeadSubmission::query()
-            ->whereIn('id', $leadIds)
-            ->visibleTo($user)
-            ->update(['executive_id' => $executiveId]);
-
-        try {
-            SystemAuditLog::record('lead_submission.bulk_assigned', null, ['lead_ids' => $leadIds, 'assigned_to' => $executiveId, 'count' => count($leadIds)], $request->user()->id, 'lead_submission');
-        } catch (\Throwable $e) {
-            report($e);
+        $existingCount = DB::table('lead_submissions')->whereIn('id', $ids)->count();
+        if ($existingCount !== count($ids)) {
+            return response()->json(['message' => 'One or more submission IDs are invalid.'], 422);
         }
 
+        $trackingId = (string) Str::uuid();
+
+        Cache::put("bulk_assign:{$trackingId}", [
+            'status' => 'pending',
+            'total' => count($ids),
+            'processed' => 0,
+            'percent' => 0,
+            'message' => 'Queued for processing...',
+        ], now()->addMinutes(30));
+
+        BulkAssignLeadJob::dispatch($ids, $executiveId, $user->id, $trackingId);
+
         return response()->json([
-            'message' => "Assigned {$updated} submission(s) to back office executive.",
-            'updated_count' => $updated,
+            'message' => 'Assignment queued. Processing '.count($ids).' submission(s) in background.',
+            'queued' => true,
+            'count' => count($ids),
+            'tracking_id' => $trackingId,
         ]);
+    }
+
+    /**
+     * GET /api/lead-submissions/bulk-assign/{trackingId}/status
+     */
+    public function bulkAssignStatus(Request $request, string $trackingId): JsonResponse
+    {
+        $data = Cache::get("bulk_assign:{$trackingId}");
+
+        if (! $data) {
+            return response()->json(['status' => 'not_found'], 404);
+        }
+
+        return response()->json($data);
     }
 
     /**

@@ -487,7 +487,10 @@ function openBulkAssign() {
 }
 
 function onAssignModalSaved() {
-  toast('success', 'Lead assigned successfully.')
+  const wasBulk = assignBulkIds.value.length > 0
+  toast('success', wasBulk
+    ? `Assignment started for ${assignBulkIds.value.length} submission(s). Processing in background.`
+    : 'Lead assigned successfully.')
   assignLeadRow.value = null
   assignBulkIds.value = []
   selectedLeadIds.value = []

@@ -1,7 +1,7 @@
 <script setup>
 /**
- * Assign to Back Office Executive – modal when clicking "Unassigned" on listing.
- * Only for super admin or back office role. Submission details + select executive + optional notes.
+ * Assign to Back Office Executive – modal for lead submissions.
+ * Fire-and-forget: dispatches to queue, closes immediately, user keeps working.
  */
 import { ref, computed, watch } from 'vue'
 import leadSubmissionsApi from '@/services/leadSubmissionsApi'
@@ -49,7 +49,6 @@ watch(
       } else {
         error.value = 'Failed to load executive options. Please try again.'
       }
-      console.warn('[AssignBackOfficeModal] Failed to load options:', err?.response?.status, err?.response?.data?.message || err?.message)
     } finally {
       loading.value = false
     }
@@ -256,8 +255,8 @@ function statusBadgeClass(status) {
                 </p>
               </div>
 
-              <!-- Assignment Notes -->
-              <div>
+              <!-- Assignment Notes (single assign only) -->
+              <div v-if="!isBulk">
                 <label for="assign-notes" class="block text-sm font-medium text-gray-700 mb-1.5">Assignment Notes <span class="text-xs text-gray-400 font-normal">(Optional)</span></label>
                 <textarea
                   id="assign-notes"

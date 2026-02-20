@@ -8,6 +8,7 @@ import { useFormDraft } from '@/composables/useFormDraft'
 import fieldSubmissionsApi from '@/services/fieldSubmissionsApi'
 import { useAuthStore } from '@/stores/auth'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import Toast from '@/components/Toast.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -57,6 +58,21 @@ const { draftSaving, draftSavedAt, clearDraft } = useFormDraft('field-submission
 
 const newFiles = ref([])
 const fileInput = ref(null)
+const meetingDateRef = ref(null)
+
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+function formatDateDisplay(val) {
+  if (!val) return ''
+  const [y, m, d] = val.split('-')
+  if (!y || !m || !d) return ''
+  return `${d}-${MONTHS[parseInt(m, 10) - 1]}-${y}`
+}
+function openDatePicker(r) {
+  const el = r?.$el ?? r
+  if (el?.showPicker) {
+    try { el.showPicker() } catch { el.click() }
+  } else if (el) { el.click() }
+}
 
 const id = computed(() => {
   const p = route.params.id
@@ -172,9 +188,55 @@ async function downloadDoc(doc) {
 }
 
 const serverErrors = ref({})
+const showToast = ref(false)
+const toastType = ref('success')
+const toastMsg = ref('')
+function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
+const fieldErrors = ref({})
+
+function validatePhone(value) {
+  if (!value) return null
+  if (!/^\d{12}$/.test(value)) return 'Must be exactly 12 digits with no spaces (e.g. 971XXXXXXXXX).'
+  if (!value.startsWith('971')) return 'Must start with 971.'
+  return null
+}
+
+function validateCoordinates(value) {
+  if (!value) return null
+  const coordPattern = /^-?\d{1,3}(\.\d+)?\s*,\s*-?\d{1,3}(\.\d+)?$/
+  const coords = value.trim()
+  if (!coordPattern.test(coords)) return 'Enter valid coordinates (e.g. 25.2048, 55.2708).'
+  const [lat, lng] = coords.split(',').map(s => parseFloat(s.trim()))
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return 'Latitude must be -90 to 90, longitude -180 to 180.'
+  return null
+}
+
+function onPhoneInput(field, e) {
+  form.value[field] = e.target.value.replace(/\D/g, '').slice(0, 12)
+  fieldErrors.value[field] = null
+}
+
+function validateFields() {
+  const errs = {}
+  if (form.value.contact_number) {
+    const phoneErr = validatePhone(form.value.contact_number.trim())
+    if (phoneErr) errs.contact_number = phoneErr
+  }
+  if (form.value.alternate_number) {
+    const altErr = validatePhone(form.value.alternate_number.trim())
+    if (altErr) errs.alternate_number = altErr
+  }
+  if (form.value.location_coordinates) {
+    const coordErr = validateCoordinates(form.value.location_coordinates)
+    if (coordErr) errs.location_coordinates = coordErr
+  }
+  fieldErrors.value = errs
+  return Object.keys(errs).length === 0
+}
 
 async function submitForm() {
   if (!id.value) return
+  if (!validateFields()) return
   saving.value = true
   serverErrors.value = {}
   try {
@@ -198,14 +260,17 @@ async function submitForm() {
     }
     await fieldSubmissionsApi.updateSubmission(id.value, payload, newFiles.value.length ? newFiles.value : null)
     await clearDraft()
-    await load()
     newFiles.value = []
+    toast('success', 'Field submission updated successfully.')
+    setTimeout(() => {
+      router.push(`/field-submissions/${id.value}`)
+    }, 1200)
   } catch (err) {
     if (err.response?.status === 422 && err.response?.data?.errors) {
       serverErrors.value = err.response.data.errors
     }
     const msg = err.response?.data?.message || err.message || 'Failed to save.'
-    alert(msg)
+    toast('error', msg)
   } finally {
     saving.value = false
   }
@@ -223,9 +288,17 @@ onMounted(() => {
       <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
         <!-- Heading: same background as form -->
         <div class="px-4 py-4 sm:px-5">
-          <div class="flex flex-wrap items-baseline gap-2">
-            <h1 class="text-xl font-semibold text-gray-900">Edit Field Submission</h1>
-            <Breadcrumbs />
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <div class="flex flex-wrap items-baseline gap-2">
+              <h1 class="text-xl font-semibold text-gray-900">Edit Field Submission</h1>
+              <Breadcrumbs />
+            </div>
+            <router-link
+              to="/field-submissions"
+              class="rounded border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              Back to List
+            </router-link>
           </div>
         </div>
         <div class="border-t border-gray-200" />
@@ -271,20 +344,28 @@ onMounted(() => {
                 v-model="form.contact_number"
                 type="text"
                 required
+                maxlength="12"
+                placeholder="971XXXXXXXXX"
                 autocomplete="off"
-                :class="['contact-number-input mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.contact_number ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+                :class="['contact-number-input mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', fieldErrors.contact_number || serverErrors.contact_number ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+                @input="onPhoneInput('contact_number', $event)"
               />
-              <p v-if="serverErrors.contact_number" class="mt-1 text-xs text-red-600">{{ serverErrors.contact_number[0] }}</p>
+              <p v-if="fieldErrors.contact_number" class="mt-1 text-xs text-red-600">{{ fieldErrors.contact_number }}</p>
+              <p v-else-if="serverErrors.contact_number" class="mt-1 text-xs text-red-600">{{ serverErrors.contact_number[0] }}</p>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Alternate Contact Number</label>
               <input
                 v-model="form.alternate_number"
                 type="text"
+                maxlength="12"
+                placeholder="971XXXXXXXXX"
                 autocomplete="off"
-                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.alternate_number ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', fieldErrors.alternate_number || serverErrors.alternate_number ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+                @input="onPhoneInput('alternate_number', $event)"
               />
-              <p v-if="serverErrors.alternate_number" class="mt-1 text-xs text-red-600">{{ serverErrors.alternate_number[0] }}</p>
+              <p v-if="fieldErrors.alternate_number" class="mt-1 text-xs text-red-600">{{ fieldErrors.alternate_number }}</p>
+              <p v-else-if="serverErrors.alternate_number" class="mt-1 text-xs text-red-600">{{ serverErrors.alternate_number[0] }}</p>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Emirates <span class="text-red-500">*</span></label>
@@ -303,9 +384,11 @@ onMounted(() => {
               <input
                 v-model="form.location_coordinates"
                 type="text"
-                placeholder="e.g. 12.2048, 55.2708"
-                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder="e.g. 25.2048, 55.2708"
+                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', fieldErrors.location_coordinates ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+                @input="fieldErrors.location_coordinates = null"
               />
+              <p v-if="fieldErrors.location_coordinates" class="mt-1 text-xs text-red-600">{{ fieldErrors.location_coordinates }}</p>
             </div>
         </div>
         <div class="mt-4">
@@ -402,11 +485,17 @@ onMounted(() => {
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700">Meeting Date <span class="text-red-500">*</span></label>
-            <input
-              v-model="form.meeting_date"
-              type="date"
-              class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            />
+            <div class="relative mt-1" @click="openDatePicker(meetingDateRef)">
+              <input
+                type="text"
+                readonly
+                :value="formatDateDisplay(form.meeting_date)"
+                placeholder="DD-MMM-YYYY"
+                class="block w-full cursor-pointer rounded border border-gray-300 bg-white px-3 py-2 pr-9 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              />
+              <svg class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+              <input ref="meetingDateRef" v-model="form.meeting_date" type="date" class="sr-only" tabindex="-1" />
+            </div>
           </div>
         </div>
         <div class="mt-4 grid gap-4 sm:grid-cols-2">
@@ -484,6 +573,7 @@ onMounted(() => {
         </form>
       </div>
     </div>
+    <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />
   </div>
 </template>
 

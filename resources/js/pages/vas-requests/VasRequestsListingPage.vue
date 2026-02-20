@@ -338,9 +338,12 @@ function goToResubmit(row) {
   if (row?.id) router.push(`/vas-requests/${row.id}/resubmit`)
 }
 
+let _cachedBackOfficeOptions = null
 async function loadBackOfficeOptions() {
+  if (_cachedBackOfficeOptions) return _cachedBackOfficeOptions
   const res = await vasRequestsApi.getBackOfficeOptions()
-  return res?.executives ?? res?.users ?? res ?? []
+  _cachedBackOfficeOptions = res?.executives ?? res?.users ?? res ?? []
+  return _cachedBackOfficeOptions
 }
 
 async function onAssignSingle(row, executiveId, notes) {
@@ -348,7 +351,12 @@ async function onAssignSingle(row, executiveId, notes) {
 }
 
 async function onAssignBulk(ids, executiveId) {
-  await vasRequestsApi.bulkAssign(ids, { executive_id: executiveId })
+  const res = await vasRequestsApi.bulkAssign(ids, { executive_id: executiveId })
+  return res
+}
+
+async function pollBulkAssignStatus(trackingId) {
+  return vasRequestsApi.bulkAssignStatus(trackingId)
 }
 
 function openAssignModal(row) {
@@ -370,7 +378,10 @@ function openBulkAssign() {
 }
 
 function onAssignModalSaved() {
-  toast('success', 'VAS request assigned successfully.')
+  const wasBulk = assignBulkIds.value.length > 0
+  toast('success', wasBulk
+    ? `Assignment started for ${assignBulkIds.value.length} request(s). Processing in background.`
+    : 'VAS request assigned successfully.')
   assignRow.value = null
   assignBulkIds.value = []
   selectedSubmissionIds.value = []
@@ -434,6 +445,8 @@ onMounted(async () => {
     loadColumns()
     load()
   }
+
+  loadBackOfficeOptions().catch(() => {})
 })
 </script>
 
@@ -592,6 +605,7 @@ onMounted(async () => {
       :load-options="loadBackOfficeOptions"
       :on-assign-single="onAssignSingle"
       :on-assign-bulk="onAssignBulk"
+      :poll-status="pollBulkAssignStatus"
       @close="onAssignModalClose"
       @saved="onAssignModalSaved"
     />

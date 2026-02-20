@@ -122,17 +122,14 @@ function slaTimerClass(timer, status) {
 }
 
 const fieldStatusBadgeClass = {
-  'Pending Assignment': 'bg-gray-100 text-gray-700',
-  'Site Survey Scheduled': 'bg-blue-100 text-blue-700',
-  'Survey Completed': 'bg-green-100 text-green-700',
-  'In Progress': 'bg-amber-100 text-amber-800',
-  'Installation Scheduled': 'bg-blue-100 text-blue-700',
-  'Completed': 'bg-green-100 text-green-700',
   'Meeting Scheduled': 'bg-blue-100 text-blue-700',
-  'Visited': 'bg-green-100 text-green-700',
-  'Cancelled': 'bg-red-100 text-red-700',
-  'Rescheduled': 'bg-amber-100 text-amber-800',
-  'No Show': 'bg-gray-100 text-gray-600',
+  'CM Cancelled': 'bg-red-100 text-red-700',
+  'Meeting Done - Closed Documents Shared with Sales': 'bg-green-100 text-green-700',
+  'Meeting Done - Closed CM will Share Documents': 'bg-green-100 text-green-700',
+  'Meeting Done - Sales In Follow Up': 'bg-amber-100 text-amber-800',
+  'Meeting Done - CM Not Interested': 'bg-red-100 text-red-700',
+  'Field Executive In Follow Up': 'bg-amber-100 text-amber-800',
+  'No Meeting Closed on Call': 'bg-gray-100 text-gray-700',
 }
 
 function statusBadgeClass(fieldStatus) {

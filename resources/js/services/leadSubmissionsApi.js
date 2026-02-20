@@ -153,13 +153,18 @@ const leadSubmissionsApi = {
     return res
   },
 
-  /** Bulk assign: assign one executive to multiple lead submissions (superadmin / back_office only). */
+  /** Bulk assign: dispatches queue job, returns tracking_id for progress polling. */
   async bulkAssign(leadIds, data) {
     const { data: res } = await api.post('/lead-submissions/bulk-assign', {
       lead_ids: leadIds,
       executive_id: data.executive_id,
     })
     return res
+  },
+
+  async bulkAssignStatus(trackingId) {
+    const { data } = await api.get(`/lead-submissions/bulk-assign/${trackingId}/status`)
+    return data
   },
 
   /** Change history (audit log) for a single lead submission. */

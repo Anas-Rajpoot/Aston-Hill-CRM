@@ -76,6 +76,7 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::get('/field-submissions/team-options', [FieldSubmissionController::class, 'teamOptions']);
     Route::get('/field-submissions/field-agent-options', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'fieldAgentOptions']);
     Route::post('/field-submissions/bulk-assign', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'bulkAssign']);
+    Route::get('/field-submissions/bulk-assign/{trackingId}/status', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'bulkAssignStatus']);
     Route::post('/field-submissions', [FieldSubmissionController::class, 'store']);
     Route::get('/field-submissions', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'index'])->middleware('api.cache:10,20');
     Route::get('/field-submissions/filters', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'filters'])->middleware('api.cache:60,120');
@@ -114,6 +115,7 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::get('/customer-support/team-options', [CustomerSupportController::class, 'teamOptions']);
     Route::get('/customer-support/csr-options', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'csrOptions']);
     Route::post('/customer-support/bulk-assign', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'bulkAssign']);
+    Route::get('/customer-support/bulk-assign/{trackingId}/status', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'bulkAssignStatus']);
     Route::post('/customer-support', [CustomerSupportController::class, 'store']);
     Route::get('/customer-support', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'index'])->middleware('api.cache:10,20');
     Route::get('/customer-support/filters', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'filters'])->middleware('api.cache:60,120');
@@ -166,6 +168,7 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::post('/vas-requests/columns', [\App\Http\Controllers\Api\VasRequestApiController::class, 'saveColumns']);
     Route::get('/vas-requests/back-office-options', [\App\Http\Controllers\Api\VasRequestApiController::class, 'backOfficeOptions']);
     Route::post('/vas-requests/bulk-assign', [\App\Http\Controllers\Api\VasRequestApiController::class, 'bulkAssign']);
+    Route::get('/vas-requests/bulk-assign/{trackingId}/status', [\App\Http\Controllers\Api\VasRequestApiController::class, 'bulkAssignStatus']);
     Route::get('/vas-requests/{vasRequest}/audits', [\App\Http\Controllers\Api\VasRequestApiController::class, 'audits'])->whereNumber('vasRequest');
     Route::get('/vas-requests/{vasRequest}', [VasRequestController::class, 'show'])->whereNumber('vasRequest');
     Route::get('/vas-requests/{vasRequest}/documents/{document}/download', [VasRequestController::class, 'downloadDocument'])->whereNumber('vasRequest')->whereNumber('document');
@@ -185,6 +188,7 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::get('/lead-submissions/back-office-options', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'backOfficeOptions']);
     Route::get('/lead-submissions/audit-log', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'auditLog']);
     Route::post('/lead-submissions/bulk-assign', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'bulkAssign']);
+    Route::get('/lead-submissions/bulk-assign/{trackingId}/status', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'bulkAssignStatus']);
     Route::patch('/lead-submissions/{lead}/status', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'updateStatus'])
         ->whereNumber('lead');
     Route::patch('/lead-submissions/{lead}/status-changed-at', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'updateStatusChangedAt'])

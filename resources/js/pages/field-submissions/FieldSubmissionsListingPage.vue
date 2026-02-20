@@ -412,16 +412,22 @@ function onAssignModalClose() {
 }
 
 function onAssignModalSaved() {
-  toast('success', 'Field agent assigned successfully.')
+  const wasBulk = assignBulkIds.value.length > 0
+  toast('success', wasBulk
+    ? `Assignment started for ${assignBulkIds.value.length} submission(s). Processing in background.`
+    : 'Field agent assigned successfully.')
   assignRow.value = null
   assignBulkIds.value = []
   selectedIds.value = []
   load()
 }
 
+let _cachedAgentOptions = null
 async function loadFieldAgentOptions() {
+  if (_cachedAgentOptions) return _cachedAgentOptions
   const res = await fieldSubmissionsApi.getFieldAgentOptions()
-  return res?.agents ?? []
+  _cachedAgentOptions = res?.agents ?? []
+  return _cachedAgentOptions
 }
 
 async function onAssignSingle(row, agentId) {
@@ -429,7 +435,12 @@ async function onAssignSingle(row, agentId) {
 }
 
 async function onAssignBulk(ids, agentId) {
-  await fieldSubmissionsApi.bulkAssign(ids, { field_executive_id: agentId })
+  const res = await fieldSubmissionsApi.bulkAssign(ids, { field_executive_id: agentId })
+  return res
+}
+
+async function pollBulkAssignStatus(trackingId) {
+  return fieldSubmissionsApi.bulkAssignStatus(trackingId)
 }
 
 watch(selectedIds, (ids) => {
@@ -485,6 +496,9 @@ onMounted(async () => {
     loadColumns()
     load()
   }
+
+  // Pre-warm agent options cache so the assign modal opens instantly
+  loadFieldAgentOptions().catch(() => {})
 })
 </script>
 
@@ -659,6 +673,7 @@ onMounted(async () => {
       :load-options="loadFieldAgentOptions"
       :on-assign-single="onAssignSingle"
       :on-assign-bulk="onAssignBulk"
+      :poll-status="pollBulkAssignStatus"
       @close="onAssignModalClose"
       @saved="onAssignModalSaved"
     />

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\CustomerSupportController;
 use App\Http\Controllers\FieldSubmissionController;
+use App\Jobs\BulkAssignCsrJob;
 use App\Models\CustomerSupportSubmission;
 use App\Models\CustomerSupportSubmissionAudit;
 use App\Models\SystemAuditLog;
@@ -13,7 +14,9 @@ use App\Models\UserColumnPreference;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -657,8 +660,7 @@ class CustomerSupportApiController extends Controller
 
     /**
      * POST /api/customer-support/bulk-assign
-     * Assign one CSR to multiple customer support submissions.
-     * Only superadmin, support_manager, or customer_support_representative role.
+     * Dispatches a queue job for instant response. Returns a tracking_id for progress polling.
      */
     public function bulkAssign(Request $request): JsonResponse
     {
@@ -669,41 +671,50 @@ class CustomerSupportApiController extends Controller
 
         $data = $request->validate([
             'submission_ids' => ['required', 'array', 'min:1'],
-            'submission_ids.*' => ['integer', 'exists:customer_support_submissions,id'],
+            'submission_ids.*' => ['integer'],
             'csr_id' => ['required', 'integer', 'exists:users,id'],
         ]);
 
-        $ids = $data['submission_ids'];
-        $csrId = $data['csr_id'];
+        $ids = array_unique(array_map('intval', $data['submission_ids']));
+        $csrId = (int) $data['csr_id'];
 
-        // Get the CSR user name for the csr_name field
-        $csrUser = User::find($csrId);
-        $csrName = $csrUser ? $csrUser->name : null;
-
-        $updated = CustomerSupportSubmission::query()
-            ->whereIn('id', $ids)
-            ->visibleTo($user)
-            ->update([
-                'csr_id' => $csrId,
-                'csr_name' => $csrName,
-            ]);
-
-        try {
-            SystemAuditLog::record(
-                'customer_support.bulk_assigned',
-                null,
-                ['submission_ids' => $ids, 'assigned_to' => $csrId, 'count' => count($ids)],
-                $user->id,
-                'customer_support'
-            );
-        } catch (\Throwable $e) {
-            report($e);
+        $existingCount = DB::table('customer_support_submissions')->whereIn('id', $ids)->count();
+        if ($existingCount !== count($ids)) {
+            return response()->json(['message' => 'One or more submission IDs are invalid.'], 422);
         }
 
+        $trackingId = (string) Str::uuid();
+
+        Cache::put("bulk_assign:{$trackingId}", [
+            'status' => 'pending',
+            'total' => count($ids),
+            'processed' => 0,
+            'percent' => 0,
+            'message' => 'Queued for processing...',
+        ], now()->addMinutes(30));
+
+        BulkAssignCsrJob::dispatch($ids, $csrId, $user->id, $trackingId);
+
         return response()->json([
-            'message' => "Assigned {$updated} request(s) to CSR.",
-            'updated_count' => $updated,
+            'message' => 'Assignment queued. Processing '.count($ids).' submission(s) in background.',
+            'queued' => true,
+            'count' => count($ids),
+            'tracking_id' => $trackingId,
         ]);
+    }
+
+    /**
+     * GET /api/customer-support/bulk-assign/{trackingId}/status
+     */
+    public function bulkAssignStatus(Request $request, string $trackingId): JsonResponse
+    {
+        $data = Cache::get("bulk_assign:{$trackingId}");
+
+        if (! $data) {
+            return response()->json(['status' => 'not_found'], 404);
+        }
+
+        return response()->json($data);
     }
 
     /**

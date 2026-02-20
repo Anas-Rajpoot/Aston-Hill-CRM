@@ -73,6 +73,11 @@ export default {
     return data
   },
 
+  async bulkAssignStatus(trackingId) {
+    const { data } = await api.get(`/customer-support/bulk-assign/${trackingId}/status`)
+    return data
+  },
+
   async resubmit(id, payload) {
     const { data } = await api.post(`/customer-support/${id}/resubmit`, payload)
     return data

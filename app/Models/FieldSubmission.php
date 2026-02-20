@@ -34,8 +34,14 @@ class FieldSubmission extends Model
 
     /** Status options for field head edit (meeting/visit workflow). */
     const FIELD_STATUSES = [
-        'Meeting Scheduled', 'Visited', 'Cancelled', 'Rescheduled', 'No Show',
-        'Pending Assignment', 'Site Survey Scheduled', 'Survey Completed', 'In Progress', 'Installation Scheduled', 'Completed',
+        'Meeting Scheduled',
+        'CM Cancelled',
+        'Meeting Done - Closed Documents Shared with Sales',
+        'Meeting Done - Closed CM will Share Documents',
+        'Meeting Done - Sales In Follow Up',
+        'Meeting Done - CM Not Interested',
+        'Field Executive In Follow Up',
+        'No Meeting Closed on Call',
     ];
 
     protected $casts = [

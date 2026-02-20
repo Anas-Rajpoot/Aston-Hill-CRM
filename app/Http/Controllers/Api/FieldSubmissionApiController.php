@@ -829,21 +829,29 @@ class FieldSubmissionApiController extends Controller
             abort(403, 'Unauthorized.');
         }
 
-        $agents = User::whereHas('roles', fn ($q) => $q->where('name', 'field_agent'))
-            ->where('status', 'approved')
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name]);
+        $agents = \DB::table('users')
+            ->join('model_has_roles', function ($j) {
+                $j->on('users.id', '=', 'model_has_roles.model_id')
+                  ->where('model_has_roles.model_type', (new User)->getMorphClass());
+            })
+            ->join('roles', function ($j) {
+                $j->on('model_has_roles.role_id', '=', 'roles.id')
+                  ->where('roles.name', 'field_agent');
+            })
+            ->where('users.status', 'approved')
+            ->orderBy('users.name')
+            ->select('users.id', 'users.name')
+            ->get();
 
         return response()->json([
-            'agents' => $agents->values()->all(),
+            'agents' => $agents->all(),
         ]);
     }
 
     /**
      * POST /api/field-submissions/bulk-assign
-     * Assign one field agent to multiple field submissions.
-     * Only superadmin, field_operations_head, or field_agent role.
+     * Always dispatches to queue for instant response. Returns a tracking_id
+     * so the frontend can poll for progress.
      */
     public function bulkAssign(Request $request): JsonResponse
     {
@@ -854,34 +862,51 @@ class FieldSubmissionApiController extends Controller
 
         $data = $request->validate([
             'submission_ids' => ['required', 'array', 'min:1'],
-            'submission_ids.*' => ['integer', 'exists:field_submissions,id'],
+            'submission_ids.*' => ['integer'],
             'field_executive_id' => ['required', 'integer', 'exists:users,id'],
         ]);
 
-        $ids = $data['submission_ids'];
-        $agentId = $data['field_executive_id'];
+        $ids = array_unique(array_map('intval', $data['submission_ids']));
+        $agentId = (int) $data['field_executive_id'];
 
-        $updated = FieldSubmission::query()
-            ->whereIn('id', $ids)
-            ->visibleTo($user)
-            ->update(['field_executive_id' => $agentId]);
-
-        try {
-            SystemAuditLog::record(
-                'field_submission.bulk_assigned',
-                null,
-                ['submission_ids' => $ids, 'assigned_to' => $agentId, 'count' => count($ids)],
-                $user->id,
-                'field_submission'
-            );
-        } catch (\Throwable $e) {
-            report($e);
+        $existingCount = \DB::table('field_submissions')->whereIn('id', $ids)->count();
+        if ($existingCount !== count($ids)) {
+            return response()->json(['message' => 'One or more submission IDs are invalid.'], 422);
         }
 
+        $trackingId = (string) \Illuminate\Support\Str::uuid();
+
+        \Illuminate\Support\Facades\Cache::put("bulk_assign:{$trackingId}", [
+            'status' => 'pending',
+            'total' => count($ids),
+            'processed' => 0,
+            'percent' => 0,
+            'message' => 'Queued for processing...',
+        ], now()->addMinutes(30));
+
+        \App\Jobs\BulkAssignFieldAgentJob::dispatch($ids, $agentId, $user->id, $trackingId);
+
         return response()->json([
-            'message' => "Assigned {$updated} submission(s) to field agent.",
-            'updated_count' => $updated,
+            'message' => count($ids) . ' submission(s) queued for assignment.',
+            'queued' => true,
+            'count' => count($ids),
+            'tracking_id' => $trackingId,
         ]);
+    }
+
+    /**
+     * GET /api/field-submissions/bulk-assign/{trackingId}/status
+     * Poll for bulk assign progress.
+     */
+    public function bulkAssignStatus(Request $request, string $trackingId): JsonResponse
+    {
+        $data = \Illuminate\Support\Facades\Cache::get("bulk_assign:{$trackingId}");
+
+        if (! $data) {
+            return response()->json(['status' => 'not_found'], 404);
+        }
+
+        return response()->json($data);
     }
 
     /**

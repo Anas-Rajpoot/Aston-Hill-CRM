@@ -1,6 +1,7 @@
 <script setup>
 /**
- * Assign to Back Office Executive – single row or bulk. Same pattern as lead submission.
+ * Assign to Back Office Executive – single row or bulk for VAS requests.
+ * Fire-and-forget: dispatches to queue, closes immediately, user keeps working.
  */
 import { ref, computed, watch } from 'vue'
 import vasRequestsApi from '@/services/vasRequestsApi'
@@ -45,7 +46,6 @@ watch(
       } else {
         error.value = 'Failed to load executive options. Please try again.'
       }
-      console.warn('[VAS AssignBackOfficeModal] Failed to load options:', err?.response?.status, err?.response?.data?.message || err?.message)
     } finally {
       loading.value = false
     }
@@ -220,7 +220,7 @@ function statusBadgeClass(status) {
                 </div>
                 <div>
                   <p class="text-sm font-semibold text-blue-900">{{ bulkVasIds.length }} request(s) selected</p>
-                  <p class="text-xs text-blue-700 mt-0.5">Only rows without an assigned back office will be updated.</p>
+                  <p class="text-xs text-blue-700 mt-0.5">All selected requests will be assigned to the same executive.</p>
                 </div>
               </div>
 

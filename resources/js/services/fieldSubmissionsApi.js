@@ -58,6 +58,11 @@ export default {
     return data
   },
 
+  async bulkAssignStatus(trackingId) {
+    const { data } = await api.get(`/field-submissions/bulk-assign/${trackingId}/status`)
+    return data
+  },
+
   async getSubmission(id) {
     const { data } = await api.get(`/field-submissions/${id}`)
     return data

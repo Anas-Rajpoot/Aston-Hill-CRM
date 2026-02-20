@@ -1,18 +1,7 @@
 <script setup>
 /**
- * Generic Assign Modal – professional design matching Lead Submissions' AssignBackOfficeModal.
- * Reusable across all 4 submission types (Field, Customer Support, VAS, Lead fallback).
- *
- * Props:
- *   - visible: Boolean
- *   - row: Object (single submission to assign, or null for bulk)
- *   - bulkIds: Array of IDs for bulk assignment
- *   - title: String (e.g. "Assign to Field Agent")
- *   - bulkTitle: String (e.g. "Assign {count} submission(s) to Field Agent")
- *   - selectLabel: String (e.g. "Select Field Agent")
- *   - loadOptions: async Function → returns array of { id, name }
- *   - onAssignSingle: async Function(row, selectedId, notes)
- *   - onAssignBulk: async Function(ids, selectedId)
+ * Generic Assign Modal – reusable across all submission types.
+ * Uses "fire and forget" for bulk: dispatches to queue, closes immediately, user keeps working.
  */
 import { ref, computed, watch } from 'vue'
 
@@ -48,22 +37,27 @@ const modalTitle = computed(() => {
   return props.title
 })
 
+let _loadGen = 0
 watch(
-  () => [props.visible, props.row, props.bulkIds],
-  async ([visible]) => {
+  () => props.visible,
+  async (visible) => {
     if (!visible) {
       selectedId.value = null
       notes.value = ''
       error.value = null
       return
     }
+    const gen = ++_loadGen
     loading.value = true
     error.value = null
     try {
-      options.value = await props.loadOptions()
+      const result = await props.loadOptions()
+      if (gen !== _loadGen) return
+      options.value = result
       selectedId.value = null
       notes.value = ''
     } catch (err) {
+      if (gen !== _loadGen) return
       options.value = []
       const status = err?.response?.status
       if (status === 403) {
@@ -72,7 +66,7 @@ watch(
         error.value = 'Failed to load options. Please try again.'
       }
     } finally {
-      loading.value = false
+      if (gen === _loadGen) loading.value = false
     }
   },
   { immediate: true }
@@ -90,12 +84,13 @@ async function assign() {
   saving.value = true
   error.value = null
   try {
+    let result
     if (isBulk.value && props.onAssignBulk) {
-      await props.onAssignBulk(props.bulkIds, Number(selectedId.value))
+      result = await props.onAssignBulk(props.bulkIds, Number(selectedId.value))
     } else if (props.onAssignSingle) {
-      await props.onAssignSingle(props.row, Number(selectedId.value), notes.value?.trim() || '')
+      result = await props.onAssignSingle(props.row, Number(selectedId.value), notes.value?.trim() || '')
     }
-    emit('saved')
+    emit('saved', result)
     close()
   } catch (e) {
     error.value = e?.response?.data?.message ?? 'Failed to assign.'
@@ -267,7 +262,7 @@ function statusBadgeClass(status) {
               </div>
 
               <!-- Bulk assign info -->
-              <div v-else-if="isBulk" class="rounded-lg border border-blue-200 bg-blue-50 p-4 flex items-center gap-3">
+              <div v-if="isBulk" class="rounded-lg border border-blue-200 bg-blue-50 p-4 flex items-center gap-3">
                 <div class="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 shrink-0">
                   <svg class="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />

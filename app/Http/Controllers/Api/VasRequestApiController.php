@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\FieldSubmissionController;
 use App\Http\Controllers\VasRequestController;
+use App\Jobs\BulkAssignVasJob;
 use App\Models\SystemAuditLog;
 use App\Models\User;
 use App\Models\UserColumnPreference;
@@ -13,7 +14,9 @@ use App\Models\VasRequestSubmission;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Throwable;
 
@@ -471,7 +474,7 @@ class VasRequestApiController extends Controller
 
     /**
      * POST /api/vas-requests/bulk-assign
-     * Assign one back office executive to selected VAS requests. Only updates rows that do not already have a back office executive.
+     * Dispatches a queue job for instant response. Returns a tracking_id for progress polling.
      */
     public function bulkAssign(Request $request): JsonResponse
     {
@@ -482,28 +485,50 @@ class VasRequestApiController extends Controller
 
         $data = $request->validate([
             'vas_request_ids' => ['required', 'array', 'min:1'],
-            'vas_request_ids.*' => ['integer', 'exists:vas_request_submissions,id'],
+            'vas_request_ids.*' => ['integer'],
             'executive_id' => ['required', 'integer', 'exists:users,id'],
         ]);
 
-        $ids = $data['vas_request_ids'];
+        $ids = array_unique(array_map('intval', $data['vas_request_ids']));
         $executiveId = (int) $data['executive_id'];
 
-        $updated = VasRequestSubmission::query()
-            ->whereIn('id', $ids)
-            ->whereNull('back_office_executive_id')
-            ->update(['back_office_executive_id' => $executiveId]);
-
-        try {
-            SystemAuditLog::record('vas_request.bulk_assigned', null, ['vas_ids' => $ids, 'assigned_to' => $executiveId, 'count' => count($ids)], $request->user()->id, 'vas_request');
-        } catch (\Throwable $e) {
-            report($e);
+        $existingCount = DB::table('vas_request_submissions')->whereIn('id', $ids)->count();
+        if ($existingCount !== count($ids)) {
+            return response()->json(['message' => 'One or more request IDs are invalid.'], 422);
         }
 
+        $trackingId = (string) Str::uuid();
+
+        Cache::put("bulk_assign:{$trackingId}", [
+            'status' => 'pending',
+            'total' => count($ids),
+            'processed' => 0,
+            'percent' => 0,
+            'message' => 'Queued for processing...',
+        ], now()->addMinutes(30));
+
+        BulkAssignVasJob::dispatch($ids, $executiveId, $user->id, $trackingId);
+
         return response()->json([
-            'message' => "Assigned {$updated} request(s) to back office executive. Rows that already had an executive were left unchanged.",
-            'updated_count' => $updated,
+            'message' => 'Assignment queued. Processing '.count($ids).' request(s) in background.',
+            'queued' => true,
+            'count' => count($ids),
+            'tracking_id' => $trackingId,
         ]);
+    }
+
+    /**
+     * GET /api/vas-requests/bulk-assign/{trackingId}/status
+     */
+    public function bulkAssignStatus(Request $request, string $trackingId): JsonResponse
+    {
+        $data = Cache::get("bulk_assign:{$trackingId}");
+
+        if (! $data) {
+            return response()->json(['status' => 'not_found'], 404);
+        }
+
+        return response()->json($data);
     }
 
     /**

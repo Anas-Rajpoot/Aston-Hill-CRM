@@ -75,6 +75,11 @@ export default {
     return data
   },
 
+  async bulkAssignStatus(trackingId) {
+    const { data } = await api.get(`/vas-requests/bulk-assign/${trackingId}/status`)
+    return data
+  },
+
   async resubmit(id, payload) {
     const { data } = await api.post(`/vas-requests/${id}/resubmit`, payload)
     return data

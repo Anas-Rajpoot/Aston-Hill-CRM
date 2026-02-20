@@ -370,16 +370,22 @@ function onAssignModalClose() {
 }
 
 function onAssignModalSaved() {
-  toast('success', 'CSR assigned successfully.')
+  const wasBulk = assignBulkIds.value.length > 0
+  toast('success', wasBulk
+    ? `Assignment started for ${assignBulkIds.value.length} submission(s). Processing in background.`
+    : 'CSR assigned successfully.')
   assignRow.value = null
   assignBulkIds.value = []
   selectedIds.value = []
   load()
 }
 
+let _cachedCsrOptions = null
 async function loadCsrOptions() {
+  if (_cachedCsrOptions) return _cachedCsrOptions
   const res = await customerSupportApi.getCsrOptions()
-  return res?.csrs ?? []
+  _cachedCsrOptions = res?.csrs ?? []
+  return _cachedCsrOptions
 }
 
 async function onAssignSingle(row, csrId) {
@@ -387,7 +393,12 @@ async function onAssignSingle(row, csrId) {
 }
 
 async function onAssignBulk(ids, csrId) {
-  await customerSupportApi.bulkAssign(ids, { csr_id: csrId })
+  const res = await customerSupportApi.bulkAssign(ids, { csr_id: csrId })
+  return res
+}
+
+async function pollBulkAssignStatus(trackingId) {
+  return customerSupportApi.bulkAssignStatus(trackingId)
 }
 
 watch(selectedIds, (ids) => {
@@ -441,6 +452,8 @@ onMounted(async () => {
     loadColumns()
     load()
   }
+
+  loadCsrOptions().catch(() => {})
 })
 </script>
 
@@ -610,6 +623,7 @@ onMounted(async () => {
       :load-options="loadCsrOptions"
       :on-assign-single="onAssignSingle"
       :on-assign-bulk="onAssignBulk"
+      :poll-status="pollBulkAssignStatus"
       @close="onAssignModalClose"
       @saved="onAssignModalSaved"
     />
