@@ -62,7 +62,7 @@ const canEditBackOffice = computed(() => {
 
 /** Resubmit: submitted or rejected; super admin or the user who submitted (creator / created_by). */
 function canResubmit(row) {
-  if (row.status !== 'rejected' && row.status !== 'submitted') return false
+  if (row.status === 'approved') return false
   const roles = auth.user?.roles ?? []
   const isSuperAdmin = Array.isArray(roles) && roles.some((r) => (typeof r === 'string' ? r : r?.name) === 'superadmin')
   if (isSuperAdmin) return true
@@ -75,6 +75,68 @@ const editingCell = ref(null)
 const editStatusValue = ref('')
 const editStatusChangedAtValue = ref('')
 const inlineEditValue = ref('')
+const inlineEditError = ref('')
+
+const PHONE_COLUMNS = ['contact_number_gsm', 'alternate_contact_number']
+
+function validatePhone(value, required = false) {
+  if (!value || !value.trim()) return required ? 'Contact number is required.' : null
+  if (/\s/.test(value)) return 'Must not contain spaces.'
+  if (!/^\d+$/.test(value)) return 'Must contain only digits.'
+  if (!value.startsWith('971')) return 'Must start with 971.'
+  if (value.length !== 12) return 'Must be exactly 12 digits.'
+  return null
+}
+
+function validateEmail(value) {
+  if (!value || !value.trim()) return null
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())) return 'Please enter a valid email address.'
+  return null
+}
+
+function validateCoordinates(value) {
+  if (!value || !value.trim()) return null
+  const coordPattern = /^-?\d{1,3}(\.\d+)?\s*,\s*-?\d{1,3}(\.\d+)?$/
+  const coords = value.trim()
+  if (!coordPattern.test(coords)) return 'Enter valid coordinates (e.g. 25.2048, 55.2708).'
+  const [lat, lng] = coords.split(',').map(s => parseFloat(s.trim()))
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return 'Latitude must be -90 to 90, longitude -180 to 180.'
+  return null
+}
+
+const AE_DOMAIN_FORBIDDEN = ['lac', 'rac', 'rat', 'sgns']
+const AE_DOMAIN_SPECIAL = /[@#$%^&*()\-+={}\[\]:;'"\\<>,_?/!_`|\s]/
+function validateAeDomain(value) {
+  if (!value || !value.trim()) return null
+  const v = value.trim()
+  if (/\s/.test(v)) return 'Domain must not contain spaces.'
+  if (/[0-9]/.test(v)) return 'Domain must not contain numbers.'
+  if (AE_DOMAIN_SPECIAL.test(v)) return 'Domain must not contain special characters.'
+  const lower = v.toLowerCase()
+  for (const kw of AE_DOMAIN_FORBIDDEN) {
+    if (lower.includes(kw)) return 'Domain must not contain: LAC, RAC, RAT, SGNS.'
+  }
+  if ((v.match(/\./g) || []).length !== 1) return 'Domain must contain only one dot.'
+  if (!lower.endsWith('.ae')) return 'Domain must end with .ae'
+  return null
+}
+
+function validateMrc(value) {
+  if (!value || value === '') return null
+  if (isNaN(parseInt(value, 10)) || parseInt(value, 10) < 0) return 'MRC must be a valid whole number (0 or more).'
+  return null
+}
+
+function validateQuantity(value) {
+  if (!value || value === '') return null
+  if (parseInt(value, 10) < 0 || !Number.isInteger(Number(value))) return 'Quantity must be a whole number.'
+  return null
+}
+
+function onPhoneInput(event) {
+  inlineEditValue.value = event.target.value.replace(/\D/g, '')
+  inlineEditError.value = ''
+}
 
 /** Columns that use dropdown (click to edit). */
 const DROPDOWN_COLUMNS = [
@@ -115,26 +177,57 @@ function openDropdownEdit(row, col) {
   if (!canEditBackOffice.value) return
   editingCell.value = { rowId: row.id, col }
   inlineEditValue.value = getCellValueForEdit(row, col)
+  inlineEditError.value = ''
 }
 
 function openInputEdit(row, col) {
   if (!canEditBackOffice.value) return
   editingCell.value = { rowId: row.id, col }
   inlineEditValue.value = getCellValueForEdit(row, col)
+  inlineEditError.value = ''
 }
 
 function saveInlineEdit() {
   if (!editingCell.value) return
   const { rowId, col } = editingCell.value
   let value = inlineEditValue.value
+
+  let err = null
+  if (PHONE_COLUMNS.includes(col)) {
+    err = validatePhone(value, col === 'contact_number_gsm')
+  } else if (col === 'email') {
+    err = validateEmail(value)
+  } else if (col === 'location_coordinates') {
+    err = validateCoordinates(value)
+  } else if (col === 'ae_domain') {
+    err = validateAeDomain(value)
+  } else if (col === 'mrc_aed') {
+    err = validateMrc(value)
+  } else if (col === 'quantity') {
+    err = validateQuantity(value)
+  } else if (col === 'company_name') {
+    if (!value || !value.trim()) err = 'Company name is required.'
+  } else if (col === 'product') {
+    if (!value || !value.trim()) err = 'Product is required.'
+  } else if (col === 'address') {
+    if (!value || !value.trim()) err = 'Complete address is required.'
+  }
+
+  if (err) {
+    inlineEditError.value = err
+    return
+  }
+
   if (col === 'mrc_aed' || col === 'quantity') value = value === '' ? null : (col === 'quantity' ? parseInt(value, 10) : parseFloat(value))
   if (col === 'submission_date_from' || col === 'completion_date') value = value || null
   emit('updateCell', rowId, col, value)
   editingCell.value = null
+  inlineEditError.value = ''
 }
 
 function cancelInlineEdit() {
   editingCell.value = null
+  inlineEditError.value = ''
 }
 
 const SUBMISSION_TYPE_OPTIONS = [
@@ -417,12 +510,12 @@ function statusBadgeClass(status) {
             v-for="col in effectiveColumns"
             :key="col"
             scope="col"
-            class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold uppercase tracking-wider text-white"
+            class="whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-white"
           >
             <button
               v-if="sortable(col)"
               type="button"
-              class="inline-flex items-center gap-1 font-bold text-white hover:text-white/90"
+              class="inline-flex items-center gap-1 font-semibold text-white hover:text-white/90"
               @click="toggleSort(col)"
             >
               {{ label(col) }}
@@ -437,9 +530,9 @@ function statusBadgeClass(status) {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
               </svg>
             </button>
-            <span v-else class="font-bold text-white">{{ label(col) }}</span>
+            <span v-else class="font-semibold text-white">{{ label(col) }}</span>
           </th>
-          <th scope="col" class="whitespace-nowrap px-4 py-3 text-right text-sm font-bold uppercase tracking-wider text-white">
+          <th scope="col" class="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold text-white">
             Actions
           </th>
         </tr>
@@ -490,12 +583,28 @@ function statusBadgeClass(status) {
             <template v-else-if="canEditBackOffice && isEditing(row.id, col) && isInputColumn(col)">
               <div class="flex flex-col gap-1.5">
                 <input
-                  v-model="inlineEditValue"
-                  :type="col === 'submission_date_from' || col === 'completion_date' ? 'date' : (col === 'email' ? 'email' : 'text')"
-                  class="w-full min-w-[160px] max-w-[220px] rounded border border-gray-300 bg-white px-3 py-1.5 pr-8 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  v-if="PHONE_COLUMNS.includes(col)"
+                  :value="inlineEditValue"
+                  type="text"
+                  maxlength="12"
+                  placeholder="971XXXXXXXXX"
+                  class="w-full min-w-[160px] max-w-[220px] rounded border bg-white px-3 py-1.5 pr-8 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  :class="inlineEditError ? 'border-red-500' : 'border-gray-300'"
+                  @input="onPhoneInput($event)"
                   @keydown.enter="saveInlineEdit"
                   @keydown.esc="cancelInlineEdit"
                 />
+                <input
+                  v-else
+                  v-model="inlineEditValue"
+                  :type="col === 'submission_date_from' || col === 'completion_date' ? 'date' : (col === 'email' ? 'email' : 'text')"
+                  class="w-full min-w-[160px] max-w-[220px] rounded border bg-white px-3 py-1.5 pr-8 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  :class="inlineEditError ? 'border-red-500' : 'border-gray-300'"
+                  @input="inlineEditError = ''"
+                  @keydown.enter="saveInlineEdit"
+                  @keydown.esc="cancelInlineEdit"
+                />
+                <p v-if="inlineEditError" class="text-xs text-red-600">{{ inlineEditError }}</p>
                 <div class="flex gap-1">
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
                   <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>

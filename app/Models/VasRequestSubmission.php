@@ -32,7 +32,16 @@ class VasRequestSubmission extends Model
         'rejected_at',
     ];
 
-    const STATUSES = ['draft', 'submitted', 'approved', 'rejected'];
+    const STATUSES = [
+        'submitted',
+        'under_process',
+        'rejected',
+        'pending_with_csr',
+        'pending_with_du',
+        'pending_with_sales',
+        'pending_for_approval',
+        'unassigned',
+    ];
 
     protected $casts = [
         'submitted_at' => 'datetime',

@@ -19,7 +19,7 @@ function goToEdit(row) {
 const props = defineProps({
   columns: { type: Array, required: true },
   data: { type: Array, default: () => [] },
-  sort: { type: String, default: 'submitted_at' },
+  sort: { type: String, default: 'created_at' },
   order: { type: String, default: 'desc' },
   loading: { type: Boolean, default: false },
   currentPage: { type: Number, default: 1 },
@@ -54,8 +54,7 @@ function rowNumber(index) {
 }
 
 const columnLabels = {
-  id: '#',
-  submitted_at: 'Submission Date',
+  id: 'SR',
   created_at: 'Created',
   updated_at: 'Last Updated',
   request_type: 'Request Type',
@@ -75,7 +74,7 @@ const columnLabels = {
 }
 
 const SORTABLE_COLUMNS = [
-  'id', 'submitted_at', 'created_at', 'request_type', 'account_number', 'company_name',
+  'id', 'created_at', 'request_type', 'account_number', 'company_name',
   'description', 'manager', 'team_leader', 'sales_agent', 'executive', 'status', 'creator',
 ]
 
@@ -116,7 +115,7 @@ function fullValue(row, col) {
 const TRUNCATE_COLUMNS = [
   'request_type', 'company_name', 'account_number', 'description', 'additional_notes', 'contact_number',
   'manager', 'team_leader', 'sales_agent', 'executive', 'creator', 'status',
-  'submitted_at', 'created_at', 'updated_at', 'approved_at', 'rejected_at',
+  'created_at', 'updated_at', 'approved_at', 'rejected_at',
 ]
 function shouldTruncate(col) {
   return TRUNCATE_COLUMNS.includes(col)
@@ -128,7 +127,7 @@ function cellTitle(row, col) {
 }
 
 const DROPDOWN_COLUMNS = ['status', 'request_type', 'manager', 'team_leader', 'sales_agent', 'executive']
-const READ_ONLY_COLUMNS = ['id', 'creator', 'submitted_at', 'created_at']
+const READ_ONLY_COLUMNS = ['id', 'creator', 'created_at']
 
 const selectedSet = computed(() => new Set((props.selectedIds || []).map(String)))
 const allRowIds = computed(() => props.data.map((r) => r.id))
@@ -227,11 +226,21 @@ function isEditing(rowId, col) {
 const STATUS_BADGES = {
   draft: 'bg-gray-100 text-gray-700',
   submitted: 'bg-blue-100 text-blue-700',
+  under_process: 'bg-yellow-100 text-yellow-700',
   approved: 'bg-green-100 text-green-700',
   rejected: 'bg-red-100 text-red-700',
+  pending_with_csr: 'bg-orange-100 text-orange-700',
+  pending_with_du: 'bg-purple-100 text-purple-700',
+  pending_with_sales: 'bg-cyan-100 text-cyan-700',
+  pending_for_approval: 'bg-amber-100 text-amber-700',
+  unassigned: 'bg-rose-100 text-rose-700',
 }
 function statusBadgeClass(status) {
   return STATUS_BADGES[status] ?? 'bg-gray-100 text-gray-700'
+}
+function formatStatus(status) {
+  if (!status) return '—'
+  return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 </script>
 
@@ -373,10 +382,14 @@ function statusBadgeClass(status) {
                   @keydown.enter="saveInlineEdit"
                   @keydown.esc="cancelInlineEdit"
                 >
-                  <option value="draft">Draft</option>
                   <option value="submitted">Submitted</option>
-                  <option value="approved">Approved</option>
+                  <option value="under_process">Under Process</option>
                   <option value="rejected">Rejected</option>
+                  <option value="pending_with_csr">Pending with CSR</option>
+                  <option value="pending_with_du">Pending with DU</option>
+                  <option value="pending_with_sales">Pending with Sales</option>
+                  <option value="pending_for_approval">Pending for Approval</option>
+                  <option value="unassigned">UnAssigned</option>
                 </select>
                 <div class="flex gap-1">
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
@@ -389,12 +402,12 @@ function statusBadgeClass(status) {
                 :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium cursor-pointer hover:ring-2 hover:ring-green-400', statusBadgeClass(row.status)]"
                 @dblclick="openDropdownEdit(row, 'status')"
               >
-                {{ row.status ? row.status.charAt(0).toUpperCase() + row.status.slice(1) : '—' }}
+                {{ formatStatus(row.status) }}
               </span>
             </template>
             <template v-else-if="col === 'status'">
               <span :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', statusBadgeClass(row.status)]">
-                {{ row.status ? row.status.charAt(0).toUpperCase() + row.status.slice(1) : '—' }}
+                {{ formatStatus(row.status) }}
               </span>
             </template>
             <template v-else-if="canInlineEdit && isDropdownColumn(col)">

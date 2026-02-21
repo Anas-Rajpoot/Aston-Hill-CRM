@@ -12,6 +12,7 @@ import { toDdMmYyyy } from '@/lib/dateFormat'
 import ClientTable from '@/components/clients/ClientTable.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import Toast from '@/components/Toast.vue'
+import TruncatedText from '@/components/TruncatedText.vue'
 import api from '@/lib/axios'
 
 const route = useRoute()
@@ -1431,9 +1432,9 @@ onMounted(() => {
                 >
                   <div class="flex flex-wrap items-center gap-1.5">
                     <span class="font-medium text-gray-700">{{ a.field_label || a.field_name }}:</span>
-                    <span class="text-red-500 line-through break-all">{{ a.old_value ?? '(empty)' }}</span>
+                    <span class="text-red-500 line-through"><TruncatedText :text="a.old_value ?? ''" empty-label="(empty)" /></span>
                     <span class="text-gray-400">&rarr;</span>
-                    <span class="text-green-600 break-all">{{ a.new_value ?? '(empty)' }}</span>
+                    <span class="text-green-600"><TruncatedText :text="a.new_value ?? ''" empty-label="(empty)" /></span>
                   </div>
                   <p class="mt-1.5 text-xs text-gray-500">
                     {{ new Date(a.changed_at).toLocaleString() }} by {{ a.changed_by_name || a.changed_by || '—' }}

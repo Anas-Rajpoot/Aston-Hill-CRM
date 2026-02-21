@@ -10,6 +10,11 @@ let teamOptionsCache = null
 let teamOptionsCacheAt = 0
 const TEAM_OPTIONS_TTL_MS = 2 * 60 * 1000
 
+/** In-memory cache for getBackOfficeOptions (5 min TTL). */
+let backOfficeOptionsCache = null
+let backOfficeOptionsCacheAt = 0
+const BACK_OFFICE_OPTIONS_TTL_MS = 5 * 60 * 1000
+
 export function invalidateCurrentDraftCache() {
   currentDraftCache = null
   currentDraftCacheAt = 0
@@ -144,7 +149,12 @@ const leadSubmissionsApi = {
 
   /** Back office edit (superadmin / backoffice only) */
   async getBackOfficeOptions() {
+    if (backOfficeOptionsCache && Date.now() - backOfficeOptionsCacheAt < BACK_OFFICE_OPTIONS_TTL_MS) {
+      return backOfficeOptionsCache
+    }
     const { data } = await api.get('/lead-submissions/back-office-options')
+    backOfficeOptionsCache = data
+    backOfficeOptionsCacheAt = Date.now()
     return data
   },
 

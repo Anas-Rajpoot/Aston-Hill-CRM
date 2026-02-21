@@ -355,7 +355,7 @@ class VasRequestApiController extends Controller
 
             return [
                 'request_types' => array_values($types),
-                'statuses' => array_map(fn ($s) => ['value' => $s, 'label' => ucfirst($s)], VasRequestSubmission::STATUSES),
+                'statuses' => array_map(fn ($s) => ['value' => $s, 'label' => ucwords(str_replace('_', ' ', $s))], VasRequestSubmission::STATUSES),
                 'managers' => $managers,
                 'team_leaders' => $teamLeaders,
                 'sales_agents' => $salesAgents,
@@ -454,21 +454,37 @@ class VasRequestApiController extends Controller
      */
     public function backOfficeOptions(Request $request): JsonResponse
     {
-        $user = $request->user();
-        $allowed = $user->roles()->whereIn('name', ['superadmin', 'back_office', 'manager', 'team_leader'])->exists()
-            || $user->can('viewAny', VasRequestSubmission::class);
+        $userId = $request->user()->id;
+        $allowed = DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('model_has_roles.model_id', $userId)
+            ->where('model_has_roles.model_type', (new \App\Models\User)->getMorphClass())
+            ->whereIn('roles.name', ['superadmin', 'back_office', 'manager', 'team_leader'])
+            ->exists();
+
         if (! $allowed) {
             abort(403, 'Unauthorized.');
         }
 
-        $executives = User::whereHas('roles', fn ($q) => $q->where('name', 'back_office'))
-            ->where('status', 'approved')
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name]);
+        $executives = Cache::remember('vas_back_office_options', 600, function () {
+            return DB::table('users')
+                ->join('model_has_roles', function ($j) {
+                    $j->on('users.id', '=', 'model_has_roles.model_id')
+                      ->where('model_has_roles.model_type', (new \App\Models\User)->getMorphClass());
+                })
+                ->join('roles', function ($j) {
+                    $j->on('model_has_roles.role_id', '=', 'roles.id')
+                      ->where('roles.name', 'back_office');
+                })
+                ->where('users.status', 'approved')
+                ->orderBy('users.name')
+                ->select('users.id', 'users.name')
+                ->get()
+                ->all();
+        });
 
         return response()->json([
-            'executives' => $executives->values()->all(),
+            'executives' => $executives,
         ]);
     }
 
@@ -479,7 +495,14 @@ class VasRequestApiController extends Controller
     public function bulkAssign(Request $request): JsonResponse
     {
         $user = $request->user();
-        if (! $user->hasRole('superadmin') && ! $user->hasRole('back_office') && ! $user->hasRole('backoffice')) {
+        $allowed = DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('model_has_roles.model_id', $user->id)
+            ->where('model_has_roles.model_type', (new User)->getMorphClass())
+            ->whereIn('roles.name', ['superadmin', 'back_office', 'backoffice'])
+            ->exists();
+
+        if (! $allowed) {
             abort(403, 'Only superadmin or back office can bulk assign.');
         }
 
@@ -588,20 +611,36 @@ class VasRequestApiController extends Controller
             // silent - team options are optional for listing
         }
 
-        // Include back office options (for assign modal)
+        // Include back office options (for assign modal) — use same cache as backOfficeOptions()
         $boData = [];
         $user = $request->user();
-        if ($user->hasRole('superadmin') || $user->hasRole('back_office') || $user->hasRole('backoffice')) {
-            try {
-                $executives = User::whereHas('roles', fn ($q) => $q->where('name', 'back_office'))
-                    ->where('status', 'approved')
-                    ->orderBy('name')
-                    ->get(['id', 'name'])
-                    ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name]);
+        $canAssign = DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('model_has_roles.model_id', $user->id)
+            ->where('model_has_roles.model_type', (new User)->getMorphClass())
+            ->whereIn('roles.name', ['superadmin', 'back_office', 'backoffice', 'manager', 'team_leader'])
+            ->exists();
 
-                $boData = [
-                    'executives' => $executives->values()->all(),
-                ];
+        if ($canAssign) {
+            try {
+                $executives = Cache::remember('vas_back_office_options', 600, function () {
+                    return DB::table('users')
+                        ->join('model_has_roles', function ($j) {
+                            $j->on('users.id', '=', 'model_has_roles.model_id')
+                              ->where('model_has_roles.model_type', (new User)->getMorphClass());
+                        })
+                        ->join('roles', function ($j) {
+                            $j->on('model_has_roles.role_id', '=', 'roles.id')
+                              ->where('roles.name', 'back_office');
+                        })
+                        ->where('users.status', 'approved')
+                        ->orderBy('users.name')
+                        ->select('users.id', 'users.name')
+                        ->get()
+                        ->all();
+                });
+
+                $boData = ['executives' => $executives];
             } catch (\Throwable $e) {
                 // silent
             }

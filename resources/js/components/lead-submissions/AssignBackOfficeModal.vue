@@ -68,19 +68,20 @@ async function assign() {
   saving.value = true
   error.value = null
   try {
+    let result
     if (isBulk.value) {
-      await leadSubmissionsApi.bulkAssign(props.bulkLeadIds, {
+      result = await leadSubmissionsApi.bulkAssign(props.bulkLeadIds, {
         executive_id: Number(executiveId.value),
       })
     } else {
       const id = props.lead?.id
       if (!id) return
-      await leadSubmissionsApi.updateBackOffice(id, {
+      result = await leadSubmissionsApi.updateBackOffice(id, {
         executive_id: executiveId.value ? Number(executiveId.value) : null,
         back_office_notes: assignmentNotes.value?.trim() || undefined,
       })
     }
-    emit('saved')
+    emit('saved', result)
     close()
   } catch (e) {
     error.value = e?.response?.data?.message ?? 'Failed to assign.'

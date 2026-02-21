@@ -1,5 +1,9 @@
 import api from '@/lib/axios'
 
+let _csrOptionsCache = null
+let _csrOptionsCacheAt = 0
+const CSR_OPTIONS_TTL_MS = 5 * 60 * 1000
+
 export default {
   getTeamOptions() {
     return api.get('/customer-support/team-options')
@@ -60,8 +64,19 @@ export default {
     return data
   },
 
+  async getCsrsByAccount(accountNumber) {
+    if (!accountNumber) return { csr_ids: [] }
+    const { data } = await api.get('/customer-support/csrs-by-account', { params: { account_number: accountNumber } })
+    return data
+  },
+
   async getCsrOptions() {
+    if (_csrOptionsCache && Date.now() - _csrOptionsCacheAt < CSR_OPTIONS_TTL_MS) {
+      return _csrOptionsCache
+    }
     const { data } = await api.get('/customer-support/csr-options')
+    _csrOptionsCache = data
+    _csrOptionsCacheAt = Date.now()
     return data
   },
 

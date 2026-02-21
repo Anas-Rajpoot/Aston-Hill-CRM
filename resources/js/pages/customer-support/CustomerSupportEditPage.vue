@@ -16,10 +16,49 @@ const router = useRouter()
 const loading = ref(true)
 const saving = ref(false)
 const submission = ref(null)
-const editOptions = ref({ issue_categories: [], workflow_statuses: [], pending_options: [] })
+const editOptions = ref({ issue_categories: [], statuses: [], workflow_statuses: [], pending_options: [] })
 const teamOptions = ref({ managers: [], team_leaders: [], sales_agents: [], labels: {} })
+const csrUsers = ref([])
+const accountCsrIds = ref([])
 const newFiles = ref([])
 const fileInput = ref(null)
+const completionDateRef = ref(null)
+
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+function formatDateDisplay(val) {
+  if (!val) return ''
+  const [y, m, d] = val.split('-')
+  if (!y || !m || !d) return ''
+  return `${d}-${MONTHS[parseInt(m, 10) - 1]}-${y}`
+}
+function openDatePicker(r) {
+  const el = r?.$el ?? r
+  if (el?.showPicker) {
+    try { el.showPicker() } catch { el.click() }
+  } else if (el) { el.click() }
+}
+const accountCsrs = computed(() => {
+  const ids = new Set(accountCsrIds.value)
+  return csrUsers.value.filter((c) => ids.has(c.id))
+})
+const otherCsrs = computed(() => {
+  const ids = new Set(accountCsrIds.value)
+  return csrUsers.value.filter((c) => !ids.has(c.id))
+})
+
+async function loadAccountCsrs(accountNumber) {
+  if (!accountNumber) {
+    accountCsrIds.value = []
+    return
+  }
+  try {
+    const res = await customerSupportApi.getCsrsByAccount(accountNumber)
+    accountCsrIds.value = res?.csr_ids ?? []
+  } catch {
+    accountCsrIds.value = []
+  }
+}
+
 const settingFromChild = ref(false)
 const settingFromSalesAgent = ref(false)
 /** When true, watchers skip so initial load does not clear team assignment IDs */
@@ -29,8 +68,6 @@ const id = computed(() => {
   const p = route.params.id
   return p != null ? Number(p) : null
 })
-
-const isResubmit = computed(() => route.query.resubmit === '1')
 
 const { errors, generalMessage, setErrors, clearErrors, getError } = useFormErrors()
 
@@ -43,8 +80,9 @@ const form = ref({
   manager_id: '',
   team_leader_id: '',
   sales_agent_id: '',
+  status: '',
   ticket_number: '',
-  csr_name: '',
+  csr_id: '',
   workflow_status: '',
   completion_date: '',
   trouble_ticket: '',
@@ -114,14 +152,17 @@ async function load() {
   clearErrors()
   initialFormLoad.value = true
   try {
-    const [subData, optionsData, teamData] = await Promise.all([
+    const [subData, optionsData, teamData, csrData] = await Promise.all([
       customerSupportApi.getSubmission(id.value),
       customerSupportApi.getEditOptions().catch(() => ({})),
       customerSupportApi.getTeamOptions().then((r) => r?.data ?? {}).catch(() => ({})),
+      customerSupportApi.getCsrOptions().catch(() => ({})),
     ])
+    csrUsers.value = csrData?.csrs ?? []
     submission.value = subData
     editOptions.value = {
       issue_categories: optionsData.issue_categories ?? [],
+      statuses: optionsData.statuses ?? [],
       workflow_statuses: optionsData.workflow_statuses ?? [],
       pending_options: optionsData.pending_options ?? [],
     }
@@ -143,8 +184,9 @@ async function load() {
       manager_id: managerId != null ? String(managerId) : '',
       team_leader_id: teamLeaderId != null ? String(teamLeaderId) : '',
       sales_agent_id: salesAgentId != null ? String(salesAgentId) : '',
+      status: '',
       ticket_number: subData.ticket_number ?? '',
-      csr_name: subData.csr_name ?? '',
+      csr_id: subData.csr_id != null ? String(subData.csr_id) : '',
       workflow_status: subData.workflow_status ?? '',
       completion_date: subData.completion_date ? String(subData.completion_date).slice(0, 10) : '',
       trouble_ticket: subData.trouble_ticket ?? '',
@@ -154,6 +196,12 @@ async function load() {
       internal_remarks: subData.internal_remarks ?? '',
     }
     newFiles.value = []
+    if (subData.account_number) {
+      await loadAccountCsrs(subData.account_number)
+      if (!form.value.csr_id && accountCsrIds.value.length > 0) {
+        form.value.csr_id = String(accountCsrIds.value[0])
+      }
+    }
     nextTick(() => {
       initialFormLoad.value = false
     })
@@ -219,6 +267,18 @@ watch(
   }
 )
 
+watch(
+  () => form.value.account_number,
+  async (newVal, oldVal) => {
+    if (initialFormLoad.value) return
+    if (newVal === oldVal) return
+    await loadAccountCsrs(newVal)
+    if (accountCsrIds.value.length > 0) {
+      form.value.csr_id = String(accountCsrIds.value[0])
+    }
+  }
+)
+
 function goBack() {
   router.push(`/customer-support/${id.value}`)
 }
@@ -252,8 +312,9 @@ function buildPayload(submitAction = false) {
     manager_id: f.manager_id ? Number(f.manager_id) : null,
     team_leader_id: f.team_leader_id ? Number(f.team_leader_id) : null,
     sales_agent_id: f.sales_agent_id ? Number(f.sales_agent_id) : null,
+    status: f.status || null,
     ticket_number: f.ticket_number || null,
-    csr_name: f.csr_name || null,
+    csr_id: f.csr_id ? Number(f.csr_id) : null,
     workflow_status: f.workflow_status || null,
     completion_date: f.completion_date || null,
     trouble_ticket: f.trouble_ticket || null,
@@ -262,7 +323,7 @@ function buildPayload(submitAction = false) {
     resolution_remarks: f.resolution_remarks || null,
     internal_remarks: f.internal_remarks || null,
   }
-  if (submitAction) payload.status = 'submitted'
+  if (submitAction && !f.status) payload.status = 'submitted'
   return payload
 }
 
@@ -327,9 +388,17 @@ onMounted(() => {
     <div class="w-full">
       <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
         <div class="px-4 py-4 sm:px-5">
-          <div class="flex flex-wrap items-baseline gap-2">
-            <h1 class="text-xl font-semibold text-gray-900">Edit Customer Support Request</h1>
-            <Breadcrumbs />
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <div class="flex flex-wrap items-baseline gap-2">
+              <h1 class="text-xl font-semibold text-gray-900">Edit Customer Support Request</h1>
+              <Breadcrumbs />
+            </div>
+            <router-link
+              to="/customer-support"
+              class="rounded border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              Back to List
+            </router-link>
           </div>
         </div>
         <div class="border-t border-gray-200" />
@@ -512,23 +581,44 @@ onMounted(() => {
             <h2 class="mb-3 border-b border-gray-200 pb-2 text-base font-semibold text-gray-900">Additional Information (CSR)</h2>
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <div>
+                <label class="block text-sm font-medium text-gray-700">Status</label>
+                <select v-model="form.status" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+                  <option value="">Select Status</option>
+                  <option v-for="opt in editOptions.statuses" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                </select>
+              </div>
+              <div>
                 <label class="block text-sm font-medium text-gray-700">Ticket Number</label>
-                <input v-model="form.ticket_number" type="text" placeholder="Enter Unique ID" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+                <input :value="form.ticket_number" type="text" readonly class="mt-1 block w-full cursor-not-allowed rounded border border-gray-200 bg-gray-50 px-3 py-2 text-gray-600 shadow-sm" />
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">CSR Name</label>
-                <input v-model="form.csr_name" type="text" placeholder="Enter CSR Name" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700">Status</label>
-                <select v-model="form.workflow_status" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
-                  <option value="">Select Status</option>
-                  <option v-for="opt in editOptions.workflow_statuses" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                <select v-model="form.csr_id" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+                  <option value="">Select CSR</option>
+                  <optgroup v-if="accountCsrs.length" label="Assigned to this Account">
+                    <option v-for="csr in accountCsrs" :key="'acc-'+csr.id" :value="String(csr.id)">{{ csr.name }}</option>
+                  </optgroup>
+                  <optgroup v-if="otherCsrs.length" :label="accountCsrs.length ? 'Other CSRs' : 'All CSRs'">
+                    <option v-for="csr in otherCsrs" :key="'oth-'+csr.id" :value="String(csr.id)">{{ csr.name }}</option>
+                  </optgroup>
+                  <template v-if="!accountCsrs.length && !otherCsrs.length">
+                    <option v-for="csr in csrUsers" :key="csr.id" :value="String(csr.id)">{{ csr.name }}</option>
+                  </template>
                 </select>
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">Completion Date</label>
-                <input v-model="form.completion_date" type="date" placeholder="DD/MM/YYYY" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+                <div class="relative mt-1" @click="openDatePicker(completionDateRef)">
+                  <input
+                    type="text"
+                    readonly
+                    :value="formatDateDisplay(form.completion_date)"
+                    placeholder="DD-MMM-YYYY"
+                    class="block w-full cursor-pointer rounded border border-gray-300 bg-white px-3 py-2 pr-9 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  />
+                  <svg class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                  <input ref="completionDateRef" v-model="form.completion_date" type="date" class="sr-only" tabindex="-1" />
+                </div>
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">Trouble Ticket</label>
@@ -546,12 +636,16 @@ onMounted(() => {
                 </select>
               </div>
               <div class="sm:col-span-2 lg:col-span-3">
-                <label class="block text-sm font-medium text-gray-700">Resolution Remarks</label>
-                <textarea v-model="form.resolution_remarks" rows="3" placeholder="Provide detailed description of the issue..." class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
-              </div>
-              <div class="sm:col-span-2 lg:col-span-3">
-                <label class="block text-sm font-medium text-gray-700">Internal Remarks</label>
-                <textarea v-model="form.internal_remarks" rows="3" placeholder="Provide detailed description of the issue..." class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700">Resolution Remarks</label>
+                    <textarea v-model="form.resolution_remarks" rows="3" placeholder="Provide detailed description of the issue..." class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700">Internal Remarks</label>
+                    <textarea v-model="form.internal_remarks" rows="3" placeholder="Provide detailed description of the issue..." class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+                  </div>
+                </div>
               </div>
             </div>
           </section>

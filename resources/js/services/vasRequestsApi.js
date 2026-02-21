@@ -1,5 +1,9 @@
 import api from '@/lib/axios'
 
+let _vasBackOfficeOptionsCache = null
+let _vasBackOfficeOptionsCacheAt = 0
+const VAS_BACK_OFFICE_OPTIONS_TTL_MS = 5 * 60 * 1000
+
 export default {
   getTeamOptions() {
     return api.get('/vas-requests/team-options')
@@ -56,7 +60,12 @@ export default {
   },
 
   async getBackOfficeOptions() {
+    if (_vasBackOfficeOptionsCache && Date.now() - _vasBackOfficeOptionsCacheAt < VAS_BACK_OFFICE_OPTIONS_TTL_MS) {
+      return _vasBackOfficeOptionsCache
+    }
     const { data } = await api.get('/vas-requests/back-office-options')
+    _vasBackOfficeOptionsCache = data
+    _vasBackOfficeOptionsCacheAt = Date.now()
     return data
   },
 

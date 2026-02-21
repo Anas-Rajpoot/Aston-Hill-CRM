@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/auth'
 import leadSubmissionsApi from '@/services/leadSubmissionsApi'
 import api from '@/lib/axios'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import TruncatedText from '@/components/TruncatedText.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -292,11 +293,11 @@ onMounted(() => {
                     <td class="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">
                       {{ fieldLabel(row.field_name, row) }}
                     </td>
-                    <td class="max-w-[300px] whitespace-pre-wrap break-words px-4 py-3 text-sm text-red-500">
-                      {{ row.old_value != null && row.old_value !== '' ? formatAuditValue(row.old_value) : 'empty' }}
+                    <td class="max-w-[300px] px-4 py-3 text-sm text-red-500">
+                      <TruncatedText :text="row.old_value != null && row.old_value !== '' ? formatAuditValue(row.old_value) : ''" empty-label="empty" />
                     </td>
-                    <td class="max-w-[300px] whitespace-pre-wrap break-words px-4 py-3 text-sm text-green-600">
-                      {{ row.new_value != null && row.new_value !== '' ? formatAuditValue(row.new_value) : '—' }}
+                    <td class="max-w-[300px] px-4 py-3 text-sm text-green-600">
+                      <TruncatedText :text="row.new_value != null && row.new_value !== '' ? formatAuditValue(row.new_value) : ''" empty-label="—" />
                     </td>
                     <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-900">{{ row.changed_by_name || row.changed_by || '—' }}</td>
                     <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{{ formatDateTime(row.changed_at) }}</td>

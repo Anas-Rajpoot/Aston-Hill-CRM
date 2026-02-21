@@ -47,6 +47,15 @@ function goToEdit(row) {
   if (row?.id) router.push(`/field-submissions/${row.id}/edit`)
 }
 
+function canResubmit(row) {
+  if (row.status === 'approved') return false
+  const roles = auth.user?.roles ?? []
+  const isSuperAdmin = Array.isArray(roles) && roles.some((r) => (typeof r === 'string' ? r : r?.name) === 'superadmin')
+  if (isSuperAdmin) return true
+  const creatorId = row.creator_id ?? row.created_by
+  return creatorId != null && Number(creatorId) === Number(auth.user?.id)
+}
+
 function goToView(row) {
   if (row?.id) router.push(`/field-submissions/${row.id}`)
 }
@@ -203,6 +212,33 @@ function slaTimerClass(slaTimer, slaStatus) {
 /** Inline edit: dropdown (click) vs input (double-click). */
 const editingCell = ref(null)
 const inlineEditValue = ref('')
+const inlineEditError = ref('')
+
+const PHONE_COLUMNS = ['contact_number', 'alternate_number']
+
+function validatePhone(value, required = false) {
+  if (!value || !value.trim()) return required ? 'Contact number is required.' : null
+  if (/\s/.test(value)) return 'Must not contain spaces.'
+  if (!/^\d+$/.test(value)) return 'Must contain only digits.'
+  if (!value.startsWith('971')) return 'Must start with 971.'
+  if (value.length !== 12) return 'Must be exactly 12 digits.'
+  return null
+}
+
+function validateCoordinates(value) {
+  if (!value || !value.trim()) return null
+  const coordPattern = /^-?\d{1,3}(\.\d+)?\s*,\s*-?\d{1,3}(\.\d+)?$/
+  const coords = value.trim()
+  if (!coordPattern.test(coords)) return 'Enter valid coordinates (e.g. 25.2048, 55.2708).'
+  const [lat, lng] = coords.split(',').map(s => parseFloat(s.trim()))
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return 'Latitude must be -90 to 90, longitude -180 to 180.'
+  return null
+}
+
+function onPhoneInput(event) {
+  inlineEditValue.value = event.target.value.replace(/\D/g, '')
+  inlineEditError.value = ''
+}
 
 /** Same as field submission form: dropdowns for select fields, input for text/date. */
 const DROPDOWN_COLUMNS = ['status', 'field_status', 'emirates', 'manager', 'team_leader', 'sales_agent', 'field_agent']
@@ -235,21 +271,39 @@ function openDropdownEdit(row, col) {
   if (!canInlineEdit.value) return
   editingCell.value = { rowId: row.id, col }
   inlineEditValue.value = getCellValueForEdit(row, col)
+  inlineEditError.value = ''
 }
 
 function openInputEdit(row, col) {
   if (!canInlineEdit.value) return
   editingCell.value = { rowId: row.id, col }
   inlineEditValue.value = getCellValueForEdit(row, col)
+  inlineEditError.value = ''
 }
 
 function saveInlineEdit() {
   if (!editingCell.value) return
   const { rowId, col } = editingCell.value
   let value = inlineEditValue.value
+  if (PHONE_COLUMNS.includes(col)) {
+    const isRequired = col === 'contact_number'
+    const err = validatePhone(value, isRequired)
+    if (err) {
+      inlineEditError.value = err
+      return
+    }
+  }
+  if (col === 'location_coordinates') {
+    const err = validateCoordinates(value)
+    if (err) {
+      inlineEditError.value = err
+      return
+    }
+  }
   if (col === 'status') {
     emit('updateStatus', rowId, value)
     editingCell.value = null
+    inlineEditError.value = ''
     return
   }
   if (col === 'target_date') value = value || null
@@ -258,15 +312,19 @@ function saveInlineEdit() {
   }
   emit('updateCell', rowId, col, value)
   editingCell.value = null
+  inlineEditError.value = ''
 }
 
 function cancelInlineEdit() {
   editingCell.value = null
+  inlineEditError.value = ''
 }
 
 function getOptionsForColumn(col) {
   const opt = props.editOptions || {}
   switch (col) {
+    case 'status':
+      return (opt.field_statuses || []).map((s) => ({ value: s.value, label: s.label || s.value }))
     case 'emirates':
       return (opt.emirates || []).map((e) => ({ value: typeof e === 'string' ? e : e.value, label: typeof e === 'string' ? e : (e.label || e.value) }))
     case 'manager':
@@ -329,7 +387,7 @@ function isEditing(rowId, col) {
             v-for="col in columns"
             :key="col"
             scope="col"
-            class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold uppercase tracking-wider text-white"
+            class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold text-white"
           >
             <button
               v-if="sortable(col)"
@@ -351,7 +409,7 @@ function isEditing(rowId, col) {
             </button>
             <span v-else class="font-bold text-white">{{ label(col) }}</span>
           </th>
-          <th scope="col" class="whitespace-nowrap px-4 py-3 text-right text-sm font-bold uppercase tracking-wider text-white">
+          <th scope="col" class="whitespace-nowrap px-4 py-3 text-right text-sm font-bold text-white">
             Actions
           </th>
         </tr>
@@ -404,12 +462,37 @@ function isEditing(rowId, col) {
             <template v-else-if="canInlineEdit && isEditing(row.id, col) && isInputColumn(col)">
               <div class="flex flex-col gap-1.5">
                 <input
+                  v-if="PHONE_COLUMNS.includes(col)"
+                  :value="inlineEditValue"
+                  type="text"
+                  maxlength="12"
+                  placeholder="971XXXXXXXXX"
+                  class="w-full min-w-[100px] max-w-[220px] rounded border bg-white px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  :class="inlineEditError ? 'border-red-500' : 'border-gray-300'"
+                  @input="onPhoneInput($event)"
+                  @keydown.enter="saveInlineEdit"
+                  @keydown.esc="cancelInlineEdit"
+                />
+                <input
+                  v-else-if="col === 'location_coordinates'"
+                  v-model="inlineEditValue"
+                  type="text"
+                  placeholder="25.2048, 55.2708"
+                  class="w-full min-w-[100px] max-w-[220px] rounded border bg-white px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  :class="inlineEditError ? 'border-red-500' : 'border-gray-300'"
+                  @input="inlineEditError = ''"
+                  @keydown.enter="saveInlineEdit"
+                  @keydown.esc="cancelInlineEdit"
+                />
+                <input
+                  v-else
                   v-model="inlineEditValue"
                   :type="col === 'target_date' ? 'date' : 'text'"
                   class="w-full min-w-[100px] max-w-[220px] rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
                   @keydown.enter="saveInlineEdit"
                   @keydown.esc="cancelInlineEdit"
                 />
+                <p v-if="inlineEditError" class="text-xs text-red-600">{{ inlineEditError }}</p>
                 <div class="flex gap-1">
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
                   <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
@@ -418,23 +501,6 @@ function isEditing(rowId, col) {
             </template>
             <template v-else-if="col === 'id'">
               {{ rowNumber(rowIndex) }}
-            </template>
-            <template v-else-if="col === 'status' && canInlineEdit && isEditing(row.id, 'status')">
-              <div class="flex flex-col gap-1.5">
-                <select
-                  v-model="inlineEditValue"
-                  class="min-w-[160px] rounded border border-gray-300 bg-white px-3 py-1.5 pr-8 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-                  @keydown.enter="saveInlineEdit"
-                  @keydown.esc="cancelInlineEdit"
-                >
-                  <option value="draft">Draft</option>
-                  <option value="submitted">Submitted</option>
-                </select>
-                <div class="flex gap-1">
-                  <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
-                  <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
-                </div>
-              </div>
             </template>
             <template v-else-if="col === 'status' && canInlineEdit">
               <span
@@ -540,38 +606,47 @@ function isEditing(rowId, col) {
             </template>
           </td>
           <td class="whitespace-nowrap px-4 py-3 text-right">
-            <div class="inline-flex items-center gap-2">
-              <button
-                type="button"
-                class="rounded-full p-1.5 text-blue-600 hover:bg-blue-50"
-                title="View"
-                @click="goToView(row)"
+            <div class="flex items-center justify-end gap-2">
+              <div class="inline-flex items-center gap-1">
+                <button
+                  type="button"
+                  class="rounded-full p-1.5 text-blue-600 hover:bg-blue-50"
+                  title="View"
+                  @click="goToView(row)"
+                >
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="rounded-full p-1.5 text-green-600 hover:bg-green-50"
+                  title="Edit"
+                  @click="goToEdit(row)"
+                >
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="rounded-full p-1.5 text-amber-600 hover:bg-amber-50"
+                  title="View History"
+                  @click="$emit('viewHistory', row)"
+                >
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </button>
+              </div>
+              <router-link
+                v-if="canResubmit(row)"
+                :to="`/field-submissions/${row.id}/edit`"
+                class="rounded bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700"
               >
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                class="rounded-full p-1.5 text-green-600 hover:bg-green-50"
-                title="Edit"
-                @click="goToEdit(row)"
-              >
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                class="rounded-full p-1.5 text-amber-600 hover:bg-amber-50"
-                title="View History"
-                @click="$emit('viewHistory', row)"
-              >
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </button>
+                Resubmit
+              </router-link>
             </div>
           </td>
         </tr>

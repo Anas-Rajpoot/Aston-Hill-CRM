@@ -1,5 +1,9 @@
 import api from '@/lib/axios'
 
+let _fieldAgentOptionsCache = null
+let _fieldAgentOptionsCacheAt = 0
+const FIELD_AGENT_OPTIONS_TTL_MS = 5 * 60 * 1000
+
 export default {
   getTeamOptions() {
     return api.get('/field-submissions/team-options')
@@ -46,7 +50,12 @@ export default {
   },
 
   async getFieldAgentOptions() {
+    if (_fieldAgentOptionsCache && Date.now() - _fieldAgentOptionsCacheAt < FIELD_AGENT_OPTIONS_TTL_MS) {
+      return _fieldAgentOptionsCache
+    }
     const { data } = await api.get('/field-submissions/field-agent-options')
+    _fieldAgentOptionsCache = data
+    _fieldAgentOptionsCacheAt = Date.now()
     return data
   },
 

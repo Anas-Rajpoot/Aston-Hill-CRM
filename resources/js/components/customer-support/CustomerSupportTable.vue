@@ -68,9 +68,9 @@ function toggleRow(id) {
 }
 
 const columnLabels = {
-  id: '#',
-  submitted_at: 'Submission Date',
-  ticket_number: 'Ticket ID',
+  id: 'SR',
+  submitted_at: 'Created',
+  ticket_number: 'AH Ticket ID',
   account_number: 'Account Number',
   company_name: 'Company Name',
   issue_category: 'Issue Category',
@@ -150,7 +150,7 @@ function cellTitle(row, col) {
   return full || undefined
 }
 
-const DROPDOWN_COLUMNS = ['status', 'issue_category', 'manager', 'team_leader', 'sales_agent']
+const DROPDOWN_COLUMNS = ['status', 'issue_category', 'manager', 'team_leader', 'sales_agent', 'csr']
 const READ_ONLY_COLUMNS = ['id', 'creator', 'submitted_at', 'created_at']
 
 function isDropdownColumn(col) {
@@ -164,37 +164,97 @@ function getCellValueForEdit(row, col) {
   if (col === 'manager') return row.manager_id ?? ''
   if (col === 'team_leader') return row.team_leader_id ?? ''
   if (col === 'sales_agent') return row.sales_agent_id ?? ''
+  if (col === 'csr') return row.csr_id ?? ''
   return row[col] != null ? String(row[col]) : ''
 }
 
 const editingCell = ref(null)
 const inlineEditValue = ref('')
+const inlineEditError = ref('')
+
+function validatePhone(value) {
+  if (!value || !value.trim()) return 'Contact number is required.'
+  if (/\s/.test(value)) return 'Must not contain spaces.'
+  if (!/^\d+$/.test(value)) return 'Must contain only digits.'
+  if (!value.startsWith('971')) return 'Must start with 971.'
+  if (value.length !== 12) return 'Must be exactly 12 digits.'
+  return null
+}
+
+function onPhoneInput(event) {
+  inlineEditValue.value = event.target.value.replace(/\D/g, '')
+  inlineEditError.value = ''
+}
 
 function openDropdownEdit(row, col) {
   if (!canInlineEdit.value) return
   editingCell.value = { rowId: row.id, col }
   inlineEditValue.value = getCellValueForEdit(row, col)
+  inlineEditError.value = ''
 }
 
 function openInputEdit(row, col) {
   if (!canInlineEdit.value) return
   editingCell.value = { rowId: row.id, col }
   inlineEditValue.value = getCellValueForEdit(row, col)
+  inlineEditError.value = ''
 }
 
 function saveInlineEdit() {
   if (!editingCell.value) return
   const { rowId, col } = editingCell.value
   let value = inlineEditValue.value
-  if (['manager', 'team_leader', 'sales_agent'].includes(col)) {
+  if (col === 'contact_number') {
+    const err = validatePhone(value)
+    if (err) {
+      inlineEditError.value = err
+      return
+    }
+  }
+  if (col === 'company_name') {
+    if (!value || !value.trim()) { inlineEditError.value = 'Company name is required.'; return }
+    if (value.length > 255) { inlineEditError.value = 'Company name must not exceed 255 characters.'; return }
+  }
+  if (col === 'issue_description') {
+    if (!value || !value.trim()) { inlineEditError.value = 'Issue description is required.'; return }
+    if (value.length > 5000) { inlineEditError.value = 'Issue description must not exceed 5000 characters.'; return }
+  }
+  if (col === 'issue_category' && (!value || !value.trim())) {
+    inlineEditError.value = 'Issue category is required.'
+    return
+  }
+  if (col === 'account_number' && value && value.length > 100) {
+    inlineEditError.value = 'Account number must not exceed 100 characters.'
+    return
+  }
+  if (col === 'trouble_ticket' && value && value.length > 255) {
+    inlineEditError.value = 'Trouble ticket must not exceed 255 characters.'
+    return
+  }
+  if (col === 'activity' && value && value.length > 255) {
+    inlineEditError.value = 'Activity must not exceed 255 characters.'
+    return
+  }
+  if (col === 'pending' && value && value.length > 255) {
+    inlineEditError.value = 'Pending must not exceed 255 characters.'
+    return
+  }
+  const REQUIRED_DROPDOWNS = { manager: 'Manager', team_leader: 'Team Leader', sales_agent: 'Sales Agent' }
+  if (col in REQUIRED_DROPDOWNS && (value === '' || value == null)) {
+    inlineEditError.value = `${REQUIRED_DROPDOWNS[col]} is required.`
+    return
+  }
+  if (['manager', 'team_leader', 'sales_agent', 'csr'].includes(col)) {
     value = value === '' || value == null ? null : Number(value)
   }
   emit('updateCell', rowId, col, value)
   editingCell.value = null
+  inlineEditError.value = ''
 }
 
 function cancelInlineEdit() {
   editingCell.value = null
+  inlineEditError.value = ''
 }
 
 function getOptionsForColumn(col) {
@@ -210,6 +270,11 @@ function getOptionsForColumn(col) {
       return (opt.team_leaders || []).map((t) => ({ value: t.id, label: t.name }))
     case 'sales_agent':
       return (opt.sales_agents || []).map((s) => ({ value: s.id, label: s.name }))
+    case 'csr':
+      return [
+        { value: '', label: 'Unassign' },
+        ...(opt.csrs || []).map((c) => ({ value: c.id, label: c.name })),
+      ]
     default:
       return []
   }
@@ -224,13 +289,18 @@ const STATUS_BADGES = {
   submitted: 'bg-blue-100 text-blue-700',
   approved: 'bg-green-100 text-green-700',
   rejected: 'bg-red-100 text-red-700',
+  completed: 'bg-emerald-100 text-emerald-700',
+  'Pending with CM': 'bg-orange-100 text-orange-700',
+  'Pending with DU': 'bg-yellow-100 text-yellow-700',
+  'Pending with Sales': 'bg-purple-100 text-purple-700',
+  'Pending with CSR': 'bg-pink-100 text-pink-700',
 }
 function statusBadgeClass(status) {
   return STATUS_BADGES[status] ?? 'bg-gray-100 text-gray-700'
 }
 
 function canResubmit(row) {
-  if (row.status !== 'rejected') return false
+  if (row.status === 'approved') return false
   const roles = auth.user?.roles ?? []
   const isSuperAdmin = Array.isArray(roles) && roles.some((r) => (typeof r === 'string' ? r : r?.name) === 'superadmin')
   if (isSuperAdmin) return true
@@ -361,12 +431,15 @@ function isUnassignedCsr(row) {
               <div class="flex flex-col gap-1.5">
                 <select
                   v-model="inlineEditValue"
-                  class="w-full min-w-[160px] max-w-[220px] rounded border border-gray-300 bg-white px-3 py-1.5 pr-8 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full min-w-[200px] rounded border bg-white px-3 py-1.5 pr-8 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  :class="inlineEditError ? 'border-red-500' : 'border-gray-300'"
+                  @change="inlineEditError = ''"
                   @keydown.enter="saveInlineEdit"
                   @keydown.esc="cancelInlineEdit"
                 >
                   <option v-for="o in getOptionsForColumn(col)" :key="String(o.value)" :value="o.value">{{ o.label }}</option>
                 </select>
+                <p v-if="inlineEditError" class="text-xs text-red-600">{{ inlineEditError }}</p>
                 <div class="flex gap-1">
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
                   <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
@@ -380,34 +453,74 @@ function isUnassignedCsr(row) {
                   v-if="col === 'issue_description'"
                   v-model="inlineEditValue"
                   rows="3"
-                  class="w-full min-w-[180px] max-w-[280px] rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full min-w-[180px] max-w-[280px] rounded border bg-white px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  :class="inlineEditError ? 'border-red-500' : 'border-gray-300'"
+                  @input="inlineEditError = ''"
+                  @keydown.esc="cancelInlineEdit"
+                />
+                <input
+                  v-else-if="col === 'contact_number'"
+                  :value="inlineEditValue"
+                  type="text"
+                  maxlength="12"
+                  placeholder="971XXXXXXXXX"
+                  class="w-full min-w-[100px] max-w-[220px] rounded border bg-white px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  :class="inlineEditError ? 'border-red-500' : 'border-gray-300'"
+                  @input="onPhoneInput($event)"
+                  @keydown.enter="saveInlineEdit"
                   @keydown.esc="cancelInlineEdit"
                 />
                 <input
                   v-else
                   v-model="inlineEditValue"
                   type="text"
-                  class="w-full min-w-[100px] max-w-[220px] rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full min-w-[100px] max-w-[220px] rounded border bg-white px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  :class="inlineEditError ? 'border-red-500' : 'border-gray-300'"
+                  @input="inlineEditError = ''"
                   @keydown.enter="saveInlineEdit"
                   @keydown.esc="cancelInlineEdit"
                 />
+                <p v-if="inlineEditError" class="text-xs text-red-600">{{ inlineEditError }}</p>
                 <div class="flex gap-1">
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
                   <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
                 </div>
               </div>
             </template>
-            <!-- CSR Name: show "Unassigned" in red when not assigned -->
+            <!-- CSR Name: dropdown editable on double-click -->
+            <template v-else-if="col === 'csr' && canInlineEdit && isEditing(row.id, 'csr')">
+              <div class="flex flex-col gap-1.5">
+                <select
+                  v-model="inlineEditValue"
+                  class="w-full min-w-[160px] max-w-[220px] rounded border bg-white px-3 py-1.5 pr-8 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  :class="inlineEditError ? 'border-red-500' : 'border-gray-300'"
+                  @change="inlineEditError = ''"
+                  @keydown.enter="saveInlineEdit"
+                  @keydown.esc="cancelInlineEdit"
+                >
+                  <option v-for="o in getOptionsForColumn('csr')" :key="String(o.value)" :value="o.value">{{ o.label }}</option>
+                </select>
+                <p v-if="inlineEditError" class="text-xs text-red-600">{{ inlineEditError }}</p>
+                <div class="flex gap-1">
+                  <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
+                  <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
+                </div>
+              </div>
+            </template>
+            <template v-else-if="col === 'csr' && canInlineEdit">
+              <span
+                v-if="isUnassignedCsr(row)"
+                class="cursor-pointer text-red-600 hover:bg-gray-100 rounded px-0.5"
+                @dblclick="openDropdownEdit(row, 'csr')"
+              >Unassigned</span>
+              <span
+                v-else
+                class="cursor-pointer hover:bg-gray-100 rounded px-0.5"
+                @dblclick="openDropdownEdit(row, 'csr')"
+              >{{ truncate(formatValue(row, 'csr')) }}</span>
+            </template>
             <template v-else-if="col === 'csr' && isUnassignedCsr(row)">
-              <button
-                v-if="canBulkAssign"
-                type="button"
-                class="cursor-pointer text-red-600 underline hover:text-red-700"
-                @click="$emit('openAssign', row)"
-              >
-                Unassigned
-              </button>
-              <span v-else class="text-red-600">Unassigned</span>
+              <span class="text-red-600">Unassigned</span>
             </template>
             <!-- Workflow / SLA Status badge -->
             <template v-else-if="col === 'workflow_status'">
@@ -418,25 +531,6 @@ function isUnassignedCsr(row) {
                 {{ row.workflow_status }}
               </span>
               <span v-else class="text-gray-400">—</span>
-            </template>
-            <template v-else-if="col === 'status' && canInlineEdit && isEditing(row.id, 'status')">
-              <div class="flex flex-col gap-1.5">
-                <select
-                  v-model="inlineEditValue"
-                  class="min-w-[160px] rounded border border-gray-300 bg-white px-3 py-1.5 pr-8 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-                  @keydown.enter="saveInlineEdit"
-                  @keydown.esc="cancelInlineEdit"
-                >
-                  <option value="draft">Draft</option>
-                  <option value="submitted">Submitted</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
-                </select>
-                <div class="flex gap-1">
-                  <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
-                  <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
-                </div>
-              </div>
             </template>
             <template v-else-if="col === 'status' && canInlineEdit">
               <span

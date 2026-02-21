@@ -114,6 +114,7 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     // Customer support
     Route::get('/customer-support/team-options', [CustomerSupportController::class, 'teamOptions']);
     Route::get('/customer-support/csr-options', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'csrOptions']);
+    Route::get('/customer-support/csrs-by-account', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'csrsByAccount']);
     Route::post('/customer-support/bulk-assign', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'bulkAssign']);
     Route::get('/customer-support/bulk-assign/{trackingId}/status', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'bulkAssignStatus']);
     Route::post('/customer-support', [CustomerSupportController::class, 'store']);

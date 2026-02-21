@@ -9,6 +9,7 @@ use App\Jobs\BulkAssignCsrJob;
 use App\Models\CustomerSupportSubmission;
 use App\Models\CustomerSupportSubmissionAudit;
 use App\Models\SystemAuditLog;
+use App\Models\Client;
 use App\Models\User;
 use App\Models\UserColumnPreference;
 use Illuminate\Http\JsonResponse;
@@ -131,7 +132,7 @@ class CustomerSupportApiController extends Controller
     {
         $this->authorize('view', $customerSupportSubmission);
 
-        $customerSupportSubmission->load(['manager:id,name', 'teamLeader:id,name', 'salesAgent:id,name', 'creator:id,name', 'creator.roles:id,name']);
+        $customerSupportSubmission->load(['manager:id,name', 'teamLeader:id,name', 'salesAgent:id,name', 'csrUser:id,name', 'creator:id,name', 'creator.roles:id,name']);
         $row = $customerSupportSubmission->toArray();
         $row['manager_id'] = $customerSupportSubmission->manager_id;
         $row['team_leader_id'] = $customerSupportSubmission->team_leader_id;
@@ -139,6 +140,7 @@ class CustomerSupportApiController extends Controller
         $row['manager_name'] = $customerSupportSubmission->manager?->name;
         $row['team_leader_name'] = $customerSupportSubmission->teamLeader?->name;
         $row['sales_agent_name'] = $customerSupportSubmission->salesAgent?->name;
+        $row['csr_user_name'] = $customerSupportSubmission->csrUser?->name;
         $row['creator_name'] = $customerSupportSubmission->creator?->name;
         $firstRole = $customerSupportSubmission->creator?->roles->first();
         $row['creator_role'] = $firstRole
@@ -147,6 +149,20 @@ class CustomerSupportApiController extends Controller
         $row['submitted_at'] = $customerSupportSubmission->submitted_at?->toIso8601String();
         $row['created_at'] = $customerSupportSubmission->created_at?->toIso8601String();
         $row['completion_date'] = $customerSupportSubmission->completion_date?->format('Y-m-d');
+
+        $accountCsrNames = [];
+        if ($customerSupportSubmission->account_number) {
+            $client = Client::where('account_number', $customerSupportSubmission->account_number)->first();
+            if ($client) {
+                $accountCsrNames = DB::table('client_csrs')
+                    ->join('users', 'client_csrs.user_id', '=', 'users.id')
+                    ->where('client_csrs.client_id', $client->id)
+                    ->orderBy('client_csrs.sort_order')
+                    ->pluck('users.name')
+                    ->all();
+            }
+        }
+        $row['account_csr_names'] = $accountCsrNames;
 
         return response()->json($row);
     }
@@ -325,11 +341,11 @@ class CustomerSupportApiController extends Controller
                 continue;
             }
             if (in_array($col, ['submitted_at', 'created_at', 'updated_at'], true)) {
-                $out[$col] = $row->$col ? $row->$col->format('d/M/Y H:i') : null;
+                $out[$col] = $row->$col ? $row->$col->format('d-M-Y H:i') : null;
                 continue;
             }
             if ($col === 'completion_date') {
-                $out[$col] = $row->completion_date ? $row->completion_date->format('d/M/Y') : null;
+                $out[$col] = $row->completion_date ? $row->completion_date->format('d-M-Y') : null;
                 continue;
             }
             $out[$col] = $row->$col ?? null;
@@ -463,7 +479,7 @@ class CustomerSupportApiController extends Controller
             // Update history is tracked by CustomerSupportSubmissionObserver -> customer_support_submission_audits
         }
 
-        $customerSupportSubmission->load(['manager:id,name', 'teamLeader:id,name', 'salesAgent:id,name', 'creator:id,name']);
+        $customerSupportSubmission->load(['manager:id,name', 'teamLeader:id,name', 'salesAgent:id,name', 'creator:id,name', 'csrUser:id,name']);
         $columns = array_merge(
             ['id', 'submitted_at', 'created_at', 'issue_category', 'company_name', 'account_number', 'contact_number', 'issue_description', 'attachments', 'manager', 'team_leader', 'sales_agent', 'status', 'creator'],
             array_keys($data)
@@ -485,22 +501,29 @@ class CustomerSupportApiController extends Controller
     {
         $this->authorize('viewAny', CustomerSupportSubmission::class);
 
+        $excluded = ['draft', 'submitted', 'approved'];
+        $editableStatuses = array_values(array_filter(
+            CustomerSupportSubmission::STATUSES,
+            fn ($s) => ! in_array(strtolower($s), $excluded),
+        ));
+
         return response()->json([
             'issue_categories' => CustomerSupportController::issueCategories(),
+            'statuses' => array_map(fn ($s) => ['value' => $s, 'label' => ucfirst($s)], $editableStatuses),
             'workflow_statuses' => array_map(fn ($v) => ['value' => $v, 'label' => ucfirst(str_replace('_', ' ', $v))], CustomerSupportSubmission::WORKFLOW_STATUSES),
             'pending_options' => array_map(fn ($v) => ['value' => $v, 'label' => $v], CustomerSupportSubmission::PENDING_OPTIONS),
         ]);
     }
 
     /**
-     * POST resubmit a rejected customer support submission.
+     * POST resubmit a customer support submission (allowed for all non-approved statuses).
      */
     public function resubmit(Request $request, CustomerSupportSubmission $customerSupportSubmission): JsonResponse
     {
         $this->authorize('update', $customerSupportSubmission);
 
-        if ($customerSupportSubmission->status !== 'rejected') {
-            return response()->json(['message' => 'Only rejected requests can be resubmitted.'], 422);
+        if ($customerSupportSubmission->status === 'approved') {
+            return response()->json(['message' => 'Approved requests cannot be resubmitted.'], 422);
         }
 
         $categories = CustomerSupportController::issueCategories();
@@ -640,22 +663,64 @@ class CustomerSupportApiController extends Controller
      */
     public function csrOptions(Request $request): JsonResponse
     {
-        $user = $request->user();
-        $allowed = $user->roles()->whereIn('name', ['superadmin', 'customer_support_representative', 'support_manager', 'manager', 'team_leader'])->exists()
-            || $user->can('viewAny', CustomerSupportSubmission::class);
+        $userId = $request->user()->id;
+        $allowed = DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('model_has_roles.model_id', $userId)
+            ->where('model_has_roles.model_type', (new \App\Models\User)->getMorphClass())
+            ->whereIn('roles.name', ['superadmin', 'customer_support_representative', 'support_manager', 'manager', 'team_leader'])
+            ->exists();
+
         if (! $allowed) {
             abort(403, 'Unauthorized.');
         }
 
-        $csrs = User::whereHas('roles', fn ($q) => $q->where('name', 'customer_support_representative'))
-            ->where('status', 'approved')
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name]);
+        $csrs = Cache::remember('csr_options', 600, function () {
+            return DB::table('users')
+                ->join('model_has_roles', function ($j) {
+                    $j->on('users.id', '=', 'model_has_roles.model_id')
+                      ->where('model_has_roles.model_type', (new \App\Models\User)->getMorphClass());
+                })
+                ->join('roles', function ($j) {
+                    $j->on('model_has_roles.role_id', '=', 'roles.id')
+                      ->where('roles.name', 'customer_support_representative');
+                })
+                ->where('users.status', 'approved')
+                ->orderBy('users.name')
+                ->select('users.id', 'users.name')
+                ->get()
+                ->all();
+        });
 
         return response()->json([
-            'csrs' => $csrs->values()->all(),
+            'csrs' => $csrs,
         ]);
+    }
+
+    /**
+     * GET /api/customer-support/csrs-by-account?account_number=...
+     * Returns CSR user IDs assigned to a client with the given account number via client_csrs.
+     */
+    public function csrsByAccount(Request $request): JsonResponse
+    {
+        $accountNumber = $request->query('account_number');
+        if (! $accountNumber) {
+            return response()->json(['csr_ids' => []]);
+        }
+
+        $client = Client::where('account_number', $accountNumber)->first();
+        if (! $client) {
+            return response()->json(['csr_ids' => []]);
+        }
+
+        $csrIds = DB::table('client_csrs')
+            ->where('client_id', $client->id)
+            ->pluck('user_id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        return response()->json(['csr_ids' => $csrIds]);
     }
 
     /**
@@ -665,7 +730,14 @@ class CustomerSupportApiController extends Controller
     public function bulkAssign(Request $request): JsonResponse
     {
         $user = $request->user();
-        if (! $user->hasRole('superadmin') && ! $user->hasRole('customer_support_representative') && ! $user->hasRole('support_manager')) {
+        $allowed = DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('model_has_roles.model_id', $user->id)
+            ->where('model_has_roles.model_type', (new User)->getMorphClass())
+            ->whereIn('roles.name', ['superadmin', 'customer_support_representative', 'support_manager'])
+            ->exists();
+
+        if (! $allowed) {
             abort(403, 'Only superadmin, support manager, or CSR can bulk assign.');
         }
 
@@ -724,7 +796,14 @@ class CustomerSupportApiController extends Controller
     public function assignCsr(Request $request, CustomerSupportSubmission $customerSupportSubmission): JsonResponse
     {
         $user = $request->user();
-        if (! $user->hasRole('superadmin') && ! $user->hasRole('customer_support_representative') && ! $user->hasRole('support_manager')) {
+        $allowed = DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('model_has_roles.model_id', $user->id)
+            ->where('model_has_roles.model_type', (new User)->getMorphClass())
+            ->whereIn('roles.name', ['superadmin', 'customer_support_representative', 'support_manager'])
+            ->exists();
+
+        if (! $allowed) {
             abort(403, 'Unauthorized.');
         }
 
@@ -771,20 +850,36 @@ class CustomerSupportApiController extends Controller
             // silent - team options are optional for listing
         }
 
-        // Include CSR options (for assign modal)
+        // Include CSR options (for assign modal) — use same cache as csrOptions()
         $csrData = [];
         $user = $request->user();
-        if ($user->hasRole('superadmin') || $user->hasRole('customer_support_representative') || $user->hasRole('support_manager')) {
-            try {
-                $csrs = User::whereHas('roles', fn ($q) => $q->where('name', 'customer_support_representative'))
-                    ->where('status', 'approved')
-                    ->orderBy('name')
-                    ->get(['id', 'name'])
-                    ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name]);
+        $canAssign = DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('model_has_roles.model_id', $user->id)
+            ->where('model_has_roles.model_type', (new User)->getMorphClass())
+            ->whereIn('roles.name', ['superadmin', 'customer_support_representative', 'support_manager', 'manager', 'team_leader'])
+            ->exists();
 
-                $csrData = [
-                    'csrs' => $csrs->values()->all(),
-                ];
+        if ($canAssign) {
+            try {
+                $csrs = Cache::remember('csr_options', 600, function () {
+                    return DB::table('users')
+                        ->join('model_has_roles', function ($j) {
+                            $j->on('users.id', '=', 'model_has_roles.model_id')
+                              ->where('model_has_roles.model_type', (new User)->getMorphClass());
+                        })
+                        ->join('roles', function ($j) {
+                            $j->on('model_has_roles.role_id', '=', 'roles.id')
+                              ->where('roles.name', 'customer_support_representative');
+                        })
+                        ->where('users.status', 'approved')
+                        ->orderBy('users.name')
+                        ->select('users.id', 'users.name')
+                        ->get()
+                        ->all();
+                });
+
+                $csrData = ['csrs' => $csrs];
             } catch (\Throwable $e) {
                 // silent
             }

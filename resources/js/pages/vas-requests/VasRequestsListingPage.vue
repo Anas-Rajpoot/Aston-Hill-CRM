@@ -68,10 +68,10 @@ const meta = ref({ current_page: 1, last_page: 1, per_page: auth.defaultTablePag
 const perPageOptions = ref([10, 20, 25, 50, 100])
 const allColumns = ref([])
 const visibleColumns = ref([
-  'id', 'submitted_at', 'request_type', 'account_number', 'company_name', 'description',
+  'id', 'request_type', 'account_number', 'company_name', 'description',
   'manager', 'team_leader', 'sales_agent', 'executive', 'status', 'creator',
 ])
-const sort = ref('submitted_at')
+const sort = ref('id')
 const order = ref('desc')
 const advancedVisible = ref(false)
 const columnModalVisible = ref(false)
@@ -118,7 +118,6 @@ function buildParams() {
 
 const COLUMN_LABELS = {
   id: 'ID',
-  submitted_at: 'Submission Date',
   created_at: 'Created',
   request_type: 'Request Type',
   account_number: 'Account Number',
@@ -355,9 +354,6 @@ async function onAssignBulk(ids, executiveId) {
   return res
 }
 
-async function pollBulkAssignStatus(trackingId) {
-  return vasRequestsApi.bulkAssignStatus(trackingId)
-}
 
 function openAssignModal(row) {
   if (!row) return
@@ -377,15 +373,43 @@ function openBulkAssign() {
   assignModalVisible.value = true
 }
 
-function onAssignModalSaved() {
+let _assignPollTimer = null
+function onAssignModalSaved(result) {
   const wasBulk = assignBulkIds.value.length > 0
+  const bulkCount = assignBulkIds.value.length
   toast('success', wasBulk
-    ? `Assignment started for ${assignBulkIds.value.length} request(s). Processing in background.`
-    : 'VAS request assigned successfully.')
+    ? `We are assigning back office to ${bulkCount} request(s). You can continue working.`
+    : 'Back office executive assigned successfully.')
   assignRow.value = null
   assignBulkIds.value = []
   selectedSubmissionIds.value = []
   load()
+  if (wasBulk && result?.tracking_id) {
+    let attempts = 0
+    if (_assignPollTimer) clearInterval(_assignPollTimer)
+    _assignPollTimer = setInterval(async () => {
+      attempts++
+      try {
+        const status = await vasRequestsApi.bulkAssignStatus(result.tracking_id)
+        if (status?.status === 'completed') {
+          clearInterval(_assignPollTimer)
+          _assignPollTimer = null
+          load()
+          toast('success', `${bulkCount} request(s) assigned successfully.`)
+        } else if (status?.status === 'failed') {
+          clearInterval(_assignPollTimer)
+          _assignPollTimer = null
+          load()
+          toast('error', 'Bulk assignment failed. Please try again.')
+        }
+      } catch { /* ignore polling errors */ }
+      if (attempts >= 20) {
+        clearInterval(_assignPollTimer)
+        _assignPollTimer = null
+        load()
+      }
+    }, 3000)
+  }
 }
 
 function onAssignModalClose() {
@@ -412,6 +436,7 @@ watch(() => filters.value.q, (newVal, oldVal) => {
 // Cleanup on unmount
 onUnmounted(() => {
   if (listAbortController) listAbortController.abort()
+  if (_assignPollTimer) { clearInterval(_assignPollTimer); _assignPollTimer = null }
   debouncedSearch.cancel()
 })
 
@@ -432,12 +457,14 @@ onMounted(async () => {
     }
     const cd = bootstrapResult.columns ?? {}
     if (cd.all_columns) allColumns.value = cd.all_columns
+    const requestedCols = [...visibleColumns.value]
     if (cd.visible_columns) visibleColumns.value = cd.visible_columns ?? visibleColumns.value
     const pd = bootstrapResult.page ?? {}
     submissions.value = pd.data ?? []
     meta.value = pd.meta ?? meta.value
     loading.value = false
-    // No separate loadFilters() needed - bootstrap has everything
+    const colsChanged = visibleColumns.value.length !== requestedCols.length || visibleColumns.value.some(c => !requestedCols.includes(c))
+    if (colsChanged) load()
   } else {
     // Fallback: individual requests (parallel)
     await loadTablePreference()
@@ -605,7 +632,6 @@ onMounted(async () => {
       :load-options="loadBackOfficeOptions"
       :on-assign-single="onAssignSingle"
       :on-assign-bulk="onAssignBulk"
-      :poll-status="pollBulkAssignStatus"
       @close="onAssignModalClose"
       @saved="onAssignModalSaved"
     />

@@ -4,10 +4,34 @@ namespace App\Models;
 
 use App\Traits\ResolvesClientLink;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class CustomerSupportSubmission extends Model
 {
     use ResolvesClientLink;
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $submission) {
+            if (empty($submission->ticket_number)) {
+                $submission->ticket_number = static::generateTicketNumber();
+            }
+        });
+    }
+
+    public static function generateTicketNumber(): string
+    {
+        $today = now();
+        $prefix = 'AH' . $today->format('dmY');
+
+        $count = DB::table('customer_support_submissions')
+            ->whereDate('created_at', $today->toDateString())
+            ->count();
+
+        $seq = str_pad($count + 1, 2, '0', STR_PAD_LEFT);
+
+        return $prefix . $seq;
+    }
 
     protected $table = 'customer_support_submissions';
 
@@ -38,7 +62,17 @@ class CustomerSupportSubmission extends Model
         'internal_remarks',
     ];
 
-    const STATUSES = ['draft', 'submitted', 'approved', 'rejected'];
+    const STATUSES = [
+        'draft',
+        'submitted',
+        'approved',
+        'rejected',
+        'completed',
+        'Pending with CM',
+        'Pending with DU',
+        'Pending with Sales',
+        'Pending with CSR',
+    ];
 
     const WORKFLOW_STATUSES = ['open', 'in_progress', 'pending', 'resolved', 'closed'];
 

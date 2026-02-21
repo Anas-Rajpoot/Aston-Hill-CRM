@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import specialRequestsApi from '@/services/specialRequestsApi'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import TruncatedText from '@/components/TruncatedText.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -284,8 +285,8 @@ onMounted(() => loadData())
                 <tbody>
                   <tr v-for="a in audits" :key="a.id" class="hover:bg-gray-50">
                     <td class="border-b border-gray-200 px-3 py-2 text-sm text-gray-700">{{ a.field_label ?? a.field_name }}</td>
-                    <td class="border-b border-gray-200 px-3 py-2 text-sm text-gray-500 max-w-[350px] whitespace-pre-wrap break-words">{{ a.old_value != null && a.old_value !== '' ? formatAuditValue(a.old_display ?? a.old_value) : 'empty' }}</td>
-                    <td class="border-b border-gray-200 px-3 py-2 text-sm text-gray-900 max-w-[350px] whitespace-pre-wrap break-words">{{ a.new_value != null && a.new_value !== '' ? formatAuditValue(a.new_display ?? a.new_value) : '—' }}</td>
+                    <td class="border-b border-gray-200 px-3 py-2 text-sm text-gray-500 max-w-[350px]"><TruncatedText :text="a.old_value != null && a.old_value !== '' ? formatAuditValue(a.old_display ?? a.old_value) : ''" empty-label="empty" /></td>
+                    <td class="border-b border-gray-200 px-3 py-2 text-sm text-gray-900 max-w-[350px]"><TruncatedText :text="a.new_value != null && a.new_value !== '' ? formatAuditValue(a.new_display ?? a.new_value) : ''" empty-label="—" /></td>
                     <td class="border-b border-gray-200 px-3 py-2 text-sm text-gray-500 whitespace-nowrap">{{ formatDateTime(a.changed_at) }}</td>
                     <td class="border-b border-gray-200 px-3 py-2 text-sm text-gray-700">{{ a.changed_by_name ?? '—' }}</td>
                   </tr>

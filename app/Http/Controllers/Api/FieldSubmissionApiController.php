@@ -14,6 +14,7 @@ use App\Models\FieldSubmissionDocument;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
@@ -822,29 +823,37 @@ class FieldSubmissionApiController extends Controller
      */
     public function fieldAgentOptions(Request $request): JsonResponse
     {
-        $user = $request->user();
-        $allowed = $user->roles()->whereIn('name', ['superadmin', 'field_agent', 'field_operations_head', 'manager', 'team_leader'])->exists()
-            || $user->can('viewAny', FieldSubmission::class);
+        $userId = $request->user()->id;
+        $allowed = DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('model_has_roles.model_id', $userId)
+            ->where('model_has_roles.model_type', (new \App\Models\User)->getMorphClass())
+            ->whereIn('roles.name', ['superadmin', 'field_agent', 'field_operations_head', 'manager', 'team_leader'])
+            ->exists();
+
         if (! $allowed) {
             abort(403, 'Unauthorized.');
         }
 
-        $agents = \DB::table('users')
-            ->join('model_has_roles', function ($j) {
-                $j->on('users.id', '=', 'model_has_roles.model_id')
-                  ->where('model_has_roles.model_type', (new User)->getMorphClass());
-            })
-            ->join('roles', function ($j) {
-                $j->on('model_has_roles.role_id', '=', 'roles.id')
-                  ->where('roles.name', 'field_agent');
-            })
-            ->where('users.status', 'approved')
-            ->orderBy('users.name')
-            ->select('users.id', 'users.name')
-            ->get();
+        $agents = Cache::remember('field_agent_options', 600, function () {
+            return DB::table('users')
+                ->join('model_has_roles', function ($j) {
+                    $j->on('users.id', '=', 'model_has_roles.model_id')
+                      ->where('model_has_roles.model_type', (new \App\Models\User)->getMorphClass());
+                })
+                ->join('roles', function ($j) {
+                    $j->on('model_has_roles.role_id', '=', 'roles.id')
+                      ->where('roles.name', 'field_agent');
+                })
+                ->where('users.status', 'approved')
+                ->orderBy('users.name')
+                ->select('users.id', 'users.name')
+                ->get()
+                ->all();
+        });
 
         return response()->json([
-            'agents' => $agents->all(),
+            'agents' => $agents,
         ]);
     }
 
@@ -856,7 +865,14 @@ class FieldSubmissionApiController extends Controller
     public function bulkAssign(Request $request): JsonResponse
     {
         $user = $request->user();
-        if (! $user->hasRole('superadmin') && ! $user->hasRole('field_agent') && ! $user->hasRole('field_operations_head')) {
+        $allowed = DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('model_has_roles.model_id', $user->id)
+            ->where('model_has_roles.model_type', (new User)->getMorphClass())
+            ->whereIn('roles.name', ['superadmin', 'field_agent', 'field_operations_head'])
+            ->exists();
+
+        if (! $allowed) {
             abort(403, 'Only superadmin, field operations head, or field agent can bulk assign.');
         }
 
@@ -933,20 +949,36 @@ class FieldSubmissionApiController extends Controller
             // silent - team options are optional for listing
         }
 
-        // Include field agent options (for assign modal)
+        // Include field agent options (for assign modal) — use same cache as fieldAgentOptions()
         $fieldAgentData = [];
         $user = $request->user();
-        if ($user->hasRole('superadmin') || $user->hasRole('field_agent') || $user->hasRole('field_operations_head')) {
-            try {
-                $agents = User::whereHas('roles', fn ($q) => $q->where('name', 'field_agent'))
-                    ->where('status', 'approved')
-                    ->orderBy('name')
-                    ->get(['id', 'name'])
-                    ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name]);
+        $canAssign = DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('model_has_roles.model_id', $user->id)
+            ->where('model_has_roles.model_type', (new User)->getMorphClass())
+            ->whereIn('roles.name', ['superadmin', 'field_agent', 'field_operations_head', 'manager', 'team_leader'])
+            ->exists();
 
-                $fieldAgentData = [
-                    'agents' => $agents->values()->all(),
-                ];
+        if ($canAssign) {
+            try {
+                $agents = Cache::remember('field_agent_options', 600, function () {
+                    return DB::table('users')
+                        ->join('model_has_roles', function ($j) {
+                            $j->on('users.id', '=', 'model_has_roles.model_id')
+                              ->where('model_has_roles.model_type', (new User)->getMorphClass());
+                        })
+                        ->join('roles', function ($j) {
+                            $j->on('model_has_roles.role_id', '=', 'roles.id')
+                              ->where('roles.name', 'field_agent');
+                        })
+                        ->where('users.status', 'approved')
+                        ->orderBy('users.name')
+                        ->select('users.id', 'users.name')
+                        ->get()
+                        ->all();
+                });
+
+                $fieldAgentData = ['agents' => $agents];
             } catch (\Throwable $e) {
                 // silent
             }
@@ -958,6 +990,7 @@ class FieldSubmissionApiController extends Controller
             'page' => $indexData,
             'team_options' => $teamData,
             'field_agent_options' => $fieldAgentData,
+            'field_statuses' => array_map(fn ($s) => ['value' => $s, 'label' => $s], FieldSubmission::FIELD_STATUSES),
         ]);
     }
 }

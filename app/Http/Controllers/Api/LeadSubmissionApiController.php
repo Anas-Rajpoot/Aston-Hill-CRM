@@ -524,21 +524,37 @@ class LeadSubmissionApiController extends Controller
      */
     public function backOfficeOptions(Request $request): JsonResponse
     {
-        $user = $request->user();
-        $allowed = $user->roles()->whereIn('name', ['superadmin', 'back_office', 'manager', 'team_leader'])->exists()
-            || $user->can('viewAny', LeadSubmission::class);
+        $userId = $request->user()->id;
+        $allowed = DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('model_has_roles.model_id', $userId)
+            ->where('model_has_roles.model_type', (new User)->getMorphClass())
+            ->whereIn('roles.name', ['superadmin', 'back_office', 'manager', 'team_leader'])
+            ->exists();
+
         if (! $allowed) {
             abort(403, 'Unauthorized.');
         }
 
-        $executives = User::whereHas('roles', fn ($q) => $q->where('name', 'back_office'))
-            ->where('status', 'approved')
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name]);
+        $executives = Cache::remember('lead_back_office_options', 600, function () {
+            return DB::table('users')
+                ->join('model_has_roles', function ($j) {
+                    $j->on('users.id', '=', 'model_has_roles.model_id')
+                      ->where('model_has_roles.model_type', (new User)->getMorphClass());
+                })
+                ->join('roles', function ($j) {
+                    $j->on('model_has_roles.role_id', '=', 'roles.id')
+                      ->where('roles.name', 'back_office');
+                })
+                ->where('users.status', 'approved')
+                ->orderBy('users.name')
+                ->select('users.id', 'users.name')
+                ->get()
+                ->all();
+        });
 
         return response()->json([
-            'executives' => $executives->values()->all(),
+            'executives' => $executives,
             'call_verification_options' => [['value' => 'Verified', 'label' => 'Verified'], ['value' => 'Not Verified', 'label' => 'Not Verified']],
             'pending_from_sales_options' => [['value' => 'UnAssigned', 'label' => 'UnAssigned'], ['value' => 'Assigned', 'label' => 'Assigned']],
             'documents_verification_options' => [['value' => 'Verified', 'label' => 'Verified'], ['value' => 'Not Verified', 'label' => 'Not Verified']],
@@ -637,7 +653,14 @@ class LeadSubmissionApiController extends Controller
     public function bulkAssign(Request $request): JsonResponse
     {
         $user = $request->user();
-        if (! $user->hasRole('superadmin') && ! $user->hasRole('back_office')) {
+        $allowed = DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('model_has_roles.model_id', $user->id)
+            ->where('model_has_roles.model_type', (new User)->getMorphClass())
+            ->whereIn('roles.name', ['superadmin', 'back_office'])
+            ->exists();
+
+        if (! $allowed) {
             abort(403, 'Only superadmin or back office can bulk assign.');
         }
 
@@ -696,7 +719,14 @@ class LeadSubmissionApiController extends Controller
     public function updateBackOffice(Request $request, LeadSubmission $lead): JsonResponse
     {
         $user = $request->user();
-        if (! $user->hasRole('superadmin') && ! $user->hasRole('back_office')) {
+        $allowed = DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('model_has_roles.model_id', $user->id)
+            ->where('model_has_roles.model_type', (new User)->getMorphClass())
+            ->whereIn('roles.name', ['superadmin', 'back_office'])
+            ->exists();
+
+        if (! $allowed) {
             abort(403, 'Only superadmin or back office can edit this submission.');
         }
 
@@ -756,7 +786,14 @@ class LeadSubmissionApiController extends Controller
     public function deleteDocument(Request $request, LeadSubmission $lead, int $document): JsonResponse
     {
         $user = $request->user();
-        if (! $user->hasRole('superadmin') && ! $user->hasRole('back_office')) {
+        $allowed = DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('model_has_roles.model_id', $user->id)
+            ->where('model_has_roles.model_type', (new User)->getMorphClass())
+            ->whereIn('roles.name', ['superadmin', 'back_office'])
+            ->exists();
+
+        if (! $allowed) {
             abort(403, 'Only superadmin or back office can remove documents.');
         }
 
@@ -778,7 +815,14 @@ class LeadSubmissionApiController extends Controller
     public function uploadDocuments(Request $request, LeadSubmission $lead): JsonResponse
     {
         $user = $request->user();
-        if (! $user->hasRole('superadmin') && ! $user->hasRole('back_office')) {
+        $allowed = DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('model_has_roles.model_id', $user->id)
+            ->where('model_has_roles.model_type', (new User)->getMorphClass())
+            ->whereIn('roles.name', ['superadmin', 'back_office'])
+            ->exists();
+
+        if (! $allowed) {
             abort(403, 'Only superadmin or back office can add documents.');
         }
 
@@ -822,19 +866,30 @@ class LeadSubmissionApiController extends Controller
             // silent - team options are optional for listing
         }
 
-        // Include back office options for any authenticated user (data is not sensitive)
+        // Include back office options — use same cache as backOfficeOptions()
         $boData = [];
         $user = $request->user();
         if ($user) {
             try {
-                $executives = User::whereHas('roles', fn ($q) => $q->where('name', 'back_office'))
-                    ->where('status', 'approved')
-                    ->orderBy('name')
-                    ->get(['id', 'name'])
-                    ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name]);
+                $executives = Cache::remember('lead_back_office_options', 600, function () {
+                    return DB::table('users')
+                        ->join('model_has_roles', function ($j) {
+                            $j->on('users.id', '=', 'model_has_roles.model_id')
+                              ->where('model_has_roles.model_type', (new User)->getMorphClass());
+                        })
+                        ->join('roles', function ($j) {
+                            $j->on('model_has_roles.role_id', '=', 'roles.id')
+                              ->where('roles.name', 'back_office');
+                        })
+                        ->where('users.status', 'approved')
+                        ->orderBy('users.name')
+                        ->select('users.id', 'users.name')
+                        ->get()
+                        ->all();
+                });
 
                 $boData = [
-                    'executives' => $executives->values()->all(),
+                    'executives' => $executives,
                     'call_verification_options' => [['value' => 'Verified', 'label' => 'Verified'], ['value' => 'Not Verified', 'label' => 'Not Verified']],
                     'pending_from_sales_options' => [['value' => 'UnAssigned', 'label' => 'UnAssigned'], ['value' => 'Assigned', 'label' => 'Assigned']],
                     'documents_verification_options' => [['value' => 'Verified', 'label' => 'Verified'], ['value' => 'Not Verified', 'label' => 'Not Verified']],

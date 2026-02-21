@@ -65,18 +65,19 @@ async function assign() {
   saving.value = true
   error.value = null
   try {
+    let result
     if (isBulk.value) {
-      await vasRequestsApi.bulkAssign(props.bulkVasIds, {
+      result = await vasRequestsApi.bulkAssign(props.bulkVasIds, {
         executive_id: Number(executiveId.value),
       })
     } else {
       const id = props.vas?.id
       if (!id) return
-      await vasRequestsApi.assignBackOffice(id, {
+      result = await vasRequestsApi.assignBackOffice(id, {
         executive_id: Number(executiveId.value),
       })
     }
-    emit('saved')
+    emit('saved', result)
     close()
   } catch (e) {
     error.value = e?.response?.data?.message ?? 'Failed to assign.'

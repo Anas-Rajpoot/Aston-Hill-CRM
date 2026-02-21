@@ -486,15 +486,47 @@ function openBulkAssign() {
   assignModalVisible.value = true
 }
 
-function onAssignModalSaved() {
+let _assignPollTimer = null
+function onAssignModalSaved(result) {
   const wasBulk = assignBulkIds.value.length > 0
+  const bulkCount = assignBulkIds.value.length
   toast('success', wasBulk
-    ? `Assignment started for ${assignBulkIds.value.length} submission(s). Processing in background.`
-    : 'Lead assigned successfully.')
+    ? `We are assigning back office to ${bulkCount} submission(s). You can continue working.`
+    : 'Back office executive assigned successfully.')
   assignLeadRow.value = null
   assignBulkIds.value = []
   selectedLeadIds.value = []
   load()
+  if (wasBulk && result?.tracking_id) {
+    pollJobCompletion(result.tracking_id, bulkCount, leadSubmissionsApi)
+  }
+}
+
+function pollJobCompletion(trackingId, count, api) {
+  let attempts = 0
+  if (_assignPollTimer) clearInterval(_assignPollTimer)
+  _assignPollTimer = setInterval(async () => {
+    attempts++
+    try {
+      const status = await api.bulkAssignStatus(trackingId)
+      if (status?.status === 'completed') {
+        clearInterval(_assignPollTimer)
+        _assignPollTimer = null
+        load()
+        toast('success', `${count} submission(s) assigned successfully.`)
+      } else if (status?.status === 'failed') {
+        clearInterval(_assignPollTimer)
+        _assignPollTimer = null
+        load()
+        toast('error', 'Bulk assignment failed. Please try again.')
+      }
+    } catch { /* ignore polling errors */ }
+    if (attempts >= 20) {
+      clearInterval(_assignPollTimer)
+      _assignPollTimer = null
+      load()
+    }
+  }, 3000)
 }
 
 function onAssignModalClose() {
@@ -525,6 +557,7 @@ function onEditModalSaved() {
 // Cleanup on unmount
 onUnmounted(() => {
   if (listAbortController) listAbortController.abort()
+  if (_assignPollTimer) clearInterval(_assignPollTimer)
   debouncedSearch.cancel()
 })
 
@@ -552,6 +585,7 @@ onMounted(async () => {
     }
     const cd = bootstrapResult.columns ?? {}
     if (cd.all_columns) allColumns.value = cd.all_columns
+    const requestedCols = [...visibleColumns.value]
     if (cd.visible_columns) {
       let cols = Array.isArray(cd.visible_columns) ? cd.visible_columns.filter(c => c !== 'created_at') : visibleColumns.value
       visibleColumns.value = ensureSlaAfterExecutive(cols)
@@ -560,7 +594,9 @@ onMounted(async () => {
     leads.value = pd.data ?? []
     meta.value = pd.meta ?? meta.value
     loading.value = false
-    // No separate loadFilters() needed - bootstrap has everything
+    // If user's saved columns differ from the defaults used in bootstrap, re-fetch with correct columns
+    const colsChanged = visibleColumns.value.length !== requestedCols.length || visibleColumns.value.some(c => !requestedCols.includes(c))
+    if (colsChanged) load()
   } else {
     // Fallback: individual requests (parallel)
     await loadTablePreference()

@@ -36,11 +36,23 @@ const documentToRemove = ref(null)
 const showAddDocs = ref(false)
 const addDocsSectionRef = ref(null)
 
+const VAS_STATUSES = [
+  { value: 'submitted', label: 'Submitted' },
+  { value: 'under_process', label: 'Under Process' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: 'pending_with_csr', label: 'Pending with CSR' },
+  { value: 'pending_with_du', label: 'Pending with DU' },
+  { value: 'pending_with_sales', label: 'Pending with Sales' },
+  { value: 'pending_for_approval', label: 'Pending for Approval' },
+  { value: 'unassigned', label: 'UnAssigned' },
+]
+
 const form = ref({
   request_type: '',
   account_number: '',
   company_name: '',
   description: '',
+  status: '',
   manager_id: null,
   team_leader_id: null,
   sales_agent_id: null,
@@ -94,6 +106,7 @@ async function load() {
       account_number: data.account_number ?? '',
       company_name: data.company_name ?? '',
       description: data.description ?? '',
+      status: data.status ?? '',
       manager_id: data.manager_id != null ? data.manager_id : null,
       team_leader_id: data.team_leader_id != null ? data.team_leader_id : null,
       sales_agent_id: data.sales_agent_id != null ? data.sales_agent_id : null,
@@ -282,6 +295,7 @@ async function submitForm() {
       account_number: form.value.account_number || null,
       company_name: form.value.company_name,
       description: form.value.description || null,
+      status: form.value.status || null,
       manager_id: form.value.manager_id,
       team_leader_id: form.value.team_leader_id,
       sales_agent_id: form.value.sales_agent_id,
@@ -419,9 +433,13 @@ onMounted(() => load())
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Status</label>
-              <div class="mt-1 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-800 capitalize">
-                {{ request.status || '—' }}
-              </div>
+              <select
+                v-model="form.status"
+                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              >
+                <option value="">Select Status</option>
+                <option v-for="s in VAS_STATUSES" :key="s.value" :value="s.value">{{ s.label }}</option>
+              </select>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Submission Date</label>

@@ -22,10 +22,6 @@ const router = useRouter()
 const historyModalVisible = ref(false)
 const historyRecordId = ref(null)
 const historyRecordLabel = ref('')
-function onResubmit(row) {
-  if (!row?.id) return
-  router.push(`/customer-support/${row.id}/edit?resubmit=1`)
-}
 
 function openHistoryModal(row) {
   if (!row?.id) return
@@ -231,6 +227,11 @@ async function loadFilters() {
       managers: data.managers ?? [],
       team_leaders: data.team_leaders ?? [],
       sales_agents: data.sales_agents ?? [],
+      csrs: filterOptions.value.csrs ?? [],
+    }
+    if (!filterOptions.value.csrs?.length) {
+      const csrData = await customerSupportApi.getCsrOptions()
+      filterOptions.value.csrs = csrData?.csrs ?? []
     }
   } catch {
     //
@@ -294,6 +295,7 @@ const COLUMN_TO_API_FIELD = {
   manager: 'manager_id',
   team_leader: 'team_leader_id',
   sales_agent: 'sales_agent_id',
+  csr: 'csr_id',
 }
 
 async function onUpdateCell(submissionId, field, value) {
@@ -311,6 +313,9 @@ async function onUpdateCell(submissionId, field, value) {
     } else if (field === 'sales_agent') {
       row.sales_agent_id = value
       row.sales_agent = filterOptions.value.sales_agents.find((s) => s.id === value)?.name ?? row.sales_agent
+    } else if (field === 'csr') {
+      row.csr_id = value
+      row.csr = value ? (filterOptions.value.csrs || []).find((c) => c.id === value)?.name ?? row.csr : null
     } else {
       row[field] = value
     }
@@ -369,15 +374,43 @@ function onAssignModalClose() {
   assignBulkIds.value = []
 }
 
-function onAssignModalSaved() {
+let _assignPollTimer = null
+function onAssignModalSaved(result) {
   const wasBulk = assignBulkIds.value.length > 0
+  const bulkCount = assignBulkIds.value.length
   toast('success', wasBulk
-    ? `Assignment started for ${assignBulkIds.value.length} submission(s). Processing in background.`
+    ? `We are assigning CSR to ${bulkCount} submission(s). You can continue working.`
     : 'CSR assigned successfully.')
   assignRow.value = null
   assignBulkIds.value = []
   selectedIds.value = []
   load()
+  if (wasBulk && result?.tracking_id) {
+    let attempts = 0
+    if (_assignPollTimer) clearInterval(_assignPollTimer)
+    _assignPollTimer = setInterval(async () => {
+      attempts++
+      try {
+        const status = await customerSupportApi.bulkAssignStatus(result.tracking_id)
+        if (status?.status === 'completed') {
+          clearInterval(_assignPollTimer)
+          _assignPollTimer = null
+          load()
+          toast('success', `${bulkCount} submission(s) assigned successfully.`)
+        } else if (status?.status === 'failed') {
+          clearInterval(_assignPollTimer)
+          _assignPollTimer = null
+          load()
+          toast('error', 'Bulk assignment failed. Please try again.')
+        }
+      } catch { /* ignore polling errors */ }
+      if (attempts >= 20) {
+        clearInterval(_assignPollTimer)
+        _assignPollTimer = null
+        load()
+      }
+    }, 3000)
+  }
 }
 
 let _cachedCsrOptions = null
@@ -397,9 +430,6 @@ async function onAssignBulk(ids, csrId) {
   return res
 }
 
-async function pollBulkAssignStatus(trackingId) {
-  return customerSupportApi.bulkAssignStatus(trackingId)
-}
 
 watch(selectedIds, (ids) => {
   if (ids && ids.length > 0) bulkAssignMessage.value = ''
@@ -419,6 +449,7 @@ watch(() => filters.value.q, (newVal, oldVal) => {
 // Cleanup on unmount
 onUnmounted(() => {
   if (listAbortController) listAbortController.abort()
+  if (_assignPollTimer) clearInterval(_assignPollTimer)
   debouncedSearch.cancel()
 })
 
@@ -439,12 +470,14 @@ onMounted(async () => {
     }
     const cd = bootstrapResult.columns ?? {}
     if (cd.all_columns) allColumns.value = cd.all_columns
+    const requestedCols = [...visibleColumns.value]
     if (cd.visible_columns) visibleColumns.value = cd.visible_columns ?? visibleColumns.value
     const pd = bootstrapResult.page ?? {}
     submissions.value = pd.data ?? []
     meta.value = pd.meta ?? meta.value
     loading.value = false
-    // No separate loadFilters() needed - bootstrap has everything
+    const colsChanged = visibleColumns.value.length !== requestedCols.length || visibleColumns.value.some(c => !requestedCols.includes(c))
+    if (colsChanged) load()
   } else {
     // Fallback: individual requests (parallel)
     await loadTablePreference()
@@ -567,7 +600,6 @@ onMounted(async () => {
           @update-cell="onUpdateCell"
           @open-assign="openAssignModal"
           @view-history="openHistoryModal"
-          @resubmit="onResubmit"
         />
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
           <p class="text-sm text-gray-600">
@@ -623,7 +655,6 @@ onMounted(async () => {
       :load-options="loadCsrOptions"
       :on-assign-single="onAssignSingle"
       :on-assign-bulk="onAssignBulk"
-      :poll-status="pollBulkAssignStatus"
       @close="onAssignModalClose"
       @saved="onAssignModalSaved"
     />

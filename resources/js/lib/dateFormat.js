@@ -93,6 +93,22 @@ export function toDdMonYyyy(ymd) {
   return `${String(dInt).padStart(2, '0')} ${monthLabel} ${y}`
 }
 
+/**
+ * Format date for display: dd-Mon-yyyy (e.g. 15-Jan-2024, 10-Mar-2024).
+ * @param {string} ymd - Date in yyyy-mm-dd or empty
+ * @returns {string} dd-Mon-yyyy or ''
+ */
+export function toDdMonYyyyDash(ymd) {
+  if (!ymd || typeof ymd !== 'string') return ''
+  const parts = ymd.trim().slice(0, 10).split('-')
+  if (parts.length !== 3) return ''
+  const [y, m, d] = parts
+  const mInt = parseInt(m, 10)
+  const dInt = parseInt(d, 10)
+  if (Number.isNaN(mInt) || Number.isNaN(dInt) || mInt < 1 || mInt > 12) return ''
+  return `${String(dInt).padStart(2, '0')}-${MONTHS_3[mInt - 1]}-${y}`
+}
+
 const MONTHS_3_LOWER = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
 
 /**

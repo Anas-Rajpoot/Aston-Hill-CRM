@@ -12,6 +12,7 @@ import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import Toast from '@/components/Toast.vue'
 import { toDdMmYyyy, toDdMonYyyy } from '@/lib/dateFormat'
+import TruncatedText from '@/components/TruncatedText.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -1576,9 +1577,9 @@ watch(addUserRolesDropdownOpen, (open) => {
                 >
                   <div class="flex flex-wrap items-center gap-1.5">
                     <span class="font-medium text-gray-700">{{ log.field_label || log.field_name }}:</span>
-                    <span class="text-red-500 line-through break-all">{{ log.old_value ?? '(empty)' }}</span>
+                    <span class="text-red-500 line-through break-all"><TruncatedText :text="log.old_value ?? ''" empty-label="(empty)" /></span>
                     <span class="text-gray-400">&rarr;</span>
-                    <span class="text-green-600 break-all">{{ log.new_value ?? '(empty)' }}</span>
+                    <span class="text-green-600 break-all"><TruncatedText :text="log.new_value ?? ''" empty-label="(empty)" /></span>
                   </div>
                   <p class="mt-1.5 text-xs text-gray-500">
                     {{ log.changed_at ? formatDateTime(log.changed_at) : '—' }} by {{ log.changed_by_name || log.changed_by || '—' }}

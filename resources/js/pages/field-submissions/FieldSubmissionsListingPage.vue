@@ -411,15 +411,43 @@ function onAssignModalClose() {
   assignBulkIds.value = []
 }
 
-function onAssignModalSaved() {
+let _assignPollTimer = null
+function onAssignModalSaved(result) {
   const wasBulk = assignBulkIds.value.length > 0
+  const bulkCount = assignBulkIds.value.length
   toast('success', wasBulk
-    ? `Assignment started for ${assignBulkIds.value.length} submission(s). Processing in background.`
+    ? `We are assigning field agent to ${bulkCount} submission(s). You can continue working.`
     : 'Field agent assigned successfully.')
   assignRow.value = null
   assignBulkIds.value = []
   selectedIds.value = []
   load()
+  if (wasBulk && result?.tracking_id) {
+    let attempts = 0
+    if (_assignPollTimer) clearInterval(_assignPollTimer)
+    _assignPollTimer = setInterval(async () => {
+      attempts++
+      try {
+        const status = await fieldSubmissionsApi.bulkAssignStatus(result.tracking_id)
+        if (status?.status === 'completed') {
+          clearInterval(_assignPollTimer)
+          _assignPollTimer = null
+          load()
+          toast('success', `${bulkCount} submission(s) assigned successfully.`)
+        } else if (status?.status === 'failed') {
+          clearInterval(_assignPollTimer)
+          _assignPollTimer = null
+          load()
+          toast('error', 'Bulk assignment failed. Please try again.')
+        }
+      } catch { /* ignore polling errors */ }
+      if (attempts >= 20) {
+        clearInterval(_assignPollTimer)
+        _assignPollTimer = null
+        load()
+      }
+    }, 3000)
+  }
 }
 
 let _cachedAgentOptions = null
@@ -439,9 +467,6 @@ async function onAssignBulk(ids, agentId) {
   return res
 }
 
-async function pollBulkAssignStatus(trackingId) {
-  return fieldSubmissionsApi.bulkAssignStatus(trackingId)
-}
 
 watch(selectedIds, (ids) => {
   if (ids && ids.length > 0) bulkAssignMessage.value = ''
@@ -461,6 +486,7 @@ watch(() => filters.value.q, (newVal, oldVal) => {
 // Cleanup on unmount
 onUnmounted(() => {
   if (listAbortController) listAbortController.abort()
+  if (_assignPollTimer) clearInterval(_assignPollTimer)
   debouncedSearch.cancel()
 })
 
@@ -470,7 +496,6 @@ onMounted(async () => {
   if (bootstrapResult) {
     const fd = bootstrapResult.filters ?? {}
     const team = bootstrapResult.team_options ?? {}
-    const fa = bootstrapResult.field_agent_options ?? {}
     filterOptions.value = {
       statuses: fd.statuses ?? [],
       products: fd.products ?? [],
@@ -479,16 +504,18 @@ onMounted(async () => {
       teamLeaders: team.team_leaders ?? [],
       salesAgents: team.sales_agents ?? [],
       field_executives: team.field_executives ?? [],
-      field_statuses: fa.field_statuses ?? [],
+      field_statuses: bootstrapResult.field_statuses ?? [],
     }
     const cd = bootstrapResult.columns ?? {}
     if (cd.all_columns) allColumns.value = cd.all_columns
+    const requestedCols = [...visibleColumns.value]
     if (cd.visible_columns) visibleColumns.value = cd.visible_columns ?? visibleColumns.value
     const pd = bootstrapResult.page ?? {}
     submissions.value = pd.data ?? []
     meta.value = pd.meta ?? meta.value
     loading.value = false
-    // No separate loadFilters() needed - bootstrap has everything
+    const colsChanged = visibleColumns.value.length !== requestedCols.length || visibleColumns.value.some(c => !requestedCols.includes(c))
+    if (colsChanged) load()
   } else {
     // Fallback: individual requests (parallel)
     await loadTablePreference()
@@ -673,7 +700,6 @@ onMounted(async () => {
       :load-options="loadFieldAgentOptions"
       :on-assign-single="onAssignSingle"
       :on-assign-bulk="onAssignBulk"
-      :poll-status="pollBulkAssignStatus"
       @close="onAssignModalClose"
       @saved="onAssignModalSaved"
     />

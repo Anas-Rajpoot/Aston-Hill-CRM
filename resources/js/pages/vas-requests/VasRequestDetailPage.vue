@@ -7,6 +7,7 @@ import { useRoute, useRouter } from 'vue-router'
 import vasRequestsApi from '@/services/vasRequestsApi'
 import { useAuthStore } from '@/stores/auth'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import TruncatedText from '@/components/TruncatedText.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -14,6 +15,15 @@ const auth = useAuthStore()
 
 const loading = ref(true)
 const request = ref(null)
+const audits = ref([])
+const auditsLoading = ref(false)
+const auditPage = ref(1)
+const auditPerPage = 10
+const auditTotalPages = computed(() => Math.max(1, Math.ceil(audits.value.length / auditPerPage)))
+const paginatedAudits = computed(() => {
+  const start = (auditPage.value - 1) * auditPerPage
+  return audits.value.slice(start, start + auditPerPage)
+})
 
 const id = computed(() => {
   const p = route.params.id
@@ -86,6 +96,76 @@ async function load() {
   }
 }
 
+function prettifyKey(key) {
+  return String(key).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+function formatAuditSingleValue(v) {
+  if (v == null || v === '') return null
+  if (typeof v === 'boolean') return v ? 'true' : 'false'
+  return String(v)
+}
+
+function formatAuditObject(obj) {
+  if (Array.isArray(obj)) {
+    if (obj.length === 0) return 'empty'
+    return obj.map((item, i) => (typeof item === 'object' && item !== null ? formatAuditObject(item) : `${formatAuditSingleValue(item) ?? 'empty'}`)).join(', ')
+  }
+  if (typeof obj === 'object' && obj !== null) {
+    const entries = Object.entries(obj).filter(([, v]) => v !== undefined)
+    if (entries.length === 0) return 'empty'
+    return entries.map(([k, v]) => {
+      const label = prettifyKey(k)
+      if (v != null && typeof v === 'object') return `${label}: ${formatAuditObject(v)}`
+      return `${label}: ${formatAuditSingleValue(v) ?? 'empty'}`
+    }).join('\n')
+  }
+  return formatAuditSingleValue(obj) ?? 'empty'
+}
+
+function formatAuditValue(val) {
+  if (val == null || val === '') return null
+  const s = String(val).trim()
+  if ((s.startsWith('{') && s.endsWith('}')) || (s.startsWith('[') && s.endsWith(']'))) {
+    try {
+      return formatAuditObject(JSON.parse(s))
+    } catch {}
+  }
+  return formatAuditSingleValue(s)
+}
+
+const FIELD_LABELS = {
+  company_name: 'Company Name',
+  account_number: 'Account Number',
+  request_type: 'Request Type',
+  description: 'Description',
+  status: 'Status',
+  manager_id: 'Manager',
+  team_leader_id: 'Team Leader',
+  sales_agent_id: 'Sales Agent',
+  backoffice_user_id: 'Back Office Executive',
+  submitted_at: 'Submitted At',
+  documents: 'Documents',
+}
+
+function fieldLabel(name, row) {
+  if (row?.field_label) return row.field_label
+  return FIELD_LABELS[name] || name?.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || '—'
+}
+
+async function loadAudits() {
+  if (!id.value) return
+  auditsLoading.value = true
+  try {
+    const res = await vasRequestsApi.getAudits(id.value)
+    audits.value = res?.data ?? []
+  } catch {
+    audits.value = []
+  } finally {
+    auditsLoading.value = false
+  }
+}
+
 function goBack() {
   router.push('/vas-requests')
 }
@@ -94,7 +174,10 @@ function goToEdit() {
   if (request.value?.id) router.push(`/vas-requests/${request.value.id}/edit`)
 }
 
-onMounted(() => load())
+onMounted(() => {
+  load()
+  loadAudits()
+})
 </script>
 
 <template>
@@ -243,6 +326,53 @@ onMounted(() => load())
               </div>
             </div>
           </section>
+        </div>
+
+        <!-- Change History -->
+        <div v-if="request" class="border-t border-black px-4 py-5 sm:px-5">
+          <h2 class="mb-3 text-base font-semibold text-gray-900">Change History</h2>
+
+          <div v-if="auditsLoading" class="flex items-center justify-center py-8">
+            <svg class="h-6 w-6 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          </div>
+
+          <div v-else-if="!audits.length" class="py-6 text-center text-sm text-gray-400">No changes recorded yet.</div>
+
+          <template v-else>
+            <div class="overflow-x-auto rounded-lg border border-gray-200">
+              <table class="min-w-full divide-y divide-gray-200 text-sm">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="whitespace-nowrap px-4 py-2 text-left font-semibold text-gray-600">Field</th>
+                    <th class="whitespace-nowrap px-4 py-2 text-left font-semibold text-gray-600">Old Value</th>
+                    <th class="whitespace-nowrap px-4 py-2 text-left font-semibold text-gray-600">New Value</th>
+                    <th class="whitespace-nowrap px-4 py-2 text-left font-semibold text-gray-600">Date</th>
+                    <th class="whitespace-nowrap px-4 py-2 text-left font-semibold text-gray-600">Changed By</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 bg-white">
+                  <tr v-for="a in paginatedAudits" :key="a.id" class="hover:bg-gray-50/50">
+                    <td class="whitespace-nowrap px-4 py-2 font-medium text-gray-800">{{ fieldLabel(a.field_name, a) }}</td>
+                    <td class="max-w-[350px] px-4 py-2 text-gray-600"><TruncatedText :text="a.old_value != null && a.old_value !== '' ? formatAuditValue(a.old_value) : ''" empty-label="empty" /></td>
+                    <td class="max-w-[350px] px-4 py-2 text-gray-600"><TruncatedText :text="a.new_value != null && a.new_value !== '' ? formatAuditValue(a.new_value) : ''" empty-label="—" /></td>
+                    <td class="whitespace-nowrap px-4 py-2 text-gray-600">{{ a.changed_at ? formatDateTime(a.changed_at) : '—' }}</td>
+                    <td class="whitespace-nowrap px-4 py-2 text-gray-600">{{ a.changed_by_name ?? '—' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div v-if="auditTotalPages > 1" class="mt-3 flex items-center justify-between">
+              <span class="text-xs text-gray-500">Page {{ auditPage }} of {{ auditTotalPages }}</span>
+              <div class="flex gap-1">
+                <button type="button" class="rounded border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40" :disabled="auditPage <= 1" @click="auditPage--">&laquo; Prev</button>
+                <button type="button" class="rounded border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40" :disabled="auditPage >= auditTotalPages" @click="auditPage++">Next &raquo;</button>
+              </div>
+            </div>
+          </template>
         </div>
 
         <div v-if="request" class="border-t border-black px-4 py-4 text-right sm:px-5">

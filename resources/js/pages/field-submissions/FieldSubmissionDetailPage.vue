@@ -7,6 +7,7 @@ import { useRoute, useRouter } from 'vue-router'
 import fieldSubmissionsApi from '@/services/fieldSubmissionsApi'
 import { useAuthStore } from '@/stores/auth'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import TruncatedText from '@/components/TruncatedText.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -471,8 +472,8 @@ onMounted(() => load())
                     <tbody class="divide-y divide-gray-100 bg-white">
                       <tr v-for="a in paginatedAudits" :key="a.id" class="hover:bg-gray-50/50">
                         <td class="whitespace-nowrap px-4 py-2 font-medium text-gray-800">{{ fieldLabel(a.field_name) }}</td>
-                        <td class="max-w-[350px] whitespace-pre-wrap break-words px-4 py-2 text-gray-600">{{ a.old_value != null && a.old_value !== '' ? formatAuditValue(a.old_value) : 'empty' }}</td>
-                        <td class="max-w-[350px] whitespace-pre-wrap break-words px-4 py-2 text-gray-600">{{ a.new_value != null && a.new_value !== '' ? formatAuditValue(a.new_value) : '—' }}</td>
+                        <td class="max-w-[350px] px-4 py-2 text-gray-600"><TruncatedText :text="a.old_value != null && a.old_value !== '' ? formatAuditValue(a.old_value) : ''" empty-label="empty" /></td>
+                        <td class="max-w-[350px] px-4 py-2 text-gray-600"><TruncatedText :text="a.new_value != null && a.new_value !== '' ? formatAuditValue(a.new_value) : ''" empty-label="—" /></td>
                         <td class="whitespace-nowrap px-4 py-2 text-gray-600">{{ a.changed_at ? formatDateTime(a.changed_at) : '—' }}</td>
                         <td class="whitespace-nowrap px-4 py-2 text-gray-600">{{ a.changed_by_name ?? '—' }}</td>
                       </tr>
