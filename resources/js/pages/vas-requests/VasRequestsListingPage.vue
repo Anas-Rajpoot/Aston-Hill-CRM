@@ -446,6 +446,9 @@ onUnmounted(() => {
 })
 
 onMounted(async () => {
+  // Load user's saved per_page preference before any data fetch
+  await loadTablePreference()
+
   // Try aggregated bootstrap endpoint (1 request instead of 4+)
   const bootstrapResult = await loadCachedBootstrap(buildParams())
   if (bootstrapResult) {
@@ -472,7 +475,6 @@ onMounted(async () => {
     if (colsChanged) load()
   } else {
     // Fallback: individual requests (parallel)
-    await loadTablePreference()
     loadFilters()
     loadColumns()
     load()

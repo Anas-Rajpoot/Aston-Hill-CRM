@@ -271,6 +271,7 @@ return [
             'quantity' => ['label' => 'Quantity', 'filter' => null, 'sortable' => true],
             'other' => ['label' => 'Other', 'filter' => null, 'sortable' => false],
             'migration_numbers' => ['label' => 'Migration Numbers', 'filter' => null, 'sortable' => false],
+            'activity' => ['label' => 'Activity', 'filter' => null, 'sortable' => false],
             'wo_number' => ['label' => 'Work Order', 'filter' => 'text', 'sortable' => true],
             'completion_date' => ['label' => 'Completion Date', 'filter' => 'date', 'sortable' => true],
             'payment_connection' => ['label' => 'Payment Connection', 'filter' => null, 'sortable' => false],
@@ -281,7 +282,7 @@ return [
             'account_number' => ['label' => 'Account Number', 'filter' => 'text', 'sortable' => true],
             'creator' => ['label' => 'Created By', 'filter' => null, 'sortable' => false],
         ],
-        'default_columns' => ['company_name', 'submitted_at', 'manager', 'team_leader', 'sales_agent', 'status', 'service_type', 'product_type', 'address', 'product_name', 'mrc', 'quantity', 'other', 'migration_numbers', 'wo_number', 'completion_date', 'payment_connection', 'contract_type', 'contract_end_date', 'renewal_alert', 'additional_notes'],
+        'default_columns' => ['company_name', 'submitted_at', 'manager', 'team_leader', 'sales_agent', 'service_type', 'product_type', 'address', 'product_name', 'mrc', 'quantity', 'other', 'migration_numbers', 'activity', 'account_number', 'wo_number', 'status', 'completion_date', 'payment_connection', 'contract_type', 'contract_end_date', 'renewal_alert', 'additional_notes'],
         'default_sort' => ['submitted_at', 'desc'],
     ],
 

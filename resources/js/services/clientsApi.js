@@ -47,6 +47,11 @@ export default {
     return data
   },
 
+  async inlineUpdate(id, payload) {
+    const { data } = await api.put(`/clients/${id}/inline`, payload)
+    return data
+  },
+
   async products(id, params = {}) {
     const { data } = await api.get(`/clients/${id}/products`, { params })
     return data

@@ -57,7 +57,7 @@ const routes = [
       { path: 'clients', component: () => import('@/pages/clients/ClientsListingPage.vue') },
       { path: 'clients/create', component: () => import('@/pages/clients/ClientCreatePage.vue'), meta: { title: 'Add New Client' } },
       { path: 'clients/:id', component: () => import('@/pages/clients/ClientProfilePage.vue'), name: 'client-profile' },
-      { path: 'clients/:id/edit', ...ph('Edit Client') },
+      { path: 'clients/:id/edit', component: () => import('@/pages/clients/ClientEditPage.vue'), meta: { title: 'Edit Client' } },
       { path: 'order-status', component: () => import('@/pages/order-status/OrderStatusListingPage.vue'), meta: { title: 'Order Status' } },
       { path: 'dsp-tracker', component: () => import('@/pages/dsp-tracker/DSPTrackerListingPage.vue') },
       { path: 'gsm-tracker', redirect: '/dsp-tracker' },

@@ -21,7 +21,9 @@ const auth = useAuthStore()
 
 const client = ref(null)
 const loading = ref(true)
-const activeTab = ref('company-details')
+const validTabs = ['company-details', 'contact-details', 'products-services', 'vas-requests', 'customer-support', 'alerts']
+const initialTab = validTabs.includes(route.query.tab) ? route.query.tab : 'company-details'
+const activeTab = ref(initialTab)
 
 const canEdit = computed(() => {
   const perms = auth.user?.permissions ?? []
@@ -67,6 +69,7 @@ const auditLoading = ref(false)
 const contactDraft = ref([])
 const addressDraft = ref([])
 const contactSaveLoading = ref(false)
+const contactFieldErrors = ref([])
 
 const showToast = ref(false)
 const toastType = ref('success')
@@ -84,12 +87,14 @@ const productsOrder = ref('desc')
 const allColumns = ref([])
 const defaultColumns = ref([])
 const visibleColumns = ref([
-  'company_name', 'account_number', 'submitted_at', 'manager', 'team_leader', 'sales_agent', 'status',
-  'service_type', 'product_type', 'address', 'product_name', 'mrc', 'quantity', 'other', 'migration_numbers',
-  'wo_number', 'completion_date', 'payment_connection', 'contract_type', 'contract_end_date',
+  'company_name', 'submitted_at', 'manager', 'team_leader', 'sales_agent',
+  'service_type', 'product_type', 'address', 'product_name', 'mrc', 'quantity', 'other',
+  'migration_numbers', 'activity', 'account_number', 'wo_number', 'status', 'completion_date',
+  'contract_type', 'contract_end_date',
   'renewal_alert', 'additional_notes', 'creator',
 ])
 const columnModalVisible = ref(false)
+const profileFilterOptions = ref({ managers: [], team_leaders: [], sales_agents: [] })
 
 // VAS / Customer Support / Alerts
 const vasRequests = ref([])
@@ -262,11 +267,27 @@ async function loadTablePreference() {
   } catch { /* use system default */ }
 }
 
+const COLUMN_ORDER = [
+  'company_name', 'submitted_at', 'manager', 'team_leader', 'sales_agent',
+  'service_type', 'product_type', 'address', 'product_name', 'mrc', 'quantity', 'other',
+  'migration_numbers', 'activity', 'account_number', 'wo_number', 'status', 'completion_date',
+  'contract_type', 'contract_end_date',
+  'renewal_alert', 'additional_notes', 'creator',
+]
+
+function enforceColumnOrder(cols) {
+  const set = new Set(cols)
+  if (!set.has('activity')) set.add('activity')
+  const ordered = COLUMN_ORDER.filter((c) => set.has(c))
+  const extra = [...set].filter((c) => !COLUMN_ORDER.includes(c))
+  return [...ordered, ...extra]
+}
+
 async function loadColumns() {
   try {
     const data = await clientsApi.columns()
     allColumns.value = data.all_columns ?? []
-    visibleColumns.value = data.visible_columns ?? visibleColumns.value
+    visibleColumns.value = enforceColumnOrder(data.visible_columns ?? visibleColumns.value)
     defaultColumns.value = data.default_columns ?? []
   } catch {}
 }
@@ -274,7 +295,7 @@ async function loadColumns() {
 async function onSaveColumns(cols) {
   try {
     await clientsApi.saveColumns(cols)
-    visibleColumns.value = cols
+    visibleColumns.value = enforceColumnOrder(cols)
     loadProducts()
   } catch {}
 }
@@ -473,24 +494,99 @@ async function saveAlertCellEdit() {
   alertEditingCell.value = null
 }
 
+async function loadProfileFilterOptions() {
+  try {
+    const data = await clientsApi.filters()
+    profileFilterOptions.value = {
+      managers: data.managers ?? [],
+      team_leaders: data.team_leaders ?? [],
+      sales_agents: data.sales_agents ?? [],
+    }
+  } catch { /* silent */ }
+}
+
+async function onProductUpdateCell(clientId, field, value) {
+  const row = products.value.find((r) => r.id === clientId)
+  const prev = row ? { ...row } : null
+  if (row) {
+    if (field === 'manager_id' && value != null) {
+      row.manager_id = value
+      row.manager = profileFilterOptions.value.managers.find((u) => u.id === Number(value))?.name ?? row.manager
+    } else if (field === 'team_leader_id' && value != null) {
+      row.team_leader_id = value
+      row.team_leader = profileFilterOptions.value.team_leaders.find((u) => u.id === Number(value))?.name ?? row.team_leader
+    } else if (field === 'sales_agent_id' && value != null) {
+      row.sales_agent_id = value
+      row.sales_agent = profileFilterOptions.value.sales_agents.find((u) => u.id === Number(value))?.name ?? row.sales_agent
+    } else {
+      row[field] = value
+    }
+  }
+  try {
+    await clientsApi.inlineUpdate(clientId, { [field]: value })
+  } catch {
+    if (prev) Object.assign(row, prev)
+    loadProducts()
+  }
+}
+
 watch(activeTab, (tab) => {
   if (tab === 'products-services') {
     loadProducts()
     loadColumns()
+    loadProfileFilterOptions()
   } else if (tab === 'vas-requests') loadVasRequests()
   else if (tab === 'customer-support') loadCustomerSupport()
   else if (tab === 'alerts') { loadAlerts(); loadManagerOptions() }
 })
 
+function validatePhone(value) {
+  if (!value) return null
+  if (/\s/.test(value)) return 'Must not contain spaces.'
+  if (!/^\d+$/.test(value)) return 'Must contain only digits.'
+  if (!value.startsWith('971')) return 'Must start with 971.'
+  if (value.length !== 12) return 'Must be exactly 12 digits.'
+  return null
+}
+
+function onContactPhoneInput(idx, event) {
+  const raw = event.target.value.replace(/\D/g, '')
+  contactDraft.value[idx].contact_number = raw
+  event.target.value = raw
+  if (contactFieldErrors.value[idx]) contactFieldErrors.value[idx].contact_number = ''
+}
+
+function validateContacts() {
+  const errs = contactDraft.value.map((c) => {
+    const e = {}
+    if (!c.name?.trim()) e.name = 'Name is required.'
+    if (!c.contact_number?.trim()) {
+      e.contact_number = 'Contact Number is required.'
+    } else {
+      const phoneErr = validatePhone(c.contact_number.trim())
+      if (phoneErr) e.contact_number = phoneErr
+    }
+    if (!c.email?.trim()) e.email = 'Email is required.'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email.trim())) e.email = 'Enter a valid email address.'
+    return e
+  })
+  contactFieldErrors.value = errs
+  return errs.every((e) => Object.keys(e).length === 0)
+}
+
 async function saveContactDetails() {
   if (!id.value) return
+  if (!validateContacts()) return
   contactSaveLoading.value = true
   try {
     const addresses = addressDraft.value.map((a) => ({
       ...a,
       full_address: [a.unit, a.building, a.area, a.emirates].filter(Boolean).join(', '),
     }))
-    await clientsApi.updateContacts(id.value, { contacts: contactDraft.value, addresses })
+    await Promise.all([
+      clientsApi.updateContacts(id.value, { contacts: contactDraft.value }),
+      clientsApi.updateAddresses(id.value, { addresses }),
+    ])
     toast('success', 'Contact details saved successfully.')
     await loadClient()
   } catch (e) {
@@ -541,6 +637,7 @@ onMounted(() => {
       if (activeTab.value === 'products-services') {
         loadProducts()
         loadColumns()
+        loadProfileFilterOptions()
       } else if (activeTab.value === 'vas-requests') loadVasRequests()
       else if (activeTab.value === 'customer-support') loadCustomerSupport()
       else if (activeTab.value === 'alerts') loadAlerts()
@@ -592,21 +689,21 @@ onMounted(() => {
               <p class="text-xs font-medium text-gray-500">Account Number</p>
               <p class="text-sm font-medium text-gray-900">{{ displayVal(client.account_number) }}</p>
             </div>
-            <div>
-              <p class="text-xs font-medium text-gray-500">Status</p>
-              <span
-                :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', statusBadgeClass(client.status)]"
-              >
-                {{ client.status ? (client.status.replace('_', ' ')) : '—' }}
-              </span>
-            </div>
             <div v-for="(csrName, csrIdx) in csrNamesList" :key="'csr-' + csrIdx">
               <p class="text-xs font-medium text-gray-500">CSR Name{{ csrNamesList.length > 1 ? ' ' + (csrIdx + 1) : '' }}</p>
               <p class="text-sm text-gray-900">{{ displayVal(csrName) }}</p>
             </div>
             <div>
-              <p class="text-xs font-medium text-gray-500">Revenue</p>
-              <p class="text-sm font-medium text-gray-900">{{ client.revenue != null ? client.revenue : '—' }}</p>
+              <p class="text-xs font-medium text-gray-500">Normal Revenue</p>
+              <p class="text-sm font-medium text-gray-900">{{ client.normal_revenue != null ? client.normal_revenue : '—' }}</p>
+            </div>
+            <div>
+              <p class="text-xs font-medium text-gray-500">Churn Revenue</p>
+              <p class="text-sm font-medium text-gray-900">{{ client.churn_revenue != null ? client.churn_revenue : '—' }}</p>
+            </div>
+            <div>
+              <p class="text-xs font-medium text-gray-500">Clawback Revenue</p>
+              <p class="text-sm font-medium text-gray-900">{{ client.clawback_revenue != null ? client.clawback_revenue : '—' }}</p>
             </div>
           </div>
         </div>
@@ -763,13 +860,15 @@ onMounted(() => {
                   <div class="mb-3 font-medium text-gray-700">Contact Person {{ idx + 1 }}</div>
                   <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
-                      <label class="block text-xs text-gray-500">Name</label>
+                      <label class="block text-xs text-gray-500">Name <span class="text-red-500">*</span></label>
                       <input
                         v-model="c.name"
                         type="text"
-                        class="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                        :class="contactFieldErrors[idx]?.name ? 'mt-1 w-full rounded border border-red-500 px-3 py-2 text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500' : 'mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm'"
                         :readonly="!canEdit"
+                        @input="contactFieldErrors[idx] && (contactFieldErrors[idx].name = '')"
                       />
+                      <p v-if="contactFieldErrors[idx]?.name" class="mt-0.5 text-xs text-red-600">{{ contactFieldErrors[idx].name }}</p>
                     </div>
                     <div>
                       <label class="block text-xs text-gray-500">Designation</label>
@@ -781,13 +880,17 @@ onMounted(() => {
                       />
                     </div>
                     <div>
-                      <label class="block text-xs text-gray-500">Contact Number</label>
+                      <label class="block text-xs text-gray-500">Contact Number <span class="text-red-500">*</span></label>
                       <input
-                        v-model="c.contact_number"
+                        :value="c.contact_number"
                         type="text"
-                        class="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                        maxlength="12"
+                        placeholder="971XXXXXXXXX"
+                        :class="contactFieldErrors[idx]?.contact_number ? 'mt-1 w-full rounded border border-red-500 px-3 py-2 text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500' : 'mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm'"
                         :readonly="!canEdit"
+                        @input="onContactPhoneInput(idx, $event)"
                       />
+                      <p v-if="contactFieldErrors[idx]?.contact_number" class="mt-0.5 text-xs text-red-600">{{ contactFieldErrors[idx].contact_number }}</p>
                     </div>
                     <div>
                       <label class="block text-xs text-gray-500">Alternate Contact Number</label>
@@ -799,13 +902,15 @@ onMounted(() => {
                       />
                     </div>
                     <div>
-                      <label class="block text-xs text-gray-500">Email</label>
+                      <label class="block text-xs text-gray-500">Email <span class="text-red-500">*</span></label>
                       <input
                         v-model="c.email"
                         type="email"
-                        class="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                        :class="contactFieldErrors[idx]?.email ? 'mt-1 w-full rounded border border-red-500 px-3 py-2 text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500' : 'mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm'"
                         :readonly="!canEdit"
+                        @input="contactFieldErrors[idx] && (contactFieldErrors[idx].email = '')"
                       />
+                      <p v-if="contactFieldErrors[idx]?.email" class="mt-0.5 text-xs text-red-600">{{ contactFieldErrors[idx].email }}</p>
                     </div>
                     <div>
                       <label class="block text-xs text-gray-500">AS Updated or Not</label>
@@ -826,7 +931,7 @@ onMounted(() => {
                       />
                     </div>
                   </div>
-                  <div v-if="canEdit" class="mt-2 flex justify-end">
+                  <div v-if="canEdit && contactDraft.length > 1" class="mt-2 flex justify-end">
                     <button
                       type="button"
                       class="text-red-600 hover:text-red-800"
@@ -896,12 +1001,20 @@ onMounted(() => {
                     </div>
                     <div>
                       <label class="block text-xs text-gray-500">Emirates</label>
-                      <input
+                      <select
                         v-model="a.emirates"
-                        type="text"
-                        class="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                        :readonly="!canEdit"
-                      />
+                        class="mt-1 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm"
+                        :disabled="!canEdit"
+                      >
+                        <option value="">Select Emirates</option>
+                        <option value="Abu Dhabi">Abu Dhabi</option>
+                        <option value="Dubai">Dubai</option>
+                        <option value="Sharjah">Sharjah</option>
+                        <option value="Ajman">Ajman</option>
+                        <option value="Umm Al Quwain">Umm Al Quwain</option>
+                        <option value="Ras Al Khaimah">Ras Al Khaimah</option>
+                        <option value="Fujairah">Fujairah</option>
+                      </select>
                     </div>
                   </div>
                   <div v-if="canEdit" class="mt-2 flex justify-end">
@@ -972,7 +1085,9 @@ onMounted(() => {
                   :loading="productsLoading"
                   :current-page="productsMeta.current_page || 1"
                   :per-page="productsMeta.per_page || 10"
+                  :edit-options="profileFilterOptions"
                   @sort="onProductsSort"
+                  @update-cell="onProductUpdateCell"
                 />
               </div>
               <div v-if="productsMeta.total > 0" class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 bg-white px-4 py-3">
@@ -1009,36 +1124,54 @@ onMounted(() => {
               </p>
               <div class="overflow-x-auto rounded-lg border border-gray-200">
                 <table class="min-w-full border-collapse">
-                  <thead class="bg-gray-100">
+                  <thead class="bg-green-700 text-white">
                     <tr>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold text-gray-700">Request ID</th>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold text-gray-700">Submission Date</th>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold text-gray-700">Request Type</th>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold text-gray-700">Status</th>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold text-gray-700">Activity</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">SR</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Created</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Request Type</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Account Number</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Company Name</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Contact Number</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Description</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Additional Notes</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Manager</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Team Leader</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Sales Agent</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Back Office Executive</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Status</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Created By</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr v-if="vasLoading" class="bg-white">
-                      <td colspan="5" class="px-4 py-8 text-center text-gray-500">Loading…</td>
+                      <td colspan="14" class="px-4 py-8 text-center text-gray-500">Loading…</td>
                     </tr>
                     <tr v-else-if="!vasRequests.length" class="bg-white">
-                      <td colspan="5" class="px-4 py-8 text-center text-gray-500">No VAS requests found.</td>
+                      <td colspan="14" class="px-4 py-8 text-center text-gray-500">No VAS requests found.</td>
                     </tr>
                     <tr
-                      v-for="row in vasRequests"
+                      v-for="(row, idx) in vasRequests"
                       :key="row.id"
                       class="border-b border-gray-200 bg-white hover:bg-gray-50"
                     >
-                      <td class="px-4 py-2 text-sm text-gray-900">{{ row.request_id }}</td>
-                      <td class="px-4 py-2 text-sm text-gray-900">{{ row.submitted_at }}</td>
-                      <td class="px-4 py-2 text-sm text-gray-900">{{ row.request_type }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900">{{ idx + 1 }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.created_at || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900">{{ row.request_type || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900">{{ row.account_number || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900">{{ row.company_name || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900">{{ row.contact_number || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900">{{ row.description || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900">{{ row.additional_notes || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900">{{ row.manager || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900">{{ row.team_leader || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900">{{ row.sales_agent || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900">{{ row.executive || '—' }}</td>
                       <td class="px-4 py-2">
-                        <span :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', statusBadgeClass(row.status)]">
-                          {{ row.status }}
+                        <span :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap', statusBadgeClass(row.status)]">
+                          {{ row.status || '—' }}
                         </span>
                       </td>
-                      <td class="px-4 py-2 text-sm text-gray-900">{{ row.description || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900">{{ row.creator || '—' }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -1053,35 +1186,68 @@ onMounted(() => {
               </p>
               <div class="overflow-x-auto rounded-lg border border-gray-200">
                 <table class="min-w-full border-collapse">
-                  <thead class="bg-gray-100">
+                  <thead class="bg-green-700 text-white">
                     <tr>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold text-gray-700">Ticket ID</th>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold text-gray-700">Submission Date</th>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold text-gray-700">Issue Category</th>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold text-gray-700">Status</th>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold text-gray-700">Activity</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">ID</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Submission Date</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Ticket ID</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Account Number</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Company Name</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Issue Category</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Contact Number</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Submitted By</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">CSR Name</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Status</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">SLA Status</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Pending With</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Completion Date</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Last Updated</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Trouble Ticket</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Activity</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Resolution Remarks</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Internal Remarks</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Manager</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Team Leader</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Sales Agent</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr v-if="csLoading" class="bg-white">
-                      <td colspan="5" class="px-4 py-8 text-center text-gray-500">Loading…</td>
+                      <td colspan="21" class="px-4 py-8 text-center text-gray-500">Loading…</td>
                     </tr>
                     <tr v-else-if="!customerSupport.length" class="bg-white">
-                      <td colspan="5" class="px-4 py-8 text-center text-gray-500">No tickets found.</td>
+                      <td colspan="21" class="px-4 py-8 text-center text-gray-500">No tickets found.</td>
                     </tr>
                     <tr
                       v-for="row in customerSupport"
                       :key="row.id"
                       class="border-b border-gray-200 bg-white hover:bg-gray-50"
                     >
-                      <td class="px-4 py-2 text-sm text-gray-900">{{ row.ticket_id }}</td>
-                      <td class="px-4 py-2 text-sm text-gray-900">{{ row.submitted_at }}</td>
-                      <td class="px-4 py-2 text-sm text-gray-900">{{ row.issue_category }}</td>
-                      <td class="px-4 py-2">
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.id }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.submitted_at || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.ticket_number || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.account_number || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.company_name || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.issue_category || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.contact_number || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.creator || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.csr || '—' }}</td>
+                      <td class="px-4 py-2 whitespace-nowrap">
                         <span :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', statusBadgeClass(row.status)]">
-                          {{ row.status }}
+                          {{ row.status || '—' }}
                         </span>
                       </td>
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.workflow_status || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.pending || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.completion_date || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.updated_at || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.trouble_ticket || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.activity || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900">{{ row.resolution_remarks || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900">{{ row.internal_remarks || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.manager || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.team_leader || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.sales_agent || '—' }}</td>
                       <td class="px-4 py-2 text-sm text-gray-900">{{ row.issue_description || '—' }}</td>
                     </tr>
                   </tbody>

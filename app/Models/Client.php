@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Client extends Model
 {
-    public const STATUSES = ['pending', 'in_progress', 'completed', 'cancelled'];
+    public const STATUSES = ['Normal', 'Churn', 'Clawback'];
 
     protected $table = 'clients';
 
@@ -27,6 +27,7 @@ class Client extends Model
         'quantity',
         'other',
         'migration_numbers',
+        'activity',
         'fiber',
         'order_number',
         'wo_number',

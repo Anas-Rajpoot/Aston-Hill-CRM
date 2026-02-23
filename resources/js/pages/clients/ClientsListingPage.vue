@@ -41,12 +41,11 @@ const meta = ref({ current_page: 1, last_page: 1, per_page: authStore.defaultTab
 const allColumns = ref([])
 const defaultColumns = ref([])
 const visibleColumns = ref([
-  'company_name', 'submitted_at', 'manager', 'team_leader', 'sales_agent', 'status',
+  'company_name', 'submitted_at', 'manager', 'team_leader', 'sales_agent',
   'service_type', 'product_type', 'address', 'product_name', 'mrc', 'quantity',
-  'other', 'migration_numbers',
-  'wo_number',
-  'completion_date', 'payment_connection', 'contract_type', 'contract_end_date',
-  'renewal_alert', 'additional_notes',
+  'other', 'migration_numbers', 'activity', 'account_number', 'wo_number', 'status',
+  'completion_date', 'contract_type', 'contract_end_date',
+  'renewal_alert', 'additional_notes', 'creator',
 ])
 const sort = ref('submitted_at')
 const order = ref('desc')
@@ -56,6 +55,7 @@ const importLoading = ref(false)
 const importFileInputRef = ref(null)
 
 const accountNumbers = ref([])
+const filterOptions = ref({ managers: [], team_leaders: [], sales_agents: [] })
 
 const filters = ref({
   company_name: '',
@@ -129,7 +129,7 @@ async function onExport() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `clients-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `products-services-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
     URL.revokeObjectURL(url)
   } catch {
@@ -172,14 +172,35 @@ async function loadFilters() {
   try {
     const data = await clientsApi.filters()
     accountNumbers.value = data.account_numbers ?? []
+    filterOptions.value = {
+      managers: data.managers ?? [],
+      team_leaders: data.team_leaders ?? [],
+      sales_agents: data.sales_agents ?? [],
+    }
   } catch { /* silent */ }
+}
+
+const COLUMN_ORDER = [
+  'company_name', 'submitted_at', 'manager', 'team_leader', 'sales_agent',
+  'service_type', 'product_type', 'address', 'product_name', 'mrc', 'quantity', 'other',
+  'migration_numbers', 'activity', 'account_number', 'wo_number', 'status', 'completion_date',
+  'contract_type', 'contract_end_date',
+  'renewal_alert', 'additional_notes', 'creator',
+]
+
+function enforceColumnOrder(cols) {
+  const set = new Set(cols)
+  if (!set.has('activity')) set.add('activity')
+  const ordered = COLUMN_ORDER.filter((c) => set.has(c))
+  const extra = [...set].filter((c) => !COLUMN_ORDER.includes(c))
+  return [...ordered, ...extra]
 }
 
 async function loadColumns() {
   try {
     const data = await clientsApi.columns()
     allColumns.value = data.all_columns ?? []
-    visibleColumns.value = data.visible_columns ?? visibleColumns.value
+    visibleColumns.value = enforceColumnOrder(data.visible_columns ?? visibleColumns.value)
     defaultColumns.value = data.default_columns ?? []
     updateTableColumns()
   } catch {
@@ -220,7 +241,7 @@ function onSort({ sort: s, order: o }) {
 async function onSaveColumns(cols) {
   try {
     await clientsApi.saveColumns(cols)
-    visibleColumns.value = cols
+    visibleColumns.value = enforceColumnOrder(cols)
     updateTableColumns()
     meta.value.current_page = 1
     load()
@@ -254,6 +275,31 @@ async function loadTablePreference() {
 
 function goToAddClient() {
   router.push('/clients/create')
+}
+
+async function onUpdateCell(clientId, field, value) {
+  const row = clients.value.find((r) => r.id === clientId)
+  const prev = row ? { ...row } : null
+  if (row) {
+    if (field === 'manager_id' && value != null) {
+      row.manager_id = value
+      row.manager = filterOptions.value.managers.find((u) => u.id === Number(value))?.name ?? row.manager
+    } else if (field === 'team_leader_id' && value != null) {
+      row.team_leader_id = value
+      row.team_leader = filterOptions.value.team_leaders.find((u) => u.id === Number(value))?.name ?? row.team_leader
+    } else if (field === 'sales_agent_id' && value != null) {
+      row.sales_agent_id = value
+      row.sales_agent = filterOptions.value.sales_agents.find((u) => u.id === Number(value))?.name ?? row.sales_agent
+    } else {
+      row[field] = value
+    }
+  }
+  try {
+    await clientsApi.inlineUpdate(clientId, { [field]: value })
+  } catch {
+    if (prev) Object.assign(row, prev)
+    load()
+  }
 }
 
 const tableColumns = ref([])
@@ -364,7 +410,9 @@ onMounted(() => {
           :loading="loading"
           :current-page="meta.current_page"
           :per-page="meta.per_page"
+          :edit-options="filterOptions"
           @sort="onSort"
+          @update-cell="onUpdateCell"
           @view-history="openHistoryModal"
         />
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">

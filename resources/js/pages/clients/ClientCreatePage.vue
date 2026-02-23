@@ -19,10 +19,9 @@ const router = useRouter()
 const auth = useAuthStore()
 
 const STATUS_OPTIONS = [
-  { value: 'pending', label: 'Pending' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'cancelled', label: 'Cancelled' },
+  { value: 'Normal', label: 'Normal' },
+  { value: 'Churn', label: 'Churn' },
+  { value: 'Clawback', label: 'Clawback' },
 ]
 
 const COMPANY_CATEGORY_OPTIONS = [
@@ -68,7 +67,7 @@ let toastRedirectTimer = null
 const form = ref({
   company_name: '',
   account_number: '',
-  status: 'pending',
+  status: 'Normal',
   submitted_at: '',
   manager_id: null,
   team_leader_id: null,
@@ -213,6 +212,18 @@ onMounted(async () => {
   }
 })
 
+function onContractTypeChange() {
+  const val = form.value.contract_type
+  if (!val) { form.value.contract_end_date = ''; return }
+  const months = parseInt(val)
+  if (!months) return
+  const now = new Date()
+  const end = new Date(now.getFullYear(), now.getMonth() + months, now.getDate())
+  const dd = String(end.getDate()).padStart(2, '0')
+  const mm = String(end.getMonth() + 1).padStart(2, '0')
+  form.value.contract_end_date = `${dd}-${mm}-${end.getFullYear()}`
+}
+
 function addContact() {
   if (form.value.contacts.length >= MAX_CONTACTS) return
   form.value.contacts.push({ name: '', designation: '', contact_number: '', alternate_number: '', email: '', as_updated_or_not: '', as_expiry_date: '', additional_note: '' })
@@ -331,7 +342,7 @@ function resetForm() {
   form.value = {
     company_name: '',
     account_number: '',
-    status: 'pending',
+    status: 'Normal',
     submitted_at: '',
     manager_id: null,
     team_leader_id: null,
@@ -411,7 +422,7 @@ function validateForm() {
   const hasCsr = f.csrs.some((c) => c.user_id)
   if (!hasCsr) errs.csr = 'At least one CSR is required.'
 
-  if (!f.status?.trim()) errs.status = 'Account Status is required.'
+  if (!f.status?.trim()) errs.status = 'After Sales Status is required.'
 
   const c0 = f.contacts[0]
   if (c0) {
@@ -434,7 +445,7 @@ const requiredFieldLabels = {
   fourth_bill: 'Fourth Bill',
   account_manager_name: 'Account Manager Name',
   csr: 'CSR (at least one)',
-  status: 'Account Status',
+  status: 'After Sales Status',
   contact_0_name: 'Contact Person Name',
   contact_0_contact_number: 'Contact Number',
   contact_0_email: 'Email ID',
@@ -506,11 +517,20 @@ async function submit(andAddAnother = false) {
   } catch (e) {
     const msg = e?.response?.data?.message
     const errs = e?.response?.data?.errors
+    if (errs && typeof errs === 'object') {
+      const mapped = {}
+      for (const [key, messages] of Object.entries(errs)) {
+        mapped[key] = Array.isArray(messages) ? messages[0] : messages
+      }
+      fieldErrors.value = { ...fieldErrors.value, ...mapped }
+    }
     const detail = msg || (errs ? Object.values(errs).flat().filter(Boolean).join(' ') : '')
     resultModalMessage.value = detail ? `Client can not be added. ${detail}` : 'Client can not be added'
     resultModalType.value = 'error'
     showResultModal.value = true
     error.value = resultModalMessage.value
+    await nextTick()
+    errorAlertEl.value?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   } finally {
     loading.value = false
   }
@@ -662,8 +682,9 @@ function closeToast() {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Account Number</label>
-              <input v-model="form.account_number" type="text" placeholder="Enter unique account number" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
-              <p class="mt-0.5 text-xs text-gray-500">Must be unique across all clients.</p>
+              <input v-model="form.account_number" type="text" placeholder="Enter unique account number" :class="inputClass('account_number')" />
+              <p v-if="fieldErrors.account_number" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.account_number }}</p>
+              <p v-else class="mt-0.5 text-xs text-gray-500">Must be unique across all clients.</p>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Trade License Issuing Authority</label>
@@ -845,7 +866,16 @@ function closeToast() {
                 </div>
                 <div>
                   <label class="block text-sm font-medium text-gray-700">Emirates</label>
-                  <input v-model="form.addresses[idx].emirates" type="text" placeholder="Enter emirates" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+                  <select v-model="form.addresses[idx].emirates" class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+                    <option value="">Select Emirates</option>
+                    <option value="Abu Dhabi">Abu Dhabi</option>
+                    <option value="Dubai">Dubai</option>
+                    <option value="Sharjah">Sharjah</option>
+                    <option value="Ajman">Ajman</option>
+                    <option value="Umm Al Quwain">Umm Al Quwain</option>
+                    <option value="Ras Al Khaimah">Ras Al Khaimah</option>
+                    <option value="Fujairah">Fujairah</option>
+                  </select>
                 </div>
               </div>
             </div>
@@ -983,12 +1013,16 @@ function closeToast() {
             </div>
             <!-- Row 5: Contract Term, Deactivation Date, Clawback / Chum, Remarks -->
             <div>
-              <label class="block text-sm font-medium text-gray-700">Contract Term</label>
-              <input v-model="form.contract_term" type="text" placeholder="36 months" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+              <label class="block text-sm font-medium text-gray-700">Contract Type Term</label>
+              <select v-model="form.contract_type" class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" @change="onContractTypeChange">
+                <option value="">Select Contract Type Term</option>
+                <option value="12 months">12 months</option>
+                <option value="24 months">24 months</option>
+              </select>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700">Deactivation Date</label>
-              <DateInputDdMmYyyy v-model="form.contract_end_date" />
+              <label class="block text-sm font-medium text-gray-700">Contract End Date</label>
+              <DateInputDdMmYyyy v-model="form.contract_end_date" :readonly="true" />
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Clawback / Chum</label>
@@ -1029,7 +1063,11 @@ function closeToast() {
               <label class="block text-sm font-medium text-gray-700">Account Manager Name <span class="text-red-600">*</span></label>
               <select v-model="form.company_detail.account_manager_name" :class="selectClass('account_manager_name')">
                 <option value="">Select account manager</option>
-                <option value="Irfan siddque">Irfan siddque</option>
+                <option value="Imran Siddiqui">Imran Siddiqui</option>
+                <option value="Asma Fahmy">Asma Fahmy</option>
+                <option value="Ilhomjon Isomitdinov">Ilhomjon Isomitdinov</option>
+                <option value="Mohamed Shanib">Mohamed Shanib</option>
+                <option value="Tanveer Mirza">Tanveer Mirza</option>
               </select>
               <p v-if="fieldErrors.account_manager_name" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.account_manager_name }}</p>
             </div>
@@ -1060,12 +1098,12 @@ function closeToast() {
             </span>
             <div>
               <h2 class="text-xl font-bold text-gray-900">Status & Notes</h2>
-              <p class="mt-0.5 text-sm text-gray-500">Account status and additional information.</p>
+              <p class="mt-0.5 text-sm text-gray-500">After sales status and additional information.</p>
             </div>
           </div>
           <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
-              <label class="block text-sm font-medium text-gray-700">Account Status <span class="text-red-600">*</span></label>
+              <label class="block text-sm font-medium text-gray-700">After Sales Status <span class="text-red-600">*</span></label>
               <select v-model="form.status" :class="selectClass('status')">
                 <option value="">Select status</option>
                 <option v-for="s in STATUS_OPTIONS" :key="s.value" :value="s.value">{{ s.label }}</option>

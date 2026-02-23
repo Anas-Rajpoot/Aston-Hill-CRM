@@ -30,7 +30,7 @@ class ClientApiController extends Controller
         'id', 'company_name', 'account_number', 'submitted_at',
         'manager_id', 'team_leader_id', 'sales_agent_id',
         'status', 'service_type', 'product_type', 'address', 'product_name',
-        'mrc', 'quantity', 'other', 'migration_numbers', 'fiber',
+        'mrc', 'quantity', 'other', 'migration_numbers', 'activity', 'fiber',
         'order_number', 'wo_number', 'completion_date', 'payment_connection',
         'contract_type', 'contract_end_date', 'renewal_alert', 'additional_notes',
         'created_by', 'revenue', 'csr_name_1', 'csr_name_2', 'csr_name_3',
@@ -135,6 +135,18 @@ class ClientApiController extends Controller
         return array_values(array_unique(array_merge(self::BASE_COLUMNS, $allowed)));
     }
 
+    private function sumMrcByStatus(Client $client, string $status): float
+    {
+        $accountNumber = trim((string) $client->account_number);
+        $query = Client::where('status', $status);
+        if ($accountNumber !== '') {
+            $query->where('account_number', $accountNumber);
+        } else {
+            $query->where('id', $client->id);
+        }
+        return (float) $query->sum('mrc');
+    }
+
     private function applyFilters($query, array $validated): void
     {
         if (! empty($validated['status'])) {
@@ -208,6 +220,7 @@ class ClientApiController extends Controller
             'quantity' => 'clients.quantity',
             'other' => 'clients.other',
             'migration_numbers' => 'clients.migration_numbers',
+            'activity' => 'clients.activity',
             'fiber' => 'clients.fiber',
             'order_number' => 'clients.order_number',
             'wo_number' => 'clients.wo_number',
@@ -278,7 +291,7 @@ class ClientApiController extends Controller
                 continue;
             }
             if (in_array($col, ['submitted_at'], true)) {
-                $out[$col] = $row->$col ? $row->$col->format('d/m/Y H:i') : null;
+                $out[$col] = $row->$col ? $row->$col->format('d-M-Y H:i') : null;
                 continue;
             }
             if (in_array($col, ['completion_date', 'contract_end_date'], true)) {
@@ -742,6 +755,9 @@ class ClientApiController extends Controller
             'created_by' => $client->created_by,
             'creator' => $client->creator?->name,
             'revenue' => $client->revenue ? (float) $client->revenue : null,
+            'normal_revenue' => $this->sumMrcByStatus($client, 'Normal'),
+            'churn_revenue' => $this->sumMrcByStatus($client, 'Churn'),
+            'clawback_revenue' => $this->sumMrcByStatus($client, 'Clawback'),
             'csr_name_1' => $client->csr_name_1,
             'csr_name_2' => $client->csr_name_2,
             'csr_name_3' => $client->csr_name_3,
@@ -864,19 +880,24 @@ class ClientApiController extends Controller
         $page = (int) $request->input('page', 1);
         $paginated = $query->paginate($perPage, ['*'], 'page', $page);
 
+        $query->with(['creator:id,name', 'backOfficeExecutive:id,name']);
+
         $items = $paginated->getCollection()->map(function ($row) {
             return [
                 'id' => $row->id,
-                'request_id' => 'VAS-' . $row->id,
-                'submitted_at' => $row->submitted_at?->format('d-M-Y'),
+                'created_at' => $row->created_at?->format('d-M-Y H:i'),
                 'request_type' => $row->request_type,
-                'status' => $row->status,
-                'company_name' => $row->company_name,
                 'account_number' => $row->account_number,
+                'company_name' => $row->company_name,
+                'contact_number' => $row->contact_number,
                 'description' => $row->description,
+                'additional_notes' => $row->additional_notes,
                 'manager' => $row->manager?->name,
                 'team_leader' => $row->teamLeader?->name,
                 'sales_agent' => $row->salesAgent?->name,
+                'executive' => $row->backOfficeExecutive?->name,
+                'status' => $row->status,
+                'creator' => $row->creator?->name,
             ];
         });
         $paginated->setCollection($items);
@@ -906,7 +927,7 @@ class ClientApiController extends Controller
                 }
             });
 
-        $query->with(['manager:id,name', 'teamLeader:id,name', 'salesAgent:id,name']);
+        $query->with(['manager:id,name', 'teamLeader:id,name', 'salesAgent:id,name', 'creator:id,name', 'csrs.user:id,name']);
         $query->orderByDesc('submitted_at');
 
         $perPage = (int) $request->input('per_page', 10);
@@ -916,17 +937,27 @@ class ClientApiController extends Controller
         $items = $paginated->getCollection()->map(function ($row) {
             return [
                 'id' => $row->id,
-                'ticket_id' => 'CS-' . $row->id,
-                'submitted_at' => $row->submitted_at?->format('d-M-Y'),
+                'ticket_number' => $row->ticket_number,
+                'submitted_at' => $row->submitted_at?->format('d-M-Y H:i'),
                 'issue_category' => $row->issue_category,
                 'status' => $row->status,
                 'company_name' => $row->company_name,
                 'account_number' => $row->account_number,
                 'contact_number' => $row->contact_number,
                 'issue_description' => $row->issue_description,
+                'creator' => $row->creator?->name,
+                'csr' => $row->csrs->map(fn ($c) => $c->user?->name)->filter()->implode(', '),
                 'manager' => $row->manager?->name,
                 'team_leader' => $row->teamLeader?->name,
                 'sales_agent' => $row->salesAgent?->name,
+                'workflow_status' => $row->workflow_status,
+                'pending' => $row->pending,
+                'completion_date' => $row->completion_date?->format('d-M-Y'),
+                'updated_at' => $row->updated_at?->format('d-M-Y H:i'),
+                'trouble_ticket' => $row->trouble_ticket,
+                'activity' => $row->activity,
+                'resolution_remarks' => $row->resolution_remarks,
+                'internal_remarks' => $row->internal_remarks,
             ];
         });
         $paginated->setCollection($items);
@@ -1019,6 +1050,43 @@ class ClientApiController extends Controller
         }
 
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * PUT /api/clients/{client}/inline
+     * Single-field inline edit from the listing table. Audit tracked via ClientObserver.
+     */
+    public function inlineUpdate(Request $request, Client $client): JsonResponse
+    {
+        $this->authorize('update', $client);
+
+        $data = $request->validate([
+            'company_name'       => ['sometimes', 'nullable', 'string', 'max:200'],
+            'account_number'     => ['sometimes', 'nullable', 'string', 'max:100'],
+            'status'             => ['sometimes', 'nullable', 'string', Rule::in(Client::STATUSES)],
+            'service_type'       => ['sometimes', 'nullable', 'string', 'max:100'],
+            'product_type'       => ['sometimes', 'nullable', 'string', 'max:100'],
+            'address'            => ['sometimes', 'nullable', 'string', 'max:500'],
+            'product_name'       => ['sometimes', 'nullable', 'string', 'max:200'],
+            'mrc'                => ['sometimes', 'nullable', 'string', 'max:100'],
+            'quantity'           => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'other'              => ['sometimes', 'nullable', 'string', 'max:500'],
+            'migration_numbers'  => ['sometimes', 'nullable', 'string', 'max:100'],
+            'wo_number'          => ['sometimes', 'nullable', 'string', 'max:100'],
+            'completion_date'    => ['sometimes', 'nullable', 'date'],
+            'payment_connection' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'contract_type'      => ['sometimes', 'nullable', 'string', 'max:100'],
+            'contract_end_date'  => ['sometimes', 'nullable', 'date'],
+            'renewal_alert'      => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'additional_notes'   => ['sometimes', 'nullable', 'string'],
+            'manager_id'         => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'team_leader_id'     => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'sales_agent_id'     => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+        ]);
+
+        $client->update($data);
+
+        return response()->json(['id' => $client->id, 'message' => 'Updated.']);
     }
 
     public function updateCompanyDetails(Request $request, Client $client): JsonResponse

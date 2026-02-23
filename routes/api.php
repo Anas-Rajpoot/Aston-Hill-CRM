@@ -150,6 +150,7 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::get('/clients/{client}/customer-support', [\App\Http\Controllers\Api\ClientApiController::class, 'customerSupport'])->whereNumber('client');
     Route::get('/clients/{client}/audits', [\App\Http\Controllers\Api\ClientApiController::class, 'audits'])->whereNumber('client');
     Route::put('/clients/{client}', [\App\Http\Controllers\Api\ClientApiController::class, 'update'])->whereNumber('client');
+    Route::put('/clients/{client}/inline', [\App\Http\Controllers\Api\ClientApiController::class, 'inlineUpdate'])->whereNumber('client');
     Route::put('/clients/{client}/company-details', [\App\Http\Controllers\Api\ClientApiController::class, 'updateCompanyDetails'])->whereNumber('client');
     Route::put('/clients/{client}/contacts', [\App\Http\Controllers\Api\ClientApiController::class, 'updateContacts'])->whereNumber('client');
     Route::put('/clients/{client}/addresses', [\App\Http\Controllers\Api\ClientApiController::class, 'updateAddresses'])->whereNumber('client');

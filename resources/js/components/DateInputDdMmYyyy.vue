@@ -1,14 +1,13 @@
 <template>
   <div class="relative mt-1 block w-full">
-    <!-- Visible display in dd-mm-yyyy; clicking opens the native date picker -->
     <input
       type="text"
       readonly
       :value="displayValue"
-      placeholder="dd-mm-yyyy"
+      placeholder="dd-Mon-yyyy"
       class="block w-full rounded border border-gray-300 bg-white px-3 py-2 pr-10 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 cursor-pointer"
       :class="inputClass"
-      aria-label="Select date (dd-mm-yyyy)"
+      aria-label="Select date (dd-Mon-yyyy)"
       @click="openPicker"
     />
     <!-- Calendar button: clear way to open picker -->
@@ -38,7 +37,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { toDdMmYyyy } from '@/lib/dateFormat'
+import { toDdMonYyyyDash } from '@/lib/dateFormat'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -51,7 +50,7 @@ const dateInputRef = ref(null)
 
 const displayValue = computed(() => {
   if (!props.modelValue || typeof props.modelValue !== 'string') return ''
-  return toDdMmYyyy(props.modelValue.trim().slice(0, 10)) || props.modelValue
+  return toDdMonYyyyDash(props.modelValue.trim().slice(0, 10)) || props.modelValue
 })
 
 function openPicker() {

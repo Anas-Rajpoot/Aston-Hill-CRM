@@ -54,7 +54,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onClickOutside))
   <div class="space-y-4">
     <!-- Search Client card (as in reference image) -->
     <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-      <h3 class="text-sm font-medium text-gray-900 mb-3">Search Client</h3>
+      <h3 class="text-sm font-medium text-gray-900 mb-3">Search Products & Services</h3>
       <div class="flex flex-wrap items-end gap-4">
         <div class="min-w-[140px] max-w-[200px] flex-1">
           <label for="client-company-name" class="block text-xs text-gray-700 mb-0.5">

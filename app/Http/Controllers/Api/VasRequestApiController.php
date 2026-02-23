@@ -538,10 +538,10 @@ class VasRequestApiController extends Controller
             'message' => 'Queued for processing...',
         ], now()->addMinutes(30));
 
-        BulkAssignVasJob::dispatch($ids, $executiveId, $user->id, $trackingId);
+        BulkAssignVasJob::dispatchSync($ids, $executiveId, $user->id, $trackingId);
 
         return response()->json([
-            'message' => 'Assignment queued. Processing '.count($ids).' request(s) in background.',
+            'message' => 'Assignment completed. '.count($ids).' request(s) assigned.',
             'queued' => true,
             'count' => count($ids),
             'tracking_id' => $trackingId,
