@@ -55,6 +55,8 @@ const exportLoading = ref(false)
 const importLoading = ref(false)
 const importFileInputRef = ref(null)
 
+const accountNumbers = ref([])
+
 const filters = ref({
   company_name: '',
   account_number: '',
@@ -166,6 +168,13 @@ async function load() {
   }
 }
 
+async function loadFilters() {
+  try {
+    const data = await clientsApi.filters()
+    accountNumbers.value = data.account_numbers ?? []
+  } catch { /* silent */ }
+}
+
 async function loadColumns() {
   try {
     const data = await clientsApi.columns()
@@ -253,6 +262,7 @@ function updateTableColumns() {
 }
 
 onMounted(() => {
+  loadFilters()
   loadTablePreference().then(() => {
     loadColumns().then(() => {
       updateTableColumns()
@@ -327,6 +337,7 @@ onMounted(() => {
       <ClientsFiltersBar
         :filters="filters"
         :loading="loading"
+        :account-numbers="accountNumbers"
         @search="applyFilters"
         @clear="clearSearch"
       >

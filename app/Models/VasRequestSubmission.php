@@ -33,8 +33,7 @@ class VasRequestSubmission extends Model
     ];
 
     const STATUSES = [
-        'submitted',
-        'under_process',
+        'submitted_under_process',
         'rejected',
         'pending_with_csr',
         'pending_with_du',
@@ -52,7 +51,7 @@ class VasRequestSubmission extends Model
     public function submit(): void
     {
         $this->update([
-            'status' => 'submitted',
+            'status' => 'submitted_under_process',
             'submitted_at' => now(),
         ]);
     }

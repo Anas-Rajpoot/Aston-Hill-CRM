@@ -171,32 +171,70 @@ function getCellValueForEdit(row, col) {
 
 const editingCell = ref(null)
 const inlineEditValue = ref('')
+const inlineEditError = ref('')
+
+function validatePhone(value) {
+  if (!value) return 'Contact number is required.'
+  if (/\s/.test(value)) return 'Contact number must not contain spaces.'
+  if (!/^\d+$/.test(value)) return 'Contact number must contain only digits.'
+  if (!value.startsWith('971')) return 'Contact number must start with 971.'
+  if (value.length !== 12) return 'Contact number must be exactly 12 digits.'
+  return null
+}
+
+function validateInlineCell(col, value) {
+  if (col === 'contact_number') return validatePhone(value?.trim())
+  if (col === 'request_type') return !value?.trim() ? 'Please select a request type.' : null
+  if (col === 'account_number') return !value?.trim() ? 'Account number is required.' : null
+  if (col === 'company_name') return !value?.trim() ? 'Company name is required.' : null
+  if (col === 'description') return !value?.trim() ? 'Request description is required.' : null
+  if (col === 'manager') return !value ? 'Manager is required.' : null
+  if (col === 'team_leader') return !value ? 'Team Leader is required.' : null
+  if (col === 'sales_agent') return !value ? 'Sales Agent is required.' : null
+  return null
+}
+
+function onPhoneInlineInput(event) {
+  inlineEditValue.value = event.target.value.replace(/\D/g, '')
+  inlineEditError.value = ''
+}
 
 function openDropdownEdit(row, col) {
   if (!canInlineEdit.value) return
   editingCell.value = { rowId: row.id, col }
   inlineEditValue.value = getCellValueForEdit(row, col)
+  inlineEditError.value = ''
 }
 
 function openInputEdit(row, col) {
   if (!canInlineEdit.value) return
   editingCell.value = { rowId: row.id, col }
   inlineEditValue.value = getCellValueForEdit(row, col)
+  inlineEditError.value = ''
 }
 
 function saveInlineEdit() {
   if (!editingCell.value) return
   const { rowId, col } = editingCell.value
   let value = inlineEditValue.value
+
+  const err = validateInlineCell(col, value)
+  if (err) {
+    inlineEditError.value = err
+    return
+  }
+
   if (['manager', 'team_leader', 'sales_agent', 'executive'].includes(col)) {
     value = value === '' || value == null ? null : Number(value)
   }
   emit('updateCell', rowId, col, value)
   editingCell.value = null
+  inlineEditError.value = ''
 }
 
 function cancelInlineEdit() {
   editingCell.value = null
+  inlineEditError.value = ''
 }
 
 function getOptionsForColumn(col) {
@@ -225,8 +263,7 @@ function isEditing(rowId, col) {
 
 const STATUS_BADGES = {
   draft: 'bg-gray-100 text-gray-700',
-  submitted: 'bg-blue-100 text-blue-700',
-  under_process: 'bg-yellow-100 text-yellow-700',
+  submitted_under_process: 'bg-blue-100 text-blue-700',
   approved: 'bg-green-100 text-green-700',
   rejected: 'bg-red-100 text-red-700',
   pending_with_csr: 'bg-orange-100 text-orange-700',
@@ -328,12 +365,14 @@ function formatStatus(status) {
               <div class="flex flex-col gap-1.5">
                 <select
                   v-model="inlineEditValue"
-                  class="w-full min-w-[160px] max-w-[220px] rounded border border-gray-300 bg-white px-3 py-1.5 pr-8 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  :class="['w-full min-w-[160px] max-w-[220px] rounded border bg-white px-3 py-1.5 pr-8 text-sm focus:ring-1', inlineEditError ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+                  @change="inlineEditError = ''"
                   @keydown.enter="saveInlineEdit"
                   @keydown.esc="cancelInlineEdit"
                 >
                   <option v-for="o in getOptionsForColumn(col)" :key="String(o.value)" :value="o.value">{{ o.label }}</option>
                 </select>
+                <p v-if="inlineEditError" class="text-xs text-red-600">{{ inlineEditError }}</p>
                 <div class="flex gap-1">
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
                   <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
@@ -346,17 +385,31 @@ function formatStatus(status) {
                   v-if="col === 'description'"
                   v-model="inlineEditValue"
                   rows="3"
-                  class="w-full min-w-[180px] max-w-[280px] rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  :class="['w-full min-w-[180px] max-w-[280px] rounded border bg-white px-2 py-1 text-sm focus:ring-1', inlineEditError ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+                  @input="inlineEditError = ''"
+                  @keydown.esc="cancelInlineEdit"
+                />
+                <input
+                  v-else-if="col === 'contact_number'"
+                  :value="inlineEditValue"
+                  type="text"
+                  maxlength="12"
+                  placeholder="971XXXXXXXXX"
+                  :class="['w-full min-w-[130px] max-w-[220px] rounded border bg-white px-2 py-1 text-sm focus:ring-1', inlineEditError ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+                  @input="onPhoneInlineInput"
+                  @keydown.enter="saveInlineEdit"
                   @keydown.esc="cancelInlineEdit"
                 />
                 <input
                   v-else
                   v-model="inlineEditValue"
                   type="text"
-                  class="w-full min-w-[100px] max-w-[220px] rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  :class="['w-full min-w-[100px] max-w-[220px] rounded border bg-white px-2 py-1 text-sm focus:ring-1', inlineEditError ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+                  @input="inlineEditError = ''"
                   @keydown.enter="saveInlineEdit"
                   @keydown.esc="cancelInlineEdit"
                 />
+                <p v-if="inlineEditError" class="text-xs text-red-600">{{ inlineEditError }}</p>
                 <div class="flex gap-1">
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
                   <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
@@ -382,8 +435,7 @@ function formatStatus(status) {
                   @keydown.enter="saveInlineEdit"
                   @keydown.esc="cancelInlineEdit"
                 >
-                  <option value="submitted">Submitted</option>
-                  <option value="under_process">Under Process</option>
+                  <option value="submitted_under_process">Submitted Under Process</option>
                   <option value="rejected">Rejected</option>
                   <option value="pending_with_csr">Pending with CSR</option>
                   <option value="pending_with_du">Pending with DU</option>
@@ -445,7 +497,7 @@ function formatStatus(status) {
                 </button>
               </div>
               <router-link
-                v-if="row.status === 'rejected'"
+                v-if="row.status !== 'approved'"
                 :to="`/vas-requests/${row.id}/resubmit`"
                 class="rounded bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700"
               >

@@ -30,6 +30,7 @@ const activeCount = computed(() => {
   let n = 0
   if (f.q) n++
   if (f.account_number) n++
+  if (f.contact_number) n++
   if (f.company_name) n++
   if (f.from || f.to) n++
   if (f.submitted_from || f.submitted_to) n++
@@ -84,21 +85,31 @@ function formatDisplay(ymd) {
           />
         </div>
         <div>
-          <label class="mb-0.5 block text-xs font-medium text-gray-600">Account #</label>
+          <label class="mb-0.5 block text-xs font-medium text-gray-600">Account Number</label>
           <input
             v-model="filters.account_number"
             type="text"
-            placeholder="Account..."
+            placeholder="Account Number..."
             class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           />
         </div>
         <div>
-          <label class="mb-0.5 block text-xs font-medium text-gray-600">Company</label>
+          <label class="mb-0.5 block text-xs font-medium text-gray-600">Company Name</label>
           <input
             v-model="filters.company_name"
             type="text"
-            placeholder="Company..."
+            placeholder="Company Name..."
+            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            :disabled="loading"
+          />
+        </div>
+        <div>
+          <label class="mb-0.5 block text-xs font-medium text-gray-600">Contact Number</label>
+          <input
+            v-model="filters.contact_number"
+            type="text"
+            placeholder="Contact Number..."
             class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           />

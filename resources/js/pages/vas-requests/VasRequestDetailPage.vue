@@ -1,6 +1,6 @@
 <script setup>
 /**
- * VAS Request Details – read-only view: Basic Info, Request, Team, Status & Documents, Creator.
+ * VAS Request Details – redesigned to match Lead Submission Detail page layout.
  */
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -30,10 +30,31 @@ const id = computed(() => {
   return p != null ? Number(p) : null
 })
 
-const canEdit = computed(() => (auth.user?.permissions ?? []).includes('vas.edit'))
+const canEdit = computed(() => {
+  const perms = auth.user?.permissions ?? []
+  if (perms.includes('vas.edit')) return true
+  const roles = auth.user?.roles ?? []
+  if (!Array.isArray(roles)) return false
+  return roles.some((r) => {
+    const name = typeof r === 'string' ? r : r?.name
+    return name === 'superadmin' || name === 'back_office' || name === 'backoffice'
+  })
+})
 
 function displayVal(val) {
   return val != null && val !== '' ? String(val) : '—'
+}
+
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+function formatDate(d) {
+  if (!d) return '—'
+  const date = new Date(d)
+  if (Number.isNaN(date.getTime())) return '—'
+  const day = String(date.getDate()).padStart(2, '0')
+  const mon = MONTH_NAMES[date.getMonth()]
+  const year = date.getFullYear()
+  return `${day}-${mon}-${year}`
 }
 
 function formatDateTime(d) {
@@ -41,11 +62,16 @@ function formatDateTime(d) {
   const date = new Date(d)
   if (Number.isNaN(date.getTime())) return '—'
   const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const mon = MONTH_NAMES[date.getMonth()]
   const year = date.getFullYear()
   const h = String(date.getHours()).padStart(2, '0')
   const m = String(date.getMinutes()).padStart(2, '0')
-  return `${year}-${month}-${day} ${h}:${m}`
+  return `${day}-${mon}-${year} ${h}:${m}`
+}
+
+function formatStatus(status) {
+  if (status == null || status === '') return '—'
+  return String(status).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 function docDisplayName(doc) {
@@ -53,9 +79,9 @@ function docDisplayName(doc) {
 }
 
 function formatFileSize(bytes) {
-  if (bytes == null || bytes === '') return ''
+  if (bytes == null || bytes === '') return '—'
   const n = Number(bytes)
-  if (Number.isNaN(n) || n < 0) return ''
+  if (Number.isNaN(n) || n < 0) return '—'
   if (n < 1024) return `${n} B`
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
   return `${(n / (1024 * 1024)).toFixed(1)} MB`
@@ -100,18 +126,35 @@ function prettifyKey(key) {
   return String(key).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
-function formatAuditSingleValue(v) {
-  if (v == null || v === '') return null
-  if (typeof v === 'boolean') return v ? 'true' : 'false'
-  return String(v)
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?)?/
+
+function formatAuditSingleValue(val) {
+  if (val == null || val === '') return null
+  const s = String(val)
+  if (DATE_PATTERN.test(s)) {
+    const date = new Date(s)
+    if (!Number.isNaN(date.getTime())) {
+      const day = String(date.getDate()).padStart(2, '0')
+      const mon = MONTH_NAMES[date.getMonth()]
+      const year = date.getFullYear()
+      const h = String(date.getHours()).padStart(2, '0')
+      const m = String(date.getMinutes()).padStart(2, '0')
+      return `${day}-${mon}-${year} ${h}:${m}`
+    }
+  }
+  return s
 }
 
 function formatAuditObject(obj) {
+  if (obj == null) return 'empty'
   if (Array.isArray(obj)) {
     if (obj.length === 0) return 'empty'
-    return obj.map((item, i) => (typeof item === 'object' && item !== null ? formatAuditObject(item) : `${formatAuditSingleValue(item) ?? 'empty'}`)).join(', ')
+    return obj.map((item) => {
+      if (typeof item === 'object' && item !== null) return formatAuditObject(item)
+      return formatAuditSingleValue(item) ?? 'empty'
+    }).join('\n')
   }
-  if (typeof obj === 'object' && obj !== null) {
+  if (typeof obj === 'object') {
     const entries = Object.entries(obj).filter(([, v]) => v !== undefined)
     if (entries.length === 0) return 'empty'
     return entries.map(([k, v]) => {
@@ -128,7 +171,11 @@ function formatAuditValue(val) {
   const s = String(val).trim()
   if ((s.startsWith('{') && s.endsWith('}')) || (s.startsWith('[') && s.endsWith(']'))) {
     try {
-      return formatAuditObject(JSON.parse(s))
+      let parsed = JSON.parse(s)
+      if (typeof parsed === 'string') {
+        try { parsed = JSON.parse(parsed) } catch {}
+      }
+      return formatAuditObject(parsed)
     } catch {}
   }
   return formatAuditSingleValue(s)
@@ -137,13 +184,15 @@ function formatAuditValue(val) {
 const FIELD_LABELS = {
   company_name: 'Company Name',
   account_number: 'Account Number',
+  contact_number: 'Contact Number',
   request_type: 'Request Type',
   description: 'Description',
+  additional_notes: 'Additional Notes',
   status: 'Status',
   manager_id: 'Manager',
   team_leader_id: 'Team Leader',
   sales_agent_id: 'Sales Agent',
-  backoffice_user_id: 'Back Office Executive',
+  back_office_executive_id: 'Back Office Executive',
   submitted_at: 'Submitted At',
   documents: 'Documents',
 }
@@ -166,10 +215,6 @@ async function loadAudits() {
   }
 }
 
-function goBack() {
-  router.push('/vas-requests')
-}
-
 function goToEdit() {
   if (request.value?.id) router.push(`/vas-requests/${request.value.id}/edit`)
 }
@@ -181,123 +226,145 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] p-0">
+  <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] p-0">
     <div class="w-full">
-      <div class="border border-black">
-        <div class="px-4 py-4 sm:px-5">
-          <div class="flex flex-wrap items-center gap-3">
+      <!-- Header -->
+      <div class="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div class="flex flex-wrap items-baseline gap-2">
+            <h1 class="text-xl font-semibold text-gray-900">VAS Request Details</h1>
+            <Breadcrumbs />
+          </div>
+          <div class="flex items-center gap-2">
+            <router-link
+              to="/vas-requests"
+              class="rounded border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              Back to List
+            </router-link>
             <button
-              v-if="canEdit"
+              v-if="canEdit && request"
               type="button"
-              class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+              class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
               @click="goToEdit"
             >
               Edit VAS Request
             </button>
-            <h1 class="text-xl font-semibold text-gray-900">VAS Request Details</h1>
-            <Breadcrumbs />
           </div>
         </div>
+      </div>
 
-        <div class="border-t border-black" />
+      <div v-if="loading" class="flex justify-center py-16">
+        <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+      </div>
 
-        <div v-if="loading" class="flex justify-center px-4 py-16 sm:px-5">
-          <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-        </div>
+      <div v-else-if="!request" class="rounded-lg border border-gray-200 bg-white p-8 text-center text-gray-500">
+        Unable to load request. You may not have permission to view it.
+      </div>
 
-        <div v-else-if="!request" class="px-4 py-8 text-center text-gray-500 sm:px-5">
-          Unable to load request. You may not have permission to view it.
-        </div>
+      <div v-else class="space-y-6">
+        <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
+          <div class="px-6 py-4">
+            <!-- Primary Information -->
+            <section class="mb-6">
+              <h2 class="mb-3 text-sm font-semibold text-gray-900">Primary Information</h2>
+              <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Request Type</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.request_type) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Company Name as per Trade License</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.company_name) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Account Number</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.account_number) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Contact Number</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.contact_number) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Status</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ formatStatus(request.status) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Created</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ formatDateTime(request.created_at) }}</div>
+                </div>
+              </div>
+              <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Request Description</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 whitespace-pre-wrap">{{ displayVal(request.description) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Additional Notes</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 whitespace-pre-wrap">{{ displayVal(request.additional_notes) }}</div>
+                </div>
+              </div>
+            </section>
 
-        <div v-else class="px-4 py-5 sm:px-5">
-          <!-- Basic Information: label: value with colon and spacing -->
-          <section class="mb-6">
-            <h2 class="mb-3 border-b border-black pb-2 text-base font-semibold text-gray-900">Basic Information</h2>
-            <div class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
-              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span class="shrink-0 text-sm font-medium text-gray-500">Request ID:</span>
-                <span class="text-sm font-medium text-gray-900">{{ request.id }}</span>
+            <!-- Team Assignment -->
+            <section class="mb-6">
+              <h2 class="mb-3 text-sm font-semibold text-gray-900">Team Assignment</h2>
+              <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Sales Agent</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.sales_agent_name) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Team Leader</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.team_leader_name) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Manager</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.manager_name) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Back Office Executive</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.back_office_executive_name) }}</div>
+                </div>
               </div>
-              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span class="shrink-0 text-sm font-medium text-gray-500">Submission Date:</span>
-                <span class="text-sm font-medium text-gray-900">{{ formatDateTime(request.submitted_at) }}</span>
-              </div>
-              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span class="shrink-0 text-sm font-medium text-gray-500">Company Name:</span>
-                <span class="text-sm font-medium text-gray-900">{{ displayVal(request.company_name) }}</span>
-              </div>
-              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span class="shrink-0 text-sm font-medium text-gray-500">Request Type:</span>
-                <span class="text-sm font-medium text-gray-900">{{ displayVal(request.request_type) }}</span>
-              </div>
-              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span class="shrink-0 text-sm font-medium text-gray-500">Account Number:</span>
-                <span class="text-sm font-medium text-gray-900">{{ displayVal(request.account_number) }}</span>
-              </div>
-              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span class="shrink-0 text-sm font-medium text-gray-500">Created:</span>
-                <span class="text-sm font-medium text-gray-900">{{ formatDateTime(request.created_at) }}</span>
-              </div>
-            </div>
-          </section>
+            </section>
 
-          <!-- Description -->
-          <section class="mb-6">
-            <div class="flex flex-wrap items-start gap-x-3 gap-y-1">
-              <span class="shrink-0 text-sm font-medium text-gray-500">Description:</span>
-              <span class="min-w-0 flex-1 text-sm font-medium text-gray-900 whitespace-pre-wrap">{{ displayVal(request.description) }}</span>
-            </div>
-          </section>
+            <!-- Additional Information -->
+            <section class="mb-6">
+              <h2 class="mb-3 text-sm font-semibold text-gray-900">Additional Information</h2>
+              <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Created By</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.creator_name) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Creator Role</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ formatStatus(request.creator_role) }}</div>
+                </div>
+              </div>
+            </section>
 
-          <!-- Team -->
-          <section class="mb-6">
-            <h2 class="mb-3 border-b border-black pb-2 text-base font-semibold text-gray-900">Team</h2>
-            <div class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span class="shrink-0 text-sm font-medium text-gray-500">Sales Agent:</span>
-                <span class="text-sm font-medium text-gray-900">{{ displayVal(request.sales_agent_name) }}</span>
-              </div>
-              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span class="shrink-0 text-sm font-medium text-gray-500">Team Leader:</span>
-                <span class="text-sm font-medium text-gray-900">{{ displayVal(request.team_leader_name) }}</span>
-              </div>
-              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span class="shrink-0 text-sm font-medium text-gray-500">Manager:</span>
-                <span class="text-sm font-medium text-gray-900">{{ displayVal(request.manager_name) }}</span>
-              </div>
-              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span class="shrink-0 text-sm font-medium text-gray-500">Back Office Executive:</span>
-                <span class="text-sm font-medium text-gray-900">{{ displayVal(request.back_office_executive_name) }}</span>
-              </div>
-            </div>
-          </section>
-
-          <!-- Documents -->
-          <section class="mb-6">
-            <h2 class="mb-3 border-b border-black pb-2 text-base font-semibold text-gray-900">Documents</h2>
-            <div v-if="request.documents?.length">
-              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <!-- Documents -->
+            <section class="mb-6">
+              <h2 class="mb-3 text-sm font-semibold text-gray-900">Documents</h2>
+              <div v-if="request.documents?.length" class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div
                   v-for="doc in request.documents"
                   :key="doc.id"
-                  class="flex items-center gap-3 rounded-lg border border-black p-4"
+                  class="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-100 p-3"
                 >
-                  <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-red-50 text-red-600">
-                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
+                  <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-red-600 text-sm font-bold text-white">D</div>
                   <div class="min-w-0 flex-1">
-                    <p class="truncate text-sm font-medium text-gray-900">{{ docDisplayName(doc) }}</p>
-                    <p v-if="doc.size != null" class="mt-0.5 text-xs text-gray-500">{{ formatFileSize(doc.size) }}</p>
+                    <p class="truncate text-sm font-medium text-gray-900" :title="docDisplayName(doc)">{{ docDisplayName(doc) }}</p>
+                    <p v-if="doc.size != null" class="text-xs text-gray-500">{{ formatFileSize(doc.size) }}</p>
                   </div>
                   <button
                     type="button"
-                    class="shrink-0 rounded p-2 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
-                    :title="'Download ' + docDisplayName(doc)"
+                    class="shrink-0 rounded p-1.5 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                    title="Download"
                     @click="downloadDocument(doc)"
                   >
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -306,83 +373,69 @@ onMounted(() => {
                   </button>
                 </div>
               </div>
-            </div>
-            <div v-else>
-              <span class="text-sm text-gray-500">No documents</span>
-            </div>
-          </section>
+              <div v-else class="rounded-lg border border-gray-200 bg-gray-50 py-8 text-center text-sm text-gray-500">No documents uploaded.</div>
+            </section>
 
-          <!-- Created By -->
-          <section class="mb-2">
-            <h2 class="mb-3 border-b border-black pb-2 text-base font-semibold text-gray-900">Created By</h2>
-            <div class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span class="shrink-0 text-sm font-medium text-gray-500">Creator:</span>
-                <span class="text-sm font-medium text-gray-900">{{ displayVal(request.creator_name) }}</span>
+            <!-- Change History -->
+            <section class="mb-6">
+              <h2 class="mb-3 text-sm font-semibold text-gray-900">Change History</h2>
+              <p class="mb-3 text-xs text-gray-500">All field changes with previous value, new value, date/time and who made the change.</p>
+
+              <div v-if="auditsLoading" class="flex items-center justify-center py-8">
+                <svg class="h-6 w-6 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
               </div>
-              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span class="shrink-0 text-sm font-medium text-gray-500">Role:</span>
-                <span class="text-sm font-medium text-gray-900">{{ displayVal(request.creator_role) }}</span>
-              </div>
+
+              <div v-else-if="!audits.length" class="rounded-lg border border-gray-200 bg-gray-50 py-6 text-center text-sm text-gray-500">No changes recorded yet.</div>
+
+              <template v-else>
+                <div class="overflow-x-auto rounded-lg border border-gray-200">
+                  <table class="min-w-full text-left text-sm">
+                    <thead class="border-b border-gray-200 bg-gray-100">
+                      <tr>
+                        <th class="px-4 py-2 font-semibold text-gray-900">Field</th>
+                        <th class="px-4 py-2 font-semibold text-gray-900">Old Value</th>
+                        <th class="px-4 py-2 font-semibold text-gray-900">New Value</th>
+                        <th class="px-4 py-2 font-semibold text-gray-900">Date & Time</th>
+                        <th class="px-4 py-2 font-semibold text-gray-900">Changed By</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 bg-white">
+                      <tr v-for="a in paginatedAudits" :key="a.id" class="hover:bg-gray-50/50">
+                        <td class="whitespace-nowrap px-4 py-2 font-medium text-gray-800">{{ fieldLabel(a.field_name, a) }}</td>
+                        <td class="max-w-[350px] px-4 py-2 text-gray-600"><TruncatedText :text="a.old_value != null && a.old_value !== '' ? formatAuditValue(a.old_value) : ''" empty-label="empty" /></td>
+                        <td class="max-w-[350px] px-4 py-2 text-gray-600"><TruncatedText :text="a.new_value != null && a.new_value !== '' ? formatAuditValue(a.new_value) : ''" empty-label="—" /></td>
+                        <td class="whitespace-nowrap px-4 py-2 text-gray-600">{{ a.changed_at ? formatDateTime(a.changed_at) : '—' }}</td>
+                        <td class="whitespace-nowrap px-4 py-2 text-gray-600">{{ a.changed_by_name ?? '—' }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div v-if="auditTotalPages > 1" class="mt-3 flex items-center justify-between">
+                  <p class="text-xs text-gray-500">
+                    Showing {{ (auditPage - 1) * auditPerPage + 1 }}–{{ Math.min(auditPage * auditPerPage, audits.length) }} of {{ audits.length }} changes
+                  </p>
+                  <div class="flex items-center gap-1.5">
+                    <button type="button" :disabled="auditPage <= 1" class="rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50" @click="auditPage--">Previous</button>
+                    <span class="rounded border border-gray-300 bg-gray-50 px-3 py-1 text-xs text-gray-700">Page {{ auditPage }} of {{ auditTotalPages }}</span>
+                    <button type="button" :disabled="auditPage >= auditTotalPages" class="rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50" @click="auditPage++">Next</button>
+                  </div>
+                </div>
+              </template>
+            </section>
+
+            <!-- Close Button -->
+            <div class="mt-6 flex justify-end border-t border-gray-200 pt-4">
+              <router-link
+                to="/vas-requests"
+                class="rounded-lg border border-gray-300 bg-white px-6 py-2.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+              >
+                Close
+              </router-link>
             </div>
-          </section>
-        </div>
-
-        <!-- Change History -->
-        <div v-if="request" class="border-t border-black px-4 py-5 sm:px-5">
-          <h2 class="mb-3 text-base font-semibold text-gray-900">Change History</h2>
-
-          <div v-if="auditsLoading" class="flex items-center justify-center py-8">
-            <svg class="h-6 w-6 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
           </div>
-
-          <div v-else-if="!audits.length" class="py-6 text-center text-sm text-gray-400">No changes recorded yet.</div>
-
-          <template v-else>
-            <div class="overflow-x-auto rounded-lg border border-gray-200">
-              <table class="min-w-full divide-y divide-gray-200 text-sm">
-                <thead class="bg-gray-50">
-                  <tr>
-                    <th class="whitespace-nowrap px-4 py-2 text-left font-semibold text-gray-600">Field</th>
-                    <th class="whitespace-nowrap px-4 py-2 text-left font-semibold text-gray-600">Old Value</th>
-                    <th class="whitespace-nowrap px-4 py-2 text-left font-semibold text-gray-600">New Value</th>
-                    <th class="whitespace-nowrap px-4 py-2 text-left font-semibold text-gray-600">Date</th>
-                    <th class="whitespace-nowrap px-4 py-2 text-left font-semibold text-gray-600">Changed By</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100 bg-white">
-                  <tr v-for="a in paginatedAudits" :key="a.id" class="hover:bg-gray-50/50">
-                    <td class="whitespace-nowrap px-4 py-2 font-medium text-gray-800">{{ fieldLabel(a.field_name, a) }}</td>
-                    <td class="max-w-[350px] px-4 py-2 text-gray-600"><TruncatedText :text="a.old_value != null && a.old_value !== '' ? formatAuditValue(a.old_value) : ''" empty-label="empty" /></td>
-                    <td class="max-w-[350px] px-4 py-2 text-gray-600"><TruncatedText :text="a.new_value != null && a.new_value !== '' ? formatAuditValue(a.new_value) : ''" empty-label="—" /></td>
-                    <td class="whitespace-nowrap px-4 py-2 text-gray-600">{{ a.changed_at ? formatDateTime(a.changed_at) : '—' }}</td>
-                    <td class="whitespace-nowrap px-4 py-2 text-gray-600">{{ a.changed_by_name ?? '—' }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div v-if="auditTotalPages > 1" class="mt-3 flex items-center justify-between">
-              <span class="text-xs text-gray-500">Page {{ auditPage }} of {{ auditTotalPages }}</span>
-              <div class="flex gap-1">
-                <button type="button" class="rounded border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40" :disabled="auditPage <= 1" @click="auditPage--">&laquo; Prev</button>
-                <button type="button" class="rounded border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40" :disabled="auditPage >= auditTotalPages" @click="auditPage++">Next &raquo;</button>
-              </div>
-            </div>
-          </template>
-        </div>
-
-        <div v-if="request" class="border-t border-black px-4 py-4 text-right sm:px-5">
-          <button
-            type="button"
-            class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-            @click="goBack"
-          >
-            Close
-          </button>
         </div>
       </div>
     </div>

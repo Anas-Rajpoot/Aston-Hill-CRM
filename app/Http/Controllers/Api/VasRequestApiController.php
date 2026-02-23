@@ -26,7 +26,7 @@ class VasRequestApiController extends Controller
     private const MODULE = 'vas_request_submissions';
 
     private const ALLOWED_COLUMNS = [
-        'id', 'submitted_at', 'created_at', 'created_by', 'updated_at', 'approved_at', 'rejected_at',
+        'id', 'created_at', 'created_by', 'updated_at', 'approved_at', 'rejected_at',
         'request_type', 'account_number', 'contact_number', 'company_name', 'description', 'additional_notes',
         'manager_id', 'team_leader_id', 'sales_agent_id', 'back_office_executive_id',
         'status',
@@ -70,10 +70,11 @@ class VasRequestApiController extends Controller
             'sort' => ['sometimes', 'string', Rule::in(array_merge(self::ALLOWED_COLUMNS, ['manager', 'team_leader', 'sales_agent', 'executive', 'creator']))],
             'order' => ['sometimes', 'string', Rule::in(['asc', 'desc'])],
             'columns' => ['sometimes', 'array'],
-            'columns.*' => ['string', Rule::in(array_merge(self::ALLOWED_COLUMNS, ['manager', 'team_leader', 'sales_agent', 'executive', 'creator']))],
+            'columns.*' => ['string'],
             'q' => ['sometimes', 'nullable', 'string', 'max:200'],
             'company_name' => ['sometimes', 'nullable', 'string', 'max:200'],
             'account_number' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'contact_number' => ['sometimes', 'nullable', 'string', 'max:50'],
             'request_type' => ['sometimes', 'nullable', 'string', 'max:150'],
             'status' => ['sometimes', 'nullable', 'string', Rule::in(VasRequestSubmission::STATUSES)],
             'from' => ['sometimes', 'nullable', 'date'],
@@ -91,7 +92,7 @@ class VasRequestApiController extends Controller
         $columns = $this->resolveColumns($user, $validated['columns'] ?? null);
         $perPage = (int) ($validated['per_page'] ?? 15);
         $page = (int) ($validated['page'] ?? 1);
-        $sort = $validated['sort'] ?? 'submitted_at';
+        $sort = $validated['sort'] ?? 'created_at';
         $order = $validated['order'] ?? 'desc';
 
         // Single data query with sort, select, eager load, then paginate.
@@ -190,6 +191,10 @@ class VasRequestApiController extends Controller
             $term = '%' . addcslashes($validated['account_number'], '%_\\') . '%';
             $query->where('account_number', 'like', $term);
         }
+        if (! empty($validated['contact_number'])) {
+            $term = '%' . addcslashes($validated['contact_number'], '%_\\') . '%';
+            $query->where('contact_number', 'like', $term);
+        }
         if (! empty($validated['request_type'])) {
             $query->where('request_type', $validated['request_type']);
         }
@@ -231,7 +236,7 @@ class VasRequestApiController extends Controller
         }
 
         if ($cardFilter === 'pending') {
-            $query->whereIn('status', ['draft', 'submitted']);
+            $query->whereIn('status', ['draft', 'submitted_under_process']);
         } elseif ($cardFilter === 'completed_today') {
             $todayStart = now()->startOfDay()->toDateTimeString();
             $todayEnd = now()->endOfDay()->toDateTimeString();
@@ -262,7 +267,6 @@ class VasRequestApiController extends Controller
         $t = 'vas_request_submissions';
         $base = ["{$t}.id", "{$t}.status"];
         $map = [
-            'submitted_at' => "{$t}.submitted_at",
             'created_at' => "{$t}.created_at",
             'created_by' => "{$t}.created_by",
             'creator' => "{$t}.created_by",
@@ -329,8 +333,8 @@ class VasRequestApiController extends Controller
                 $out['creator'] = $row->creator?->name ?? null;
                 continue;
             }
-            if (in_array($col, ['submitted_at', 'created_at', 'approved_at', 'rejected_at', 'updated_at'], true)) {
-                $out[$col] = $row->$col ? $row->$col->format('d/M/Y H:i') : null;
+            if (in_array($col, ['created_at', 'approved_at', 'rejected_at', 'updated_at'], true)) {
+                $out[$col] = $row->$col ? $row->$col->format('d-M-Y H:i') : null;
                 continue;
             }
             $out[$col] = $row->$col ?? null;
@@ -369,9 +373,12 @@ class VasRequestApiController extends Controller
     {
         $this->authorize('viewAny', VasRequestSubmission::class);
 
+        $allAllowed = array_merge(self::ALLOWED_COLUMNS, ['manager', 'team_leader', 'sales_agent', 'executive', 'creator']);
+
         $config = config('modules.vas_request_submissions.columns', []);
         $allColumns = [];
         foreach ($config as $key => $def) {
+            if (! in_array($key, $allAllowed, true)) continue;
             $allColumns[] = [
                 'key' => $key,
                 'label' => $def['label'] ?? $key,
@@ -383,6 +390,7 @@ class VasRequestApiController extends Controller
             ->first();
 
         $visible = $pref?->visible_columns ?? config('modules.vas_request_submissions.default_columns', []);
+        $visible = array_values(array_intersect($visible, $allAllowed));
 
         return response()->json([
             'all_columns' => $allColumns,
@@ -434,7 +442,7 @@ class VasRequestApiController extends Controller
 
         $vasRequest->load(['manager:id,name', 'teamLeader:id,name', 'salesAgent:id,name', 'backOfficeExecutive:id,name', 'creator:id,name']);
         $columns = array_merge(
-            ['id', 'submitted_at', 'created_at', 'request_type', 'account_number', 'company_name', 'description', 'approved_at', 'manager', 'team_leader', 'sales_agent', 'executive', 'status', 'creator'],
+            ['id', 'created_at', 'request_type', 'account_number', 'company_name', 'description', 'approved_at', 'manager', 'team_leader', 'sales_agent', 'executive', 'status', 'creator'],
             array_keys($data)
         );
         $columns = array_unique($columns);

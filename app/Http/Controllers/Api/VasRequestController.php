@@ -51,7 +51,7 @@ class VasRequestController extends Controller
         }
 
         $vas->update([
-            'status' => 'submitted',
+            'status' => 'submitted_under_process',
             'submitted_at' => now(),
         ]);
 
@@ -62,7 +62,7 @@ class VasRequestController extends Controller
     {
         $this->authorize('approve', $vas);
 
-        if ($vas->status !== 'submitted') {
+        if ($vas->status !== 'submitted_under_process') {
             return response()->json(['message' => 'Only submitted requests can be approved'], 422);
         }
 
@@ -77,7 +77,7 @@ class VasRequestController extends Controller
     {
         $this->authorize('reject', $vas);
 
-        if ($vas->status !== 'submitted') {
+        if ($vas->status !== 'submitted_under_process') {
             return response()->json(['message' => 'Only submitted requests can be rejected'], 422);
         }
 

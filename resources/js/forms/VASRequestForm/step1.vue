@@ -360,7 +360,7 @@ const selectClass = (field) =>
           <p v-if="getError('request_description')" class="mt-1 text-sm text-red-600">{{ getError('request_description') }}</p>
         </div>
         <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700">Additional Notes (Optional)</label>
+          <label class="mb-1 block text-sm font-medium text-gray-700">Additional Notes</label>
           <textarea
             v-model="form.additional_notes"
             rows="4"

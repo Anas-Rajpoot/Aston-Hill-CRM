@@ -300,11 +300,19 @@ class ClientApiController extends Controller
         $teamLeaders = $teamData['team_leaders'] ?? [];
         $salesAgents = $teamData['sales_agents'] ?? [];
 
+        $accountNumbers = Client::whereNotNull('account_number')
+            ->where('account_number', '!=', '')
+            ->distinct()
+            ->orderBy('account_number')
+            ->pluck('account_number')
+            ->values();
+
         return response()->json([
             'statuses' => array_map(fn ($s) => ['value' => $s, 'label' => ucfirst(str_replace('_', ' ', $s))], Client::STATUSES),
             'managers' => $managers,
             'team_leaders' => $teamLeaders,
             'sales_agents' => $salesAgents,
+            'account_numbers' => $accountNumbers,
         ]);
     }
 

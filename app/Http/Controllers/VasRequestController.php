@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\VasRequestAudit;
 use App\Models\VasRequestDocument;
 use App\Models\VasRequestSubmission;
 use App\Services\VasRequestService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
@@ -165,9 +167,12 @@ class VasRequestController extends Controller
             ], 422);
         }
 
+        $uploadedNames = [];
+
         foreach ($schema as $key => $doc) {
             if ($request->hasFile($key)) {
                 $this->vasRequestService->storeDocument($vasRequest, $key, $request->file($key), null);
+                $uploadedNames[] = $request->file($key)->getClientOriginalName();
             }
         }
 
@@ -176,7 +181,21 @@ class VasRequestController extends Controller
             if ($file && $file->isValid()) {
                 $label = $labels[$i] ?? 'Additional document ' . ($i + 1);
                 $this->vasRequestService->storeDocument($vasRequest, 'additional_' . $i, $file, $label);
+                $uploadedNames[] = $file->getClientOriginalName();
             }
+        }
+
+        if (! empty($uploadedNames)) {
+            VasRequestAudit::create([
+                'vas_request_submission_id' => $vasRequest->id,
+                'field_name' => 'documents',
+                'old_value' => null,
+                'new_value' => implode(', ', $uploadedNames),
+                'changed_at' => now(),
+                'changed_by' => Auth::id(),
+                'ip_address' => $request->ip(),
+                'user_agent' => substr((string) $request->userAgent(), 0, 500),
+            ]);
         }
 
         return response()->json([
@@ -269,6 +288,7 @@ class VasRequestController extends Controller
             'team_leader_id' => ['required', 'exists:users,id'],
             'sales_agent_id' => ['required', 'exists:users,id'],
             'back_office_executive_id' => ['nullable', 'exists:users,id'],
+            'status' => ['nullable', 'string', Rule::in(VasRequestSubmission::STATUSES)],
         ]);
 
         if (isset($data['request_description'])) {
@@ -291,9 +311,9 @@ class VasRequestController extends Controller
     {
         $this->authorize('update', $vasRequest);
 
-        if ($vasRequest->status !== 'rejected') {
+        if ($vasRequest->status === 'approved') {
             return response()->json([
-                'message' => 'Only rejected requests can be resubmitted.',
+                'message' => 'Approved requests cannot be resubmitted.',
             ], 422);
         }
 
@@ -310,7 +330,7 @@ class VasRequestController extends Controller
         ]);
 
         $vasRequest->update(array_merge($data, [
-            'status' => 'submitted',
+            'status' => 'submitted_under_process',
             'submitted_at' => now(),
         ]));
 
@@ -351,7 +371,23 @@ class VasRequestController extends Controller
     {
         $this->authorize('update', $vasRequest);
 
+        $doc = VasRequestDocument::where('vas_request_submission_id', $vasRequest->id)
+            ->where('id', $document)
+            ->first();
+        $docName = $doc?->file_name ?? $doc?->label ?? 'Document #' . $document;
+
         $this->vasRequestService->deleteDocument($vasRequest, $document);
+
+        VasRequestAudit::create([
+            'vas_request_submission_id' => $vasRequest->id,
+            'field_name' => 'documents',
+            'old_value' => $docName,
+            'new_value' => null,
+            'changed_at' => now(),
+            'changed_by' => Auth::id(),
+            'ip_address' => $request->ip(),
+            'user_agent' => substr((string) $request->userAgent(), 0, 500),
+        ]);
 
         return response()->json(['message' => 'Document removed.']);
     }

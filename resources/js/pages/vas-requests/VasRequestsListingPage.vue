@@ -68,7 +68,7 @@ const meta = ref({ current_page: 1, last_page: 1, per_page: auth.defaultTablePag
 const perPageOptions = ref([10, 20, 25, 50, 100])
 const allColumns = ref([])
 const visibleColumns = ref([
-  'id', 'request_type', 'account_number', 'company_name', 'description',
+  'id', 'request_type', 'account_number', 'company_name', 'contact_number', 'description', 'additional_notes',
   'manager', 'team_leader', 'sales_agent', 'executive', 'status', 'creator',
 ])
 const sort = ref('id')
@@ -81,6 +81,7 @@ const filters = ref({
   q: '',
   company_name: '',
   account_number: '',
+  contact_number: '',
   request_type: '',
   status: '',
   from: '',
@@ -104,6 +105,7 @@ function buildParams() {
   if (f.q) p.q = f.q
   if (f.company_name) p.company_name = f.company_name
   if (f.account_number) p.account_number = f.account_number
+  if (f.contact_number) p.contact_number = f.contact_number
   if (f.request_type) p.request_type = f.request_type
   if (f.status) p.status = f.status
   if (f.from) p.from = f.from
@@ -122,7 +124,9 @@ const COLUMN_LABELS = {
   request_type: 'Request Type',
   account_number: 'Account Number',
   company_name: 'Company Name',
+  contact_number: 'Contact Number',
   description: 'Description',
+  additional_notes: 'Additional Notes',
   manager: 'Manager',
   team_leader: 'Team Leader',
   sales_agent: 'Sales Agent',
@@ -233,6 +237,7 @@ function resetFilters() {
     q: '',
     company_name: '',
     account_number: '',
+    contact_number: '',
     request_type: '',
     status: '',
     from: '',
