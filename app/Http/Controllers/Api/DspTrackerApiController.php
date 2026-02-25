@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\DspTrackerEntry;
 use App\Models\SystemAuditLog;
+use App\Models\Verifier;
+use App\Support\RbacPermission;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -32,6 +34,8 @@ class DspTrackerApiController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $this->authorizeAction($request, 'read', ['dsp_tracker.list', 'dsp_tracker.search_dsp_status', 'dsp_tracker_status.list']);
+
         $validated = $request->validate([
             'sort' => ['sometimes', 'string', Rule::in(array_merge(self::ALLOWED_COLUMNS, ['id', 'created_at']))],
             'order' => ['sometimes', 'string', Rule::in(['asc', 'desc'])],
@@ -66,7 +70,11 @@ class DspTrackerApiController extends Controller
         $order = $validated['order'] ?? 'asc';
         $query->orderBy($sort, $order);
 
-        $items = $query->get()->map(fn ($row) => $this->formatRow($row));
+        $rows = $query->get();
+        $verifierNumberByName = $this->buildVerifierNumberMap(
+            $rows->pluck('verifier_name')->all()
+        );
+        $items = $rows->map(fn ($row) => $this->formatRow($row, $verifierNumberByName));
 
         $lastImportBatchId = DspTrackerEntry::query()
             ->where('user_id', $request->user()?->id)
@@ -83,6 +91,8 @@ class DspTrackerApiController extends Controller
 
     public function import(Request $request): JsonResponse
     {
+        $this->authorizeAction($request, 'create', ['dsp_tracker.upload_csv']);
+
         $validated = $request->validate([
             'rows' => ['required', 'array', 'min:1'],
             'rows.*' => ['array'],
@@ -107,6 +117,9 @@ class DspTrackerApiController extends Controller
         $userId = $request->user()?->id;
 
         $allowed = self::ALLOWED_COLUMNS;
+        $verifierNumberByName = $this->buildVerifierNumberMap(
+            array_map(fn ($r) => $r['verifier_name'] ?? null, $validated['rows'])
+        );
         $toInsert = [];
         foreach ($validated['rows'] as $row) {
             $entry = [
@@ -116,9 +129,33 @@ class DspTrackerApiController extends Controller
                 'updated_at' => now(),
             ];
             foreach ($allowed as $col) {
-                $entry[$col] = isset($row[$col]) ? (string) $row[$col] : null;
+                $val = $row[$col] ?? null;
+                $val = is_string($val) ? trim($val) : $val;
+                $entry[$col] = ($val === '' || $val === null) ? null : (string) $val;
+            }
+            if (($entry['verifier_number'] ?? null) === null && !empty($entry['verifier_name'])) {
+                $key = strtolower(trim((string) $entry['verifier_name']));
+                if (isset($verifierNumberByName[$key]) && $verifierNumberByName[$key] !== '') {
+                    $entry['verifier_number'] = $verifierNumberByName[$key];
+                }
+            }
+
+            // Skip fully empty rows to avoid storing meaningless records.
+            $hasContent = false;
+            foreach ($allowed as $col) {
+                if ($entry[$col] !== null) {
+                    $hasContent = true;
+                    break;
+                }
+            }
+            if (! $hasContent) {
+                continue;
             }
             $toInsert[] = $entry;
+        }
+
+        if (empty($toInsert)) {
+            return response()->json(['message' => 'No valid rows found to import.'], 422);
         }
 
         DspTrackerEntry::query()->insert($toInsert);
@@ -145,6 +182,8 @@ class DspTrackerApiController extends Controller
 
     public function destroyBatch(Request $request, string $batchId): JsonResponse
     {
+        $this->authorizeAction($request, 'delete', ['dsp_tracker.delete_existing_csv']);
+
         $count = DspTrackerEntry::query()
             ->where('import_batch_id', $batchId)
             ->count();
@@ -171,8 +210,35 @@ class DspTrackerApiController extends Controller
         ]);
     }
 
-    private function formatRow(DspTrackerEntry $row): array
+    private function buildVerifierNumberMap(array $names): array
     {
+        $normalized = collect($names)
+            ->map(fn ($n) => trim((string) $n))
+            ->filter(fn ($n) => $n !== '')
+            ->unique()
+            ->values();
+
+        if ($normalized->isEmpty()) {
+            return [];
+        }
+
+        return Verifier::query()
+            ->whereIn('verifier_name', $normalized->all())
+            ->get(['verifier_name', 'verifier_number'])
+            ->mapWithKeys(function ($v) {
+                return [strtolower(trim((string) $v->verifier_name)) => trim((string) ($v->verifier_number ?? ''))];
+            })
+            ->all();
+    }
+
+    private function formatRow(DspTrackerEntry $row, array $verifierNumberByName = []): array
+    {
+        $resolvedVerifierNumber = $row->verifier_number;
+        if ((is_null($resolvedVerifierNumber) || $resolvedVerifierNumber === '') && !empty($row->verifier_name)) {
+            $key = strtolower(trim((string) $row->verifier_name));
+            $resolvedVerifierNumber = $verifierNumberByName[$key] ?? null;
+        }
+
         $out = [
             'id' => $row->id,
             'activity_number' => $row->activity_number,
@@ -186,11 +252,19 @@ class DspTrackerApiController extends Controller
             'request_status' => $row->request_status,
             'rejection_reason' => $row->rejection_reason,
             'verifier_name' => $row->verifier_name,
-            'verifier_number' => $row->verifier_number,
+            'verifier_number' => $resolvedVerifierNumber,
             'dsp_om_id' => $row->dsp_om_id,
             'uploaded_by' => $row->uploaded_by,
             'uploaded_at' => $row->uploaded_at,
         ];
         return $out;
+    }
+
+    private function authorizeAction(Request $request, string $action, array $legacyNames = []): void
+    {
+        $user = $request->user();
+        if (! $user || ! RbacPermission::can($user, ['dsp_tracker', 'dsp_tracker_status'], $action, $legacyNames)) {
+            abort(403, 'Unauthorized.');
+        }
     }
 }

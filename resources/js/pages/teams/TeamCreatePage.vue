@@ -11,6 +11,9 @@ const form = ref({
   description: '',
   manager_id: '',
   team_leader_id: '',
+  manager_ids: [],
+  team_leader_ids: [],
+  member_ids: [],
   department: '',
   status: 'active',
   max_members: '',
@@ -19,8 +22,10 @@ const form = ref({
 const allUsers = ref([])
 const managerSearch = ref('')
 const leaderSearch = ref('')
+const memberSearch = ref('')
 const managerDropdownOpen = ref(false)
 const leaderDropdownOpen = ref(false)
+const memberDropdownOpen = ref(false)
 const loading = ref(false)
 const error = ref('')
 const errors = ref({})
@@ -28,38 +33,68 @@ const successMessage = ref('')
 
 const filteredManagers = computed(() => {
   const term = managerSearch.value.toLowerCase()
-  if (!term) return allUsers.value
-  return allUsers.value.filter((u) => u.name.toLowerCase().includes(term) || u.email?.toLowerCase().includes(term))
+  const blocked = new Set([...(form.value.team_leader_ids || []), ...(form.value.member_ids || [])])
+  const base = allUsers.value.filter((u) => !blocked.has(u.id))
+  if (!term) return base
+  return base.filter((u) => u.name.toLowerCase().includes(term) || u.email?.toLowerCase().includes(term))
 })
 
 const filteredLeaders = computed(() => {
   const term = leaderSearch.value.toLowerCase()
-  if (!term) return allUsers.value
-  return allUsers.value.filter((u) => u.name.toLowerCase().includes(term) || u.email?.toLowerCase().includes(term))
+  const blocked = new Set([...(form.value.manager_ids || []), ...(form.value.member_ids || [])])
+  const base = allUsers.value.filter((u) => !blocked.has(u.id))
+  if (!term) return base
+  return base.filter((u) => u.name.toLowerCase().includes(term) || u.email?.toLowerCase().includes(term))
 })
 
-const selectedManager = computed(() => allUsers.value.find((u) => u.id === form.value.manager_id))
-const selectedLeader = computed(() => allUsers.value.find((u) => u.id === form.value.team_leader_id))
+const filteredMembers = computed(() => {
+  const term = memberSearch.value.toLowerCase()
+  const blocked = new Set([...(form.value.manager_ids || []), ...(form.value.team_leader_ids || [])])
+  const base = allUsers.value.filter((u) => !blocked.has(u.id))
+  if (!term) return base
+  return base.filter((u) => u.name.toLowerCase().includes(term) || u.email?.toLowerCase().includes(term))
+})
+
+const selectedManagers = computed(() => allUsers.value.filter((u) => (form.value.manager_ids || []).includes(u.id)))
+const selectedLeaders = computed(() => allUsers.value.filter((u) => (form.value.team_leader_ids || []).includes(u.id)))
+const selectedMembers = computed(() => allUsers.value.filter((u) => (form.value.member_ids || []).includes(u.id)))
 
 function initials(name) {
   if (!name) return '?'
   return name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2)
 }
 
-function selectManager(user) {
-  form.value.manager_id = user.id
-  managerDropdownOpen.value = false
-  managerSearch.value = ''
+function toggleManager(user) {
+  const ids = new Set(form.value.manager_ids || [])
+  if (ids.has(user.id)) ids.delete(user.id)
+  else ids.add(user.id)
+  form.value.manager_ids = [...ids]
+  // Keep selections mutually exclusive
+  form.value.team_leader_ids = (form.value.team_leader_ids || []).filter((id) => id !== user.id)
+  form.value.member_ids = (form.value.member_ids || []).filter((id) => id !== user.id)
 }
 
-function selectLeader(user) {
-  form.value.team_leader_id = user.id
-  leaderDropdownOpen.value = false
-  leaderSearch.value = ''
+function toggleLeader(user) {
+  const ids = new Set(form.value.team_leader_ids || [])
+  if (ids.has(user.id)) ids.delete(user.id)
+  else ids.add(user.id)
+  form.value.team_leader_ids = [...ids]
+  // Keep selections mutually exclusive
+  form.value.manager_ids = (form.value.manager_ids || []).filter((id) => id !== user.id)
+  form.value.member_ids = (form.value.member_ids || []).filter((id) => id !== user.id)
 }
 
-function clearManager() { form.value.manager_id = '' }
-function clearLeader() { form.value.team_leader_id = '' }
+function toggleMember(user) {
+  if ((form.value.manager_ids || []).includes(user.id) || (form.value.team_leader_ids || []).includes(user.id)) return
+  const ids = new Set(form.value.member_ids || [])
+  if (ids.has(user.id)) ids.delete(user.id)
+  else ids.add(user.id)
+  form.value.member_ids = [...ids]
+}
+
+function removeManager(id) { form.value.manager_ids = (form.value.manager_ids || []).filter((x) => x !== id) }
+function removeLeader(id) { form.value.team_leader_ids = (form.value.team_leader_ids || []).filter((x) => x !== id) }
+function removeMember(id) { form.value.member_ids = (form.value.member_ids || []).filter((x) => x !== id) }
 
 onMounted(async () => {
   try {
@@ -85,8 +120,11 @@ const save = async () => {
   loading.value = true
   try {
     const payload = { ...form.value }
-    if (!payload.manager_id) payload.manager_id = null
-    if (!payload.team_leader_id) payload.team_leader_id = null
+    payload.manager_ids = (payload.manager_ids || []).map((id) => Number(id)).filter(Boolean)
+    payload.team_leader_ids = (payload.team_leader_ids || []).map((id) => Number(id)).filter(Boolean)
+    payload.member_ids = (payload.member_ids || []).map((id) => Number(id)).filter(Boolean)
+    payload.manager_id = payload.manager_ids[0] ?? null
+    payload.team_leader_id = payload.team_leader_ids[0] ?? null
     if (!payload.max_members) payload.max_members = null
     else payload.max_members = parseInt(payload.max_members, 10)
 
@@ -177,15 +215,17 @@ const save = async () => {
             <!-- Manager -->
             <div class="relative">
               <label class="block text-sm font-medium text-gray-700 mb-1">Manager</label>
-              <div v-if="selectedManager" class="flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm">
-                <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-green-100 text-[10px] font-bold text-green-700">{{ initials(selectedManager.name) }}</span>
-                <span class="text-gray-900 flex-1 truncate">{{ selectedManager.name }}</span>
-                <button type="button" class="text-gray-400 hover:text-gray-600 text-lg leading-none" @click="clearManager">&times;</button>
-              </div>
-              <div v-else>
-                <input v-model="managerSearch" type="text" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" placeholder="Search manager…" @focus="managerDropdownOpen = true" @blur="setTimeout(() => managerDropdownOpen = false, 200)" />
+              <div class="rounded border border-gray-300 px-3 py-2 text-sm" @click="managerDropdownOpen = true">
+                <div v-if="selectedManagers.length" class="mb-2 flex flex-wrap gap-1.5">
+                  <span v-for="u in selectedManagers" :key="u.id" class="inline-flex items-center gap-1 rounded bg-green-100 px-2 py-1 text-xs text-green-800">
+                    {{ u.name }}
+                    <button type="button" class="text-green-700 hover:text-green-900" @click.stop="removeManager(u.id)">&times;</button>
+                  </span>
+                </div>
+                <input v-model="managerSearch" type="text" class="w-full border-0 p-0 text-sm focus:ring-0" placeholder="Select team manager" @focus="managerDropdownOpen = true" @blur="setTimeout(() => managerDropdownOpen = false, 200)" />
                 <div v-if="managerDropdownOpen && filteredManagers.length" class="absolute z-20 top-full left-0 right-0 mt-1 max-h-52 overflow-y-auto rounded border border-gray-200 bg-white shadow-lg">
-                  <button v-for="u in filteredManagers.slice(0, 30)" :key="u.id" type="button" class="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-50 text-left" @mousedown.prevent="selectManager(u)">
+                  <button v-for="u in filteredManagers.slice(0, 40)" :key="u.id" type="button" class="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-50 text-left" @mousedown.prevent="toggleManager(u)">
+                    <input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-green-600" :checked="(form.manager_ids || []).includes(u.id)" />
                     <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-[9px] font-bold text-gray-600">{{ initials(u.name) }}</span>
                     <div class="min-w-0">
                       <p class="text-sm text-gray-900 truncate">{{ u.name }}</p>
@@ -194,21 +234,23 @@ const save = async () => {
                   </button>
                 </div>
               </div>
-              <p v-if="fieldError('manager_id')" class="mt-1 text-xs text-red-600">{{ fieldError('manager_id') }}</p>
+              <p v-if="fieldError('manager_ids')" class="mt-1 text-xs text-red-600">{{ fieldError('manager_ids') }}</p>
             </div>
 
             <!-- Team Leader -->
             <div class="relative">
               <label class="block text-sm font-medium text-gray-700 mb-1">Team Leader</label>
-              <div v-if="selectedLeader" class="flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm">
-                <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-700">{{ initials(selectedLeader.name) }}</span>
-                <span class="text-gray-900 flex-1 truncate">{{ selectedLeader.name }}</span>
-                <button type="button" class="text-gray-400 hover:text-gray-600 text-lg leading-none" @click="clearLeader">&times;</button>
-              </div>
-              <div v-else>
-                <input v-model="leaderSearch" type="text" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" placeholder="Search team leader…" @focus="leaderDropdownOpen = true" @blur="setTimeout(() => leaderDropdownOpen = false, 200)" />
+              <div class="rounded border border-gray-300 px-3 py-2 text-sm" @click="leaderDropdownOpen = true">
+                <div v-if="selectedLeaders.length" class="mb-2 flex flex-wrap gap-1.5">
+                  <span v-for="u in selectedLeaders" :key="u.id" class="inline-flex items-center gap-1 rounded bg-blue-100 px-2 py-1 text-xs text-blue-800">
+                    {{ u.name }}
+                    <button type="button" class="text-blue-700 hover:text-blue-900" @click.stop="removeLeader(u.id)">&times;</button>
+                  </span>
+                </div>
+                <input v-model="leaderSearch" type="text" class="w-full border-0 p-0 text-sm focus:ring-0" placeholder="Select team leader" @focus="leaderDropdownOpen = true" @blur="setTimeout(() => leaderDropdownOpen = false, 200)" />
                 <div v-if="leaderDropdownOpen && filteredLeaders.length" class="absolute z-20 top-full left-0 right-0 mt-1 max-h-52 overflow-y-auto rounded border border-gray-200 bg-white shadow-lg">
-                  <button v-for="u in filteredLeaders.slice(0, 30)" :key="u.id" type="button" class="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-50 text-left" @mousedown.prevent="selectLeader(u)">
+                  <button v-for="u in filteredLeaders.slice(0, 40)" :key="u.id" type="button" class="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-50 text-left" @mousedown.prevent="toggleLeader(u)">
+                    <input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600" :checked="(form.team_leader_ids || []).includes(u.id)" />
                     <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-[9px] font-bold text-gray-600">{{ initials(u.name) }}</span>
                     <div class="min-w-0">
                       <p class="text-sm text-gray-900 truncate">{{ u.name }}</p>
@@ -217,7 +259,32 @@ const save = async () => {
                   </button>
                 </div>
               </div>
-              <p v-if="fieldError('team_leader_id')" class="mt-1 text-xs text-red-600">{{ fieldError('team_leader_id') }}</p>
+              <p v-if="fieldError('team_leader_ids')" class="mt-1 text-xs text-red-600">{{ fieldError('team_leader_ids') }}</p>
+            </div>
+
+            <!-- Team Members -->
+            <div class="relative md:col-span-2">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Team Members</label>
+              <div class="rounded border border-gray-300 px-3 py-2 text-sm" @click="memberDropdownOpen = true">
+                <div v-if="selectedMembers.length" class="mb-2 flex flex-wrap gap-1.5">
+                  <span v-for="u in selectedMembers" :key="u.id" class="inline-flex items-center gap-1 rounded bg-gray-100 px-2 py-1 text-xs text-gray-800">
+                    {{ u.name }}
+                    <button type="button" class="text-gray-700 hover:text-gray-900" @click.stop="removeMember(u.id)">&times;</button>
+                  </span>
+                </div>
+                <input v-model="memberSearch" type="text" class="w-full border-0 p-0 text-sm focus:ring-0" placeholder="Select team members" @focus="memberDropdownOpen = true" @blur="setTimeout(() => memberDropdownOpen = false, 200)" />
+                <div v-if="memberDropdownOpen && filteredMembers.length" class="absolute z-20 top-full left-0 right-0 mt-1 max-h-56 overflow-y-auto rounded border border-gray-200 bg-white shadow-lg">
+                  <button v-for="u in filteredMembers.slice(0, 60)" :key="u.id" type="button" class="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-50 text-left" @mousedown.prevent="toggleMember(u)">
+                    <input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-gray-700" :checked="(form.member_ids || []).includes(u.id)" />
+                    <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-[9px] font-bold text-gray-600">{{ initials(u.name) }}</span>
+                    <div class="min-w-0">
+                      <p class="text-sm text-gray-900 truncate">{{ u.name }}</p>
+                      <p class="text-xs text-gray-500 truncate">{{ u.email }}</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+              <p v-if="fieldError('member_ids')" class="mt-1 text-xs text-red-600">{{ fieldError('member_ids') }}</p>
             </div>
           </div>
         </div>

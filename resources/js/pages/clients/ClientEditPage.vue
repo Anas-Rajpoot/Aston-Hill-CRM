@@ -60,10 +60,17 @@ async function load() {
       clientsApi.show(clientId.value),
       api.get('/customer-support/csr-options').then(r => r.data).catch(() => ({ csrs: [] })),
     ])
-    csrOptions.value = csrRes?.csrs ?? []
     const d = raw?.data ?? raw
     client.value = d
     const cd = d.company_detail ?? {}
+    const csrsFromClient = Array.isArray(d.csrs)
+      ? d.csrs.map((c) => (typeof c?.user === 'string' ? c.user.trim() : '')).filter(Boolean)
+      : []
+    const apiCsrNames = Array.isArray(csrRes?.csrs)
+      ? csrRes.csrs.map((c) => (typeof c?.name === 'string' ? c.name.trim() : '')).filter(Boolean)
+      : []
+    const initialCsrName = (cd.csr_name_1 ?? csrsFromClient[0] ?? '').trim()
+    csrOptions.value = Array.from(new Set([...apiCsrNames, ...csrsFromClient, initialCsrName].filter(Boolean)))
     form.value = {
       company_name: d.company_name ?? '',
       account_number: d.account_number ?? '',
@@ -78,7 +85,7 @@ async function load() {
       account_transfer_given_to: cd.account_transfer_given_to ?? '',
       account_transfer_given_date: cd.account_transfer_given_date ?? '',
       account_manager_name: cd.account_manager_name ?? '',
-      csr_name_1: cd.csr_name_1 ?? '',
+      csr_name_1: initialCsrName,
       first_bill: cd.first_bill ?? '',
       second_bill: cd.second_bill ?? '',
       third_bill: cd.third_bill ?? '',
@@ -109,6 +116,7 @@ function validateForm() {
   const f = form.value
   const errs = {}
   if (!f.company_name?.trim()) errs.company_name = 'Company Name is required.'
+  if (!f.account_number?.trim()) errs.account_number = 'Account Number is required.'
   if (!f.company_category?.trim()) errs.company_category = 'Company Category is required.'
   if (!f.trade_license_number?.trim()) errs.trade_license_number = 'Trade License Number is required.'
   if (!f.first_bill?.trim()) errs.first_bill = 'First Bill is required.'
@@ -242,8 +250,8 @@ onMounted(() => load())
                 <p v-if="fieldErrors.company_name" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.company_name }}</p>
               </div>
               <div>
-                <label class="text-xs font-medium text-gray-500">Account Number</label>
-                <input v-model="form.account_number" type="text" placeholder="Enter account number" :class="inputClass('account_number')" />
+                <label class="text-xs font-medium text-gray-500">Account Number <span class="text-red-500">*</span></label>
+                <input v-model="form.account_number" type="text" placeholder="Enter account number" :class="inputClass('account_number')" @input="fieldErrors.account_number = ''" />
                 <p v-if="fieldErrors.account_number" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.account_number }}</p>
               </div>
               <div>
@@ -315,7 +323,7 @@ onMounted(() => load())
                 <label class="text-xs font-medium text-gray-500">CSR Name 1 <span class="text-red-500">*</span></label>
                 <select v-model="form.csr_name_1" :class="selectClass('csr_name_1')" @change="fieldErrors.csr_name_1 = ''">
                   <option value="">Select CSR</option>
-                  <option v-for="csr in csrOptions" :key="csr.id" :value="csr.name">{{ csr.name }}</option>
+                  <option v-for="csrName in csrOptions" :key="csrName" :value="csrName">{{ csrName }}</option>
                 </select>
                 <p v-if="fieldErrors.csr_name_1" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.csr_name_1 }}</p>
               </div>

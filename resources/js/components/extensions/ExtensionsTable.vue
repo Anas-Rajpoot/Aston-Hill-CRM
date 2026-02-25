@@ -17,12 +17,15 @@ const props = defineProps({
   perPage: { type: Number, default: 15 },
   filterOptions: { type: Object, default: () => ({ gateways: [], statuses: [] }) },
   assignableEmployees: { type: Array, default: () => [] },
+  managerOptions: { type: Array, default: () => [] },
+  teamLeaderOptions: { type: Array, default: () => [] },
 })
 
 const emit = defineEmits(['sort', 'delete', 'updateCell', 'openHistory', 'edit', 'view'])
 
 const editingCell = ref(null)
 const inlineEditValue = ref('')
+const inlineEditError = ref('')
 
 const permissions = computed(() => auth.user?.permissions ?? [])
 const isSuperAdmin = computed(() => {
@@ -34,9 +37,8 @@ const canEdit = computed(() => isSuperAdmin.value || permissions.value.includes(
 const canDelete = computed(() => isSuperAdmin.value || permissions.value.includes('extensions.edit'))
 const canInlineEdit = computed(() => canEdit.value)
 
-// All editable except id, password (special), team_leader, manager, usage, updated_at (derived/read-only)
-const EDITABLE_COLUMNS = ['extension', 'landline_number', 'gateway', 'username', 'password', 'status', 'assigned_to_name', 'comment']
-const DROPDOWN_COLUMNS = ['gateway', 'status', 'assigned_to_name']
+const EDITABLE_COLUMNS = ['extension', 'landline_number', 'gateway', 'username', 'password', 'status', 'assigned_to_name', 'manager', 'team_leader', 'comment']
+const DROPDOWN_COLUMNS = ['gateway', 'status', 'assigned_to_name', 'manager', 'team_leader']
 
 function isEditableColumn(col) {
   return canInlineEdit.value && EDITABLE_COLUMNS.includes(col)
@@ -48,27 +50,56 @@ function isDropdownColumn(col) {
 
 function getCellValueForEdit(row, col) {
   if (col === 'assigned_to_name') return row.assigned_to != null ? String(row.assigned_to) : ''
+  if (col === 'manager') return row.manager_id != null ? String(row.manager_id) : ''
+  if (col === 'team_leader') return row.team_leader_id != null ? String(row.team_leader_id) : ''
   if (col === 'password') return '' // never show current password; leave blank to keep
   return row[col] != null ? String(row[col]) : ''
 }
 
 function openDropdownEdit(row, col) {
   if (!isEditableColumn(col)) return
+  inlineEditError.value = ''
   editingCell.value = { rowId: row.id, col }
   inlineEditValue.value = getCellValueForEdit(row, col)
 }
 
 function openInputEdit(row, col) {
   if (!isEditableColumn(col)) return
+  inlineEditError.value = ''
   editingCell.value = { rowId: row.id, col }
   inlineEditValue.value = getCellValueForEdit(row, col)
+}
+
+function validateInlineValue(col, value) {
+  const raw = value == null ? '' : String(value).trim()
+  if (col === 'extension' && !raw) return 'Extension is required.'
+  if (col === 'gateway' && !raw) return 'Gateway is required.'
+  if (col === 'username' && !raw) return 'Username is required.'
+  if (col === 'status' && !raw) return 'Status is required.'
+  if (col === 'password' && !raw) return 'Password is required.'
+  if (col === 'landline_number') {
+    if (!raw) return 'Landline Number is required.'
+    if (/\s/.test(raw)) return 'Must not contain spaces.'
+    if (!/^\d+$/.test(raw)) return 'Must contain only digits.'
+    if (!raw.startsWith('971')) return 'Must start with 971.'
+    if (raw.length !== 12) return 'Must be exactly 12 digits.'
+  }
+  return ''
 }
 
 function saveInlineEdit() {
   if (!editingCell.value) return
   const { rowId, col } = editingCell.value
+  const err = validateInlineValue(col, inlineEditValue.value)
+  if (err) {
+    inlineEditError.value = err
+    return
+  }
+  inlineEditError.value = ''
   let value = inlineEditValue.value
   if (col === 'assigned_to_name') {
+    value = value === '' ? null : (Number(value) || null)
+  } else if (col === 'manager' || col === 'team_leader') {
     value = value === '' ? null : (Number(value) || null)
   } else {
     value = value === '' ? null : value
@@ -78,6 +109,7 @@ function saveInlineEdit() {
 }
 
 function cancelInlineEdit() {
+  inlineEditError.value = ''
   editingCell.value = null
 }
 
@@ -98,8 +130,18 @@ function getAssignedOptions() {
   return [{ value: '', label: 'Not Assigned' }, ...list.map((e) => ({ value: String(e.id), label: e.name || e.label }))]
 }
 
+function getManagerOptions() {
+  const list = props.managerOptions ?? []
+  return [{ value: '', label: 'Not Assigned' }, ...list.map((e) => ({ value: String(e.id), label: e.name || e.label }))]
+}
+
+function getTeamLeaderOptions() {
+  const list = props.teamLeaderOptions ?? []
+  return [{ value: '', label: 'Not Assigned' }, ...list.map((e) => ({ value: String(e.id), label: e.name || e.label }))]
+}
+
 const COLUMN_LABELS = {
-  id: 'ID',
+  id: 'SR',
   extension: 'Extension',
   landline_number: 'Landline Number',
   gateway: 'Gateway',
@@ -213,7 +255,7 @@ function onDelete(row) {
           <td :colspan="columns.length + 1" class="px-4 py-12 text-center text-sm text-gray-500">No extensions found.</td>
         </tr>
         <tr
-          v-for="row in data"
+          v-for="(row, rowIndex) in data"
           :key="row.id"
           class="border-b border-black bg-white hover:bg-gray-50/30"
         >
@@ -226,7 +268,7 @@ function onDelete(row) {
             }"
           >
             <template v-if="col === 'id'">
-              {{ row.id }}
+              {{ ((currentPage - 1) * perPage) + rowIndex + 1 }}
             </template>
             <template v-else-if="col === 'extension'">
               <span
@@ -279,18 +321,35 @@ function onDelete(row) {
                   >
                     <option v-for="opt in getAssignedOptions()" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                   </select>
+                  <select
+                    v-else-if="col === 'manager'"
+                    v-model="inlineEditValue"
+                    class="min-w-[140px] rounded border border-gray-300 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  >
+                    <option v-for="opt in getManagerOptions()" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                  </select>
+                  <select
+                    v-else-if="col === 'team_leader'"
+                    v-model="inlineEditValue"
+                    class="min-w-[140px] rounded border border-gray-300 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  >
+                    <option v-for="opt in getTeamLeaderOptions()" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                  </select>
                   <span class="inline-flex items-center gap-1 shrink-0">
                     <button type="button" class="rounded bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
                     <button type="button" class="rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
                   </span>
                 </span>
+                <p v-if="inlineEditError && isEditing(row.id, col)" class="mt-1 text-xs text-red-600">{{ inlineEditError }}</p>
               </template>
               <span v-else class="inline-flex flex-wrap items-center gap-2">
                 <input
                   v-model="inlineEditValue"
                   :type="editingCell?.col === 'password' ? 'password' : 'text'"
+                  :maxlength="editingCell?.col === 'landline_number' ? 12 : undefined"
                   :placeholder="editingCell?.col === 'password' ? 'Leave blank to keep current' : undefined"
                   class="min-w-[100px] rounded border border-gray-300 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  @input="editingCell?.col === 'landline_number' && (inlineEditValue = String(inlineEditValue ?? '').replace(/\D/g, '').slice(0, 12))"
                   @keydown.enter="saveInlineEdit"
                   @keydown.escape="cancelInlineEdit"
                 />
@@ -299,6 +358,7 @@ function onDelete(row) {
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
                 </span>
               </span>
+              <p v-if="inlineEditError && isEditing(row.id, col)" class="mt-1 text-xs text-red-600">{{ inlineEditError }}</p>
             </template>
             <template v-else-if="col === 'status'">
               <span
@@ -324,6 +384,9 @@ function onDelete(row) {
                 class="italic text-gray-500"
                 @click="openDropdownEdit(row, col)"
               >Not assigned</span>
+            </template>
+            <template v-else-if="(col === 'manager' || col === 'team_leader') && isEditableColumn(col)">
+              <span class="cursor-pointer" @click="openDropdownEdit(row, col)">{{ formatValue(row, col) }}</span>
             </template>
             <template v-else-if="col === 'gateway' && isEditableColumn(col)">
               <span @click="openDropdownEdit(row, col)">{{ formatValue(row, col) }}</span>

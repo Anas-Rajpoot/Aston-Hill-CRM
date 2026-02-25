@@ -18,8 +18,16 @@ function formatDateTime(val) {
 
 function formatDateOnly(val) {
   if (!val || typeof val !== 'string') return '—'
-  const date = new Date(val)
-  if (isNaN(date.getTime())) return val
+  const raw = val.trim()
+  let date = new Date(raw)
+  if (isNaN(date.getTime())) {
+    // Accept API values that come as dd/mm/yyyy.
+    const m = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+    if (!m) return raw
+    const [, dd, mm, yyyy] = m
+    date = new Date(`${yyyy}-${mm}-${dd}`)
+    if (isNaN(date.getTime())) return raw
+  }
   const dd = String(date.getDate()).padStart(2, '0')
   const mon = MONTHS_3[date.getMonth()]
   const yyyy = date.getFullYear()
@@ -37,7 +45,7 @@ const props = defineProps({
   editOptions: { type: Object, default: () => ({}) },
 })
 
-const emit = defineEmits(['sort', 'updateCell', 'viewHistory'])
+const emit = defineEmits(['sort', 'updateCell', 'viewHistory', 'show-renewal-alerts'])
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -46,7 +54,30 @@ const columnLabels = {
   id: 'ID',
   company_name: 'Company Name',
   account_number: 'Account Number',
+  trade_license_issuing_authority: 'Trade License Issuing Authority',
+  company_category: 'Company Category',
+  trade_license_number: 'Trade License Number',
+  trade_license_expiry_date: 'Trade License Expiry Date',
+  establishment_card_number: 'Establishment Card Number',
+  establishment_card_expiry_date: 'Establishment Card Expiry Date',
+  account_taken_from: 'Account Taken From',
+  account_mapping_date: 'Account Mapping Date',
+  account_transfer_given_to: 'Account Transfer Given To',
+  account_transfer_given_date: 'Account Transfer Given Date',
+  full_address: 'Full Address',
+  account_manager_name: 'Account Manager Name',
+  csr_name_1: 'CSR Name 1',
+  csr_name_2: 'CSR Name 2',
+  csr_name_3: 'CSR Name 3',
+  first_bill: 'First Bill',
+  second_bill: 'Second Bill',
+  third_bill: 'Third Bill',
+  fourth_bill: 'Fourth Bill',
+  additional_comment_1: 'Additional Note 1',
+  additional_comment_2: 'Additional Note 2',
   submitted_at: 'Created',
+  submission_type: 'Submission Type',
+  service_category: 'Service Category',
   manager: 'Manager Name',
   team_leader: 'Team Leader',
   sales_agent: 'Sales Agent Name',
@@ -61,10 +92,14 @@ const columnLabels = {
   migration_numbers: 'Migration Numbers',
   activity: 'Activity',
   wo_number: 'Work Order',
+  work_order_status: 'Work Order Status',
+  activation_date: 'Activation Date',
   completion_date: 'Completion Date',
   payment_connection: 'Payment Connection',
   contract_type: 'Contract Type Term',
   contract_end_date: 'Contract End Date',
+  clawback_chum: 'Clawback / Chum',
+  remarks: 'Remarks',
   renewal_alert: 'Renewal Alert',
   additional_notes: 'Additional Notes',
   creator: 'Created By',
@@ -72,17 +107,18 @@ const columnLabels = {
 
 const SORTABLE_COLUMNS = [
   'company_name', 'account_number', 'submitted_at',
+  'submission_type', 'service_category',
   'manager', 'team_leader', 'sales_agent', 'status',
   'service_type', 'product_type', 'product_name', 'mrc', 'quantity',
-  'wo_number', 'completion_date',
-  'contract_type', 'contract_end_date', 'renewal_alert', 'creator',
+  'wo_number', 'work_order_status', 'activation_date', 'completion_date',
+  'contract_type', 'contract_end_date', 'clawback_chum', 'renewal_alert', 'creator',
 ]
 
-const READ_ONLY_COLUMNS = ['id', 'submitted_at', 'creator']
+const READ_ONLY_COLUMNS = ['id', 'submitted_at', 'creator', 'renewal_alert']
 
-const DROPDOWN_COLUMNS = ['status', 'manager', 'team_leader', 'sales_agent', 'service_type', 'product_type', 'payment_connection', 'contract_type']
+const DROPDOWN_COLUMNS = ['status', 'manager', 'team_leader', 'sales_agent', 'submission_type', 'service_category', 'service_type', 'product_type', 'payment_connection', 'contract_type', 'clawback_chum']
 
-const DATE_COLUMNS = ['completion_date', 'contract_end_date']
+const DATE_COLUMNS = ['activation_date', 'completion_date', 'contract_end_date']
 
 const STATUS_OPTIONS = [
   { value: 'Normal', label: 'Normal' },
@@ -110,6 +146,20 @@ const PRODUCT_TYPE_OPTIONS = [
   { value: 'Firewall', label: 'Firewall' },
 ]
 
+const SUBMISSION_TYPE_OPTIONS = [
+  { value: 'New | Submit', label: 'New | Submit' },
+  { value: 'Resubmit', label: 'Resubmit' },
+]
+
+const SERVICE_CATEGORY_OPTIONS = [
+  { value: 'New Connection', label: 'New Connection' },
+  { value: 'Migration', label: 'Migration' },
+  { value: 'Upgrade', label: 'Upgrade' },
+  { value: 'Downgrade', label: 'Downgrade' },
+  { value: 'Renewal', label: 'Renewal' },
+  { value: 'Disconnection', label: 'Disconnection' },
+]
+
 const PAYMENT_CONNECTION_OPTIONS = [
   { value: 'Paid', label: 'Paid' },
   { value: 'Unpaid', label: 'Unpaid' },
@@ -119,6 +169,11 @@ const PAYMENT_CONNECTION_OPTIONS = [
 const CONTRACT_TYPE_OPTIONS = [
   { value: '12 months', label: '12 months' },
   { value: '24 months', label: '24 months' },
+]
+
+const CLAWBACK_CHUM_OPTIONS = [
+  { value: 'Yes', label: 'Yes' },
+  { value: 'No', label: 'No' },
 ]
 
 function calcContractEndDate(months) {
@@ -149,7 +204,11 @@ function formatValue(row, col) {
   const val = row[col]
   if (val == null || val === '') return '—'
   if (col === 'submitted_at') return formatDateTime(val)
-  if (col === 'contract_end_date' || col === 'completion_date') return formatDateOnly(val)
+  if ([
+    'activation_date', 'contract_end_date', 'completion_date',
+    'trade_license_expiry_date', 'establishment_card_expiry_date',
+    'account_mapping_date', 'account_transfer_given_date',
+  ].includes(col)) return formatDateOnly(val)
   if (typeof val === 'object') return val?.name ?? '—'
   return val
 }
@@ -165,6 +224,15 @@ function truncate(str, max = TRUNCATE_LENGTH) {
 function cellTitle(row, col) {
   const val = formatValue(row, col)
   return val == null || val === '—' ? '' : String(val)
+}
+
+function renewalAlertCount(row) {
+  const n = Number(row?.renewal_alert ?? 0)
+  return Number.isFinite(n) && n > 0 ? n : 0
+}
+
+function showRenewalAlerts(row) {
+  emit('show-renewal-alerts', row)
 }
 
 const STATUS_BADGES = {
@@ -203,16 +271,32 @@ function isEditing(rowId, col) {
 }
 
 function getCellValueForEdit(row, col) {
+  const normalizeDateForInput = (raw) => {
+    if (!raw) return ''
+    const s = String(raw).trim()
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
+      const [dd, mm, yyyy] = s.split('/')
+      return `${yyyy}-${mm}-${dd}`
+    }
+    const d = new Date(s)
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10)
+    return ''
+  }
   if (col === 'manager') return row.manager_id != null ? String(row.manager_id) : ''
   if (col === 'team_leader') return row.team_leader_id != null ? String(row.team_leader_id) : ''
   if (col === 'sales_agent') return row.sales_agent_id != null ? String(row.sales_agent_id) : ''
   if (col === 'status') return row.status ?? ''
+  if (col === 'submission_type') return row.submission_type ?? ''
+  if (col === 'service_category') return row.service_category ?? ''
   if (col === 'service_type') return row.service_type ?? ''
   if (col === 'product_type') return row.product_type ?? ''
   if (col === 'payment_connection') return row.payment_connection ?? ''
   if (col === 'contract_type') return row.contract_type ?? ''
-  if (col === 'completion_date') return row._raw_completion_date ?? row.completion_date ?? ''
-  if (col === 'contract_end_date') return row._raw_contract_end_date ?? row.contract_end_date ?? ''
+  if (col === 'clawback_chum') return row.clawback_chum ?? ''
+  if (col === 'activation_date') return normalizeDateForInput(row._raw_activation_date ?? row.activation_date)
+  if (col === 'completion_date') return normalizeDateForInput(row._raw_completion_date ?? row.completion_date)
+  if (col === 'contract_end_date') return normalizeDateForInput(row._raw_contract_end_date ?? row.contract_end_date)
   const val = row[col]
   if (val == null) return ''
   if (typeof val === 'object') return val?.name ?? ''
@@ -221,10 +305,13 @@ function getCellValueForEdit(row, col) {
 
 function getOptionsForColumn(col) {
   if (col === 'status') return STATUS_OPTIONS
+  if (col === 'submission_type') return SUBMISSION_TYPE_OPTIONS
+  if (col === 'service_category') return SERVICE_CATEGORY_OPTIONS
   if (col === 'service_type') return SERVICE_TYPE_OPTIONS
   if (col === 'product_type') return PRODUCT_TYPE_OPTIONS
   if (col === 'payment_connection') return PAYMENT_CONNECTION_OPTIONS
   if (col === 'contract_type') return CONTRACT_TYPE_OPTIONS
+  if (col === 'clawback_chum') return CLAWBACK_CHUM_OPTIONS
   if (col === 'manager') return (props.editOptions.managers ?? []).map(u => ({ value: String(u.id), label: u.name }))
   if (col === 'team_leader') return (props.editOptions.team_leaders ?? []).map(u => ({ value: String(u.id), label: u.name }))
   if (col === 'sales_agent') return (props.editOptions.sales_agents ?? []).map(u => ({ value: String(u.id), label: u.name }))
@@ -255,7 +342,7 @@ function saveInlineEdit() {
     if (!value || !String(value).trim()) err = 'Status is required.'
   } else if (col === 'account_number') {
     if (!value || !String(value).trim()) err = 'Account number is required.'
-  } else if (col === 'quantity' || col === 'renewal_alert') {
+  } else if (col === 'quantity') {
     if (value !== '' && value !== null) {
       const n = Number(value)
       if (isNaN(n) || n < 0) err = 'Must be a non-negative number.'
@@ -353,6 +440,12 @@ function onCellDblClick(e, row, col) {
       <thead>
         <tr class="border-b-2 border-black bg-green-600">
           <th
+            scope="col"
+            class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold text-white"
+          >
+            SR
+          </th>
+          <th
             v-for="col in columns"
             :key="col"
             scope="col"
@@ -385,7 +478,7 @@ function onCellDblClick(e, row, col) {
       </thead>
       <tbody class="bg-white">
         <tr v-if="!loading && !data.length" class="border-b border-black bg-white">
-          <td :colspan="columns.length + 1" class="px-4 py-12 text-center text-gray-500">
+          <td :colspan="columns.length + 2" class="px-4 py-12 text-center text-gray-500">
             No clients found.
           </td>
         </tr>
@@ -394,6 +487,9 @@ function onCellDblClick(e, row, col) {
           :key="row.id"
           class="border-b border-black bg-white hover:bg-gray-50/50"
         >
+          <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-900">
+            {{ ((currentPage - 1) * perPage) + rowIndex + 1 }}
+          </td>
           <td
             v-for="col in columns"
             :key="col"
@@ -468,6 +564,16 @@ function onCellDblClick(e, row, col) {
                 >
                   {{ row.status ? (row.status.charAt(0).toUpperCase() + row.status.slice(1).replace('_', ' ')) : '—' }}
                 </span>
+              </template>
+              <template v-else-if="col === 'renewal_alert'">
+                <button
+                  type="button"
+                  class="inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold"
+                  :class="renewalAlertCount(row) > 0 ? 'bg-amber-100 text-amber-800 hover:bg-amber-200' : 'bg-gray-100 text-gray-600'"
+                  @click.stop="showRenewalAlerts(row)"
+                >
+                  {{ renewalAlertCount(row) }}
+                </button>
               </template>
               <template v-else>
                 {{ truncate(formatValue(row, col)) }}

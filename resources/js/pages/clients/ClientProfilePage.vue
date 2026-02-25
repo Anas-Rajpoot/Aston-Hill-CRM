@@ -10,6 +10,7 @@ import { useAuthStore } from '@/stores/auth'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import { toDdMmYyyy } from '@/lib/dateFormat'
 import ClientTable from '@/components/clients/ClientTable.vue'
+import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import Toast from '@/components/Toast.vue'
 import TruncatedText from '@/components/TruncatedText.vue'
@@ -87,10 +88,10 @@ const productsOrder = ref('desc')
 const allColumns = ref([])
 const defaultColumns = ref([])
 const visibleColumns = ref([
-  'company_name', 'submitted_at', 'manager', 'team_leader', 'sales_agent',
+  'company_name', 'submitted_at', 'submission_type', 'service_category', 'manager', 'team_leader', 'sales_agent',
   'service_type', 'product_type', 'address', 'product_name', 'mrc', 'quantity', 'other',
-  'migration_numbers', 'activity', 'account_number', 'wo_number', 'status', 'completion_date',
-  'contract_type', 'contract_end_date',
+  'migration_numbers', 'activity', 'account_number', 'wo_number', 'work_order_status', 'status', 'activation_date',
+  'contract_type', 'contract_end_date', 'clawback_chum', 'remarks',
   'renewal_alert', 'additional_notes', 'creator',
 ])
 const columnModalVisible = ref(false)
@@ -116,7 +117,7 @@ const alertForm = ref({ alert_type: '', expiry_date: '', days_remaining: '', man
 const alertFormErrors = ref({})
 const managerOptions = ref([])
 const showAlertAdvanced = ref(false)
-const alertAdvFilters = ref({ resolved: '', manager_id: '', expiry_from: '', expiry_to: '', created_from: '', created_to: '' })
+const alertAdvFilters = ref({ resolved: '', manager_id: '', expiry_from: '', expiry_to: '', created_from: '', created_to: '', days_remaining_from: '', days_remaining_to: '' })
 const alertColumnModal = ref(false)
 const alertEditingCell = ref(null)
 const alertEditValue = ref('')
@@ -150,6 +151,12 @@ function alertColLabel(key) {
   return ALL_ALERT_COLUMNS.find(c => c.key === key)?.label || key
 }
 
+function alertRowNumber(index) {
+  const currentPage = Number(alertsMeta.value?.current_page || 1)
+  const perPage = Number(alertsMeta.value?.per_page || alertsList.value.length || 25)
+  return (currentPage - 1) * perPage + index + 1
+}
+
 function alertAdvCount() {
   const f = alertAdvFilters.value
   let n = 0
@@ -157,6 +164,7 @@ function alertAdvCount() {
   if (f.manager_id) n++
   if (f.expiry_from || f.expiry_to) n++
   if (f.created_from || f.created_to) n++
+  if (f.days_remaining_from !== '' || f.days_remaining_to !== '') n++
   return n
 }
 
@@ -268,16 +276,17 @@ async function loadTablePreference() {
 }
 
 const COLUMN_ORDER = [
-  'company_name', 'submitted_at', 'manager', 'team_leader', 'sales_agent',
+  'company_name', 'submitted_at', 'submission_type', 'service_category', 'manager', 'team_leader', 'sales_agent',
   'service_type', 'product_type', 'address', 'product_name', 'mrc', 'quantity', 'other',
-  'migration_numbers', 'activity', 'account_number', 'wo_number', 'status', 'completion_date',
-  'contract_type', 'contract_end_date',
+  'migration_numbers', 'activity', 'account_number', 'wo_number', 'work_order_status', 'status', 'activation_date',
+  'contract_type', 'contract_end_date', 'clawback_chum', 'remarks',
   'renewal_alert', 'additional_notes', 'creator',
 ]
 
 function enforceColumnOrder(cols) {
   const set = new Set(cols)
-  if (!set.has('activity')) set.add('activity')
+  set.delete('completion_date')
+  ;['activity', 'submission_type', 'service_category', 'work_order_status', 'activation_date', 'clawback_chum', 'remarks'].forEach((c) => set.add(c))
   const ordered = COLUMN_ORDER.filter((c) => set.has(c))
   const extra = [...set].filter((c) => !COLUMN_ORDER.includes(c))
   return [...ordered, ...extra]
@@ -342,6 +351,8 @@ async function loadAlerts() {
     if (adv.expiry_to) params.expiry_to = adv.expiry_to
     if (adv.created_from) params.created_from = adv.created_from
     if (adv.created_to) params.created_to = adv.created_to
+    if (adv.days_remaining_from !== '' && adv.days_remaining_from != null) params.days_remaining_from = adv.days_remaining_from
+    if (adv.days_remaining_to !== '' && adv.days_remaining_to != null) params.days_remaining_to = adv.days_remaining_to
     const res = await clientsApi.alerts(id.value, params)
     alertsList.value = res.data ?? []
     alertsMeta.value = res.meta ?? {}
@@ -361,7 +372,7 @@ function clearAlertFilters() {
 }
 
 function clearAlertAdvFilters() {
-  alertAdvFilters.value = { resolved: '', manager_id: '', expiry_from: '', expiry_to: '', created_from: '', created_to: '' }
+  alertAdvFilters.value = { resolved: '', manager_id: '', expiry_from: '', expiry_to: '', created_from: '', created_to: '', days_remaining_from: '', days_remaining_to: '' }
   loadAlerts()
 }
 
@@ -385,16 +396,6 @@ function openAlertModal() {
 function onSaveAlertColumns(cols) {
   alertVisibleCols.value = cols
   alertColumnModal.value = false
-}
-
-function toggleAlertColumn(key) {
-  const idx = alertVisibleCols.value.indexOf(key)
-  if (idx !== -1) {
-    if (alertVisibleCols.value.length <= 1) return
-    alertVisibleCols.value.splice(idx, 1)
-  } else {
-    alertVisibleCols.value.push(key)
-  }
 }
 
 async function loadManagerOptions() {
@@ -506,6 +507,19 @@ async function loadProfileFilterOptions() {
 }
 
 async function onProductUpdateCell(clientId, field, value) {
+  const isRenewal = field === 'service_category' && String(value ?? '').trim().toLowerCase() === 'renewal'
+  if (isRenewal) {
+    try {
+      await clientsApi.inlineUpdate(clientId, { [field]: value, create_renewal_record: true })
+      await loadProducts()
+      toast('success', 'Renewal record created.')
+    } catch {
+      toast('error', 'Failed to create renewal record.')
+      loadProducts()
+    }
+    return
+  }
+
   const row = products.value.find((r) => r.id === clientId)
   const prev = row ? { ...row } : null
   if (row) {
@@ -1069,7 +1083,7 @@ onMounted(() => {
                   </button>
                   <router-link
                     v-if="canEdit"
-                    to="/clients/create"
+                    :to="`/clients/create?mode=product&client_id=${id}`"
                     class="inline-flex items-center rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
                   >
                     + Add Product
@@ -1265,7 +1279,7 @@ onMounted(() => {
                 <div class="flex items-center gap-2">
                   <button type="button" class="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="alertColumnModal = true">
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7" /></svg>
-                    Columns
+                    Customize Columns
                   </button>
                   <button
                     v-if="canEdit"
@@ -1323,19 +1337,27 @@ onMounted(() => {
                   </div>
                   <div>
                     <label class="block text-xs font-medium text-gray-600 mb-1">Expiry From</label>
-                    <input v-model="alertAdvFilters.expiry_from" type="date" class="rounded border border-gray-300 px-3 py-1.5 text-sm" />
+                    <DateInputDdMmYyyy v-model="alertAdvFilters.expiry_from" placeholder="dd-Mon-yyyy" />
                   </div>
                   <div>
                     <label class="block text-xs font-medium text-gray-600 mb-1">Expiry To</label>
-                    <input v-model="alertAdvFilters.expiry_to" type="date" class="rounded border border-gray-300 px-3 py-1.5 text-sm" />
+                    <DateInputDdMmYyyy v-model="alertAdvFilters.expiry_to" placeholder="dd-Mon-yyyy" />
                   </div>
                   <div>
                     <label class="block text-xs font-medium text-gray-600 mb-1">Created From</label>
-                    <input v-model="alertAdvFilters.created_from" type="date" class="rounded border border-gray-300 px-3 py-1.5 text-sm" />
+                    <DateInputDdMmYyyy v-model="alertAdvFilters.created_from" placeholder="dd-Mon-yyyy" />
                   </div>
                   <div>
                     <label class="block text-xs font-medium text-gray-600 mb-1">Created To</label>
-                    <input v-model="alertAdvFilters.created_to" type="date" class="rounded border border-gray-300 px-3 py-1.5 text-sm" />
+                    <DateInputDdMmYyyy v-model="alertAdvFilters.created_to" placeholder="dd-Mon-yyyy" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Days Remaining From</label>
+                    <input v-model="alertAdvFilters.days_remaining_from" type="number" min="0" class="rounded border border-gray-300 px-3 py-1.5 text-sm min-w-[170px]" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Days Remaining To</label>
+                    <input v-model="alertAdvFilters.days_remaining_to" type="number" min="0" class="rounded border border-gray-300 px-3 py-1.5 text-sm min-w-[170px]" />
                   </div>
                   <button type="button" class="rounded bg-green-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-green-700" @click="applyAlertFilters">Apply</button>
                   <button type="button" class="rounded border border-gray-300 bg-white px-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100" @click="clearAlertAdvFilters">Clear Advanced</button>
@@ -1347,6 +1369,7 @@ onMounted(() => {
                 <table class="min-w-full border-collapse">
                   <thead class="bg-gray-100">
                     <tr>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold text-gray-700">SR</th>
                       <th
                         v-for="col in alertVisibleCols"
                         :key="col"
@@ -1368,16 +1391,17 @@ onMounted(() => {
                   </thead>
                   <tbody>
                     <tr v-if="alertsLoading" class="bg-white">
-                      <td :colspan="alertVisibleCols.length + 1" class="px-4 py-8 text-center text-gray-500">Loading…</td>
+                      <td :colspan="alertVisibleCols.length + 2" class="px-4 py-8 text-center text-gray-500">Loading…</td>
                     </tr>
                     <tr v-else-if="!alertsList.length" class="bg-white">
-                      <td :colspan="alertVisibleCols.length + 1" class="px-4 py-8 text-center text-gray-500">No alerts found.</td>
+                      <td :colspan="alertVisibleCols.length + 2" class="px-4 py-8 text-center text-gray-500">No alerts found.</td>
                     </tr>
                     <tr
-                      v-for="row in alertsList"
+                      v-for="(row, rowIndex) in alertsList"
                       :key="row.id"
                       class="border-b border-gray-200 bg-white hover:bg-gray-50"
                     >
+                      <td class="px-4 py-2 text-sm text-gray-900">{{ alertRowNumber(rowIndex) }}</td>
                       <td
                         v-for="col in alertVisibleCols"
                         :key="col"
@@ -1504,7 +1528,7 @@ onMounted(() => {
                     </div>
                     <div>
                       <label class="block text-sm font-medium text-gray-700 mb-1">Expiry Date <span class="text-red-500">*</span></label>
-                      <input v-model="alertForm.expiry_date" type="date" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+                      <DateInputDdMmYyyy v-model="alertForm.expiry_date" placeholder="dd-Mon-yyyy" />
                       <p v-if="alertFormErrors.expiry_date" class="mt-1 text-xs text-red-600">{{ alertFormErrors.expiry_date }}</p>
                     </div>
                     <div>
@@ -1537,34 +1561,6 @@ onMounted(() => {
               </div>
             </div>
 
-            <!-- Alert Column Customizer Modal -->
-            <div v-if="alertColumnModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="alertColumnModal = false">
-              <div class="w-full max-w-md rounded-lg bg-white shadow-xl">
-                <div class="flex items-center justify-between border-b px-5 py-3">
-                  <h3 class="text-lg font-semibold text-gray-900">Customize Columns</h3>
-                  <button type="button" class="text-gray-400 hover:text-gray-600 text-xl leading-none" @click="alertColumnModal = false">&times;</button>
-                </div>
-                <div class="p-5 space-y-3 max-h-[60vh] overflow-y-auto">
-                  <label
-                    v-for="c in ALL_ALERT_COLUMNS"
-                    :key="c.key"
-                    class="flex items-center gap-2 rounded px-2 py-1.5 hover:bg-gray-50 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      :checked="alertVisibleCols.includes(c.key)"
-                      class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                      @change="toggleAlertColumn(c.key)"
-                    />
-                    <span class="text-sm text-gray-700">{{ c.label }}</span>
-                  </label>
-                </div>
-                <div class="flex items-center justify-between border-t px-5 py-3">
-                  <button type="button" class="text-sm text-gray-500 hover:text-gray-700" @click="alertVisibleCols = [...DEFAULT_ALERT_COLS]">Reset to Default</button>
-                  <button type="button" class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700" @click="alertColumnModal = false">Done</button>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -1618,6 +1614,15 @@ onMounted(() => {
           :default-columns="defaultColumns"
           @update:visible="columnModalVisible = $event"
           @save="onSaveColumns"
+        />
+
+        <ColumnCustomizerModal
+          :visible="alertColumnModal"
+          :all-columns="ALL_ALERT_COLUMNS"
+          :visible-columns="alertVisibleCols"
+          :default-columns="DEFAULT_ALERT_COLS"
+          @update:visible="alertColumnModal = $event"
+          @save="onSaveAlertColumns"
         />
       </template>
 

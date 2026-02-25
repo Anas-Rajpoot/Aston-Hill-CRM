@@ -124,6 +124,27 @@ function dismissToast() {
   showToast.value = false
 }
 
+function validateVerifierNumber(value) {
+  if (!value) return 'Verifier number is required.'
+  if (/\s/.test(value)) return 'Must not contain spaces.'
+  if (!/^\d+$/.test(value)) return 'Must contain only digits.'
+  if (!value.startsWith('971')) return 'Must start with 971.'
+  if (value.length !== 12) return 'Must be exactly 12 digits.'
+  return null
+}
+
+function onVerifierNumberInput(formKey, event) {
+  const raw = String(event?.target?.value ?? '').replace(/\D/g, '').slice(0, 12)
+  if (formKey === 'add') {
+    addForm.value.verifier_number = raw
+    addError.value = ''
+  } else {
+    editForm.value.verifier_number = raw
+    editError.value = ''
+  }
+  if (event?.target) event.target.value = raw
+}
+
 async function submitAdd() {
   const name = (addForm.value.verifier_name || '').trim()
   const number = (addForm.value.verifier_number || '').trim()
@@ -133,6 +154,11 @@ async function submitAdd() {
   }
   if (!number) {
     addError.value = 'Verifier number is required.'
+    return
+  }
+  const numberErr = validateVerifierNumber(number)
+  if (numberErr) {
+    addError.value = numberErr
     return
   }
   addSaving.value = true
@@ -190,7 +216,12 @@ function parseCsvLine(line) {
   for (let i = 0; i < line.length; i++) {
     const c = line[i]
     if (c === '"') {
-      inQuotes = !inQuotes
+      if (inQuotes && line[i + 1] === '"') {
+        cur += '"'
+        i++
+      } else {
+        inQuotes = !inQuotes
+      }
     } else if ((c === ',' && !inQuotes) || c === '\t') {
       out.push(cur.trim())
       cur = ''
@@ -200,6 +231,27 @@ function parseCsvLine(line) {
   }
   out.push(cur.trim())
   return out
+}
+
+function csvEscape(val) {
+  const s = val == null ? '' : String(val)
+  if (s.includes('"') || s.includes(',') || s.includes('\n')) {
+    return `"${s.replace(/"/g, '""')}"`
+  }
+  return s
+}
+
+function downloadCsvSample() {
+  const headers = ['no.', 'Verifier Name', 'Verifier Number', 'Remarks']
+  const sampleRow = ['1', 'Ahmed Khan', '971501234567', 'Primary verifier']
+  const csv = [headers.map(csvEscape).join(','), sampleRow.map(csvEscape).join(',')].join('\r\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'verifiers-sample.csv'
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 async function onCsvFileChange(event) {
@@ -215,11 +267,11 @@ async function onCsvFileChange(event) {
       importError.value = 'CSV must have a header row and at least one data row.'
       return
     }
-    const headerRow = parseCsvLine(lines[0]).map((h) => h.toLowerCase().replace(/\s+/g, '_'))
-    const nameIdx = headerRow.findIndex((h) => h === 'verifier_name' || h === 'verifier name' || h === 'verifiername')
-    const numberIdx = headerRow.findIndex((h) => h === 'verifier_number' || h === 'verifier number' || h === 'verifiernumber' || h === 'number')
+    const norm = (s) => String(s || '').toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
+    const headerRow = parseCsvLine(lines[0]).map((h) => norm(h))
+    const nameIdx = headerRow.findIndex((h) => h === 'verifier_name' || h === 'verifiername')
+    const numberIdx = headerRow.findIndex((h) => h === 'verifier_number' || h === 'verifiernumber' || h === 'number')
     const remarksIdx = headerRow.findIndex((h) => h === 'remarks')
-    const noIdx = headerRow.findIndex((h) => h === 'no.' || h === 'no' || h === 'no')
     const rows = []
     for (let i = 1; i < lines.length; i++) {
       const cells = parseCsvLine(lines[i])
@@ -319,8 +371,8 @@ function openDeleteModal(row) {
   showDeleteModal.value = true
 }
 
-function closeDeleteModal() {
-  if (deleteInProgress.value) return
+function closeDeleteModal(force = false) {
+  if (deleteInProgress.value && !force) return
   showDeleteModal.value = false
   verifierToDelete.value = null
 }
@@ -331,7 +383,7 @@ async function confirmDeleteVerifier() {
   deleteInProgress.value = true
   try {
     await api.delete(`/verifiers/${row.id}`)
-    closeDeleteModal()
+    closeDeleteModal(true)
     toastType.value = 'success'
     toastMessage.value = 'Verifier deleted successfully.'
     showToast.value = true
@@ -340,7 +392,7 @@ async function confirmDeleteVerifier() {
     const msg = e?.response?.status === 403
       ? 'You do not have permission to delete verifiers.'
       : (e?.response?.data?.message || 'Failed to delete verifier.')
-    closeDeleteModal()
+    closeDeleteModal(true)
     toastType.value = 'error'
     toastMessage.value = msg
     showToast.value = true
@@ -401,8 +453,8 @@ function openEditModal(row) {
   showEditModal.value = true
 }
 
-function closeEditModal() {
-  if (editSaving.value) return
+function closeEditModal(force = false) {
+  if (editSaving.value && !force) return
   showEditModal.value = false
   editForm.value = { id: null, verifier_name: '', verifier_number: '', remarks: '' }
 }
@@ -420,6 +472,11 @@ async function submitEdit() {
     editError.value = 'Verifier number is required.'
     return
   }
+  const numberErr = validateVerifierNumber(number)
+  if (numberErr) {
+    editError.value = numberErr
+    return
+  }
   editSaving.value = true
   editError.value = ''
   try {
@@ -428,10 +485,10 @@ async function submitEdit() {
       verifier_number: number || null,
       remarks: (editForm.value.remarks || '').trim() || null,
     })
-    closeEditModal()
-    await load()
     successMessage.value = 'Verifier updated.'
     setTimeout(() => { successMessage.value = '' }, 3000)
+    closeEditModal(true)
+    await load()
   } catch (e) {
     editError.value = e?.response?.data?.message || 'Failed to update verifier.'
   } finally {
@@ -468,6 +525,16 @@ onMounted(() => load())
           class="hidden"
           @change="onCsvFileChange"
         />
+        <button
+          type="button"
+          @click="downloadCsvSample"
+          class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Download CSV Sample
+        </button>
         <button
           v-if="canAdd"
           type="button"
@@ -515,7 +582,7 @@ onMounted(() => load())
     <div v-if="importError" class="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{{ importError }}</div>
 
     <!-- Search -->
-    <div class="relative">
+    <div class="relative w-full md:max-w-2xl">
       <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -724,12 +791,14 @@ onMounted(() => load())
                 <input
                   v-model="addForm.verifier_number"
                   type="text"
+                  maxlength="12"
                   class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:ring-teal-500"
-                  placeholder="+971-50-123-4567"
+                  placeholder="971XXXXXXXXX"
+                  @input="onVerifierNumberInput('add', $event)"
                 />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Notes (Optional)</label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Remarks (Optional)</label>
                 <textarea
                   v-model="addForm.remarks"
                   rows="3"
@@ -822,7 +891,7 @@ onMounted(() => load())
               <dl class="grid grid-cols-1 gap-y-3 text-sm">
                 <div>
                   <dt class="text-gray-500 font-medium">Added By</dt>
-                  <dd class="mt-0.5 text-gray-900">—</dd>
+                  <dd class="mt-0.5 text-gray-900">{{ selectedVerifier.added_by_name || '—' }}</dd>
                 </div>
                 <div>
                   <dt class="text-gray-500 font-medium">Created Date</dt>
@@ -835,9 +904,9 @@ onMounted(() => load())
               </dl>
             </div>
 
-            <!-- Notes -->
+            <!-- Remarks -->
             <div class="rounded-lg border border-gray-200 bg-white p-4">
-              <h5 class="text-sm font-semibold text-gray-900 mb-2">Notes</h5>
+              <h5 class="text-sm font-semibold text-gray-900 mb-2">Remarks</h5>
               <p class="text-sm text-gray-600 whitespace-pre-wrap">{{ selectedVerifier.remarks || '—' }}</p>
             </div>
 
@@ -911,12 +980,14 @@ onMounted(() => load())
                 <input
                   v-model="editForm.verifier_number"
                   type="text"
+                  maxlength="12"
                   class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:ring-teal-500"
-                  placeholder="+971-50-123-4567"
+                  placeholder="971XXXXXXXXX"
+                  @input="onVerifierNumberInput('edit', $event)"
                 />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Notes (Optional)</label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Remarks (Optional)</label>
                 <textarea
                   v-model="editForm.remarks"
                   rows="3"

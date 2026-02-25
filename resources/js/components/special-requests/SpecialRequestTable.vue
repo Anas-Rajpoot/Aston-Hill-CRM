@@ -36,13 +36,13 @@ const canInlineEdit = computed(() => {
 })
 
 const COLUMN_LABELS = {
-  id: 'ID',
+  id: 'SR',
   submitted_at: 'Submission Date',
   created_at: 'Created',
   company_name: 'Company Name',
   account_number: 'Account Number',
   request_type: 'Request Type',
-  complete_address: 'Complete Address',
+  complete_address: 'Address',
   special_instruction: 'Special Instruction',
   sales_agent: 'Sales Agent',
   team_leader: 'Team Leader',
@@ -96,10 +96,15 @@ function cellVal(row, col) {
   return row[col] ?? '—'
 }
 
+function cellTitle(row, col) {
+  const val = cellVal(row, col)
+  return val == null ? '' : String(val)
+}
+
 function truncate(val, len = 40) {
   if (!val || val === '—') return val
   const s = String(val)
-  return s.length > len ? s.slice(0, len) + '…' : s
+  return s.length > len ? s.slice(0, len) + '...' : s
 }
 
 const allSelected = computed({
@@ -119,17 +124,17 @@ function toggleRow(id) {
 <template>
   <div class="overflow-x-auto">
     <table class="w-full border-collapse text-left text-sm">
-      <thead class="bg-gray-50">
+      <thead class="bg-green-600">
         <tr>
           <th class="w-10 border-b border-black px-3 py-2.5 text-center">
             <input type="checkbox" v-model="allSelected" class="rounded border-gray-300 text-green-600 focus:ring-green-500" />
           </th>
-          <th class="w-10 border-b border-black px-3 py-2.5 text-center text-xs font-semibold text-gray-600 uppercase">#</th>
+          <th class="w-10 border-b border-black px-3 py-2.5 text-center text-xs font-semibold text-white uppercase">SR</th>
           <th
             v-for="col in columns"
             :key="col"
-            class="whitespace-nowrap border-b border-black px-3 py-2.5 text-xs font-semibold uppercase text-gray-600"
-            :class="{ 'cursor-pointer select-none hover:text-gray-900': SORTABLE.has(col) }"
+            class="whitespace-nowrap border-b border-black px-3 py-2.5 text-xs font-semibold uppercase text-white"
+            :class="{ 'cursor-pointer select-none hover:text-white/90': SORTABLE.has(col) }"
             @click="toggleSort(col)"
           >
             <span class="inline-flex items-center gap-1">
@@ -137,11 +142,11 @@ function toggleRow(id) {
               <template v-if="SORTABLE.has(col)">
                 <svg v-if="sort === col && order === 'asc'" class="h-3.5 w-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
                 <svg v-else-if="sort === col && order === 'desc'" class="h-3.5 w-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-                <svg v-else class="h-3.5 w-3.5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
+                <svg v-else class="h-3.5 w-3.5 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
               </template>
             </span>
           </th>
-          <th class="whitespace-nowrap border-b border-black px-3 py-2.5 text-xs font-semibold uppercase text-gray-600">Actions</th>
+          <th class="whitespace-nowrap border-b border-black px-3 py-2.5 text-xs font-semibold uppercase text-white">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -170,7 +175,7 @@ function toggleRow(id) {
           <td
             v-for="col in columns"
             :key="col"
-            class="border-b border-gray-200 px-3 py-2 text-sm text-gray-700"
+            class="whitespace-nowrap border-b border-gray-200 px-3 py-2 text-sm text-gray-700"
             @dblclick="startEdit(row.id, col, cellVal(row, col))"
           >
             <template v-if="editingCell === `${row.id}_${col}`">
@@ -188,7 +193,9 @@ function toggleRow(id) {
               </span>
             </template>
             <template v-else>
-              <span :title="cellVal(row, col)">{{ truncate(cellVal(row, col)) }}</span>
+              <span class="inline-block max-w-[220px] truncate align-middle" :title="cellTitle(row, col)">
+                {{ truncate(cellVal(row, col)) }}
+              </span>
             </template>
           </td>
           <td class="border-b border-gray-200 px-3 py-2">

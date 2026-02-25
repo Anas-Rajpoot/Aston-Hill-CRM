@@ -3,9 +3,15 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Database\QueryException;
+use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -53,5 +59,72 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $isApiRequest = static function (Request $request): bool {
+            return $request->expectsJson() || $request->is('api/*');
+        };
+
+        $exceptions->render(function (ValidationException $e, Request $request) use ($isApiRequest) {
+            if (! $isApiRequest($request)) {
+                return null;
+            }
+
+            return response()->json([
+                'status' => 'fail',
+                'message' => 'Validation failed.',
+                'errors' => $e->errors(),
+            ], 422);
+        });
+
+        $exceptions->render(function (AuthenticationException $e, Request $request) use ($isApiRequest) {
+            if (! $isApiRequest($request)) {
+                return null;
+            }
+
+            return response()->json([
+                'status' => 'fail',
+                'message' => 'Unauthorized. Please login first.',
+            ], 401);
+        });
+
+        $exceptions->render(function (AuthorizationException $e, Request $request) use ($isApiRequest) {
+            if (! $isApiRequest($request)) {
+                return null;
+            }
+
+            return response()->json([
+                'status' => 'fail',
+                'message' => 'You do not have permission to perform this action.',
+            ], 403);
+        });
+
+        $exceptions->render(function (QueryException $e, Request $request) use ($isApiRequest) {
+            if (! $isApiRequest($request)) {
+                return null;
+            }
+
+            return response()->json([
+                'status' => 'fail',
+                'message' => 'Request failed. Please contact support if the issue persists.',
+            ], 500);
+        });
+
+        $exceptions->render(function (\Throwable $e, Request $request) use ($isApiRequest) {
+            if (! $isApiRequest($request)) {
+                return null;
+            }
+
+            $status = $e instanceof HttpExceptionInterface ? $e->getStatusCode() : 500;
+            $message = match ($status) {
+                404 => 'Requested resource was not found.',
+                405 => 'This action is not allowed.',
+                419 => 'Session expired. Please refresh and try again.',
+                429 => 'Too many requests. Please try again shortly.',
+                default => 'Something went wrong. Please try again.',
+            };
+
+            return response()->json([
+                'status' => 'fail',
+                'message' => $message,
+            ], $status);
+        });
     })->create();

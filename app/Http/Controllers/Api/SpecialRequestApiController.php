@@ -201,10 +201,8 @@ class SpecialRequestApiController extends Controller
             } elseif ($col === 'manager') {
                 $out['manager'] = $row->relationLoaded('manager') ? ($row->manager?->name ?? '-') : '-';
                 $out['manager_id'] = $row->manager_id;
-            } elseif (in_array($col, ['submitted_at'], true)) {
-                $out[$col] = $row->$col ? $row->$col->format('d/M/Y H:i') : null;
-            } elseif (in_array($col, ['created_at', 'updated_at'], true)) {
-                $out[$col] = $row->$col ? $row->$col->format('d/M/Y') : null;
+            } elseif (in_array($col, ['submitted_at', 'created_at', 'updated_at'], true)) {
+                $out[$col] = $row->$col ? $row->$col->format('d-M-Y H:i') : null;
             } else {
                 $out[$col] = $row->$col ?? null;
             }
@@ -214,6 +212,8 @@ class SpecialRequestApiController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', SpecialRequest::class);
+
         $data = $request->validate([
             'company_name' => ['required', 'string', 'max:255'],
             'account_number' => ['nullable', 'string', 'max:100'],

@@ -66,7 +66,24 @@ api.interceptors.response.use(
     }
     return res
   },
-  (err) => Promise.reject(err)
+  (err) => {
+    const data = err?.response?.data
+    if (data && typeof data === 'object') {
+      const rawMessage = String(data.message || '')
+      const looksTechnical =
+        /SQLSTATE|QueryException|PDOException|Stack trace| in .*\.php|line \d+/i.test(rawMessage)
+
+      if (looksTechnical) {
+        data.status = data.status || 'fail'
+        data.message = 'Request failed. Please contact support if the issue persists.'
+        if ('exception' in data) delete data.exception
+        if ('file' in data) delete data.file
+        if ('line' in data) delete data.line
+        if ('trace' in data) delete data.trace
+      }
+    }
+    return Promise.reject(err)
+  }
 )
 
 // Detect session termination (single-session enforcement: another device logged in).

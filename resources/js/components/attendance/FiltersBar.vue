@@ -39,7 +39,7 @@ const emit = defineEmits(['apply', 'reset'])
         <option v-for="r in filterOptions.roles" :key="r.value" :value="r.value">{{ r.label }}</option>
       </select>
     </div>
-    <div class="flex flex-wrap items-center gap-2">
+    <div class="flex w-full lg:w-auto flex-wrap lg:flex-nowrap items-center gap-2 lg:ml-auto">
       <button
         type="button"
         class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 disabled:opacity-50"
@@ -60,7 +60,7 @@ const emit = defineEmits(['apply', 'reset'])
         Reset
       </button>
     </div>
-    <div class="ml-auto flex items-center gap-2">
+    <div class="ml-0 flex items-center gap-2 lg:ml-2">
       <slot name="after-reset" />
     </div>
   </div>

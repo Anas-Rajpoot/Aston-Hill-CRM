@@ -40,7 +40,7 @@ const perPageOptions = ref([10, 20, 25, 50, 100])
 const allColumns = ref([])
 const visibleColumns = ref([
   'id', 'extension', 'landline_number', 'gateway', 'username', 'password',
-  'status', 'team_leader', 'manager', 'usage', 'assigned_to_name', 'comment', 'updated_at',
+  'status', 'manager', 'team_leader', 'assigned_to_name', 'usage', 'comment', 'updated_at',
 ])
 const sort = ref('extension')
 const order = ref('asc')
@@ -58,6 +58,8 @@ const editModalExtensionId = ref(null)
 const viewModalVisible = ref(false)
 const viewModalExtensionId = ref(null)
 const assignableEmployees = ref([])
+const managerOptions = ref([])
+const teamLeaderOptions = ref([])
 const historyModalExtension = ref(null)
 const historyAuditLog = ref([])
 const historyLoading = ref(false)
@@ -86,6 +88,30 @@ const filters = ref({
   created_from: '',
   created_to: '',
 })
+
+const COLUMN_ORDER = [
+  'id',
+  'extension',
+  'landline_number',
+  'gateway',
+  'username',
+  'password',
+  'status',
+  'manager',
+  'team_leader',
+  'assigned_to_name',
+  'usage',
+  'comment',
+  'updated_at',
+]
+
+function enforceColumnOrder(cols) {
+  const set = new Set(Array.isArray(cols) ? cols : [])
+  ;['manager', 'team_leader', 'assigned_to_name'].forEach((c) => set.add(c))
+  const ordered = COLUMN_ORDER.filter((c) => set.has(c))
+  const extra = [...set].filter((c) => !COLUMN_ORDER.includes(c))
+  return [...ordered, ...extra]
+}
 
 function buildParams() {
   const f = filters.value
@@ -157,7 +183,7 @@ async function loadColumns() {
   try {
     const { data } = await extensionsApi.columns()
     allColumns.value = data.all_columns ?? []
-    visibleColumns.value = data.visible_columns ?? visibleColumns.value
+    visibleColumns.value = enforceColumnOrder(data.visible_columns ?? visibleColumns.value)
   } catch {
     //
   }
@@ -213,8 +239,9 @@ async function loadTablePreference() {
 
 async function onSaveColumns(cols) {
   try {
-    await extensionsApi.saveColumns(cols)
-    visibleColumns.value = cols
+    const normalized = enforceColumnOrder(cols)
+    await extensionsApi.saveColumns(normalized)
+    visibleColumns.value = normalized
     load()
   } catch {
     //
@@ -226,6 +253,72 @@ function escapeCsv(val) {
   const s = String(val)
   if (s.includes(',') || s.includes('"') || s.includes('\n')) return '"' + s.replace(/"/g, '""') + '"'
   return s
+}
+
+const SAMPLE_COLUMNS = [
+  'id', 'extension', 'landline_number', 'gateway', 'username', 'password',
+  'status', 'team_leader', 'manager', 'usage', 'assigned_to_name', 'comment', 'updated_at',
+]
+
+function sampleLabel(col) {
+  const labels = {
+    id: 'ID',
+    extension: 'Extension',
+    landline_number: 'Landline Number',
+    gateway: 'Gateway',
+    username: 'Username',
+    password: 'Password',
+    status: 'Status',
+    team_leader: 'Team Leader',
+    manager: 'Manager',
+    usage: 'Usage',
+    assigned_to_name: 'Assigned To',
+    comment: 'Comment',
+    updated_at: 'Updated At',
+  }
+  return labels[col] ?? col.replace(/_/g, ' ')
+}
+
+function downloadCsvSample() {
+  const headers = SAMPLE_COLUMNS.map(sampleLabel)
+  const sampleRow = [
+    '', '1001', '042123456', 'Etisalat', 'user_1001', 'secret123',
+    'active', '', '', 'assigned', '12', 'Sample comment', '',
+  ]
+  const csvRows = [headers.map(escapeCsv).join(','), sampleRow.map(escapeCsv).join(',')]
+  const blob = new Blob([csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'cisco-extensions-sample.csv'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function triggerImport() {
+  importFileInput.value?.click()
+}
+
+async function onImportFileChange(event) {
+  const file = event.target?.files?.[0]
+  if (!file) return
+  importLoading.value = true
+  importResult.value = null
+  try {
+    const { data } = await extensionsApi.bulkImport(file)
+    importResult.value = data ?? { message: 'Import complete.' }
+    toast('success', importResult.value.message || 'CSV imported successfully.')
+    await loadSummary()
+    await load()
+  } catch (e) {
+    const message = e?.response?.data?.message || 'Failed to import CSV.'
+    const errors = Array.isArray(e?.response?.data?.errors) ? e.response.data.errors : []
+    importResult.value = { message, errors }
+    toast('error', message)
+  } finally {
+    importLoading.value = false
+    if (event?.target) event.target.value = ''
+  }
 }
 
 async function onExport() {
@@ -286,8 +379,12 @@ async function loadAssignableEmployees() {
   try {
     const { data } = await extensionsApi.getAssignableEmployees()
     assignableEmployees.value = data.data ?? []
+    managerOptions.value = data.manager_options ?? []
+    teamLeaderOptions.value = data.team_leader_options ?? []
   } catch {
     assignableEmployees.value = []
+    managerOptions.value = []
+    teamLeaderOptions.value = []
   }
 }
 
@@ -296,6 +393,10 @@ async function onUpdateCell(rowId, field, value) {
     const payload = {}
     if (field === 'assigned_to_name') {
       payload.assigned_to = value === '' || value == null ? null : Number(value)
+    } else if (field === 'manager') {
+      payload.manager_id = value === '' || value == null ? null : Number(value)
+    } else if (field === 'team_leader') {
+      payload.team_leader_id = value === '' || value == null ? null : Number(value)
     } else if (field === 'password') {
       // Only send password when user entered one; leave blank to keep current
       if (value !== '' && value != null) payload.password = value
@@ -419,7 +520,17 @@ onMounted(async () => {
           <h1 class="text-xl font-semibold text-gray-900 leading-tight">Cisco Extensions</h1>
           <Breadcrumbs />
         </div>
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="ml-auto flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            @click="downloadCsvSample"
+          >
+            <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+            </svg>
+            Download CSV Sample
+          </button>
           <button
             v-if="canCreate"
             type="button"
@@ -578,7 +689,7 @@ onMounted(async () => {
             Reset
           </button>
         </div>
-        <div class="ml-auto flex items-center gap-2">
+        <div class="flex items-center gap-2">
           <button
             type="button"
             class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -621,6 +732,8 @@ onMounted(async () => {
           :per-page="meta.per_page"
           :filter-options="filterOptions"
           :assignable-employees="assignableEmployees"
+          :manager-options="managerOptions"
+          :team-leader-options="teamLeaderOptions"
           @sort="onSort"
           @delete="openDeleteConfirm"
           @update-cell="onUpdateCell"

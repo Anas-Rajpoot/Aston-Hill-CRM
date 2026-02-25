@@ -493,11 +493,11 @@ onMounted(() => {
                 <label class="block text-sm font-medium text-gray-700 mb-1">Location Coordinates</label>
                 <input v-model="form.location_coordinates" type="text" placeholder="e.g. 25.2048, 55.2708" class="w-full rounded-lg border px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="fieldErrors.location_coordinates ? 'border-red-500' : 'border-gray-300'" @input="fieldErrors.location_coordinates = null" />
                 <p v-if="fieldErrors.location_coordinates" class="mt-1 text-sm text-red-600">{{ fieldErrors.location_coordinates }}</p>
-              </div>
+            </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Offer</label>
                 <input v-model="form.offer" type="text" placeholder="Enter offer" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
-              </div>
+          </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">MRC (AED)</label>
                 <input v-model="form.mrc_aed" type="text" placeholder="Enter MRC" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
@@ -707,21 +707,21 @@ onMounted(() => {
                   :class="getSlotFiles(slot.id).length ? 'border-green-300' : ''"
                 >
                   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div class="flex items-start gap-3 min-w-0 flex-1">
+                  <div class="flex items-start gap-3 min-w-0 flex-1">
                       <div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" :class="getSlotFiles(slot.id).length ? 'bg-green-100' : 'bg-gray-100'">
                         <svg class="w-5 h-5" :class="getSlotFiles(slot.id).length ? 'text-green-600' : 'text-gray-500'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                      </div>
-                      <div class="min-w-0 flex-1">
-                        <p class="font-semibold text-gray-900 text-sm">Additional Document</p>
-                        <p class="mt-0.5 text-xs text-gray-500">PDF, DOC, DOCX, EML. You can select multiple files.</p>
-                      </div>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
                     </div>
-                    <div class="flex items-center gap-2 shrink-0">
+                    <div class="min-w-0 flex-1">
+                      <p class="font-semibold text-gray-900 text-sm">Additional Document</p>
+                      <p class="mt-0.5 text-xs text-gray-500">PDF, DOC, DOCX, EML. You can select multiple files.</p>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2 shrink-0">
                       <label class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-sky-400 bg-white text-sky-600 text-sm font-medium cursor-pointer hover:bg-sky-50 shrink-0">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                         </svg>
                         Upload
                         <input type="file" class="hidden" accept=".pdf,.doc,.docx,.eml" multiple @change="onAdditionalFileSelect(slot.id, $event)" />
@@ -762,21 +762,21 @@ onMounted(() => {
 
         <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-gray-200 bg-white rounded-lg px-6 pb-4">
           <div class="flex items-center gap-3">
-            <button
-              type="button"
+          <button
+            type="button"
               class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              @click="cancel"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
+            @click="cancel"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
               class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              :disabled="saving"
-              @click="saveDraft"
-            >
-              Save as Draft
-            </button>
+            :disabled="saving"
+            @click="saveDraft"
+          >
+            Save as Draft
+          </button>
           </div>
           <button
             type="submit"

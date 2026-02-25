@@ -73,6 +73,7 @@ Route::get('/special-requests', $spa);
 Route::get('/special-requests/{id}', $spa)->whereNumber('id');
 Route::get('/special-requests/{id}/edit', $spa)->whereNumber('id');
 Route::get('/order-status', $spa);
+Route::get('/all-clients', $spa);
 Route::get('/clients', $spa);
 Route::get('/clients/create', $spa);
 Route::get('/clients/{id}', $spa)->whereNumber('id');

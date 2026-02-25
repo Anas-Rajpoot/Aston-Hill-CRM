@@ -25,18 +25,32 @@ class ClientApiController extends Controller
 {
     use \App\Traits\ResolvesAuditDisplayValues;
     private const MODULE = 'clients';
+    private const ALLOWED_PREF_MODULES = ['clients', 'all-clients', 'client-profile-products', 'order-status', 'order-status-listing'];
+    private const COUNT_CACHE_SECONDS = 30;
+    private const AUTO_RENEWAL_ALERT_TYPES = [
+        'Trade License Expiry',
+        'Establishment Card Expiry',
+    ];
 
     private const ALLOWED_COLUMNS = [
         'id', 'company_name', 'account_number', 'submitted_at',
         'manager_id', 'team_leader_id', 'sales_agent_id',
+        'submission_type', 'service_category',
         'status', 'service_type', 'product_type', 'address', 'product_name',
         'mrc', 'quantity', 'other', 'migration_numbers', 'activity', 'fiber',
-        'order_number', 'wo_number', 'completion_date', 'payment_connection',
-        'contract_type', 'contract_end_date', 'renewal_alert', 'additional_notes',
+        'order_number', 'wo_number', 'work_order_status', 'activation_date', 'completion_date', 'payment_connection',
+        'contract_type', 'contract_end_date', 'clawback_chum', 'remarks', 'renewal_alert', 'additional_notes',
+        'trade_license_issuing_authority', 'company_category', 'trade_license_number', 'trade_license_expiry_date',
+        'establishment_card_number', 'establishment_card_expiry_date',
+        'account_taken_from', 'account_mapping_date', 'account_transfer_given_to', 'account_transfer_given_date',
+        'account_manager_name', 'first_bill', 'second_bill', 'third_bill', 'fourth_bill',
+        'additional_comment_1', 'additional_comment_2', 'full_address',
         'created_by', 'revenue', 'csr_name_1', 'csr_name_2', 'csr_name_3',
     ];
 
     private const BASE_COLUMNS = ['id', 'status'];
+    /** @var array<string,bool>|null */
+    private static ?array $clientTableColumns = null;
 
     public function __construct()
     {
@@ -63,10 +77,12 @@ class ClientApiController extends Controller
             'manager_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'team_leader_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'sales_agent_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'alert_type' => ['sometimes', 'nullable', 'string', 'max:80'],
         ]);
 
         $user = $request->user();
-        $columns = $this->resolveColumns($user, $validated['columns'] ?? null);
+        $prefModule = $this->resolvePrefModule($request);
+        $columns = $this->resolveColumns($user, $validated['columns'] ?? null, $prefModule);
         $perPage = (int) ($validated['per_page'] ?? 15);
         $page = (int) ($validated['page'] ?? 1);
         $sort = $validated['sort'] ?? config('modules.clients.default_sort.0', 'submitted_at');
@@ -74,7 +90,11 @@ class ClientApiController extends Controller
 
         $baseQuery = Client::query();
         $this->applyFilters($baseQuery, $validated);
-        $total = $baseQuery->count();
+        $total = Cache::remember(
+            $this->countCacheKey($request, $validated),
+            self::COUNT_CACHE_SECONDS,
+            fn () => (clone $baseQuery)->count()
+        );
 
         $dataQuery = Client::query();
         $this->applyFilters($dataQuery, $validated);
@@ -92,13 +112,38 @@ class ClientApiController extends Controller
             $eagerLoad['teamLeader'] = fn ($q) => $q->select('id', 'name');
             $eagerLoad['salesAgent'] = fn ($q) => $q->select('id', 'name');
         }
+        $companyDetailCols = [
+            'trade_license_issuing_authority', 'company_category', 'trade_license_number', 'trade_license_expiry_date',
+            'establishment_card_number', 'establishment_card_expiry_date', 'account_taken_from', 'account_mapping_date',
+            'account_transfer_given_to', 'account_transfer_given_date', 'account_manager_name',
+            'first_bill', 'second_bill', 'third_bill', 'fourth_bill', 'additional_comment_1', 'additional_comment_2',
+        ];
+        if (count(array_intersect($columns, $companyDetailCols)) > 0) {
+            $eagerLoad['companyDetail'] = fn ($q) => $q->select([
+                'id', 'client_id',
+                'trade_license_issuing_authority', 'company_category', 'trade_license_number', 'trade_license_expiry_date',
+                'establishment_card_number', 'establishment_card_expiry_date', 'account_taken_from', 'account_mapping_date',
+                'account_transfer_given_to', 'account_transfer_given_date', 'account_manager_name',
+                'first_bill', 'second_bill', 'third_bill', 'fourth_bill', 'additional_comment_1', 'additional_comment_2',
+            ]);
+        }
+        if (in_array('full_address', $columns, true)) {
+            $eagerLoad['addresses'] = fn ($q) => $q->select(['id', 'client_id', 'full_address', 'unit', 'building', 'area', 'emirates', 'sort_order'])
+                ->orderBy('sort_order');
+        }
+
         if (! empty($eagerLoad)) {
             $dataQuery->with($eagerLoad);
         }
 
         $offset = ($page - 1) * $perPage;
-        $items = $dataQuery->skip($offset)->take($perPage)->get()->map(function ($row) use ($columns) {
-            return $this->formatRow($row, $columns);
+        $pageRows = $dataQuery->skip($offset)->take($perPage)->get();
+        $clientIds = $pageRows->pluck('id')->map(fn ($id) => (int) $id)->filter()->values()->all();
+        $this->syncRenewalAlertsForClientIds($clientIds);
+        $renewalAlertMap = $this->buildRenewalAlertMap($clientIds);
+
+        $items = $pageRows->map(function ($row) use ($columns, $renewalAlertMap) {
+            return $this->formatRow($row, $columns, $renewalAlertMap);
         });
 
         $lastPage = $total > 0 ? (int) ceil($total / $perPage) : 1;
@@ -114,18 +159,19 @@ class ClientApiController extends Controller
         ]);
     }
 
-    private function resolveColumns($user, ?array $requestColumns): array
+    private function resolveColumns($user, ?array $requestColumns, ?string $module = null): array
     {
+        $prefModule = $module ?: self::MODULE;
         $allAllowed = array_merge(self::ALLOWED_COLUMNS, ['manager', 'team_leader', 'sales_agent', 'creator']);
         if (! empty($requestColumns)) {
             $allowed = array_intersect($requestColumns, $allAllowed);
             return array_values(array_unique(array_merge(self::BASE_COLUMNS, $allowed)));
         }
 
-        $cacheKey = "col_pref_{$user->id}_" . self::MODULE;
-        $preference = Cache::remember($cacheKey, 3600, function () use ($user) {
+        $cacheKey = "col_pref_{$user->id}_" . $prefModule;
+        $preference = Cache::remember($cacheKey, 3600, function () use ($user, $prefModule) {
             return UserColumnPreference::where('user_id', $user->id)
-                ->where('module', self::MODULE)
+                ->where('module', $prefModule)
                 ->first();
         });
 
@@ -133,6 +179,12 @@ class ClientApiController extends Controller
         $cols = is_array($cols) ? $cols : [];
         $allowed = array_intersect($cols, $allAllowed);
         return array_values(array_unique(array_merge(self::BASE_COLUMNS, $allowed)));
+    }
+
+    private function resolvePrefModule(Request $request): string
+    {
+        $module = (string) $request->input('module', self::MODULE);
+        return in_array($module, self::ALLOWED_PREF_MODULES, true) ? $module : self::MODULE;
     }
 
     private function sumMrcByStatus(Client $client, string $status): float
@@ -179,6 +231,142 @@ class ClientApiController extends Controller
         if (! empty($validated['sales_agent_id'])) {
             $query->where('sales_agent_id', $validated['sales_agent_id']);
         }
+        if (! empty($validated['alert_type'])) {
+            if ($validated['alert_type'] === '__any__') {
+                $query->whereHas('alerts');
+            } else {
+                $query->whereHas('alerts', function ($q) use ($validated) {
+                    $q->where('alert_type', $validated['alert_type']);
+                });
+            }
+        }
+    }
+
+    private function isInCurrentOrNextMonth(?Carbon $date, Carbon $now): bool
+    {
+        if (! $date) {
+            return false;
+        }
+        if ((int) $date->year === (int) $now->year && (int) $date->month === (int) $now->month) {
+            return true;
+        }
+        $nextMonth = $now->copy()->addMonthNoOverflow();
+        return (int) $date->year === (int) $nextMonth->year
+            && (int) $date->month === (int) $nextMonth->month;
+    }
+
+    private function resolveRenewalAlertCandidates(Client $client, Carbon $now): array
+    {
+        $candidates = [];
+        $companyDetail = $client->companyDetail;
+
+        $dateMap = [
+            'Trade License Expiry' => $companyDetail?->trade_license_expiry_date,
+            'Establishment Card Expiry' => $companyDetail?->establishment_card_expiry_date,
+        ];
+
+        foreach ($dateMap as $type => $date) {
+            if (! $date || ! $this->isInCurrentOrNextMonth($date, $now)) {
+                continue;
+            }
+            $candidates[] = [
+                'alert_type' => $type,
+                'expiry_date' => $date->copy()->startOfDay(),
+            ];
+        }
+
+        return $candidates;
+    }
+
+    private function syncRenewalAlertsForClientIds(array $clientIds): void
+    {
+        if (empty($clientIds)) {
+            return;
+        }
+
+        $now = now()->startOfDay();
+        $clients = Client::query()
+            ->with(['companyDetail:id,client_id,trade_license_expiry_date,establishment_card_expiry_date'])
+            ->whereIn('id', $clientIds)
+            ->get(['id', 'company_name', 'account_number', 'manager_id', 'activation_date', 'contract_end_date']);
+
+        $existingAuto = ClientAlert::query()
+            ->whereIn('client_id', $clientIds)
+            ->whereNull('created_by')
+            ->where('resolved', false)
+            ->whereIn('alert_type', self::AUTO_RENEWAL_ALERT_TYPES)
+            ->get(['id', 'client_id', 'alert_type'])
+            ->groupBy('client_id');
+
+        foreach ($clients as $client) {
+            $candidates = $this->resolveRenewalAlertCandidates($client, $now);
+            $candidateTypes = collect($candidates)->pluck('alert_type')->all();
+
+            foreach ($candidates as $candidate) {
+                $daysRemaining = $now->diffInDays($candidate['expiry_date'], false);
+                ClientAlert::updateOrCreate(
+                    [
+                        'client_id' => $client->id,
+                        'alert_type' => $candidate['alert_type'],
+                        'resolved' => false,
+                        'created_by' => null,
+                    ],
+                    [
+                        'company_name' => $client->company_name,
+                        'account_number' => $client->account_number,
+                        'expiry_date' => $candidate['expiry_date']->toDateString(),
+                        'days_remaining' => $daysRemaining >= 0 ? $daysRemaining : 0,
+                        'manager_id' => $client->manager_id,
+                        'status' => 'Active',
+                        'created_date' => now()->toDateString(),
+                    ]
+                );
+            }
+
+            $stale = collect($existingAuto->get($client->id, []))
+                ->filter(fn ($a) => ! in_array($a->alert_type, $candidateTypes, true))
+                ->pluck('id')
+                ->all();
+
+            if (! empty($stale)) {
+                ClientAlert::query()->whereIn('id', $stale)->delete();
+            }
+        }
+
+        Client::query()->whereIn('id', $clientIds)->each(function (Client $client) {
+            $count = (int) $client->alerts()
+                ->where('resolved', false)
+                ->whereIn('alert_type', self::AUTO_RENEWAL_ALERT_TYPES)
+                ->count();
+            $client->updateQuietly(['renewal_alert' => $count]);
+        });
+    }
+
+    private function buildRenewalAlertMap(array $clientIds): array
+    {
+        if (empty($clientIds)) {
+            return [];
+        }
+
+        $alerts = ClientAlert::query()
+            ->whereIn('client_id', $clientIds)
+            ->where('resolved', false)
+            ->whereIn('alert_type', self::AUTO_RENEWAL_ALERT_TYPES)
+            ->orderBy('expiry_date')
+            ->get(['client_id', 'alert_type', 'expiry_date']);
+
+        $map = [];
+        foreach ($alerts as $alert) {
+            $clientId = (int) $alert->client_id;
+            $map[$clientId] ??= [];
+            $map[$clientId][] = [
+                'alert_type' => $alert->alert_type,
+                'expiry_date' => $alert->expiry_date?->format('Y-m-d'),
+                'display_date' => $alert->expiry_date?->format('d-M-Y'),
+            ];
+        }
+
+        return $map;
     }
 
     private function applySort($query, string $sort, string $order): void
@@ -196,7 +384,54 @@ class ClientApiController extends Controller
                 ->orderBy("{$alias}.name", $direction);
             return;
         }
-        $query->orderBy('clients.' . $sort, $direction);
+        if ($this->hasClientColumn($sort)) {
+            $query->orderBy('clients.' . $sort, $direction);
+            return;
+        }
+
+        $query->orderBy('clients.submitted_at', 'desc');
+    }
+
+    private function countCacheKey(Request $request, array $validated): string
+    {
+        $keys = [
+            'status', 'submitted_from', 'submitted_to', 'company_name',
+            'account_number', 'wo_number', 'manager_id', 'team_leader_id',
+            'sales_agent_id', 'alert_type',
+        ];
+        $filters = [];
+        foreach ($keys as $k) {
+            if (array_key_exists($k, $validated)) {
+                $filters[$k] = $validated[$k];
+            }
+        }
+        return 'clients_count_' . $request->user()->id . '_' . md5(json_encode($filters));
+    }
+
+    private function hasClientColumn(string $column): bool
+    {
+        if (self::$clientTableColumns === null) {
+            self::$clientTableColumns = [];
+            foreach (Schema::getColumnListing('clients') as $col) {
+                self::$clientTableColumns[$col] = true;
+            }
+        }
+        return isset(self::$clientTableColumns[$column]);
+    }
+
+    /**
+     * Keep only keys that actually exist in clients table.
+     * Prevents SQL errors when code is ahead of local DB migrations.
+     */
+    private function onlyExistingClientColumns(array $data): array
+    {
+        $out = [];
+        foreach ($data as $key => $value) {
+            if ($this->hasClientColumn((string) $key)) {
+                $out[$key] = $value;
+            }
+        }
+        return $out;
     }
 
     private function buildSelectColumns(array $columns): array
@@ -214,6 +449,8 @@ class ClientApiController extends Controller
             'sales_agent' => 'clients.sales_agent_id',
             'service_type' => 'clients.service_type',
             'product_type' => 'clients.product_type',
+            'submission_type' => 'clients.submission_type',
+            'service_category' => 'clients.service_category',
             'address' => 'clients.address',
             'product_name' => 'clients.product_name',
             'mrc' => 'clients.mrc',
@@ -224,10 +461,14 @@ class ClientApiController extends Controller
             'fiber' => 'clients.fiber',
             'order_number' => 'clients.order_number',
             'wo_number' => 'clients.wo_number',
+            'work_order_status' => 'clients.work_order_status',
+            'activation_date' => 'clients.activation_date',
             'completion_date' => 'clients.completion_date',
             'payment_connection' => 'clients.payment_connection',
             'contract_type' => 'clients.contract_type',
             'contract_end_date' => 'clients.contract_end_date',
+            'clawback_chum' => 'clients.clawback_chum',
+            'remarks' => 'clients.remarks',
             'renewal_alert' => 'clients.renewal_alert',
             'additional_notes' => 'clients.additional_notes',
             'created_by' => 'clients.created_by',
@@ -235,7 +476,7 @@ class ClientApiController extends Controller
         ];
         $optionalColumns = ['revenue' => 'clients.revenue', 'csr_name_1' => 'clients.csr_name_1', 'csr_name_2' => 'clients.csr_name_2', 'csr_name_3' => 'clients.csr_name_3'];
         foreach ($optionalColumns as $key => $select) {
-            if (Schema::hasColumn('clients', $key)) {
+            if ($this->hasClientColumn($key)) {
                 $map[$key] = $select;
             }
         }
@@ -244,27 +485,32 @@ class ClientApiController extends Controller
                 continue;
             }
             if (isset($map[$col])) {
-                $base[] = $map[$col];
+                $select = $map[$col];
+                if (str_starts_with($select, 'clients.')) {
+                    $dbCol = substr($select, 8);
+                    if (! $this->hasClientColumn($dbCol)) {
+                        continue;
+                    }
+                }
+                $base[] = $select;
             }
         }
         return array_unique($base);
     }
 
-    private function formatRow(Client $row, array $columns): array
+    private function formatRow(Client $row, array $columns, array $renewalAlertMap = []): array
     {
         $needsManager = in_array('manager', $columns, true) && ! $row->manager_id && $row->sales_agent_id;
         $needsTeamLeader = in_array('team_leader', $columns, true) && ! $row->team_leader_id && $row->sales_agent_id;
 
         if ($needsManager || $needsTeamLeader) {
-            $agent = $row->salesAgent ?? User::find($row->sales_agent_id);
+            $agent = $row->relationLoaded('salesAgent') ? $row->salesAgent : null;
             if ($agent) {
                 if ($needsTeamLeader && $agent->team_leader_id) {
                     $row->team_leader_id = $agent->team_leader_id;
-                    $row->setRelation('teamLeader', User::find($agent->team_leader_id));
                 }
                 if ($needsManager && $agent->manager_id) {
                     $row->manager_id = $agent->manager_id;
-                    $row->setRelation('manager', User::find($agent->manager_id));
                 }
             }
         }
@@ -294,8 +540,52 @@ class ClientApiController extends Controller
                 $out[$col] = $row->$col ? $row->$col->format('d-M-Y H:i') : null;
                 continue;
             }
-            if (in_array($col, ['completion_date', 'contract_end_date'], true)) {
+            if (in_array($col, ['activation_date', 'completion_date', 'contract_end_date'], true)) {
+                if ($col === 'activation_date') {
+                    $activation = $row->activation_date;
+                    if (! $activation && $row->submitted_at) {
+                        $activation = $row->submitted_at;
+                    }
+                    $out[$col] = $activation ? $activation->format('d/m/Y') : null;
+                    continue;
+                }
                 $out[$col] = $row->$col ? $row->$col->format('d/m/Y') : null;
+                continue;
+            }
+            if ($col === 'activity') {
+                $out[$col] = $row->activity ?: ($row->other ?: null);
+                continue;
+            }
+            if ($col === 'remarks') {
+                $out[$col] = $row->remarks ?: ($row->additional_notes ?: null);
+                continue;
+            }
+            if ($col === 'work_order_status') {
+                $out[$col] = $row->work_order_status ?: ($row->status ?: null);
+                continue;
+            }
+            if ($col === 'full_address') {
+                $addr = $row->addresses?->first();
+                $out[$col] = $addr?->full_address ?: collect([$addr?->unit, $addr?->building, $addr?->area, $addr?->emirates])->filter()->implode(', ');
+                continue;
+            }
+            if (in_array($col, [
+                'trade_license_issuing_authority', 'company_category', 'trade_license_number',
+                'establishment_card_number', 'account_taken_from', 'account_transfer_given_to',
+                'account_manager_name', 'first_bill', 'second_bill', 'third_bill', 'fourth_bill',
+                'additional_comment_1', 'additional_comment_2',
+            ], true)) {
+                $out[$col] = $row->companyDetail?->$col;
+                continue;
+            }
+            if (in_array($col, ['trade_license_expiry_date', 'establishment_card_expiry_date', 'account_mapping_date', 'account_transfer_given_date'], true)) {
+                $out[$col] = $row->companyDetail?->$col?->format('d/m/Y');
+                continue;
+            }
+            if ($col === 'renewal_alert') {
+                $details = $renewalAlertMap[(int) $row->id] ?? [];
+                $out['renewal_alert'] = count($details);
+                $out['renewal_alert_details'] = $details;
                 continue;
             }
             $out[$col] = $row->$col ?? null;
@@ -320,18 +610,34 @@ class ClientApiController extends Controller
             ->pluck('account_number')
             ->values();
 
+        $alertTypes = ClientAlert::query()
+            ->whereNotNull('alert_type')
+            ->where('alert_type', '!=', '')
+            ->distinct()
+            ->orderBy('alert_type')
+            ->pluck('alert_type')
+            ->values()
+            ->all();
+
+        $alertTypes = array_values(array_unique(array_merge(
+            ['Trade License Expiry', 'Establishment Card Expiry', 'Custom'],
+            $alertTypes
+        )));
+
         return response()->json([
             'statuses' => array_map(fn ($s) => ['value' => $s, 'label' => ucfirst(str_replace('_', ' ', $s))], Client::STATUSES),
             'managers' => $managers,
             'team_leaders' => $teamLeaders,
             'sales_agents' => $salesAgents,
             'account_numbers' => $accountNumbers,
+            'alert_types' => $alertTypes,
         ]);
     }
 
     public function columns(Request $request): JsonResponse
     {
         $this->authorize('viewAny', Client::class);
+        $prefModule = $this->resolvePrefModule($request);
 
         $config = config('modules.clients.columns', []);
         $allColumns = [];
@@ -343,13 +649,14 @@ class ClientApiController extends Controller
         }
 
         $pref = UserColumnPreference::where('user_id', $request->user()->id)
-            ->where('module', self::MODULE)
+            ->where('module', $prefModule)
             ->first();
 
         $defaultColumns = config('modules.clients.default_columns', []);
         $visible = $pref?->visible_columns ?? $defaultColumns;
 
         return response()->json([
+            'module' => $prefModule,
             'all_columns' => $allColumns,
             'visible_columns' => $visible,
             'default_columns' => $defaultColumns,
@@ -359,6 +666,7 @@ class ClientApiController extends Controller
     public function saveColumns(Request $request): JsonResponse
     {
         $this->authorize('viewAny', Client::class);
+        $prefModule = $this->resolvePrefModule($request);
 
         $allAllowed = array_merge(self::ALLOWED_COLUMNS, ['manager', 'team_leader', 'sales_agent', 'creator']);
         $data = $request->validate([
@@ -367,13 +675,13 @@ class ClientApiController extends Controller
         ]);
 
         UserColumnPreference::updateOrCreate(
-            ['user_id' => $request->user()->id, 'module' => self::MODULE],
+            ['user_id' => $request->user()->id, 'module' => $prefModule],
             ['visible_columns' => $data['visible_columns']]
         );
 
-        Cache::forget("col_pref_{$request->user()->id}_" . self::MODULE);
+        Cache::forget("col_pref_{$request->user()->id}_" . $prefModule);
 
-        return response()->json(['success' => true]);
+        return response()->json(['success' => true, 'module' => $prefModule]);
     }
 
     public function importCsv(Request $request): JsonResponse
@@ -462,6 +770,8 @@ class ClientApiController extends Controller
             'csrs' => ['sometimes', 'array', 'max:20'],
             'csrs.*.user_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'status' => ['sometimes', 'string', Rule::in(Client::STATUSES)],
+            'submission_type' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'service_category' => ['sometimes', 'nullable', 'string', 'max:100'],
             'service_type' => ['sometimes', 'nullable', 'string', 'max:100'],
             'product_type' => ['sometimes', 'nullable', 'string', 'max:100'],
             'address' => ['sometimes', 'nullable', 'string', 'max:500'],
@@ -470,13 +780,18 @@ class ClientApiController extends Controller
             'quantity' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'other' => ['sometimes', 'nullable', 'string', 'max:500'],
             'migration_numbers' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'activity' => ['sometimes', 'nullable', 'string', 'max:500'],
             'fiber' => ['sometimes', 'nullable', 'string', 'max:20'],
             'order_number' => ['sometimes', 'nullable', 'string', 'max:100'],
             'wo_number' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'work_order_status' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'activation_date' => ['sometimes', 'nullable', 'date'],
             'completion_date' => ['sometimes', 'nullable', 'date'],
             'payment_connection' => ['sometimes', 'nullable', 'string', 'max:100'],
             'contract_type' => ['sometimes', 'nullable', 'string', 'max:100'],
             'contract_end_date' => ['sometimes', 'nullable', 'date'],
+            'clawback_chum' => ['sometimes', 'nullable', 'string', 'max:10'],
+            'remarks' => ['sometimes', 'nullable', 'string', 'max:500'],
             'renewal_alert' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'additional_notes' => ['sometimes', 'nullable', 'string'],
             'csr_name_1' => ['sometimes', 'nullable', 'string', 'max:100'],
@@ -534,7 +849,7 @@ class ClientApiController extends Controller
             'status' => $validated['status'] ?? 'pending',
             'created_by' => $user->id,
         ];
-        $clientFields = ['service_type', 'product_type', 'address', 'product_name', 'mrc', 'quantity', 'other', 'migration_numbers', 'fiber', 'order_number', 'wo_number', 'completion_date', 'payment_connection', 'contract_type', 'contract_end_date', 'renewal_alert', 'additional_notes', 'csr_name_1', 'csr_name_2', 'csr_name_3'];
+        $clientFields = ['submission_type', 'service_category', 'service_type', 'product_type', 'address', 'product_name', 'mrc', 'quantity', 'other', 'migration_numbers', 'activity', 'fiber', 'order_number', 'wo_number', 'work_order_status', 'activation_date', 'completion_date', 'payment_connection', 'contract_type', 'contract_end_date', 'clawback_chum', 'remarks', 'renewal_alert', 'additional_notes', 'csr_name_1', 'csr_name_2', 'csr_name_3'];
         foreach ($clientFields as $key) {
             if (array_key_exists($key, $validated)) {
                 $clientData[$key] = $validated[$key];
@@ -542,7 +857,7 @@ class ClientApiController extends Controller
         }
 
         $client = DB::transaction(function () use ($validated, $clientData, $user) {
-            $client = Client::create($clientData);
+            $client = Client::create($this->onlyExistingClientColumns($clientData));
 
             if (! empty($validated['company_detail'])) {
                 $cd = array_merge($validated['company_detail'], ['client_id' => $client->id]);
@@ -840,8 +1155,13 @@ class ClientApiController extends Controller
 
         $paginated = $query->paginate($perPage, ['*'], 'page', $page);
         $columns = array_merge(self::BASE_COLUMNS, self::ALLOWED_COLUMNS, ['manager', 'team_leader', 'sales_agent']);
-        $items = $paginated->getCollection()->map(function ($row) use ($columns) {
-            return $this->formatRow($row, $columns);
+        $rows = $paginated->getCollection();
+        $clientIds = $rows->pluck('id')->map(fn ($id) => (int) $id)->filter()->values()->all();
+        $this->syncRenewalAlertsForClientIds($clientIds);
+        $renewalAlertMap = $this->buildRenewalAlertMap($clientIds);
+
+        $items = $rows->map(function ($row) use ($columns, $renewalAlertMap) {
+            return $this->formatRow($row, $columns, $renewalAlertMap);
         });
         $paginated->setCollection($items);
 
@@ -873,14 +1193,12 @@ class ClientApiController extends Controller
                 }
             });
 
-        $query->with(['manager:id,name', 'teamLeader:id,name', 'salesAgent:id,name']);
+        $query->with(['manager:id,name', 'teamLeader:id,name', 'salesAgent:id,name', 'creator:id,name', 'backOfficeExecutive:id,name']);
         $query->orderByDesc('submitted_at');
 
         $perPage = (int) $request->input('per_page', 10);
         $page = (int) $request->input('page', 1);
         $paginated = $query->paginate($perPage, ['*'], 'page', $page);
-
-        $query->with(['creator:id,name', 'backOfficeExecutive:id,name']);
 
         $items = $paginated->getCollection()->map(function ($row) {
             return [
@@ -1034,7 +1352,7 @@ class ClientApiController extends Controller
             $updateData['manager_id'] = $validated['manager_id'] ?? $validated['account_manager_id'];
         }
 
-        $client->update($updateData);
+        $client->update($this->onlyExistingClientColumns($updateData));
 
         if (array_key_exists('csrs', $validated)) {
             ClientCsr::where('client_id', $client->id)->delete();
@@ -1066,25 +1384,86 @@ class ClientApiController extends Controller
             'status'             => ['sometimes', 'nullable', 'string', Rule::in(Client::STATUSES)],
             'service_type'       => ['sometimes', 'nullable', 'string', 'max:100'],
             'product_type'       => ['sometimes', 'nullable', 'string', 'max:100'],
+            'submission_type'    => ['sometimes', 'nullable', 'string', 'max:100'],
+            'service_category'   => ['sometimes', 'nullable', 'string', 'max:100'],
             'address'            => ['sometimes', 'nullable', 'string', 'max:500'],
             'product_name'       => ['sometimes', 'nullable', 'string', 'max:200'],
             'mrc'                => ['sometimes', 'nullable', 'string', 'max:100'],
             'quantity'           => ['sometimes', 'nullable', 'integer', 'min:0'],
             'other'              => ['sometimes', 'nullable', 'string', 'max:500'],
             'migration_numbers'  => ['sometimes', 'nullable', 'string', 'max:100'],
+            'activity'           => ['sometimes', 'nullable', 'string', 'max:500'],
             'wo_number'          => ['sometimes', 'nullable', 'string', 'max:100'],
+            'work_order_status'  => ['sometimes', 'nullable', 'string', 'max:100'],
+            'activation_date'    => ['sometimes', 'nullable', 'date'],
             'completion_date'    => ['sometimes', 'nullable', 'date'],
             'payment_connection' => ['sometimes', 'nullable', 'string', 'max:100'],
             'contract_type'      => ['sometimes', 'nullable', 'string', 'max:100'],
             'contract_end_date'  => ['sometimes', 'nullable', 'date'],
+            'clawback_chum'      => ['sometimes', 'nullable', 'string', 'max:10'],
+            'remarks'            => ['sometimes', 'nullable', 'string', 'max:500'],
             'renewal_alert'      => ['sometimes', 'nullable', 'integer', 'min:0'],
             'additional_notes'   => ['sometimes', 'nullable', 'string'],
             'manager_id'         => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'team_leader_id'     => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'sales_agent_id'     => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'create_renewal_record' => ['sometimes', 'boolean'],
         ]);
 
-        $client->update($data);
+        $isRenewal = array_key_exists('service_category', $data)
+            && strcasecmp(trim((string) ($data['service_category'] ?? '')), 'Renewal') === 0;
+
+        if ($isRenewal) {
+            $newClient = DB::transaction(function () use ($client, $request, $data) {
+                $cloneData = $client->only((new Client())->getFillable());
+                unset($cloneData['renewal_alert']);
+
+                foreach ($data as $key => $value) {
+                    if ($key === 'create_renewal_record') {
+                        continue;
+                    }
+                    $cloneData[$key] = $value;
+                }
+
+                $cloneData['submitted_at'] = now();
+                $cloneData['created_by'] = $request->user()->id;
+                $cloneData['renewal_alert'] = 0;
+
+                $newClient = Client::create($this->onlyExistingClientColumns($cloneData));
+
+                $companyDetail = ClientCompanyDetail::query()->where('client_id', $client->id)->first();
+                if ($companyDetail) {
+                    $detailData = $companyDetail->toArray();
+                    unset($detailData['id'], $detailData['client_id'], $detailData['created_at'], $detailData['updated_at']);
+                    $detailData['client_id'] = $newClient->id;
+                    ClientCompanyDetail::create($detailData);
+                }
+
+                $csrs = ClientCsr::query()
+                    ->where('client_id', $client->id)
+                    ->orderBy('sort_order')
+                    ->get(['user_id', 'sort_order']);
+
+                foreach ($csrs as $csr) {
+                    ClientCsr::create([
+                        'client_id' => $newClient->id,
+                        'user_id' => $csr->user_id,
+                        'sort_order' => $csr->sort_order,
+                    ]);
+                }
+
+                return $newClient;
+            });
+
+            return response()->json([
+                'id' => $newClient->id,
+                'message' => 'Renewal record created.',
+                'created_new_record' => true,
+            ]);
+        }
+
+        $updateData = collect($data)->except('create_renewal_record')->all();
+        $client->update($this->onlyExistingClientColumns($updateData));
 
         return response()->json(['id' => $client->id, 'message' => 'Updated.']);
     }
@@ -1227,6 +1606,10 @@ class ClientApiController extends Controller
     {
         $this->authorize('view', $client);
 
+        // Ensure date-driven renewal alerts are up to date before listing.
+        // This covers Trade License Expiry and Establishment Card Expiry when they fall in next month.
+        $this->syncRenewalAlertsForClientIds([(int) $client->id]);
+
         $query = $client->alerts()->with('manager:id,name');
 
         if ($request->filled('alert_type')) {
@@ -1252,6 +1635,12 @@ class ClientApiController extends Controller
         }
         if ($request->filled('created_to')) {
             $query->whereDate('created_date', '<=', $request->input('created_to'));
+        }
+        if ($request->filled('days_remaining_from')) {
+            $query->where('days_remaining', '>=', (int) $request->input('days_remaining_from'));
+        }
+        if ($request->filled('days_remaining_to')) {
+            $query->where('days_remaining', '<=', (int) $request->input('days_remaining_to'));
         }
 
         $sortable = ['alert_type', 'company_name', 'account_number', 'expiry_date', 'days_remaining', 'status', 'created_date', 'resolved'];
@@ -1385,5 +1774,32 @@ class ClientApiController extends Controller
         ]);
 
         return response()->json(['message' => 'Alert resolved successfully.']);
+    }
+
+    public function generateRenewalAlerts(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', Client::class);
+
+        $validated = $request->validate([
+            'status' => ['sometimes', 'nullable', 'string', Rule::in(Client::STATUSES)],
+            'submitted_from' => ['sometimes', 'nullable', 'date'],
+            'submitted_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:submitted_from'],
+            'company_name' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'account_number' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'wo_number' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'manager_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'team_leader_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'sales_agent_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+        ]);
+
+        $query = Client::query()->select('clients.id');
+        $this->applyFilters($query, $validated);
+        $ids = $query->pluck('clients.id')->map(fn ($id) => (int) $id)->filter()->values()->all();
+        $this->syncRenewalAlertsForClientIds($ids);
+
+        return response()->json([
+            'message' => 'Renewal alerts generated successfully.',
+            'processed_clients' => count($ids),
+        ]);
     }
 }

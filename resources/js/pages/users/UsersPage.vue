@@ -13,6 +13,7 @@ import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomize
 import Toast from '@/components/Toast.vue'
 import { toDdMmYyyy, toDdMonYyyy } from '@/lib/dateFormat'
 import TruncatedText from '@/components/TruncatedText.vue'
+import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -411,7 +412,11 @@ async function openUserDetail(user) {
     const response = await usersApi.show(user.id)
     const userData = response?.data?.user
     if (userData) {
-      detailUser.value = userData
+      detailUser.value = {
+        ...user,
+        ...userData,
+        last_login_at: userData.last_login_at ?? user.last_login_at ?? null,
+      }
     } else {
       detailError.value = 'Could not load user details.'
     }
@@ -612,8 +617,12 @@ function displayCellValue(user, col) {
   return String(val)
 }
 
+function rowNumber(index) {
+  return (pagination.value.current_page - 1) * pagination.value.per_page + index + 1
+}
+
 const columnLabels = {
-  id: 'ID',
+  id: 'SR',
   name: 'User',
   email: 'Email',
   phone: 'Phone',
@@ -730,25 +739,8 @@ watch(addUserRolesDropdownOpen, (open) => {
       </div>
     </div>
 
-    <!-- Two quick filters: User, Status + Advance Filters + Customize columns -->
+    <!-- General toolbar + advanced filters + customize columns -->
     <div class="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
-      <label class="sr-only">User</label>
-      <input
-        v-model="filters.name"
-        type="text"
-        placeholder="User name..."
-        class="min-w-[160px] rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-        :disabled="loading"
-      />
-      <label class="sr-only">Status</label>
-      <select
-        v-model="filters.status"
-        class="min-w-[140px] rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
-        :disabled="loading"
-      >
-        <option value="">Status</option>
-        <option v-for="s in filterOptions.statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
-      </select>
       <button
         type="button"
         class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
@@ -765,7 +757,7 @@ watch(addUserRolesDropdownOpen, (open) => {
       >
         Reset
       </button>
-      <div class="ml-auto flex flex-wrap items-center gap-2 pl-6">
+      <div class="ml-auto flex flex-wrap items-center gap-2">
         <button
           type="button"
           class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -784,9 +776,13 @@ watch(addUserRolesDropdownOpen, (open) => {
       </div>
     </div>
 
-    <!-- Advance filters panel: only filters NOT in the top bar (no User name, no Status). All other possible filters. -->
+    <!-- Advanced filters panel: all supported users filters. -->
     <div v-show="filtersVisible" class="rounded-lg border border-gray-200 bg-white p-4">
       <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">User Name</label>
+          <input v-model="filters.name" type="text" placeholder="Search by user name" class="w-full rounded-lg border-gray-300 text-sm" />
+        </div>
         <div>
           <label class="block text-xs font-medium text-gray-600 mb-1">Email</label>
           <input v-model="filters.email" type="text" placeholder="Search by email" class="w-full rounded-lg border-gray-300 text-sm" />
@@ -803,12 +799,19 @@ watch(addUserRolesDropdownOpen, (open) => {
           <input v-model="filters.country" type="text" placeholder="Search by country" class="w-full rounded-lg border-gray-300 text-sm" />
         </div>
         <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Status</label>
+          <select v-model="filters.status" class="w-full rounded-lg border-gray-300 bg-white text-sm">
+            <option value="">All status</option>
+            <option v-for="s in filterOptions.statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
+          </select>
+        </div>
+        <div>
           <label class="block text-xs font-medium text-gray-600 mb-1">Created From</label>
-          <input v-model="filters.created_from" type="date" class="w-full rounded-lg border-gray-300 text-sm" />
+          <DateInputDdMmYyyy v-model="filters.created_from" placeholder="dd-Mon-yyyy" />
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-600 mb-1">Created To</label>
-          <input v-model="filters.created_to" type="date" class="w-full rounded-lg border-gray-300 text-sm" />
+          <DateInputDdMmYyyy v-model="filters.created_to" placeholder="dd-Mon-yyyy" />
         </div>
       </div>
       <div class="mt-3 flex gap-2">
@@ -818,7 +821,7 @@ watch(addUserRolesDropdownOpen, (open) => {
     </div>
 
     <!-- Table: sortable + editable -->
-    <div class="rounded-xl border-2 border-black bg-white shadow-sm overflow-x-auto">
+    <div class="relative overflow-x-auto">
       <div v-if="loading" class="flex justify-center items-center py-16">
         <svg class="animate-spin h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
@@ -826,9 +829,9 @@ watch(addUserRolesDropdownOpen, (open) => {
         </svg>
       </div>
       <div v-else>
-        <table class="min-w-full">
-          <thead class="bg-gray-50 border-b-2 border-black">
-            <tr>
+        <table class="min-w-full border-2 border-black border-collapse">
+          <thead>
+            <tr class="border-b-2 border-black bg-green-600">
               <th class="w-10 px-4 py-3">
                 <input
                   type="checkbox"
@@ -840,20 +843,20 @@ watch(addUserRolesDropdownOpen, (open) => {
               <th
                 v-for="col in visibleColumns"
                 :key="col"
-                class="px-4 py-3 text-left text-xs font-semibold text-gray-600 cursor-pointer hover:bg-gray-100"
-                :class="{ 'bg-green-50': sort === col }"
+                class="whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-white cursor-pointer"
+                :class="{ 'bg-green-700': sort === col }"
                 @click="toggleSort(col)"
               >
                 <span class="inline-flex items-center gap-1">
                   {{ columnLabels[col] ?? col }}
-                  <span v-if="sort === col" class="text-green-600">{{ order === 'asc' ? '↑' : '↓' }}</span>
+                  <span v-if="sort === col" class="text-white">{{ order === 'asc' ? '↑' : '↓' }}</span>
                 </span>
               </th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600">Actions</th>
+              <th class="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold text-white">Actions</th>
             </tr>
           </thead>
           <tbody class="bg-white">
-            <tr v-for="user in users" :key="user.id" class="border-b border-black hover:bg-gray-50">
+            <tr v-for="(user, rowIndex) in users" :key="user.id" class="border-b border-black bg-white hover:bg-gray-50/50">
               <td class="px-4 py-3">
                 <input
                   type="checkbox"
@@ -904,7 +907,8 @@ watch(addUserRolesDropdownOpen, (open) => {
                   </div>
                 </template>
                 <template v-else>
-                  <span v-if="col === 'name'" class="font-medium text-gray-900">{{ displayCellValue(user, col) }}</span>
+                  <span v-if="col === 'id'" class="text-sm text-gray-900">{{ rowNumber(rowIndex) }}</span>
+                  <span v-else-if="col === 'name'" class="font-medium text-gray-900">{{ displayCellValue(user, col) }}</span>
                   <span v-else-if="col === 'roles'" class="flex flex-wrap gap-1">
                     <span
                       v-for="r in (user.roles || [])"

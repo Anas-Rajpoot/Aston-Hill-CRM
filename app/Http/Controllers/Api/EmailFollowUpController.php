@@ -221,7 +221,7 @@ class EmailFollowUpController extends Controller
             ->all();
 
         return response()->json([
-            'statuses' => array_map(fn ($s) => ['value' => $s, 'label' => $s === 'followed_up' ? 'Followed Up' : ucfirst($s)], EmailFollowUp::STATUSES),
+            'statuses' => array_map(fn ($s) => ['value' => $s, 'label' => ucfirst($s)], EmailFollowUp::STATUSES),
             'categories' => array_values($categories),
         ]);
     }
@@ -277,6 +277,7 @@ class EmailFollowUpController extends Controller
 
         $data = $request->validate([
             'email_date' => ['required', 'date'],
+            'status' => ['sometimes', 'string', Rule::in(EmailFollowUp::STATUSES)],
             'category' => ['required', 'string', 'max:100'],
             'subject' => ['nullable', 'string', 'max:255'],
             'request_from' => ['nullable', 'string', 'max:190'],
@@ -285,7 +286,7 @@ class EmailFollowUpController extends Controller
         ]);
 
         $data['created_by'] = $request->user()->id;
-        $data['status'] = 'pending';
+        $data['status'] = $data['status'] ?? 'pending';
 
         $entry = EmailFollowUp::create($data);
 

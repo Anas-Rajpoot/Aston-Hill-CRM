@@ -12,6 +12,7 @@ import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const TABLE_MODULE = 'order-status'
+const COLUMN_MODULE = 'order-status-listing'
 const perPageOptions = ref([10, 20, 25, 50, 100])
 const loading = ref(true)
 const orders = ref([])
@@ -126,10 +127,8 @@ function onSort({ sort: s, order: o }) {
   load()
 }
 
-function onSaveColumns(cols) {
-  visibleColumns.value = cols
-  meta.value.current_page = 1
-  load()
+async function onSaveColumns(cols) {
+  await saveColumns(cols)
 }
 
 function onPageChange(page) {
@@ -153,8 +152,39 @@ async function loadTablePreference() {
   } catch { /* use system default */ }
 }
 
+async function loadColumns() {
+  const allowed = new Set(allOrderStatusColumns.map((c) => c.key))
+  const normalize = (cols) => (Array.isArray(cols) ? cols.filter((c) => allowed.has(c)) : [])
+  try {
+    const { data } = await api.get('/clients/columns', { params: { module: COLUMN_MODULE } })
+    const cols = normalize(data?.visible_columns)
+    if (cols.length) {
+      visibleColumns.value = cols
+      return
+    }
+    // Backward-compatible fallback for previously saved module keys.
+    const { data: legacy } = await api.get('/clients/columns', { params: { module: TABLE_MODULE } })
+    const legacyCols = normalize(legacy?.visible_columns)
+    if (legacyCols.length) {
+      visibleColumns.value = legacyCols
+    }
+  } catch { /* silent */ }
+}
+
+async function saveColumns(cols) {
+  try {
+    const allowed = new Set(allOrderStatusColumns.map((c) => c.key))
+    const normalized = (Array.isArray(cols) ? cols : []).filter((c) => allowed.has(c))
+    await api.post('/clients/columns', { module: COLUMN_MODULE, visible_columns: normalized })
+    visibleColumns.value = normalized
+    meta.value.current_page = 1
+    load()
+  } catch { /* silent */ }
+}
+
 onMounted(async () => {
   await loadTablePreference()
+  await loadColumns()
   load()
 })
 </script>
@@ -205,7 +235,7 @@ onMounted(async () => {
               @keyup.enter="applyFilters"
             />
           </div>
-          <div class="flex flex-1 flex-wrap items-center gap-2">
+          <div class="ml-auto flex flex-wrap items-center gap-2">
             <button
               type="button"
               class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 disabled:opacity-50"
@@ -225,7 +255,7 @@ onMounted(async () => {
             >
               Clear
             </button>
-            <div class="ml-auto flex items-center gap-2">
+            <div class="flex items-center gap-2">
             <button
               type="button"
               class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"

@@ -4,24 +4,43 @@ namespace App\Policies;
 
 use App\Models\SpecialRequest;
 use App\Models\User;
+use App\Services\SubmissionAccessService;
+use App\Support\RbacPermission;
 
 class SpecialRequestPolicy
 {
     public function viewAny(User $user): bool
     {
-        return true;
+        return RbacPermission::can($user, 'special_requests', 'read', [
+            'special_requests.list',
+            'special_requests.view',
+        ]);
     }
 
     public function view(User $user, SpecialRequest $specialRequest): bool
     {
-        return true;
+        return $this->viewAny($user)
+            && SubmissionAccessService::canAccessRecord($user, $specialRequest);
     }
 
     public function update(User $user, SpecialRequest $specialRequest): bool
     {
-        if ($user->hasRole('superadmin')) {
-            return true;
-        }
-        return (int) $specialRequest->created_by === (int) $user->id;
+        return RbacPermission::can($user, 'special_requests', 'update', [
+            'special_requests.edit',
+        ]) && $this->view($user, $specialRequest);
+    }
+
+    public function create(User $user): bool
+    {
+        return RbacPermission::can($user, 'special_requests', 'create', [
+            'special_requests.create',
+        ]);
+    }
+
+    public function delete(User $user, SpecialRequest $specialRequest): bool
+    {
+        return RbacPermission::can($user, 'special_requests', 'delete', [
+            'special_requests.delete',
+        ]) && $this->view($user, $specialRequest);
     }
 }

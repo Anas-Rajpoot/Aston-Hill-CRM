@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class EmailFollowUp extends Model
 {
-    public const STATUSES = ['pending', 'followed_up'];
+    public const STATUSES = ['pending', 'approved'];
 
     protected $fillable = [
         'created_by',

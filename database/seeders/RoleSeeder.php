@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Role;
 use Illuminate\Database\Seeder;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
 
 class RoleSeeder extends Seeder
@@ -78,6 +79,58 @@ class RoleSeeder extends Seeder
             }
         }
 
+        $allPermissions = Permission::query()
+            ->where('guard_name', 'web')
+            ->pluck('name')
+            ->all();
+
+        $roleBundles = [
+            'superadmin' => $allPermissions,
+            'manager' => $this->bundleForModules(['lead', 'lead-submissions', 'field-submissions', 'customer_support_requests', 'vas_requests', 'clients', 'teams', 'reports']),
+            'team_leader' => $this->bundleForModules(['lead', 'lead-submissions', 'field-submissions', 'customer_support_requests', 'vas_requests', 'clients']),
+            'back_office' => $this->bundleForModules(['lead-submissions', 'field-submissions', 'customer_support_requests', 'vas_requests', 'special_requests']),
+            'sales_agent' => $this->bundleForModules(['lead', 'lead-submissions', 'field-submissions', 'customer_support_requests', 'vas_requests', 'special_requests']),
+            'field_agent' => $this->bundleForModules(['field-submissions', 'lead-submissions']),
+            'field_operations_head' => $this->bundleForModules(['field-submissions', 'lead-submissions', 'reports']),
+            'customer_support_representative' => $this->bundleForModules(['customer_support_requests', 'clients']),
+            'support_manager' => $this->bundleForModules(['customer_support_requests', 'clients', 'reports']),
+        ];
+
+        foreach ($roleBundles as $roleName => $permissionNames) {
+            $role = Role::query()->where('name', $roleName)->where('guard_name', 'web')->first();
+            if (! $role) {
+                continue;
+            }
+
+            $validNames = Permission::query()
+                ->where('guard_name', 'web')
+                ->whereIn('name', array_values(array_unique($permissionNames)))
+                ->pluck('name')
+                ->all();
+
+            $role->syncPermissions($validNames);
+        }
+
         app(PermissionRegistrar::class)->forgetCachedPermissions();
+    }
+
+    /**
+     * Build a deterministic baseline bundle: read/create/update for selected modules.
+     *
+     * @param array<int,string> $modules
+     * @return array<int,string>
+     */
+    private function bundleForModules(array $modules): array
+    {
+        $actions = ['read', 'create', 'update'];
+        $names = [];
+
+        foreach ($modules as $module) {
+            foreach ($actions as $action) {
+                $names[] = "{$module}.{$action}";
+            }
+        }
+
+        return array_values(array_unique($names));
     }
 }

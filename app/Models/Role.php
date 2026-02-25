@@ -16,4 +16,24 @@ class Role extends SpatieRole
     protected $attributes = [
         'status' => 'active',
     ];
+
+    public function parentRoles()
+    {
+        return $this->belongsToMany(
+            self::class,
+            'role_inheritance',
+            'child_role_id',
+            'parent_role_id'
+        )->withTimestamps();
+    }
+
+    public function childRoles()
+    {
+        return $this->belongsToMany(
+            self::class,
+            'role_inheritance',
+            'parent_role_id',
+            'child_role_id'
+        )->withTimestamps();
+    }
 }

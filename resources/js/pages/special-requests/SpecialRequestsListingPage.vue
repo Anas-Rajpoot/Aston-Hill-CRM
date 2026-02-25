@@ -58,8 +58,8 @@ const meta = ref({ current_page: 1, last_page: 1, per_page: auth.defaultTablePag
 const perPageOptions = ref([10, 20, 25, 50, 100])
 const allColumns = ref([])
 const visibleColumns = ref([
-  'id', 'submitted_at', 'company_name', 'account_number', 'request_type',
-  'complete_address', 'sales_agent', 'team_leader', 'manager', 'status', 'creator', 'updated_at',
+  'created_at', 'company_name', 'account_number', 'request_type',
+  'complete_address', 'special_instruction', 'sales_agent', 'team_leader', 'manager', 'status', 'creator', 'updated_at',
 ])
 const sort = ref('created_at')
 const order = ref('desc')
@@ -108,13 +108,13 @@ function buildParams() {
 }
 
 const COLUMN_LABELS = {
-  id: 'ID',
+  id: 'SR',
   submitted_at: 'Submission Date',
   created_at: 'Created',
   company_name: 'Company Name',
   account_number: 'Account Number',
   request_type: 'Request Type',
-  complete_address: 'Complete Address',
+  complete_address: 'Address',
   special_instruction: 'Special Instruction',
   sales_agent: 'Sales Agent',
   team_leader: 'Team Leader',
@@ -122,6 +122,19 @@ const COLUMN_LABELS = {
   status: 'Status',
   creator: 'Created By',
   updated_at: 'Last Updated',
+}
+
+const COLUMN_ORDER = [
+  'created_at', 'company_name', 'account_number', 'request_type',
+  'complete_address', 'special_instruction', 'sales_agent', 'team_leader',
+  'manager', 'status', 'creator', 'updated_at',
+]
+
+function normalizeVisibleColumns(cols) {
+  const set = new Set((cols || []).filter((c) => c !== 'id' && c !== 'submitted_at'))
+  const ordered = COLUMN_ORDER.filter((c) => set.has(c))
+  const extra = [...set].filter((c) => !COLUMN_ORDER.includes(c))
+  return [...ordered, ...extra]
 }
 
 function escapeCsv(val) {
@@ -207,7 +220,7 @@ async function loadColumns() {
   try {
     const data = await specialRequestsApi.columns()
     allColumns.value = data.all_columns ?? []
-    visibleColumns.value = data.visible_columns ?? visibleColumns.value
+    visibleColumns.value = normalizeVisibleColumns(data.visible_columns ?? visibleColumns.value)
   } catch { /* silent */ }
 }
 
@@ -222,8 +235,9 @@ function onSort({ sort: s, order: o }) { sort.value = s; order.value = o; meta.v
 
 async function onSaveColumns(cols) {
   try {
-    await specialRequestsApi.saveColumns(cols)
-    visibleColumns.value = cols
+    const normalized = normalizeVisibleColumns(cols)
+    await specialRequestsApi.saveColumns(normalized)
+    visibleColumns.value = normalized
     meta.value.current_page = 1
     load()
   } catch { /* silent */ }
@@ -279,7 +293,7 @@ onMounted(async () => {
     }
     const cd = bootstrapResult.columns ?? {}
     if (cd.all_columns) allColumns.value = cd.all_columns
-    if (cd.visible_columns) visibleColumns.value = cd.visible_columns
+    if (cd.visible_columns) visibleColumns.value = normalizeVisibleColumns(cd.visible_columns)
     const pd = bootstrapResult.page ?? {}
     submissions.value = pd.data ?? []
     meta.value = pd.meta ?? meta.value

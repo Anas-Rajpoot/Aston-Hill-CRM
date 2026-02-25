@@ -33,7 +33,7 @@ function rowNumber(index) {
 }
 
 const columnLabels = {
-  id: '#',
+  id: 'SR',
   email_date: 'Email Date',
   subject: 'Subject',
   category: 'Category',
@@ -146,14 +146,14 @@ function isEditing(rowId, col) {
   return editingCell.value && editingCell.value.rowId === rowId && editingCell.value.col === col
 }
 
-/** Approved = followed_up; Not Approved = pending (for display and toggle). */
-const isApproved = (status) => status === 'followed_up'
+/** Approved = approved (legacy followed_up treated as approved). */
+const isApproved = (status) => status === 'approved' || status === 'followed_up'
 function statusLabel(status) {
-  return isApproved(status) ? 'Approved' : 'Not Approved'
+  return isApproved(status) ? 'Approved' : 'Pending'
 }
 function onStatusToggle(row) {
   if (!canInlineEdit.value || !row?.id) return
-  const next = isApproved(row.status) ? 'pending' : 'followed_up'
+  const next = isApproved(row.status) ? 'pending' : 'approved'
   emit('updateCell', row.id, 'status', next)
 }
 </script>

@@ -10,6 +10,7 @@ import AdvancedFilters from '@/components/email-followups/AdvancedFilters.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import EmailFollowUpTable from '@/components/email-followups/EmailFollowUpTable.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
 import api from '@/lib/axios'
 
 const auth = useAuthStore()
@@ -31,8 +32,7 @@ const columnModalVisible = ref(false)
 
 const form = ref({
   email_date: '',
-  category: '',
-  category_other: '',
+  status: 'pending',
   subject: '',
   request_from: '',
   sent_to: '',
@@ -40,7 +40,7 @@ const form = ref({
 
 const filters = ref({
   q: '',
-  status: '',
+  status: 'pending',
   category: '',
   from: '',
   to: '',
@@ -103,7 +103,7 @@ function applyFilters() {
 }
 
 function resetFilters() {
-  filters.value = { q: '', status: '', category: '', from: '', to: '' }
+  filters.value = { q: '', status: 'pending', category: '', from: '', to: '' }
   meta.value.current_page = 1
   load()
 }
@@ -163,27 +163,21 @@ async function loadTablePreference() {
 function clearForm() {
   form.value = {
     email_date: '',
-    category: '',
-    category_other: '',
+    status: 'pending',
     subject: '',
     request_from: '',
     sent_to: '',
   }
 }
 
-function getCategoryToSend() {
-  const c = form.value.category
-  return c === '__other__' ? (form.value.category_other || '').trim() : c
-}
-
 async function submitForm() {
-  const category = getCategoryToSend()
-  if (!form.value.email_date || !category) return
+  if (!form.value.email_date) return
   submitLoading.value = true
   try {
     await emailFollowUpsApi.store({
       email_date: form.value.email_date,
-      category,
+      status: form.value.status || 'pending',
+      category: 'General',
       subject: form.value.subject || null,
       request_from: form.value.request_from || null,
       sent_to: form.value.sent_to || null,
@@ -276,30 +270,17 @@ onMounted(async () => {
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700">Email Date <span class="text-red-500">*</span></label>
-            <input
-              v-model="form.email_date"
-              type="date"
-              required
-              class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            />
+            <DateInputDdMmYyyy v-model="form.email_date" placeholder="dd-Mon-yyyy" />
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700">Category <span class="text-red-500">*</span></label>
+            <label class="block text-sm font-medium text-gray-700">Status <span class="text-red-500">*</span></label>
             <select
-              v-model="form.category"
+              v-model="form.status"
               class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
             >
-              <option value="">Select Category</option>
-              <option v-for="c in filterOptions.categories" :key="c" :value="c">{{ c }}</option>
-              <option value="__other__">Other</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
             </select>
-            <input
-              v-if="form.category === '__other__'"
-              v-model="form.category_other"
-              type="text"
-              placeholder="Enter category name"
-              class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            />
           </div>
           <div class="sm:col-span-2">
             <label class="block text-sm font-medium text-gray-700">Subject</label>
@@ -340,7 +321,7 @@ onMounted(async () => {
           <button
             type="button"
             class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70"
-            :disabled="submitLoading || !form.email_date || !getCategoryToSend()"
+            :disabled="submitLoading || !form.email_date"
             @click="submitForm"
           >
             <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

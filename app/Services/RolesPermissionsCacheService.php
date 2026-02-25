@@ -68,10 +68,22 @@ class RolesPermissionsCacheService
                 ->pluck('permissions.name')
                 ->toArray();
 
+            $inheritedPermissionNames = $this->resolveInheritedPermissionNamesForRole($roleId);
+            $effectivePermissionNames = array_values(array_unique(array_merge($permissionNames, $inheritedPermissionNames)));
+
+            $parentRoleIds = DB::table('role_inheritance')
+                ->where('child_role_id', $roleId)
+                ->pluck('parent_role_id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
             return [
                 'structure' => $structure,
                 'role' => ['id' => $role->id, 'name' => $role->name],
                 'permission_names' => $permissionNames,
+                'inherited_permission_names' => $inheritedPermissionNames,
+                'effective_permission_names' => $effectivePermissionNames,
+                'parent_role_ids' => $parentRoleIds,
                 'roles_list' => $rolesListPayload,
             ];
         });
@@ -82,6 +94,8 @@ class RolesPermissionsCacheService
         Cache::forget(self::CACHE_KEY_STRUCTURE);
         Cache::forget(self::CACHE_KEY_ROLES_LIST);
         \App\Http\Controllers\Api\BootstrapController::invalidate();
+        app(RoleInheritanceService::class)->flushAll();
+        app(EffectivePermissionService::class)->flushAll();
     }
 
     /** Forget cached permissions-page payload for one role (call after role permission sync). */
@@ -216,5 +230,30 @@ class RolesPermissionsCacheService
                 'total_users_assigned' => $totalUsersAssigned,
             ],
         ];
+    }
+
+    /**
+     * @return array<int,string>
+     */
+    private function resolveInheritedPermissionNamesForRole(int $roleId): array
+    {
+        $ancestorRoleIds = app(RoleInheritanceService::class)->resolveAncestorRoleIds($roleId);
+        $ancestorRoleIds = array_values(array_filter(
+            array_map('intval', $ancestorRoleIds),
+            fn (int $id) => $id !== $roleId
+        ));
+
+        if (empty($ancestorRoleIds)) {
+            return [];
+        }
+
+        return DB::table('role_has_permissions')
+            ->join('permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
+            ->whereIn('role_has_permissions.role_id', $ancestorRoleIds)
+            ->where('permissions.guard_name', 'web')
+            ->pluck('permissions.name')
+            ->unique()
+            ->values()
+            ->all();
     }
 }

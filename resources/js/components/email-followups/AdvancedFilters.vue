@@ -1,9 +1,9 @@
 <script setup>
 /**
- * Advanced filters: search, date range. Date display dd-mm-yyyy.
+ * Advanced filters: search + date range with calendar picker.
  */
 import { computed } from 'vue'
-import { toDdMmYyyy, fromDdMmYyyy } from '@/lib/dateFormat'
+import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -22,15 +22,6 @@ const activeCount = computed(() => {
   if (f.category) n++
   if (f.status) n++
   return n
-})
-
-const fromDisplay = computed({
-  get: () => toDdMmYyyy(props.filters.from),
-  set: (v) => { props.filters.from = fromDdMmYyyy(v) || '' },
-})
-const toDisplay = computed({
-  get: () => toDdMmYyyy(props.filters.to),
-  set: (v) => { props.filters.to = fromDdMmYyyy(v) || '' },
 })
 </script>
 
@@ -63,21 +54,17 @@ const toDisplay = computed({
         </div>
         <div>
           <label class="mb-0.5 block text-xs font-medium text-gray-600">Email Date From</label>
-          <input
-            v-model="fromDisplay"
-            type="text"
-            placeholder="dd-mm-yyyy"
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+          <DateInputDdMmYyyy
+            v-model="filters.from"
+            placeholder="dd-Mon-yyyy"
             :disabled="loading"
           />
         </div>
         <div>
           <label class="mb-0.5 block text-xs font-medium text-gray-600">Email Date To</label>
-          <input
-            v-model="toDisplay"
-            type="text"
-            placeholder="dd-mm-yyyy"
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+          <DateInputDdMmYyyy
+            v-model="filters.to"
+            placeholder="dd-Mon-yyyy"
             :disabled="loading"
           />
         </div>

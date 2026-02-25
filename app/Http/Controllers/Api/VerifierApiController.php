@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\SystemAuditLog;
 use App\Models\Verifier;
+use App\Support\RbacPermission;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,28 +23,21 @@ class VerifierApiController extends Controller
     private function canAdd(Request $request): bool
     {
         $user = $request->user();
-        if (! $user) {
-            return false;
-        }
-        if ($user->hasRole('superadmin')) {
-            return true;
-        }
-
-        return $user->can('verifiers.add') || $user->can('verifiers.create');
+        return $user && RbacPermission::can($user, ['verifiers', 'gsm_verifiers'], 'create', [
+            'verifiers.add',
+            'verifiers.create',
+            'gsm_verifiers.add_verifier',
+        ]);
     }
 
     /** Check if user can delete verifiers. */
     private function canDelete(Request $request): bool
     {
         $user = $request->user();
-        if (! $user) {
-            return false;
-        }
-        if ($user->hasRole('superadmin')) {
-            return true;
-        }
-
-        return $user->can('verifiers.delete');
+        return $user && RbacPermission::can($user, ['verifiers', 'gsm_verifiers'], 'delete', [
+            'verifiers.delete',
+            'gsm_verifiers.delete',
+        ]);
     }
 
     /**
@@ -51,6 +45,15 @@ class VerifierApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $user = $request->user();
+        if (! $user || ! RbacPermission::can($user, ['verifiers', 'gsm_verifiers'], 'read', [
+            'verifiers.list',
+            'verifiers.view',
+            'gsm_verifiers.list',
+        ])) {
+            return response()->json(['message' => 'Unauthorized to view verifiers.'], 403);
+        }
+
         $validated = $request->validate([
             'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
@@ -79,11 +82,32 @@ class VerifierApiController extends Controller
         $page = (int) ($validated['page'] ?? 1);
         $paginator = $query->paginate($perPage, ['*'], 'page', $page);
 
-        $items = $paginator->getCollection()->map(fn ($row) => [
+        $rows = $paginator->getCollection();
+        $addedByNames = [];
+        $verifierIds = $rows->pluck('id')->filter()->values()->all();
+        if (! empty($verifierIds)) {
+            $createdAuditRows = DB::table('system_audit_logs as sal')
+                ->leftJoin('users as u', 'u.id', '=', 'sal.user_id')
+                ->where('sal.entity_type', 'verifier')
+                ->where('sal.event', 'verifier.created')
+                ->whereIn('sal.entity_id', $verifierIds)
+                ->orderBy('sal.id')
+                ->get(['sal.entity_id', 'u.name']);
+
+            foreach ($createdAuditRows as $auditRow) {
+                $entityId = (int) ($auditRow->entity_id ?? 0);
+                if ($entityId > 0 && ! array_key_exists($entityId, $addedByNames)) {
+                    $addedByNames[$entityId] = $auditRow->name;
+                }
+            }
+        }
+
+        $items = $rows->map(fn ($row) => [
             'id' => $row->id,
             'verifier_name' => $row->verifier_name,
             'verifier_number' => $row->verifier_number,
             'remarks' => $row->remarks,
+            'added_by_name' => $addedByNames[$row->id] ?? null,
             'created_at' => $row->created_at?->toIso8601String(),
             'updated_at' => $row->updated_at?->toIso8601String(),
         ]);
@@ -110,7 +134,7 @@ class VerifierApiController extends Controller
 
         $validated = $request->validate([
             'verifier_name' => ['required', 'string', 'max:255'],
-            'verifier_number' => ['nullable', 'string', 'max:100'],
+            'verifier_number' => ['required', 'regex:/^971\d{9}$/'],
             'remarks' => ['nullable', 'string'],
         ]);
 
@@ -151,7 +175,7 @@ class VerifierApiController extends Controller
 
         $validated = $request->validate([
             'verifier_name' => ['sometimes', 'string', 'max:255'],
-            'verifier_number' => ['nullable', 'string', 'max:100'],
+            'verifier_number' => ['sometimes', 'nullable', 'regex:/^971\d{9}$/'],
             'remarks' => ['nullable', 'string'],
         ]);
 
@@ -245,10 +269,15 @@ class VerifierApiController extends Controller
         }
 
         $count = 0;
-        if (! empty($toInsert)) {
-            Verifier::query()->insert($toInsert);
-            $count = count($toInsert);
+        if (empty($toInsert)) {
+            return response()->json([
+                'message' => 'No valid rows found. Verifier Name is required for each row.',
+                'imported' => 0,
+            ], 422);
         }
+
+        Verifier::query()->insert($toInsert);
+        $count = count($toInsert);
 
         try {
             SystemAuditLog::record(
@@ -274,6 +303,15 @@ class VerifierApiController extends Controller
      */
     public function exportCsv(Request $request): StreamedResponse
     {
+        $user = $request->user();
+        if (! $user || ! RbacPermission::can($user, ['verifiers', 'gsm_verifiers'], 'read', [
+            'verifiers.export',
+            'verifiers.list',
+            'gsm_verifiers.list',
+        ])) {
+            abort(403, 'Unauthorized to export verifiers.');
+        }
+
         $validated = $request->validate([
             'q' => ['sometimes', 'nullable', 'string', 'max:200'],
         ]);

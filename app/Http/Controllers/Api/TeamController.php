@@ -9,6 +9,7 @@ use App\Models\SystemAuditLog;
 use App\Models\Team;
 use App\Models\User;
 use App\Models\UserColumnPreference;
+use App\Support\RbacPermission;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Services\TeamHierarchyService;
@@ -34,10 +35,7 @@ class TeamController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $user = $request->user();
-        if (! $user->hasRole('superadmin') && ! $user->can('teams.list')) {
-            return response()->json(['message' => 'Unauthorized.'], 403);
-        }
+        $this->authorizeAction($request, 'read', ['teams.list', 'teams.view']);
 
         $validated = $request->validate([
             'page' => ['sometimes', 'integer', 'min:1'],
@@ -96,7 +94,14 @@ class TeamController extends Controller
 
     public function store(StoreTeamRequest $request): JsonResponse
     {
-        $team = Team::create($request->validated());
+        $data = $request->validated();
+        [$managerIds, $leaderIds, $memberIds] = $this->resolveRoleAssignments($data);
+        $data['manager_id'] = $managerIds[0] ?? null;
+        $data['team_leader_id'] = $leaderIds[0] ?? null;
+        unset($data['manager_ids'], $data['team_leader_ids'], $data['member_ids']);
+
+        $team = Team::create($data);
+        $this->syncTeamAssignments($team, $managerIds, $leaderIds, $memberIds);
         $team->load(['manager:id,name', 'teamLeader:id,name']);
 
         try {
@@ -118,10 +123,7 @@ class TeamController extends Controller
 
     public function show(Team $team): JsonResponse
     {
-        $user = request()->user();
-        if (! $user->hasRole('superadmin') && ! $user->can('teams.view')) {
-            return response()->json(['message' => 'Unauthorized.'], 403);
-        }
+        $this->authorizeAction(request(), 'read', ['teams.view', 'teams.list']);
 
         $team->load(['manager:id,name,email', 'teamLeader:id,name,email']);
         $team->loadCount('members');
@@ -132,8 +134,20 @@ class TeamController extends Controller
             ->orderBy('name')
             ->get();
 
+        $managerIds = $members->filter(fn ($u) => $u->roles->pluck('name')->contains('manager'))->pluck('id');
+        $leaderIds = $members->filter(fn ($u) => $u->roles->pluck('name')->contains('team_leader'))->pluck('id');
+        $memberIds = $members->pluck('id')->diff($managerIds)->diff($leaderIds)->values();
+
+        if ($team->manager_id) $managerIds->prepend((int) $team->manager_id);
+        if ($team->team_leader_id) $leaderIds->prepend((int) $team->team_leader_id);
+
+        $teamData = $team->toArray();
+        $teamData['manager_ids'] = $managerIds->map(fn ($id) => (int) $id)->unique()->values()->all();
+        $teamData['team_leader_ids'] = $leaderIds->map(fn ($id) => (int) $id)->unique()->values()->all();
+        $teamData['member_ids'] = $memberIds->map(fn ($id) => (int) $id)->unique()->values()->all();
+
         return response()->json([
-            'team' => $team,
+            'team' => $teamData,
             'members' => $members,
         ]);
     }
@@ -143,7 +157,14 @@ class TeamController extends Controller
     public function update(UpdateTeamRequest $request, Team $team): JsonResponse
     {
         $oldData = $team->toArray();
-        $team->update($request->validated());
+        $data = $request->validated();
+        [$managerIds, $leaderIds, $memberIds] = $this->resolveRoleAssignments($data);
+        $data['manager_id'] = $managerIds[0] ?? null;
+        $data['team_leader_id'] = $leaderIds[0] ?? null;
+        unset($data['manager_ids'], $data['team_leader_ids'], $data['member_ids']);
+
+        $team->update($data);
+        $this->syncTeamAssignments($team, $managerIds, $leaderIds, $memberIds);
         $team->load(['manager:id,name', 'teamLeader:id,name']);
         $team->loadCount('members');
 
@@ -165,10 +186,8 @@ class TeamController extends Controller
 
     public function destroy(Request $request, Team $team): JsonResponse
     {
+        $this->authorizeAction($request, 'delete', ['teams.delete']);
         $user = $request->user();
-        if (! $user->hasRole('superadmin') && ! $user->can('teams.delete')) {
-            return response()->json(['message' => 'Unauthorized.'], 403);
-        }
 
         $memberCount = $team->members()->count();
         if ($memberCount > 0) {
@@ -193,10 +212,8 @@ class TeamController extends Controller
 
     public function bulkDelete(Request $request): JsonResponse
     {
+        $this->authorizeAction($request, 'delete', ['teams.delete']);
         $user = $request->user();
-        if (! $user->hasRole('superadmin') && ! $user->can('teams.delete')) {
-            return response()->json(['message' => 'Unauthorized.'], 403);
-        }
 
         $data = $request->validate(['ids' => ['required', 'array', 'min:1'], 'ids.*' => ['integer', 'exists:teams,id']]);
 
@@ -223,10 +240,8 @@ class TeamController extends Controller
 
     public function bulkStatusChange(Request $request): JsonResponse
     {
+        $this->authorizeAction($request, 'update', ['teams.edit']);
         $user = $request->user();
-        if (! $user->hasRole('superadmin') && ! $user->can('teams.edit')) {
-            return response()->json(['message' => 'Unauthorized.'], 403);
-        }
 
         $data = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
@@ -253,10 +268,7 @@ class TeamController extends Controller
 
     public function members(Team $team): JsonResponse
     {
-        $user = request()->user();
-        if (! $user->hasRole('superadmin') && ! $user->can('teams.view')) {
-            return response()->json(['message' => 'Unauthorized.'], 403);
-        }
+        $this->authorizeAction(request(), 'read', ['teams.view', 'teams.list']);
 
         $members = User::where('team_id', $team->id)
             ->select(['id', 'name', 'email', 'status', 'department'])
@@ -269,10 +281,8 @@ class TeamController extends Controller
 
     public function addMembers(Request $request, Team $team): JsonResponse
     {
+        $this->authorizeAction($request, 'update', ['teams.manage_members', 'teams.edit']);
         $user = $request->user();
-        if (! $user->hasRole('superadmin') && ! $user->can('teams.manage_members')) {
-            return response()->json(['message' => 'Unauthorized.'], 403);
-        }
 
         $data = $request->validate([
             'user_ids' => ['required', 'array', 'min:1'],
@@ -310,10 +320,8 @@ class TeamController extends Controller
 
     public function removeMember(Request $request, Team $team, User $member): JsonResponse
     {
+        $this->authorizeAction($request, 'update', ['teams.manage_members', 'teams.edit']);
         $user = $request->user();
-        if (! $user->hasRole('superadmin') && ! $user->can('teams.manage_members')) {
-            return response()->json(['message' => 'Unauthorized.'], 403);
-        }
 
         if ((int) $member->team_id !== (int) $team->id) {
             return response()->json(['message' => 'User is not a member of this team.'], 422);
@@ -339,6 +347,8 @@ class TeamController extends Controller
 
     public function filters(Request $request): JsonResponse
     {
+        $this->authorizeAction($request, 'read', ['teams.list', 'teams.view']);
+
         $departments = Team::whereNotNull('department')
             ->where('department', '!=', '')
             ->distinct()
@@ -368,6 +378,8 @@ class TeamController extends Controller
 
     public function columns(Request $request): JsonResponse
     {
+        $this->authorizeAction($request, 'read', ['teams.list', 'teams.view']);
+
         $allColumns = collect(self::ALLOWED_COLUMNS)->map(fn ($key) => [
             'key' => $key,
             'label' => $this->columnLabel($key),
@@ -387,6 +399,8 @@ class TeamController extends Controller
 
     public function saveColumns(Request $request): JsonResponse
     {
+        $this->authorizeAction($request, 'read', ['teams.list', 'teams.view']);
+
         $data = $request->validate([
             'visible_columns' => ['required', 'array', 'min:1'],
             'visible_columns.*' => ['string', Rule::in(self::ALLOWED_COLUMNS)],
@@ -405,6 +419,8 @@ class TeamController extends Controller
     /** Available users to add as team members (not already in any team). */
     public function availableMembers(Request $request): JsonResponse
     {
+        $this->authorizeAction($request, 'read', ['teams.list', 'teams.view']);
+
         $teamId = $request->query('team_id');
 
         $users = User::where('status', 'approved')
@@ -539,5 +555,56 @@ class TeamController extends Controller
         ];
 
         return $labels[$key] ?? ucfirst(str_replace('_', ' ', $key));
+    }
+
+    private function resolveRoleAssignments(array $data): array
+    {
+        $managerIds = collect($data['manager_ids'] ?? [])->map(fn ($id) => (int) $id)->filter()->values();
+        $leaderIds = collect($data['team_leader_ids'] ?? [])->map(fn ($id) => (int) $id)->filter()->values();
+        $memberIds = collect($data['member_ids'] ?? [])->map(fn ($id) => (int) $id)->filter()->values();
+
+        if ($managerIds->isEmpty() && ! empty($data['manager_id'])) {
+            $managerIds = collect([(int) $data['manager_id']]);
+        }
+        if ($leaderIds->isEmpty() && ! empty($data['team_leader_id'])) {
+            $leaderIds = collect([(int) $data['team_leader_id']]);
+        }
+
+        // Keep slots mutually exclusive.
+        $leaderIds = $leaderIds->diff($managerIds)->values();
+        $memberIds = $memberIds->diff($managerIds)->diff($leaderIds)->values();
+
+        return [
+            $managerIds->unique()->values()->all(),
+            $leaderIds->unique()->values()->all(),
+            $memberIds->unique()->values()->all(),
+        ];
+    }
+
+    private function syncTeamAssignments(Team $team, array $managerIds, array $leaderIds, array $memberIds): void
+    {
+        $selectedIds = collect(array_merge($managerIds, $leaderIds, $memberIds))
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        // Remove users no longer selected for this team.
+        User::where('team_id', $team->id)
+            ->when(! empty($selectedIds), fn ($q) => $q->whereNotIn('id', $selectedIds))
+            ->update(['team_id' => null]);
+
+        if (! empty($selectedIds)) {
+            User::whereIn('id', $selectedIds)->update(['team_id' => $team->id]);
+        }
+    }
+
+    private function authorizeAction(Request $request, string $action, array $legacy = []): void
+    {
+        $user = $request->user();
+        if (! $user || ! RbacPermission::can($user, 'teams', $action, $legacy)) {
+            abort(403, 'Unauthorized.');
+        }
     }
 }

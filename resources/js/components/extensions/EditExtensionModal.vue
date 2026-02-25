@@ -35,12 +35,53 @@ const loading = ref(false)
 const loadingEmployees = ref(false)
 const submitting = ref(false)
 const error = ref(null)
+const fieldErrors = ref({
+  extension: '',
+  landline_number: '',
+  gateway: '',
+  username: '',
+  status: '',
+})
+
+function resetFieldErrors() {
+  fieldErrors.value = {
+    extension: '',
+    landline_number: '',
+    gateway: '',
+    username: '',
+    status: '',
+  }
+}
+
+function inputClass(field) {
+  return [
+    'w-full rounded-lg border px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500',
+    fieldErrors.value[field] ? 'border-red-500' : 'border-gray-300',
+  ]
+}
+
+function validateLandlineNumber(value) {
+  if (!value) return 'Landline Number is required.'
+  if (/\s/.test(value)) return 'Must not contain spaces.'
+  if (!/^\d+$/.test(value)) return 'Must contain only digits.'
+  if (!value.startsWith('971')) return 'Must start with 971.'
+  if (value.length !== 12) return 'Must be exactly 12 digits.'
+  return null
+}
+
+function onLandlineInput(event) {
+  const raw = String(event?.target?.value ?? '').replace(/\D/g, '').slice(0, 12)
+  form.value.landline_number = raw
+  fieldErrors.value.landline_number = ''
+  if (event?.target) event.target.value = raw
+}
 
 watch(
   () => [props.visible, props.extensionId],
   async ([visible, id]) => {
     if (visible && id) {
       error.value = null
+      resetFieldErrors()
       gatewaysList.value = props.gateways?.length ? props.gateways : []
       statusesList.value = props.statuses?.length ? props.statuses : []
       if (!props.gateways?.length || !props.statuses?.length) {
@@ -106,24 +147,24 @@ function close() {
 
 async function submit() {
   error.value = null
-  if (!form.value.extension?.trim()) {
-    error.value = 'Extension is required.'
-    return
-  }
-  if (!form.value.landline_number?.trim()) {
-    error.value = 'Landline Number is required.'
-    return
-  }
-  if (!form.value.gateway?.trim()) {
-    error.value = 'Gateway is required.'
-    return
-  }
-  if (!form.value.username?.trim()) {
-    error.value = 'Username is required.'
-    return
-  }
-  if (!form.value.status?.trim()) {
-    error.value = 'Status is required.'
+  resetFieldErrors()
+  const errs = {}
+  const extension = (form.value.extension || '').trim()
+  const landline = (form.value.landline_number || '').trim()
+  const gateway = (form.value.gateway || '').trim()
+  const username = (form.value.username || '').trim()
+  const status = (form.value.status || '').trim()
+
+  if (!extension) errs.extension = 'Extension is required.'
+  const landlineErr = validateLandlineNumber(landline)
+  if (landlineErr) errs.landline_number = landlineErr
+  if (!gateway) errs.gateway = 'Gateway is required.'
+  if (!username) errs.username = 'Username is required.'
+  if (!status) errs.status = 'Status is required.'
+
+  if (Object.keys(errs).length > 0) {
+    fieldErrors.value = { ...fieldErrors.value, ...errs }
+    error.value = 'Please fix the highlighted required fields.'
     return
   }
   // Password optional on edit (leave blank to keep existing)
@@ -132,11 +173,11 @@ async function submit() {
   submitting.value = true
   try {
     const payload = {
-      extension: form.value.extension.trim(),
-      landline_number: form.value.landline_number.trim(),
-      gateway: form.value.gateway.trim() || null,
-      username: form.value.username.trim(),
-      status: form.value.status,
+      extension,
+      landline_number: landline,
+      gateway: gateway || null,
+      username,
+      status,
       assigned_to: form.value.assigned_to || null,
       comment: form.value.comment?.trim() || null,
     }
@@ -145,7 +186,18 @@ async function submit() {
     emit('updated')
     close()
   } catch (e) {
-    const msg = e?.response?.data?.message || e?.response?.data?.errors
+    const serverErrors = e?.response?.data?.errors
+    if (serverErrors && typeof serverErrors === 'object') {
+      fieldErrors.value = {
+        ...fieldErrors.value,
+        extension: Array.isArray(serverErrors.extension) ? serverErrors.extension[0] : (fieldErrors.value.extension || ''),
+        landline_number: Array.isArray(serverErrors.landline_number) ? serverErrors.landline_number[0] : (fieldErrors.value.landline_number || ''),
+        gateway: Array.isArray(serverErrors.gateway) ? serverErrors.gateway[0] : (fieldErrors.value.gateway || ''),
+        username: Array.isArray(serverErrors.username) ? serverErrors.username[0] : (fieldErrors.value.username || ''),
+        status: Array.isArray(serverErrors.status) ? serverErrors.status[0] : (fieldErrors.value.status || ''),
+      }
+    }
+    const msg = e?.response?.data?.message || serverErrors
     error.value = typeof msg === 'string' ? msg : (msg && Object.values(msg).flat().length ? Object.values(msg).flat().join(' ') : 'Failed to update extension.')
   } finally {
     submitting.value = false
@@ -190,6 +242,7 @@ async function submit() {
             <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
               {{ error }}
             </p>
+            <p class="text-xs text-gray-500">Fields marked with <span class="text-red-500">*</span> are required.</p>
 
             <div>
               <label for="edit-ext-extension" class="mb-1 block text-sm font-medium text-gray-700">
@@ -199,9 +252,11 @@ async function submit() {
                 id="edit-ext-extension"
                 v-model="form.extension"
                 type="text"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                :class="inputClass('extension')"
                 placeholder="e.g., 1001"
+                @input="fieldErrors.extension = ''"
               />
+              <p v-if="fieldErrors.extension" class="mt-1 text-xs text-red-600">{{ fieldErrors.extension }}</p>
             </div>
 
             <div>
@@ -212,9 +267,12 @@ async function submit() {
                 id="edit-ext-landline"
                 v-model="form.landline_number"
                 type="text"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-                placeholder="e.g., +971-4-123-1001"
+                maxlength="12"
+                :class="inputClass('landline_number')"
+                placeholder="971XXXXXXXXX"
+                @input="onLandlineInput"
               />
+              <p v-if="fieldErrors.landline_number" class="mt-1 text-xs text-red-600">{{ fieldErrors.landline_number }}</p>
             </div>
 
             <div>
@@ -224,13 +282,15 @@ async function submit() {
               <select
                 id="edit-ext-gateway"
                 v-model="form.gateway"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                :class="inputClass('gateway')"
+                @change="fieldErrors.gateway = ''"
               >
                 <option value="">Select Gateway</option>
                 <option v-for="opt in gatewaysList" :key="opt.value" :value="opt.value">
                   {{ opt.label }}
                 </option>
               </select>
+              <p v-if="fieldErrors.gateway" class="mt-1 text-xs text-red-600">{{ fieldErrors.gateway }}</p>
             </div>
 
             <div>
@@ -242,14 +302,16 @@ async function submit() {
                 v-model="form.username"
                 type="text"
                 autocomplete="off"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                :class="inputClass('username')"
                 placeholder="e.g., ext1001"
+                @input="fieldErrors.username = ''"
               />
+              <p v-if="fieldErrors.username" class="mt-1 text-xs text-red-600">{{ fieldErrors.username }}</p>
             </div>
 
             <div>
               <label for="edit-ext-password" class="mb-1 block text-sm font-medium text-gray-700">
-                Password <span class="text-red-500">*</span>
+                Password
               </label>
               <input
                 id="edit-ext-password"
@@ -268,12 +330,14 @@ async function submit() {
               <select
                 id="edit-ext-status"
                 v-model="form.status"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                :class="inputClass('status')"
+                @change="fieldErrors.status = ''"
               >
                 <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">
                   {{ opt.label }}
                 </option>
               </select>
+              <p v-if="fieldErrors.status" class="mt-1 text-xs text-red-600">{{ fieldErrors.status }}</p>
             </div>
 
             <div>

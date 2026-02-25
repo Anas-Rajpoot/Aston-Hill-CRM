@@ -5,7 +5,7 @@
  * (Status and Landline Number are in general filters and should not be duplicated here.)
  */
 import { computed } from 'vue'
-import { toDdMmYyyy, fromDdMmYyyy } from '@/lib/dateFormat'
+import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -24,12 +24,12 @@ const props = defineProps({
 const emit = defineEmits(['apply', 'reset'])
 
 const createdFromDisplay = computed({
-  get: () => toDdMmYyyy(props.filters.created_from),
-  set: (v) => { props.filters.created_from = fromDdMmYyyy(v) || '' },
+  get: () => props.filters.created_from || '',
+  set: (v) => { props.filters.created_from = v || '' },
 })
 const createdToDisplay = computed({
-  get: () => toDdMmYyyy(props.filters.created_to),
-  set: (v) => { props.filters.created_to = fromDdMmYyyy(v) || '' },
+  get: () => props.filters.created_to || '',
+  set: (v) => { props.filters.created_to = v || '' },
 })
 </script>
 
@@ -47,7 +47,7 @@ const createdToDisplay = computed({
         <p class="text-xs font-medium text-gray-600">All filters</p>
         <p class="text-xs text-gray-500">Extension, Gateway, User Name, Assigned To, Manager, Team Leader, Usage, Created Date From/To</p>
       </div>
-      <div class="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
         <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Extension</label>
           <input
@@ -109,9 +109,6 @@ const createdToDisplay = computed({
             :disabled="loading"
           />
         </div>
-      </div>
-
-      <div class="grid grid-cols-1 gap-4 border-t border-gray-100 px-4 pb-4 pt-2 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Usage</label>
           <select
@@ -125,27 +122,16 @@ const createdToDisplay = computed({
         </div>
         <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Created Date From</label>
-          <input
-            v-model="createdFromDisplay"
-            type="text"
-            placeholder="DD-MM-YYYY"
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            :disabled="loading"
-          />
+          <DateInputDdMmYyyy v-model="createdFromDisplay" placeholder="dd-Mon-yyyy" :disabled="loading" />
         </div>
         <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Created Date To</label>
-          <input
-            v-model="createdToDisplay"
-            type="text"
-            placeholder="DD-MM-YYYY"
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            :disabled="loading"
-          />
+          <DateInputDdMmYyyy v-model="createdToDisplay" placeholder="dd-Mon-yyyy" :disabled="loading" />
         </div>
       </div>
 
-      <div class="flex gap-3 border-t border-gray-200 px-4 py-3">
+      <div class="w-full border-t border-gray-200 px-4 py-3">
+        <div class="flex w-full flex-wrap items-center justify-end gap-3">
         <button
           type="button"
           class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
@@ -162,6 +148,7 @@ const createdToDisplay = computed({
         >
           Clear Filters
         </button>
+        </div>
       </div>
     </div>
   </Transition>

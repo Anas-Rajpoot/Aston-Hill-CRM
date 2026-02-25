@@ -5,18 +5,76 @@
  * Buttons: Cancel, Create Client, Create & Add Another.
  */
 import { ref, onMounted, computed, watch, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import clientsApi from '@/services/clientsApi'
 import leadSubmissionsApi from '@/services/leadSubmissionsApi'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Toast from '@/components/Toast.vue'
 import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
-import { toDdMmYyyy, fromDdMmYyyy } from '@/lib/dateFormat'
+import { fromDdMmYyyy } from '@/lib/dateFormat'
 import { useFormDraft } from '@/composables/useFormDraft'
 
+const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const isProductMode = computed(() => String(route.query.mode || '').toLowerCase() === 'product')
+const sourceClientId = computed(() => Number(route.query.client_id || route.query.source_client_id || 0))
+const initialFromListing = String(route.query.from || '').toLowerCase()
+function readStoredReturnTo() {
+  try {
+    return sessionStorage.getItem('clients.create.return_to') || ''
+  } catch {
+    return ''
+  }
+}
+function clearStoredReturnTo() {
+  try {
+    sessionStorage.removeItem('clients.create.return_to')
+  } catch {
+    // ignore storage errors
+  }
+}
+const initialReturnTo = (() => {
+  const val = route.query.return_to
+  if (typeof val === 'string' && val) return val
+  return readStoredReturnTo()
+})()
+const returnTo = computed(() => initialReturnTo)
+const normalizedReturnTo = computed(() => {
+  const raw = returnTo.value.trim()
+  if (!raw.startsWith('/')) return ''
+  if (raw === '/clients/all' || raw.startsWith('/clients/all?')) {
+    return raw.replace('/clients/all', '/all-clients')
+  }
+  return raw
+})
+const originIsAllClients = computed(() => {
+  if (initialFromListing === 'all-clients') return true
+  return (
+    normalizedReturnTo.value.startsWith('/all-clients') ||
+    returnTo.value.startsWith('/clients/all')
+  )
+})
+const listingRouteName = computed(() => (originIsAllClients.value ? 'clients.all' : 'clients.index'))
+const goToListingLabel = computed(() => (originIsAllClients.value ? 'Go to All Clients' : 'Go to Clients'))
+const backToListingLabel = computed(() => (originIsAllClients.value ? '← Back to All Clients' : '← Back to Clients'))
+
+function resolveListingTarget() {
+  const raw = normalizedReturnTo.value
+  if (
+    raw &&
+    (raw === '/clients' || raw.startsWith('/clients?') || raw === '/all-clients' || raw.startsWith('/all-clients?'))
+  ) {
+    return { path: raw }
+  }
+  return { name: listingRouteName.value }
+}
+
+function navigateToListing() {
+  clearStoredReturnTo()
+  router.push(resolveListingTarget())
+}
 
 const STATUS_OPTIONS = [
   { value: 'Normal', label: 'Normal' },
@@ -40,7 +98,7 @@ const YES_NO_OPTIONS = [
 ]
 
 const PAID_UNPAID_OPTIONS = [
-  { value: '', label: 'Paid / Unpaid' },
+  { value: '', label: 'Select' },
   { value: 'paid', label: 'Paid' },
   { value: 'unpaid', label: 'Unpaid' },
 ]
@@ -63,12 +121,15 @@ const toastType = ref('success')
 const toastMessage = ref('')
 const toastCountdown = ref(null)
 let toastRedirectTimer = null
+let successRedirectFallbackId = null
+let hasNavigatedToListing = false
+const todayYmd = () => new Date().toISOString().slice(0, 10)
 
 const form = ref({
   company_name: '',
   account_number: '',
   status: 'Normal',
-  submitted_at: '',
+  submitted_at: todayYmd(),
   manager_id: null,
   team_leader_id: null,
   sales_agent_id: null,
@@ -92,7 +153,7 @@ const form = ref({
   activation_date: '',
   contract_term: '36 months',
   contract_end_date: '',
-  clawback_chum: 'Yes',
+  clawback_chum: '',
   remarks: '',
   payment_connection: '',
   contract_type: '',
@@ -126,7 +187,7 @@ const form = ref({
   ],
 })
 
-const { draftSaving, draftSavedAt, clearDraft } = useFormDraft('client', 'new', form)
+const { draftLoaded, draftSaving, draftSavedAt, clearDraft } = useFormDraft('client', 'new', form)
 
 const createdByLabel = computed(() => auth.user?.name ? `${auth.user.name} (Auto)` : 'Current User (Auto)')
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -198,7 +259,88 @@ watch(
   }
 )
 
+function resetProductServiceFieldsToPlaceholders() {
+  form.value.manager_id = null
+  form.value.team_leader_id = null
+  form.value.sales_agent_id = null
+  form.value.submission_type = ''
+  form.value.service_category = ''
+  form.value.service_type = ''
+  form.value.product_type = ''
+  form.value.address = ''
+  form.value.product_name = ''
+  form.value.mrc = ''
+  form.value.quantity = ''
+  form.value.offer = ''
+  form.value.migration_numbers = ''
+  form.value.activity = ''
+  form.value.wo_number = ''
+  form.value.work_order_status = ''
+  form.value.activation_date = ''
+  form.value.remarks = ''
+  form.value.additional_notes = ''
+  form.value.contract_type = ''
+  form.value.contract_end_date = ''
+}
+
+function adjustQuantity(delta) {
+  const current = Number(form.value.quantity || 0)
+  const next = Math.max(0, current + delta)
+  form.value.quantity = String(next)
+}
+
+function normalizeDateValueToYmd(value) {
+  const out = fromDdMmYyyy(value || '')
+  return out || ''
+}
+
+function normalizeFormDatesToYmd() {
+  form.value.submitted_at = normalizeDateValueToYmd(form.value.submitted_at)
+  form.value.activation_date = normalizeDateValueToYmd(form.value.activation_date)
+  form.value.completion_date = normalizeDateValueToYmd(form.value.completion_date)
+  form.value.contract_end_date = normalizeDateValueToYmd(form.value.contract_end_date)
+
+  if (form.value.company_detail) {
+    form.value.company_detail.trade_license_expiry_date = normalizeDateValueToYmd(form.value.company_detail.trade_license_expiry_date)
+    form.value.company_detail.establishment_card_expiry_date = normalizeDateValueToYmd(form.value.company_detail.establishment_card_expiry_date)
+    form.value.company_detail.account_mapping_date = normalizeDateValueToYmd(form.value.company_detail.account_mapping_date)
+    form.value.company_detail.account_transfer_given_date = normalizeDateValueToYmd(form.value.company_detail.account_transfer_given_date)
+  }
+
+  if (Array.isArray(form.value.contacts)) {
+    form.value.contacts = form.value.contacts.map((c) => ({
+      ...c,
+      as_expiry_date: normalizeDateValueToYmd(c.as_expiry_date),
+    }))
+  }
+}
+
+watch(draftLoaded, (loaded) => {
+  if (!loaded) return
+
+  normalizeFormDatesToYmd()
+
+  // Keep these fields empty on new Add Client form even if a draft exists.
+  if (!isProductMode.value) {
+    form.value.company_name = ''
+    form.value.account_number = ''
+    resetProductServiceFieldsToPlaceholders()
+    return
+  }
+
+  // In Add Product mode, always start Product/Service section from placeholders.
+  resetProductServiceFieldsToPlaceholders()
+})
+
 onMounted(async () => {
+  normalizeFormDatesToYmd()
+
+  if (!isProductMode.value) {
+    form.value.company_name = ''
+    form.value.account_number = ''
+  }
+  resetProductServiceFieldsToPlaceholders()
+
   try {
     const res = await leadSubmissionsApi.getTeamOptions()
     const data = res?.data ?? res ?? {}
@@ -209,6 +351,24 @@ onMounted(async () => {
     }
   } catch {
     // keep empty
+  }
+
+  if (isProductMode.value && sourceClientId.value > 0) {
+    try {
+      const raw = await clientsApi.show(sourceClientId.value)
+      const d = raw?.data ?? raw ?? {}
+      form.value.account_number = d.account_number ?? form.value.account_number
+      if (Array.isArray(d.csrs) && d.csrs.length) {
+        form.value.csrs = d.csrs.map((c) => ({ user_id: c.user_id || null }))
+      }
+    } catch {
+      // product mode can still proceed without prefill
+    }
+  }
+
+  // In Add Product mode, always start Product/Service section from placeholders.
+  if (isProductMode.value) {
+    resetProductServiceFieldsToPlaceholders()
   }
 })
 
@@ -221,7 +381,7 @@ function onContractTypeChange() {
   const end = new Date(now.getFullYear(), now.getMonth() + months, now.getDate())
   const dd = String(end.getDate()).padStart(2, '0')
   const mm = String(end.getMonth() + 1).padStart(2, '0')
-  form.value.contract_end_date = `${dd}-${mm}-${end.getFullYear()}`
+  form.value.contract_end_date = `${end.getFullYear()}-${mm}-${dd}`
 }
 
 function addContact() {
@@ -269,20 +429,27 @@ function buildPayload() {
     csrs: f.csrs.map((c) => ({ user_id: c.user_id || null })).filter((c) => c.user_id),
     service_type: f.service_type || null,
     product_type: f.product_type || null,
+    submission_type: f.submission_type || null,
+    service_category: f.service_category || null,
     address: f.address || null,
     product_name: f.product_name || null,
     mrc: f.mrc || null,
     quantity: f.quantity ? parseInt(f.quantity, 10) : null,
+    other: f.offer || null,
     migration_numbers: f.migration_numbers || null,
+    activity: f.activity || null,
+    work_order_status: f.work_order_status || null,
+    activation_date: fromDdMmYyyy(f.activation_date) || null,
     fiber: f.fiber || null,
     order_number: f.order_number || null,
     wo_number: f.wo_number || null,
     completion_date: fromDdMmYyyy(f.completion_date) || null,
-    other: f.activity || f.other || null,
-    additional_notes: [f.remarks, f.additional_notes].filter(Boolean).join('\n') || null,
+    remarks: f.remarks || null,
+    additional_notes: f.additional_notes || null,
     contract_end_date: fromDdMmYyyy(f.contract_end_date) || null,
     payment_connection: f.payment_connection || null,
     contract_type: f.contract_type || null,
+    clawback_chum: f.clawback_chum || null,
     renewal_alert: f.renewal_alert ? parseInt(f.renewal_alert, 10) : null,
     csr_name_1: csrNames[0] || null,
     csr_name_2: csrNames[1] || null,
@@ -343,7 +510,7 @@ function resetForm() {
     company_name: '',
     account_number: '',
     status: 'Normal',
-    submitted_at: '',
+    submitted_at: todayYmd(),
     manager_id: null,
     team_leader_id: null,
     sales_agent_id: null,
@@ -367,7 +534,7 @@ function resetForm() {
     activation_date: '',
     contract_term: '36 months',
     contract_end_date: '',
-    clawback_chum: 'Yes',
+    clawback_chum: '',
     remarks: '',
     payment_connection: '',
     contract_type: '',
@@ -411,13 +578,16 @@ function validateForm() {
   const errs = {}
 
   if (!f.company_name?.trim()) errs.company_name = 'Company Name is required.'
-  if (!cd.company_category?.trim()) errs.company_category = 'Company Category is required.'
-  if (!cd.trade_license_number?.trim()) errs.trade_license_number = 'Trade License Number is required.'
-  if (!cd.first_bill?.trim()) errs.first_bill = 'First Bill is required.'
-  if (!cd.second_bill?.trim()) errs.second_bill = 'Second Bill is required.'
-  if (!cd.third_bill?.trim()) errs.third_bill = 'Third Bill is required.'
-  if (!cd.fourth_bill?.trim()) errs.fourth_bill = 'Fourth Bill is required.'
-  if (!cd.account_manager_name?.trim()) errs.account_manager_name = 'Account Manager Name is required.'
+  if (!isProductMode.value) {
+    if (!cd.company_category?.trim()) errs.company_category = 'Company Category is required.'
+    if (!cd.trade_license_number?.trim()) errs.trade_license_number = 'Trade License Number is required.'
+    if (!f.account_number?.trim()) errs.account_number = 'Account Number is required.'
+    if (!cd.first_bill?.trim()) errs.first_bill = 'First Bill is required.'
+    if (!cd.second_bill?.trim()) errs.second_bill = 'Second Bill is required.'
+    if (!cd.third_bill?.trim()) errs.third_bill = 'Third Bill is required.'
+    if (!cd.fourth_bill?.trim()) errs.fourth_bill = 'Fourth Bill is required.'
+    if (!cd.account_manager_name?.trim()) errs.account_manager_name = 'Account Manager Name is required.'
+  }
 
   const hasCsr = f.csrs.some((c) => c.user_id)
   if (!hasCsr) errs.csr = 'At least one CSR is required.'
@@ -425,7 +595,7 @@ function validateForm() {
   if (!f.status?.trim()) errs.status = 'After Sales Status is required.'
 
   const c0 = f.contacts[0]
-  if (c0) {
+  if (!isProductMode.value && c0) {
     if (!c0.name?.trim()) errs.contact_0_name = 'Contact Person Name is required.'
     if (!c0.contact_number?.trim()) errs.contact_0_contact_number = 'Contact Number is required.'
     if (!c0.email?.trim()) errs.contact_0_email = 'Email ID is required.'
@@ -437,6 +607,7 @@ function validateForm() {
 
 const requiredFieldLabels = {
   company_name: 'Company Name',
+  account_number: 'Account Number',
   company_category: 'Company Category',
   trade_license_number: 'Trade License Number',
   first_bill: 'First Bill',
@@ -503,9 +674,9 @@ async function submit(andAddAnother = false) {
         successMessage.value = 'New client is added successfully'
         showResultModal.value = true
         startRedirectCountdown(3)
-        setTimeout(() => {
+        successRedirectFallbackId = setTimeout(() => {
           showResultModal.value = false
-          router.push('/clients')
+          goToClients()
         }, 3500)
       }
     } else {
@@ -517,6 +688,9 @@ async function submit(andAddAnother = false) {
   } catch (e) {
     const msg = e?.response?.data?.message
     const errs = e?.response?.data?.errors
+    const safeMsg = typeof msg === 'string' && /SQLSTATE|QueryException|PDOException|Stack trace| in .*\.php|line \d+/i.test(msg)
+      ? 'Request failed. Please contact support if the issue persists.'
+      : msg
     if (errs && typeof errs === 'object') {
       const mapped = {}
       for (const [key, messages] of Object.entries(errs)) {
@@ -524,7 +698,7 @@ async function submit(andAddAnother = false) {
       }
       fieldErrors.value = { ...fieldErrors.value, ...mapped }
     }
-    const detail = msg || (errs ? Object.values(errs).flat().filter(Boolean).join(' ') : '')
+    const detail = safeMsg || (errs ? Object.values(errs).flat().filter(Boolean).join(' ') : '')
     resultModalMessage.value = detail ? `Client can not be added. ${detail}` : 'Client can not be added'
     resultModalType.value = 'error'
     showResultModal.value = true
@@ -537,7 +711,11 @@ async function submit(andAddAnother = false) {
 }
 
 function cancel() {
-  router.push('/clients')
+  if (isProductMode.value && sourceClientId.value > 0) {
+    router.push(`/clients/${sourceClientId.value}?tab=products-services`)
+    return
+  }
+  navigateToListing()
 }
 
 function startRedirectCountdown(seconds = 3) {
@@ -549,18 +727,28 @@ function startRedirectCountdown(seconds = 3) {
       if (redirectTimerId) clearInterval(redirectTimerId)
       redirectTimerId = null
       showResultModal.value = false
-      router.push('/clients')
+      goToClients()
     }
   }, 1000)
 }
 
 function goToClients() {
+  if (hasNavigatedToListing) return
+  hasNavigatedToListing = true
   if (redirectTimerId) {
     clearInterval(redirectTimerId)
     redirectTimerId = null
   }
+  if (successRedirectFallbackId) {
+    clearTimeout(successRedirectFallbackId)
+    successRedirectFallbackId = null
+  }
   showResultModal.value = false
-  router.push('/clients')
+  if (isProductMode.value && sourceClientId.value > 0) {
+    router.push(`/clients/${sourceClientId.value}?tab=products-services`)
+    return
+  }
+  navigateToListing()
 }
 
 function closeResultModal() {
@@ -569,8 +757,16 @@ function closeResultModal() {
     clearInterval(redirectTimerId)
     redirectTimerId = null
   }
+  if (successRedirectFallbackId) {
+    clearTimeout(successRedirectFallbackId)
+    successRedirectFallbackId = null
+  }
   if (resultModalType.value === 'success') {
-    router.push('/clients')
+    if (isProductMode.value && sourceClientId.value > 0) {
+      router.push(`/clients/${sourceClientId.value}?tab=products-services`)
+      return
+    }
+    navigateToListing()
   }
 }
 
@@ -601,7 +797,7 @@ function closeToast() {
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
         </svg>
-        <p class="text-sm font-medium text-gray-700">Creating client…</p>
+        <p class="text-sm font-medium text-gray-700">{{ isProductMode ? 'Creating product…' : 'Creating client…' }}</p>
       </div>
     </div>
 
@@ -617,9 +813,9 @@ function closeToast() {
           </div>
           <h2 id="result-success-title" class="text-lg font-semibold text-gray-900">Success</h2>
           <p class="mt-2 text-gray-700">{{ resultModalMessage }}</p>
-          <p class="mt-3 text-sm text-gray-500">Redirecting to clients listing in {{ redirectCountdown }} seconds…</p>
+          <p class="mt-3 text-sm text-gray-500">Redirecting in {{ redirectCountdown }} seconds…</p>
           <button type="button" class="mt-4 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700" @click="goToClients">
-            Go to clients
+            {{ goToListingLabel }}
           </button>
         </div>
         <div v-else class="flex flex-col items-center text-center">
@@ -637,12 +833,12 @@ function closeToast() {
     </Teleport>
 
     <div class="max-w-full space-y-4">
-      <router-link to="/clients" class="inline-block text-sm text-blue-600 hover:text-blue-700">
-        ← Back to Clients
+      <router-link :to="resolveListingTarget()" class="inline-block text-sm text-blue-600 hover:text-blue-700">
+        {{ backToListingLabel }}
       </router-link>
       <div>
         <div class="flex flex-wrap items-baseline gap-2">
-          <h1 class="text-2xl font-semibold text-gray-900">Add New Client</h1>
+          <h1 class="text-2xl font-semibold text-gray-900">{{ isProductMode ? 'Add Product' : 'Add New Client' }}</h1>
           <span v-if="draftSavedAt" class="text-xs text-gray-400 flex items-center gap-1">
             <svg v-if="draftSaving" class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="4" class="opacity-25" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
             <svg v-else class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
@@ -650,7 +846,9 @@ function closeToast() {
           </span>
           <Breadcrumbs />
         </div>
-        <p class="mt-2 text-sm text-gray-500">Create a new client master record.</p>
+        <p class="mt-2 text-sm text-gray-500">
+          {{ isProductMode ? 'Create a product/service record for this client.' : 'Create a new client master record.' }}
+        </p>
       </div>
 
       <div v-if="error" ref="errorAlertEl" class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
@@ -660,9 +858,9 @@ function closeToast() {
         {{ successMessage }}
       </div>
 
-      <form @submit.prevent="submit(false)" class="space-y-6">
+      <form @submit.prevent="submit(false)" class="space-y-6" autocomplete="off">
         <!-- Company Information -->
-        <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div v-if="!isProductMode" class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <div class="flex items-start gap-3 border-b border-gray-200 pb-3">
             <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#E0F7F2]">
               <svg class="h-5 w-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -681,7 +879,7 @@ function closeToast() {
               <p v-if="fieldErrors.company_name" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.company_name }}</p>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700">Account Number</label>
+              <label class="block text-sm font-medium text-gray-700">Account Number <span class="text-red-600">*</span></label>
               <input v-model="form.account_number" type="text" placeholder="Enter unique account number" :class="inputClass('account_number')" />
               <p v-if="fieldErrors.account_number" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.account_number }}</p>
               <p v-else class="mt-0.5 text-xs text-gray-500">Must be unique across all clients.</p>
@@ -776,7 +974,7 @@ function closeToast() {
         </div>
 
         <!-- Contact Details (design per 1st image: icon left, heading+subtitle, link right parallel to heading) -->
-        <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div v-if="!isProductMode" class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <div class="flex flex-wrap items-start justify-between gap-4 border-b border-gray-200 pb-3">
             <div class="flex items-start gap-3">
               <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#E8F0FE]">
@@ -885,11 +1083,18 @@ function closeToast() {
         <!-- Product or Service (Company Name and Account Number auto-fill from Company Information) -->
         <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 class="border-b border-gray-200 pb-3 text-base font-semibold text-gray-900">Product or Service</h2>
-          <p class="mt-1 text-sm text-gray-500">Company Name and Account Number below mirror the values from Company Information.</p>
+          <p class="mt-1 text-sm text-gray-500">
+            {{ isProductMode ? 'Company Name and Account Number are prefilled from the selected client.' : 'Company Name and Account Number below mirror the values from Company Information.' }}
+          </p>
           <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <div>
               <label class="block text-sm font-medium text-gray-700">Company Name</label>
-              <input v-model="form.company_name" type="text" placeholder="Enter company name" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+              <input
+                v-model="form.company_name"
+                type="text"
+                placeholder="Enter company name"
+                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              />
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Submission Date</label>
@@ -965,9 +1170,7 @@ function closeToast() {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Address</label>
-              <select v-model="form.address" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
-                <option value="">Select</option>
-              </select>
+              <input v-model="form.address" type="text" placeholder="Enter address" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
             </div>
             <!-- Row 3: Product Name, MRC, Quantity, Offer, Migration Numbers -->
             <div>
@@ -980,7 +1183,25 @@ function closeToast() {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Quantity</label>
-              <input v-model="form.quantity" type="number" min="0" placeholder="Enter Quantity" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+              <div class="mt-1 flex items-center gap-2">
+                <button
+                  type="button"
+                  class="inline-flex h-9 w-9 items-center justify-center rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                  @click="adjustQuantity(-1)"
+                  aria-label="Decrease quantity"
+                >
+                  -
+                </button>
+                <input v-model="form.quantity" type="number" min="0" placeholder="Enter Quantity" class="block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+                <button
+                  type="button"
+                  class="inline-flex h-9 w-9 items-center justify-center rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                  @click="adjustQuantity(1)"
+                  aria-label="Increase quantity"
+                >
+                  +
+                </button>
+              </div>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Offer</label>
@@ -1009,24 +1230,28 @@ function closeToast() {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Activation Date</label>
-              <DateInputDdMmYyyy v-model="form.activation_date" />
+              <DateInputDdMmYyyy v-model="form.activation_date" placeholder="dd-mm-yyyy" />
             </div>
             <!-- Row 5: Contract Term, Deactivation Date, Clawback / Chum, Remarks -->
             <div>
               <label class="block text-sm font-medium text-gray-700">Contract Type Term</label>
               <select v-model="form.contract_type" class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" @change="onContractTypeChange">
-                <option value="">Select Contract Type Term</option>
+                <option value="">Select</option>
                 <option value="12 months">12 months</option>
                 <option value="24 months">24 months</option>
               </select>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Contract End Date</label>
-              <DateInputDdMmYyyy v-model="form.contract_end_date" :readonly="true" />
+              <DateInputDdMmYyyy v-model="form.contract_end_date" placeholder="dd-mm-yyyy" />
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Clawback / Chum</label>
-              <input v-model="form.clawback_chum" type="text" placeholder="Yes" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+              <select v-model="form.clawback_chum" class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+                <option value="">Select</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </select>
             </div>
             <div class="lg:col-span-2">
               <label class="block text-sm font-medium text-gray-700">Remarks</label>
@@ -1159,13 +1384,13 @@ function closeToast() {
               Cancel
             </button>
             <button type="submit" class="inline-flex items-center rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50" :disabled="loading">
-              {{ loading ? 'Creating…' : 'Create Client' }}
+              {{ loading ? 'Creating…' : (isProductMode ? 'Create Product' : 'Create Client') }}
             </button>
             <button type="button" class="inline-flex items-center rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50" :disabled="loading" @click="submit(true)">
               <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
               </svg>
-              Create & Add Another
+              {{ isProductMode ? 'Create & Add Another Product' : 'Create & Add Another' }}
             </button>
           </div>
         </div>

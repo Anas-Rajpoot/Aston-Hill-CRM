@@ -85,6 +85,7 @@ const {
   retry,
 } = useUserEditData({ useCache: true })
 const error = ref('')
+const phoneError = ref('')
 const showPassword = ref(false)
 const rolesDropdownOpen = ref(false)
 const rolesDropdownRef = ref(null)
@@ -145,6 +146,20 @@ const selectedRolesLabel = computed(() => {
     .map((r) => formatRoleForDisplay(r.name))
     .join(', ')
 })
+
+function validatePhone(value) {
+  if (!value || !value.trim()) return null
+  if (/\s/.test(value)) return 'Must not contain spaces.'
+  if (!/^\d+$/.test(value)) return 'Must contain only digits.'
+  if (!value.startsWith('971')) return 'Must start with 971.'
+  if (value.length !== 12) return 'Must be exactly 12 digits.'
+  return null
+}
+
+function onPhoneInput(event) {
+  form.value.phone = event.target.value.replace(/\D/g, '')
+  phoneError.value = ''
+}
 
 watch(
   () => form.value.manager_id,
@@ -303,6 +318,15 @@ const toggleRole = (roleId) => {
 
 const save = async (closeAfter = false) => {
   error.value = ''
+  phoneError.value = ''
+
+  const phoneErr = validatePhone((form.value.phone || '').trim())
+  if (phoneErr) {
+    phoneError.value = phoneErr
+    error.value = 'Please correct the contact number.'
+    return
+  }
+
   saving.value = true
   try {
     const payload = { ...form.value }
@@ -351,13 +375,25 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-4 bg-white px-4 py-4 sm:px-5">
     <!-- Shell: always visible -->
-    <div class="flex flex-wrap items-baseline gap-2">
-      <h1 class="text-2xl font-bold text-gray-900 leading-tight">Edit Employee</h1>
-      <Breadcrumbs />
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="flex flex-wrap items-baseline gap-2">
+        <h1 class="text-2xl font-bold text-gray-900 leading-tight">Edit Employee</h1>
+        <Breadcrumbs />
+      </div>
+      <button
+        type="button"
+        class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        @click="router.push(isEmployeeRoute ? '/employees' : '/users')"
+      >
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+        Back to List
+      </button>
     </div>
-    <p class="text-sm text-gray-500">Update employee record in the system.</p>
+    <p class="text-xs text-gray-500">Update employee record in the system.</p>
 
     <div v-if="errorPrime || errorExtras" class="rounded-xl bg-red-50 border border-red-200 px-4 py-3 flex items-center justify-between">
       <span class="text-sm text-red-700">{{ errorPrime || errorExtras }}</span>
@@ -374,7 +410,7 @@ onUnmounted(() => {
       <UserEditSectionSkeleton :lines="6" />
     </template>
 
-    <form v-else-if="formPopulated" @submit.prevent="save(true)" class="space-y-6">
+    <form v-else-if="formPopulated" @submit.prevent="save(false)" class="space-y-6">
       <!-- Basic Information -->
       <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
         <div class="px-6 py-4 border-b border-gray-200 flex items-center gap-2 bg-gray-50">
@@ -530,7 +566,16 @@ onUnmounted(() => {
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Contact Number</label>
-            <input v-model="form.phone" type="text" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="+971-50-123-4567" />
+            <input
+              v-model="form.phone"
+              type="text"
+              maxlength="12"
+              class="w-full rounded-lg border shadow-sm focus:ring-blue-500 focus:border-blue-500"
+              :class="phoneError ? 'border-red-500' : 'border-gray-300'"
+              placeholder="971XXXXXXXXX"
+              @input="onPhoneInput"
+            />
+            <p v-if="phoneError" class="mt-1 text-xs text-red-600">{{ phoneError }}</p>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Country</label>
@@ -606,7 +651,7 @@ onUnmounted(() => {
         <button
           type="button"
           :disabled="saving"
-          @click="save(false)"
+          @click="save(true)"
           class="inline-flex items-center gap-2 rounded-lg border border-sky-400 bg-sky-50 px-5 py-2.5 text-sm font-medium text-sky-600 hover:bg-sky-100 disabled:opacity-50"
         >
           {{ saving ? 'Saving...' : 'Save & Close' }}

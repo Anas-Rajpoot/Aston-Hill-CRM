@@ -1,10 +1,9 @@
 <script setup>
 /**
- * Advanced filters for Expense Tracker. No section headings, 4 filters per row. Dates: dd-mm-yyyy.
+ * Advanced filters for Expense Tracker. No section headings, 4 filters per row. Dates: dd-Mon-yyyy.
  * Apply and Reset buttons at bottom.
  */
-import { computed } from 'vue'
-import { toDdMmYyyy, fromDdMmYyyy } from '@/lib/dateFormat'
+import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -21,23 +20,6 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['apply', 'reset'])
-
-const expenseDateFromDisplay = computed({
-  get: () => toDdMmYyyy(props.filters.expense_date_from),
-  set: (v) => { props.filters.expense_date_from = fromDdMmYyyy(v) || '' },
-})
-const expenseDateToDisplay = computed({
-  get: () => toDdMmYyyy(props.filters.expense_date_to),
-  set: (v) => { props.filters.expense_date_to = fromDdMmYyyy(v) || '' },
-})
-const createdFromDisplay = computed({
-  get: () => toDdMmYyyy(props.filters.created_from),
-  set: (v) => { props.filters.created_from = fromDdMmYyyy(v) || '' },
-})
-const createdToDisplay = computed({
-  get: () => toDdMmYyyy(props.filters.created_to),
-  set: (v) => { props.filters.created_to = fromDdMmYyyy(v) || '' },
-})
 </script>
 
 <template>
@@ -53,43 +35,19 @@ const createdToDisplay = computed({
       <div class="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Expense Date From</label>
-          <input
-            v-model="expenseDateFromDisplay"
-            type="text"
-            placeholder="DD-MM-YYYY"
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            :disabled="loading"
-          />
+          <DateInputDdMmYyyy v-model="filters.expense_date_from" placeholder="dd-Mon-yyyy" :disabled="loading" />
         </div>
         <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Expense Date To</label>
-          <input
-            v-model="expenseDateToDisplay"
-            type="text"
-            placeholder="DD-MM-YYYY"
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            :disabled="loading"
-          />
+          <DateInputDdMmYyyy v-model="filters.expense_date_to" placeholder="dd-Mon-yyyy" :disabled="loading" />
         </div>
         <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Created Date From</label>
-          <input
-            v-model="createdFromDisplay"
-            type="text"
-            placeholder="DD-MM-YYYY"
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            :disabled="loading"
-          />
+          <DateInputDdMmYyyy v-model="filters.created_from" placeholder="dd-Mon-yyyy" :disabled="loading" />
         </div>
         <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Created Date To</label>
-          <input
-            v-model="createdToDisplay"
-            type="text"
-            placeholder="DD-MM-YYYY"
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            :disabled="loading"
-          />
+          <DateInputDdMmYyyy v-model="filters.created_to" placeholder="dd-Mon-yyyy" :disabled="loading" />
         </div>
         <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Added By</label>

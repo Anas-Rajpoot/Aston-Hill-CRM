@@ -82,6 +82,32 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Canonical RBAC actions (system-wide enforcement contract)
+    |--------------------------------------------------------------------------
+    */
+    'canonical_actions' => [
+        'create',
+        'read',
+        'update',
+        'delete',
+        'assign_permissions',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Action alias map (canonical -> accepted legacy variants)
+    |--------------------------------------------------------------------------
+    */
+    'action_aliases' => [
+        'create' => ['create', 'add'],
+        'read' => ['read', 'list', 'view'],
+        'update' => ['update', 'edit'],
+        'delete' => ['delete'],
+        'assign_permissions' => ['assign_permissions', 'manage_permissions'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Permission name format
     |--------------------------------------------------------------------------
     | Result: {module}.{action}

@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api\SuperAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Role;
+use App\Services\RoleInheritanceService;
 use App\Services\RolesPermissionsCacheService;
+use App\Support\RbacPermission;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Spatie\Permission\Models\Permission;
@@ -13,7 +15,8 @@ use Spatie\Permission\PermissionRegistrar;
 class RoleApiController extends Controller
 {
     public function __construct(
-        private RolesPermissionsCacheService $cache
+        private RolesPermissionsCacheService $cache,
+        private RoleInheritanceService $inheritance
     ) {}
 
     /**
@@ -30,6 +33,8 @@ class RoleApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorizeRolePermissionAssignment($request->user());
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:190', 'unique:roles,name'],
             'description' => ['nullable', 'string', 'max:500'],
@@ -69,6 +74,8 @@ class RoleApiController extends Controller
      */
     public function update(Request $request, Role $role): JsonResponse
     {
+        $this->authorizeRolePermissionAssignment($request->user());
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:190', 'unique:roles,name,' . $role->id],
             'description' => ['nullable', 'string', 'max:500'],
@@ -97,6 +104,8 @@ class RoleApiController extends Controller
      */
     public function destroy(Role $role): JsonResponse
     {
+        $this->authorizeRolePermissionAssignment(request()->user());
+
         if ($role->name === 'superadmin') {
             return response()->json(['message' => 'Cannot delete superadmin role.'], 422);
         }
@@ -143,6 +152,8 @@ class RoleApiController extends Controller
      */
     public function updateRolePermissions(Request $request, Role $role): JsonResponse
     {
+        $this->authorizeRolePermissionAssignment($request->user());
+
         if ($role->name === 'superadmin') {
             return response()->json(['message' => 'Superadmin permissions are managed by the system.'], 422);
         }
@@ -152,6 +163,13 @@ class RoleApiController extends Controller
         ]);
         $names = array_values(array_unique(array_filter($data['permission_names'] ?? [])));
         $validNames = Permission::whereIn('name', $names)->where('guard_name', 'web')->pluck('name')->toArray();
+
+        if ($role->name === 'superadmin' && ! in_array('roles.assign_permissions', $validNames, true)) {
+            return response()->json([
+                'message' => 'Superadmin invariants violated: roles.assign_permissions is required.',
+            ], 422);
+        }
+
         $role->syncPermissions($validNames);
         $this->cache->forgetPermissionsPageForRole((int) $role->id);
         $this->cache->forgetAll();
@@ -160,5 +178,50 @@ class RoleApiController extends Controller
             'message' => 'Role permissions updated.',
             'data' => ['permission_names' => $validNames],
         ]);
+    }
+
+    public function addParentRole(Request $request, Role $role): JsonResponse
+    {
+        $this->authorizeRolePermissionAssignment($request->user());
+
+        if ($role->name === 'superadmin') {
+            return response()->json(['message' => 'Superadmin role cannot inherit other roles.'], 422);
+        }
+
+        $data = $request->validate([
+            'parent_role_id' => ['required', 'integer', 'exists:roles,id'],
+        ]);
+
+        $parent = Role::query()->where('id', (int) $data['parent_role_id'])->firstOrFail();
+        if ($parent->name === 'superadmin') {
+            return response()->json(['message' => 'Roles cannot inherit superadmin capabilities.'], 422);
+        }
+
+        $this->inheritance->addEdge($parent, $role);
+        $this->cache->forgetAll();
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        return response()->json(['message' => 'Parent role assigned successfully.']);
+    }
+
+    public function removeParentRole(Request $request, Role $role, Role $parentRole): JsonResponse
+    {
+        $this->authorizeRolePermissionAssignment($request->user());
+
+        $this->inheritance->removeEdge($parentRole, $role);
+        $this->cache->forgetAll();
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        return response()->json(['message' => 'Parent role removed successfully.']);
+    }
+
+    private function authorizeRolePermissionAssignment($user): void
+    {
+        if (! $user || ! RbacPermission::can($user, 'roles', 'assign_permissions', [
+            'roles.manage_permissions',
+            'roles.assign_permissions',
+        ])) {
+            abort(403, 'Unauthorized');
+        }
     }
 }

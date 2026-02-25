@@ -261,7 +261,12 @@ function parseCsvLine(line) {
   for (let i = 0; i < line.length; i++) {
     const c = line[i]
     if (c === '"') {
-      inQuotes = !inQuotes
+      if (inQuotes && line[i + 1] === '"') {
+        cur += '"'
+        i++
+      } else {
+        inQuotes = !inQuotes
+      }
     } else if (inQuotes) {
       cur += c
     } else if (c === ',' || c === '\t') {
@@ -273,6 +278,40 @@ function parseCsvLine(line) {
   }
   out.push(cur.trim())
   return out
+}
+
+function csvEscape(val) {
+  const s = val == null ? '' : String(val)
+  if (s.includes('"') || s.includes(',') || s.includes('\n')) {
+    return `"${s.replace(/"/g, '""')}"`
+  }
+  return s
+}
+
+function downloadCsvSample() {
+  const headers = COLUMNS.map((c) => COLUMN_LABELS[c] || c)
+  const sampleRow = [
+    'ACT-1001',
+    'ABC Trading LLC',
+    'ACC-0001',
+    'New Request',
+    '24-Feb-2026',
+    '10:30',
+    'Fiber 100Mbps',
+    'SO-1001',
+    'Pending',
+    '',
+    'Ahmed',
+    '971501234567',
+  ]
+  const csv = [headers.map(csvEscape).join(','), sampleRow.map(csvEscape).join(',')].join('\r\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'dsp-tracker-sample.csv'
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 function onCsvChange(e) {
@@ -420,6 +459,16 @@ onMounted(() => load())
             class="hidden"
             @change="onCsvChange"
           />
+          <button
+            type="button"
+            class="inline-flex items-center gap-2 rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            @click="downloadCsvSample"
+          >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Download CSV Sample
+          </button>
           <button
             type="button"
             class="inline-flex items-center rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"

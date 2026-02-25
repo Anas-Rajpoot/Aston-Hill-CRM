@@ -543,9 +543,9 @@ onMounted(async () => {
             <option v-for="c in filterOptions.categories" :key="c.id" :value="c.id">{{ c.name }}</option>
           </select>
         </div>
-        <button type="button" class="rounded-lg bg-green-600 px-5 py-2 text-sm font-medium text-white hover:bg-green-700" @click="applyFilters">Apply</button>
+        <button type="button" class="ml-auto rounded-lg bg-green-600 px-5 py-2 text-sm font-medium text-white hover:bg-green-700" @click="applyFilters">Apply</button>
         <button type="button" class="rounded-lg border border-gray-300 bg-white px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="resetFilters">Reset</button>
-        <div class="ml-auto flex items-center gap-2">
+        <div class="flex items-center gap-2">
           <button
             type="button"
             class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"

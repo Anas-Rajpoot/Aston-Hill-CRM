@@ -8,6 +8,10 @@ const props = defineProps({
   filters: { type: Object, required: true },
   loading: { type: Boolean, default: false },
   accountNumbers: { type: Array, default: () => [] },
+  alertTypes: { type: Array, default: () => [] },
+  showAlertTypeFilter: { type: Boolean, default: true },
+  title: { type: String, default: 'Search Products & Services' },
+  compactActions: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['search', 'clear'])
@@ -54,9 +58,9 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onClickOutside))
   <div class="space-y-4">
     <!-- Search Client card (as in reference image) -->
     <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-      <h3 class="text-sm font-medium text-gray-900 mb-3">Search Products & Services</h3>
-      <div class="flex flex-wrap items-end gap-4">
-        <div class="min-w-[140px] max-w-[200px] flex-1">
+      <h3 class="text-sm font-medium text-gray-900 mb-3">{{ title }}</h3>
+      <div class="flex flex-wrap lg:flex-nowrap items-end gap-2.5">
+        <div class="min-w-[130px] max-w-[180px] flex-1 lg:flex-none lg:w-[165px]">
           <label for="client-company-name" class="block text-xs text-gray-700 mb-0.5">
             Company Name
           </label>
@@ -70,7 +74,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onClickOutside))
             @keyup.enter="$emit('search')"
           />
         </div>
-        <div ref="accDropdownRef" class="relative min-w-[140px] max-w-[200px] flex-1">
+        <div ref="accDropdownRef" class="relative min-w-[130px] max-w-[180px] flex-1 lg:flex-none lg:w-[165px]">
           <label class="block text-xs text-gray-700 mb-0.5">Account Number</label>
           <button
             type="button"
@@ -124,7 +128,22 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onClickOutside))
             </ul>
           </div>
         </div>
-        <div class="flex flex-1 flex-wrap items-center gap-2">
+        <div v-if="showAlertTypeFilter" class="min-w-[130px] max-w-[180px] flex-1 lg:flex-none lg:w-[165px]">
+          <label for="client-alert-type" class="block text-xs text-gray-700 mb-0.5">Alert Type</label>
+          <select
+            id="client-alert-type"
+            v-model="filters.alert_type"
+            class="w-full rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            :disabled="loading"
+          >
+            <option value="__any__">All Alert Types</option>
+            <option v-for="a in alertTypes" :key="a" :value="a">{{ a }}</option>
+          </select>
+        </div>
+        <div
+          class="flex w-full lg:w-auto flex-wrap lg:flex-nowrap items-center gap-2 lg:shrink-0"
+          :class="'lg:ml-auto'"
+        >
           <button
             type="button"
             class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 disabled:opacity-50"
@@ -147,7 +166,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onClickOutside))
             </svg>
             Clear
           </button>
-          <span class="ml-auto inline-flex items-center">
+          <span class="inline-flex items-center gap-2 whitespace-nowrap" :class="compactActions ? 'ml-0 lg:ml-4' : ''">
             <slot name="customize-columns" />
           </span>
         </div>

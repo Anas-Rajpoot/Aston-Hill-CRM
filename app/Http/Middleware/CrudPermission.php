@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\RbacPermission;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -22,22 +23,17 @@ class CrudPermission
             return $next($request);
         }
 
-        // Superadmin bypass (if you used Gate::before you can keep this, it’s extra safety)
-        if (method_exists($user, 'hasRole') && $user->hasRole('superadmin')) {
-            return $next($request);
-        }
-
         // Resource action inferred from route
         $action = $request->route()?->getActionMethod(); // index, show, create, store, edit, update, destroy
 
         // Map controller action -> permission action
         $map = [
-            'index'   => 'list',
-            'show'    => 'view',
+            'index'   => 'read',
+            'show'    => 'read',
             'create'  => 'create',
             'store'   => 'create',
-            'edit'    => 'edit',
-            'update'  => 'edit',
+            'edit'    => 'update',
+            'update'  => 'update',
             'destroy' => 'delete',
             'submit'  => 'create',
         ];
@@ -51,10 +47,15 @@ class CrudPermission
             // return $next($request);
         }
 
-        $permission = "{$module}.{$permAction}";
+        $legacy = match ($permAction) {
+            'read' => ["{$module}.list", "{$module}.view"],
+            'create' => ["{$module}.create", "{$module}.add"],
+            'update' => ["{$module}.edit", "{$module}.update"],
+            'delete' => ["{$module}.delete"],
+            default => [],
+        };
 
-        // Spatie permission check
-        if (!$user->can($permission)) {
+        if (! RbacPermission::can($user, $module, $permAction, $legacy)) {
             abort(403, 'Unauthorized');
         }
 

@@ -60,9 +60,20 @@ async function loadRules() {
   loading.value = true
   try {
     const { data } = await api.get('/sla-rules')
-    rules.value = data?.data ?? []
+    rules.value = (data?.data ?? [])
+      .filter((rule) => ![
+        'lead_resubmissions',
+        'back_office_queue',
+        'field_head_queue',
+      ].includes(rule?.module_key))
+      .map((rule) => ({
+        ...rule,
+        module_name: rule?.module_name === 'Field Submissions (Assignment SLA)'
+          ? 'Field Submissions'
+          : rule?.module_name,
+      }))
     canUpdate.value = data?.meta?.can_update ?? false
-    activeCount.value = data?.meta?.active_count ?? 0
+    activeCount.value = rules.value.filter((r) => r.is_active).length
   } catch (e) {
     toast('error', e?.response?.data?.message || 'Failed to load SLA rules.')
   } finally {
@@ -143,25 +154,23 @@ async function saveRow(rule) {
 // ─── Toggle active (optimistic) ─────────────────────────────────────────────
 const togglingIds = reactive({})
 
-async function toggleActive(rule) {
+async function updateStatus(rule, nextStatus) {
   if (!canUpdate.value || togglingIds[rule.id]) return
-  const oldVal = rule.is_active
-  const newVal = !oldVal
+  const newVal = nextStatus === 'active'
+  if (rule.is_active === newVal) return
 
-  // Optimistic UI
+  const oldVal = rule.is_active
   rule.is_active = newVal
   togglingIds[rule.id] = true
 
   try {
     const { data } = await api.patch(`/sla-rules/${rule.id}/toggle`, { is_active: newVal })
-    // Sync from server response
     const idx = rules.value.findIndex((r) => r.id === rule.id)
     if (idx !== -1 && data?.data) rules.value[idx] = data.data
     activeCount.value = rules.value.filter((r) => r.is_active).length
   } catch (e) {
-    // Rollback
     rule.is_active = oldVal
-    toast('error', e?.response?.data?.message || 'Failed to toggle SLA rule.')
+    toast('error', e?.response?.data?.message || 'Failed to update status.')
   } finally {
     delete togglingIds[rule.id]
   }
@@ -254,11 +263,11 @@ onBeforeUnmount(() => {
         <table class="min-w-full text-sm">
           <thead>
             <tr class="border-b border-gray-200 bg-gray-50 text-left">
-              <th class="px-6 py-3 font-semibold text-gray-600 whitespace-nowrap">Module Name</th>
+              <th class="px-6 py-3 font-semibold text-gray-600 whitespace-nowrap">Page name</th>
               <th class="px-6 py-3 font-semibold text-gray-600 whitespace-nowrap">SLA Duration</th>
               <th class="px-6 py-3 font-semibold text-gray-600 whitespace-nowrap">Warning Threshold</th>
               <th class="px-6 py-3 font-semibold text-gray-600 whitespace-nowrap">Notification Email</th>
-              <th class="px-6 py-3 font-semibold text-gray-600 whitespace-nowrap">Active</th>
+              <th class="px-6 py-3 font-semibold text-gray-600 whitespace-nowrap">Status</th>
               <th class="px-6 py-3 font-semibold text-gray-600 whitespace-nowrap text-right">Actions</th>
             </tr>
           </thead>
@@ -269,7 +278,7 @@ onBeforeUnmount(() => {
               class="transition-colors"
               :class="isEditing(rule.id) ? 'bg-gray-50/80' : 'hover:bg-gray-50/50'"
             >
-              <!-- Module Name (always static) -->
+              <!-- Page name (always static) -->
               <td class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{{ rule.module_name }}</td>
 
               <!-- SLA Duration -->
@@ -341,23 +350,17 @@ onBeforeUnmount(() => {
                 </template>
               </td>
 
-              <!-- Active Toggle -->
+              <!-- Status Dropdown -->
               <td class="px-6 py-4">
-                <button
-                  type="button"
-                  role="switch"
-                  :aria-checked="rule.is_active"
-                  :aria-label="'Toggle ' + rule.module_name + ' active'"
+                <select
+                  :value="rule.is_active ? 'active' : 'inactive'"
                   :disabled="!canUpdate || !!togglingIds[rule.id] || isEditing(rule.id)"
-                  class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  :class="rule.is_active ? 'bg-green-500' : 'bg-gray-300'"
-                  @click="toggleActive(rule)"
+                  class="w-32 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  @change="updateStatus(rule, $event.target.value)"
                 >
-                  <span
-                    class="inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform"
-                    :class="rule.is_active ? 'translate-x-6' : 'translate-x-1'"
-                  />
-                </button>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
               </td>
 
               <!-- Actions -->

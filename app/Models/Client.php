@@ -14,6 +14,8 @@ class Client extends Model
         'company_name',
         'account_number',
         'submitted_at',
+        'submission_type',
+        'service_category',
         'manager_id',
         'team_leader_id',
         'sales_agent_id',
@@ -31,6 +33,10 @@ class Client extends Model
         'fiber',
         'order_number',
         'wo_number',
+        'work_order_status',
+        'activation_date',
+        'clawback_chum',
+        'remarks',
         'completion_date',
         'payment_connection',
         'contract_type',
@@ -46,6 +52,7 @@ class Client extends Model
 
     protected $casts = [
         'submitted_at' => 'datetime',
+        'activation_date' => 'date',
         'completion_date' => 'date',
         'contract_end_date' => 'date',
         'revenue' => 'decimal:2',

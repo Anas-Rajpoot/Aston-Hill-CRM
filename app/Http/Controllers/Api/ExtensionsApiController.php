@@ -67,6 +67,8 @@ class ExtensionsApiController extends Controller
             'assignedToUser.teamLeader:id,name',
             'assignedToUser.manager:id,name',
             'assignedToUser.roles',
+            'teamLeader:id,name',
+            'manager:id,name',
         ]);
         $this->applyFilters($query, $validated);
         $total = $query->count();
@@ -171,18 +173,18 @@ class ExtensionsApiController extends Controller
     private function formatRow(CiscoExtension $row, array $columns): array
     {
         $assigned = $row->assignedToUser;
-        $teamLeaderName = null;
-        $managerName = null;
+        $teamLeaderName = $row->teamLeader?->name;
+        $managerName = $row->manager?->name;
         if ($assigned) {
             if ($assigned->hasRole('manager')) {
                 $teamLeaderName = null;
-                $managerName = null;
+                $managerName = $assigned->name;
             } elseif ($assigned->hasRole('team_leader')) {
-                $teamLeaderName = null;
-                $managerName = $assigned->manager?->name;
+                $teamLeaderName = $assigned->name;
+                $managerName = $assigned->manager?->name ?? $managerName;
             } else {
-                $teamLeaderName = $assigned->teamLeader?->name;
-                $managerName = $assigned->manager?->name;
+                $teamLeaderName = $assigned->teamLeader?->name ?? $teamLeaderName;
+                $managerName = $assigned->manager?->name ?? $managerName;
             }
         }
 
@@ -199,10 +201,12 @@ class ExtensionsApiController extends Controller
             'usage' => $row->assigned_to ? 'assigned' : 'unassigned',
             'assigned_to_name' => $assigned?->name ?? null,
             'assigned_to' => $row->assigned_to,
+            'manager_id' => $assigned?->manager_id,
+            'team_leader_id' => $assigned?->team_leader_id,
             'comment' => $row->comment,
             'updated_at' => $row->updated_at?->format('d-m-Y'),
         ];
-        $allowed = array_flip(array_merge($columns, ['id', 'assigned_to']));
+        $allowed = array_flip(array_merge($columns, ['id', 'assigned_to', 'manager_id', 'team_leader_id']));
         return array_intersect_key($out, $allowed);
     }
 
@@ -322,7 +326,7 @@ class ExtensionsApiController extends Controller
 
         $data = $request->validate([
             'extension' => ['required', 'string', 'max:50', 'unique:cisco_extensions,extension'],
-            'landline_number' => ['nullable', 'string', 'max:50'],
+            'landline_number' => ['required', 'regex:/^971\d{9}$/'],
             'gateway' => ['nullable', 'string', 'max:100'],
             'username' => ['nullable', 'string', 'max:100'],
             'password' => ['nullable', 'string', 'max:255'],
@@ -363,18 +367,37 @@ class ExtensionsApiController extends Controller
         }
 
         $header = array_map('trim', $rows[0]);
+        $norm = static function (?string $v): string {
+            return strtolower(preg_replace('/[^a-z0-9]+/', '_', trim((string) $v)) ?? '');
+        };
+        $normalizedHeader = array_map($norm, $header);
+        $headerIndex = [];
+        foreach ($normalizedHeader as $i => $h) {
+            if ($h !== '' && ! isset($headerIndex[$h])) {
+                $headerIndex[$h] = $i;
+            }
+        }
+        $getCell = static function (array $row, array $indexMap, array $keys): ?string {
+            foreach ($keys as $k) {
+                if (isset($indexMap[$k])) {
+                    $idx = $indexMap[$k];
+                    $raw = $row[$idx] ?? null;
+                    if ($raw !== null) {
+                        return trim((string) $raw);
+                    }
+                }
+            }
+            return null;
+        };
         $created = 0;
         $errors = [];
 
         foreach (array_slice($rows, 1) as $index => $row) {
             $line = $index + 2;
-            $assoc = array_combine($header, array_pad($row, count($header), null));
-            if ($assoc === false) {
-                $errors[] = "Line {$line}: column count mismatch.";
-                continue;
-            }
+            $padded = array_pad($row, count($header), null);
 
-            $extension = trim($assoc['extension'] ?? $assoc['Extension'] ?? '');
+            $extension = $getCell($padded, $headerIndex, ['extension']);
+            $extension = $extension !== null ? trim($extension) : '';
             if (! $extension) {
                 $errors[] = "Line {$line}: extension required.";
                 continue;
@@ -385,22 +408,27 @@ class ExtensionsApiController extends Controller
                 continue;
             }
 
-            $landline_number = trim($assoc['landline_number'] ?? $assoc['Landline Number'] ?? '') ?: null;
-            $gateway = trim($assoc['gateway'] ?? $assoc['Gateway'] ?? '') ?: null;
-            $username = trim($assoc['username'] ?? $assoc['Username'] ?? '') ?: null;
-            $password = trim($assoc['password'] ?? $assoc['Password'] ?? '');
-            $status = trim($assoc['status'] ?? $assoc['Status'] ?? 'active');
+            $landline_number = $getCell($padded, $headerIndex, ['landline_number', 'landline']) ?: null;
+            $gateway = $getCell($padded, $headerIndex, ['gateway']) ?: null;
+            $username = $getCell($padded, $headerIndex, ['username', 'user_name']) ?: null;
+            $password = $getCell($padded, $headerIndex, ['password']) ?: '';
+            $status = $getCell($padded, $headerIndex, ['status']) ?: 'active';
             if (! in_array($status, CiscoExtension::STATUSES, true)) {
                 $status = CiscoExtension::STATUS_ACTIVE;
             }
-            $comment = trim($assoc['comment'] ?? $assoc['Comment'] ?? '') ?: null;
+            $comment = $getCell($padded, $headerIndex, ['comment', 'remarks']) ?: null;
 
             $assigned_to = null;
-            $assignedRaw = trim($assoc['assigned_to'] ?? $assoc['Assigned To'] ?? '');
-            if ($assignedRaw !== '' && is_numeric($assignedRaw)) {
+            $assignedRaw = $getCell($padded, $headerIndex, ['assigned_to', 'assigned_to_id', 'assigned_to_name', 'assigned_to_user']);
+            if (($assignedRaw ?? '') !== '' && is_numeric($assignedRaw)) {
                 $assigned_to = (int) $assignedRaw;
                 if (! User::where('id', $assigned_to)->exists()) {
                     $assigned_to = null;
+                }
+            } elseif (($assignedRaw ?? '') !== '') {
+                $u = User::where('name', $assignedRaw)->first();
+                if ($u) {
+                    $assigned_to = $u->id;
                 }
             }
 
@@ -439,7 +467,7 @@ class ExtensionsApiController extends Controller
 
         $data = $request->validate([
             'extension' => ['sometimes', 'string', 'max:50', Rule::unique('cisco_extensions', 'extension')->ignore($ciscoExtension->id)],
-            'landline_number' => ['nullable', 'string', 'max:50'],
+            'landline_number' => ['required', 'regex:/^971\d{9}$/'],
             'gateway' => ['nullable', 'string', 'max:100'],
             'username' => ['nullable', 'string', 'max:100'],
             'password' => ['nullable', 'string', 'max:255'],
@@ -480,7 +508,7 @@ class ExtensionsApiController extends Controller
             'comment' => ['sometimes', 'nullable', 'string', 'max:2000'],
         ]);
 
-        $relationsForFormat = ['assignedToUser.teamLeader', 'assignedToUser.manager', 'assignedToUser.roles'];
+        $relationsForFormat = ['assignedToUser.teamLeader', 'assignedToUser.manager', 'assignedToUser.roles', 'teamLeader', 'manager'];
         if (empty($data)) {
             return response()->json(['message' => 'No changes.', 'data' => $this->formatRow($ciscoExtension->fresh($relationsForFormat), self::ALLOWED_COLUMNS)]);
         }
@@ -563,6 +591,24 @@ class ExtensionsApiController extends Controller
             ->get(['id', 'name', 'email'])
             ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'label' => $u->name]);
 
-        return response()->json(['data' => $users]);
+        $managerOptions = User::query()
+            ->where('status', 'approved')
+            ->whereHas('roles', fn ($q) => $q->where('name', 'manager'))
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'label' => $u->name]);
+
+        $teamLeaderOptions = User::query()
+            ->where('status', 'approved')
+            ->whereHas('roles', fn ($q) => $q->where('name', 'team_leader'))
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'label' => $u->name]);
+
+        return response()->json([
+            'data' => $users,
+            'manager_options' => $managerOptions,
+            'team_leader_options' => $teamLeaderOptions,
+        ]);
     }
 }

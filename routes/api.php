@@ -154,6 +154,7 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::put('/clients/{client}/company-details', [\App\Http\Controllers\Api\ClientApiController::class, 'updateCompanyDetails'])->whereNumber('client');
     Route::put('/clients/{client}/contacts', [\App\Http\Controllers\Api\ClientApiController::class, 'updateContacts'])->whereNumber('client');
     Route::put('/clients/{client}/addresses', [\App\Http\Controllers\Api\ClientApiController::class, 'updateAddresses'])->whereNumber('client');
+    Route::post('/clients/renewal-alerts/generate', [\App\Http\Controllers\Api\ClientApiController::class, 'generateRenewalAlerts']);
     Route::get('/clients/{client}/alerts', [\App\Http\Controllers\Api\ClientApiController::class, 'alerts'])->whereNumber('client');
     Route::post('/clients/{client}/alerts', [\App\Http\Controllers\Api\ClientApiController::class, 'storeAlert'])->whereNumber('client');
     Route::put('/clients/{client}/alerts/{alert}', [\App\Http\Controllers\Api\ClientApiController::class, 'updateAlert'])->whereNumber('client')->whereNumber('alert');
@@ -340,6 +341,8 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
         Route::get('/roles/{role}/permissions-page', [RoleApiController::class, 'permissionsPageData']);
         Route::get('/roles/{role}/permissions', [RoleApiController::class, 'rolePermissions']);
         Route::put('/roles/{role}/permissions', [RoleApiController::class, 'updateRolePermissions']);
+        Route::post('/roles/{role}/parents', [RoleApiController::class, 'addParentRole']);
+        Route::delete('/roles/{role}/parents/{parentRole}', [RoleApiController::class, 'removeParentRole']);
         Route::apiResource('roles', RoleApiController::class);
     });
 

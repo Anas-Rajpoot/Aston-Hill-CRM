@@ -4,51 +4,59 @@ namespace App\Policies;
 
 use App\Models\LeadSubmission;
 use App\Models\User;
+use App\Services\SubmissionAccessService;
+use App\Support\RbacPermission;
 
 class LeadSubmissionPolicy
 {
-    /** Requires lead.view and at least one scoped view permission. */
+    /** Requires read permission on lead module. */
     public function viewAny(User $user): bool
     {
-        return $user->can('lead.view')
-            && ($user->can('lead.view.all')
-                || $user->can('lead.view.assigned')
-                || $user->can('lead.view.created'));
+        return RbacPermission::can($user, ['lead', 'lead-submissions'], 'read', [
+            'lead.view',
+            'lead.view.all',
+            'lead.view.assigned',
+            'lead.view.created',
+            'lead-submissions.list',
+            'lead-submissions.view',
+        ]);
     }
 
     public function create(User $user): bool
     {
-        return $user->can('lead.create');
+        return RbacPermission::can($user, ['lead', 'lead-submissions'], 'create', [
+            'lead.create',
+            'lead-submissions.create',
+        ]);
     }
 
     public function view(User $user, LeadSubmission $lead): bool
     {
-        if (!$user->can('lead.view')) {
+        if (! $this->viewAny($user)) {
             return false;
         }
+
         if ($user->can('lead.view.all')) {
             return true;
         }
-        if ($user->can('lead.view.created') && (int) $lead->created_by === (int) $user->id) {
-            return true;
-        }
-        if ($user->can('lead.view.assigned')) {
-            $userId = (int) $user->id;
-            return (int) $lead->sales_agent_id === $userId
-                || (int) $lead->team_leader_id === $userId
-                || (int) $lead->manager_id === $userId;
-        }
-        return false;
+
+        return SubmissionAccessService::canAccessRecord($user, $lead, ['executive_id']);
     }
 
     public function update(User $user, LeadSubmission $lead): bool
     {
-        return $user->can('lead.edit') && $this->view($user, $lead);
+        return RbacPermission::can($user, ['lead', 'lead-submissions'], 'update', [
+            'lead.edit',
+            'lead-submissions.edit',
+        ]) && $this->view($user, $lead);
     }
 
     public function delete(User $user, LeadSubmission $lead): bool
     {
-        return $user->can('lead.delete') && $this->view($user, $lead);
+        return RbacPermission::can($user, ['lead', 'lead-submissions'], 'delete', [
+            'lead.delete',
+            'lead-submissions.delete',
+        ]) && $this->view($user, $lead);
     }
 
     public function submit(User $user, LeadSubmission $lead): bool

@@ -37,6 +37,11 @@ export default {
     return data
   },
 
+  async storeProduct(id, payload) {
+    const { data } = await api.post(`/clients/${id}/products`, payload)
+    return data
+  },
+
   async show(id) {
     const { data } = await api.get(`/clients/${id}`)
     return data
@@ -104,6 +109,11 @@ export default {
 
   async resolveAlert(clientId, alertId) {
     const { data } = await api.post(`/clients/${clientId}/alerts/${alertId}/resolve`)
+    return data
+  },
+
+  async generateRenewalAlerts(params = {}) {
+    const { data } = await api.post('/clients/renewal-alerts/generate', params)
     return data
   },
 }

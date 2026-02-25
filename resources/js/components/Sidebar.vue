@@ -32,6 +32,7 @@ const navItems = [
   { to: '/customer-support', label: 'Customer Support', abbr: 'CS' },
   { to: '/vas-requests', label: 'VAS Requests', abbr: 'VR' },
   { to: '/special-requests', label: 'Special Requests', abbr: 'SR' },
+  { to: '/all-clients', label: 'All Clients', abbr: 'AC' },
   { to: '/clients', label: 'Clients', abbr: 'Cl' },
   { to: '/order-status', label: 'Order Status', abbr: 'OS' },
   { to: '/dsp-tracker', label: 'DSP Tracker', abbr: 'DT' },
