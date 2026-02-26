@@ -12,6 +12,7 @@ import AddExtensionModal from '@/components/extensions/AddExtensionModal.vue'
 import EditExtensionModal from '@/components/extensions/EditExtensionModal.vue'
 import ViewExtensionModal from '@/components/extensions/ViewExtensionModal.vue'
 import ExtensionsTable from '@/components/extensions/ExtensionsTable.vue'
+import RecordHistoryModal from '@/components/RecordHistoryModal.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import api from '@/lib/axios'
 import Toast from '@/components/Toast.vue'
@@ -61,14 +62,29 @@ const assignableEmployees = ref([])
 const managerOptions = ref([])
 const teamLeaderOptions = ref([])
 const historyModalExtension = ref(null)
-const historyAuditLog = ref([])
-const historyLoading = ref(false)
 const summary = ref({
   total_extensions: 0,
   assigned: 0,
   unassigned: 0,
   active_status: 0,
 })
+
+const EXTENSION_HISTORY_FIELD_LABELS = {
+  extension: 'Extension',
+  landline_number: 'Landline Number',
+  gateway: 'Gateway',
+  username: 'Username',
+  password: 'Password',
+  status: 'Status',
+  manager: 'Manager',
+  manager_id: 'Manager',
+  team_leader: 'Team Leader',
+  team_leader_id: 'Team Leader',
+  assigned_to_name: 'Assigned To',
+  assigned_to_id: 'Assigned To',
+  usage: 'Usage',
+  comment: 'Comment',
+}
 
 const showToast = ref(false)
 const toastType = ref('success')
@@ -81,8 +97,8 @@ const filters = ref({
   gateway: '',
   username: '',
   assigned_to_q: '',
-  manager_q: '',
-  team_leader_q: '',
+  manager_id: '',
+  team_leader_id: '',
   status: '',
   usage: '',
   created_from: '',
@@ -127,8 +143,8 @@ function buildParams() {
   if (f.gateway) p.gateway = f.gateway
   if (f.username) p.username = f.username
   if (f.assigned_to_q) p.assigned_to_q = f.assigned_to_q
-  if (f.manager_q) p.manager_q = f.manager_q
-  if (f.team_leader_q) p.team_leader_q = f.team_leader_q
+  if (f.manager_id !== '' && f.manager_id != null) p.manager_id = Number(f.manager_id)
+  if (f.team_leader_id !== '' && f.team_leader_id != null) p.team_leader_id = Number(f.team_leader_id)
   if (f.status) p.status = [f.status]
   if (f.usage) p.usage = [f.usage]
   if (f.created_from) p.created_from = f.created_from
@@ -200,13 +216,36 @@ function resetFilters() {
   filters.value.gateway = ''
   filters.value.username = ''
   filters.value.assigned_to_q = ''
-  filters.value.manager_q = ''
-  filters.value.team_leader_q = ''
+  filters.value.manager_id = ''
+  filters.value.team_leader_id = ''
   filters.value.status = ''
   filters.value.usage = ''
   filters.value.created_from = ''
   filters.value.created_to = ''
   meta.value.current_page = 1
+  load()
+}
+
+function clearFiltersOnly() {
+  filters.value.extension = ''
+  filters.value.landline_number = ''
+  filters.value.gateway = ''
+  filters.value.username = ''
+  filters.value.assigned_to_q = ''
+  filters.value.manager_id = ''
+  filters.value.team_leader_id = ''
+  filters.value.status = ''
+  filters.value.usage = ''
+  filters.value.created_from = ''
+  filters.value.created_to = ''
+}
+
+function onAddCreated() {
+  // Ensure the freshly created row is visible even if stale filters were applied.
+  clearFiltersOnly()
+  meta.value.current_page = 1
+  toast('success', 'Extension created successfully.')
+  loadSummary()
   load()
 }
 
@@ -409,7 +448,9 @@ async function onUpdateCell(rowId, field, value) {
       const idx = extensions.value.findIndex((r) => r.id === rowId)
           if (idx >= 0) extensions.value[idx] = { ...extensions.value[idx], ...updated }
     }
+    toast('success', field === 'password' ? 'Password updated successfully.' : 'Extension updated successfully.')
   } catch {
+    toast('error', 'Failed to update extension.')
     load()
   }
 }
@@ -455,44 +496,42 @@ function onEditUpdated() {
 
 function openHistoryModal(row) {
   historyModalExtension.value = row
-  historyAuditLog.value = []
-  if (row?.id) fetchAuditLog(row.id)
 }
 
 function closeHistoryModal() {
   historyModalExtension.value = null
-  historyAuditLog.value = []
 }
 
-function getEntryChanges(entry) {
-  const skipKeys = ['updated_at', 'created_at', 'id', 'deleted_at']
-  const labels = entry.field_labels || {}
-  const changes = []
-  const oldV = entry.old_values || {}
-  const newV = entry.new_values || {}
-  const keys = new Set([...Object.keys(oldV), ...Object.keys(newV)])
-  for (const key of keys) {
-    if (skipKeys.includes(key)) continue
-    const ov = oldV[key]
-    const nv = newV[key]
-    if (String(ov ?? '') !== String(nv ?? '')) {
-      const label = labels[key] || key.replace(/_id$/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-      changes.push({ label, oldVal: ov, newVal: nv })
+async function fetchHistoryRows(id) {
+  const { data } = await extensionsApi.getAuditLog(id)
+  const audits = data?.data ?? []
+  const skipKeys = new Set(['updated_at', 'created_at', 'deleted_at', 'id'])
+  const rows = []
+
+  for (const entry of audits) {
+    const oldValues = entry?.old_values || {}
+    const newValues = entry?.new_values || {}
+    const allKeys = new Set([...Object.keys(oldValues), ...Object.keys(newValues)])
+    const changedAt = entry?.created_at ?? null
+    const changedByName = entry?.user_name ?? 'System'
+
+    for (const key of allKeys) {
+      if (skipKeys.has(key)) continue
+      const oldValue = oldValues[key]
+      const newValue = newValues[key]
+      if (String(oldValue ?? '') === String(newValue ?? '')) continue
+
+      rows.push({
+        id: `${entry.id}-${key}`,
+        field_name: key,
+        old_value: oldValue,
+        new_value: newValue,
+        changed_at: changedAt,
+        changed_by_name: changedByName,
+      })
     }
   }
-  return changes
-}
-
-async function fetchAuditLog(id) {
-  historyLoading.value = true
-  try {
-    const { data } = await extensionsApi.getAuditLog(id)
-    historyAuditLog.value = data.data ?? []
-  } catch {
-    historyAuditLog.value = []
-  } finally {
-    historyLoading.value = false
-  }
+  return { data: rows }
 }
 
 onMounted(async () => {
@@ -515,15 +554,15 @@ onMounted(async () => {
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-white py-6 px-4 sm:px-6">
     <div class="mx-auto max-w-7xl space-y-4">
-      <div class="flex flex-wrap items-center justify-between gap-4">
-        <div class="flex flex-wrap items-baseline gap-2">
+      <div class="flex items-center justify-between gap-3 overflow-x-auto">
+        <div class="flex items-baseline gap-2 shrink-0">
           <h1 class="text-xl font-semibold text-gray-900 leading-tight">Cisco Extensions</h1>
           <Breadcrumbs />
         </div>
-        <div class="ml-auto flex flex-wrap items-center gap-2">
+        <div class="ml-auto flex items-center gap-1.5 shrink-0">
           <button
             type="button"
-            class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            class="inline-flex items-center rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
             @click="downloadCsvSample"
           >
             <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -534,7 +573,7 @@ onMounted(async () => {
           <button
             v-if="canCreate"
             type="button"
-            class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            class="inline-flex items-center rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             :disabled="loading || importLoading"
             @click="triggerImport"
           >
@@ -556,7 +595,7 @@ onMounted(async () => {
           />
           <button
             type="button"
-            class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            class="inline-flex items-center rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             :disabled="loading || exportLoading"
             @click="onExport"
           >
@@ -572,7 +611,7 @@ onMounted(async () => {
           <button
             v-if="canCreate"
             type="button"
-            class="inline-flex items-center rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+            class="inline-flex items-center rounded bg-green-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-green-700"
             @click="addModalVisible = true"
           >
             <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -716,12 +755,14 @@ onMounted(async () => {
         :visible="advancedVisible"
         :filters="filters"
         :filter-options="filterOptions"
+        :manager-options="managerOptions"
+        :team-leader-options="teamLeaderOptions"
         :loading="loading"
         @apply="applyFilters"
         @reset="resetFilters"
       />
 
-      <div class="overflow-hidden rounded-xl border-2 border-black bg-white shadow-sm">
+      <div class="overflow-x-auto rounded-xl border-2 border-black bg-white shadow-sm">
         <ExtensionsTable
           :columns="visibleColumns"
           :data="extensions"
@@ -773,7 +814,7 @@ onMounted(async () => {
       :gateways="filterOptions.gateways"
       :statuses="filterOptions.statuses"
       @close="addModalVisible = false"
-      @created="() => { toast('success', 'Extension created successfully.'); loadSummary(); load() }"
+      @created="onAddCreated"
     />
 
     <ViewExtensionModal
@@ -854,80 +895,15 @@ onMounted(async () => {
       </div>
     </Teleport>
 
-    <!-- History (audit log) modal -->
-    <Teleport to="body">
-      <div
-        v-if="historyModalExtension"
-        class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-gray-500/50 p-4"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="history-modal-title"
-        @click.self="closeHistoryModal"
-      >
-        <div class="w-full max-w-2xl max-h-[85vh] flex flex-col rounded-xl bg-white shadow-xl">
-          <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-            <h2 id="history-modal-title" class="text-lg font-semibold text-gray-900">
-              Extension History – {{ historyModalExtension?.extension ?? historyModalExtension?.id }}
-            </h2>
-            <button
-              type="button"
-              class="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-              aria-label="Close"
-              @click="closeHistoryModal"
-            >
-              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <div class="flex-1 overflow-auto px-6 py-4">
-            <div v-if="historyLoading" class="flex justify-center py-8">
-              <svg class="h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-            </div>
-            <div v-else-if="!historyAuditLog.length" class="py-8 text-center text-sm text-gray-500">
-              No history recorded.
-            </div>
-            <ul v-else class="space-y-4">
-              <li
-                v-for="entry in historyAuditLog"
-                :key="entry.id"
-                class="rounded-lg border border-gray-200 bg-gray-50/50 p-4 text-sm"
-              >
-                <div class="flex flex-wrap items-center gap-2 text-gray-700">
-                  <span class="font-medium capitalize">{{ entry.action }}</span>
-                  <span class="text-gray-500">by {{ entry.user_name }}</span>
-                  <span class="text-gray-400">– {{ entry.created_at ? new Date(entry.created_at).toLocaleString() : '' }}</span>
-                </div>
-                <div v-if="getEntryChanges(entry).length" class="mt-3 space-y-1.5">
-                  <div
-                    v-for="(c, ci) in getEntryChanges(entry)"
-                    :key="ci"
-                    class="flex flex-wrap items-center gap-1.5 text-sm"
-                  >
-                    <span class="font-medium text-gray-700">{{ c.label }}:</span>
-                    <span class="text-red-500 line-through break-all">{{ c.oldVal ?? '(empty)' }}</span>
-                    <span class="text-gray-400">&rarr;</span>
-                    <span class="text-green-600 break-all">{{ c.newVal ?? '(empty)' }}</span>
-                  </div>
-                </div>
-              </li>
-            </ul>
-          </div>
-          <div class="border-t border-gray-200 px-6 py-4">
-            <button
-              type="button"
-              class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              @click="closeHistoryModal"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <RecordHistoryModal
+      :visible="Boolean(historyModalExtension)"
+      :record-id="historyModalExtension?.id"
+      :record-label="historyModalExtension ? `Extension ${historyModalExtension.extension ?? historyModalExtension.id}` : ''"
+      module-name="Cisco Extensions"
+      :fetch-fn="fetchHistoryRows"
+      :field-labels="EXTENSION_HISTORY_FIELD_LABELS"
+      @close="closeHistoryModal"
+    />
 
     <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />
   </div>

@@ -26,6 +26,7 @@ const emit = defineEmits(['sort', 'delete', 'updateCell', 'openHistory', 'edit',
 const editingCell = ref(null)
 const inlineEditValue = ref('')
 const inlineEditError = ref('')
+const showPasswordInline = ref(false)
 
 const permissions = computed(() => auth.user?.permissions ?? [])
 const isSuperAdmin = computed(() => {
@@ -52,7 +53,7 @@ function getCellValueForEdit(row, col) {
   if (col === 'assigned_to_name') return row.assigned_to != null ? String(row.assigned_to) : ''
   if (col === 'manager') return row.manager_id != null ? String(row.manager_id) : ''
   if (col === 'team_leader') return row.team_leader_id != null ? String(row.team_leader_id) : ''
-  if (col === 'password') return '' // never show current password; leave blank to keep
+  if (col === 'password') return row.password_view != null ? String(row.password_view) : ''
   return row[col] != null ? String(row[col]) : ''
 }
 
@@ -66,6 +67,7 @@ function openDropdownEdit(row, col) {
 function openInputEdit(row, col) {
   if (!isEditableColumn(col)) return
   inlineEditError.value = ''
+  showPasswordInline.value = false
   editingCell.value = { rowId: row.id, col }
   inlineEditValue.value = getCellValueForEdit(row, col)
 }
@@ -105,11 +107,13 @@ function saveInlineEdit() {
     value = value === '' ? null : value
   }
   emit('updateCell', rowId, col, value)
+  showPasswordInline.value = false
   editingCell.value = null
 }
 
 function cancelInlineEdit() {
   inlineEditError.value = ''
+  showPasswordInline.value = false
   editingCell.value = null
 }
 
@@ -270,7 +274,7 @@ function onDelete(row) {
             <template v-if="col === 'id'">
               {{ ((currentPage - 1) * perPage) + rowIndex + 1 }}
             </template>
-            <template v-else-if="col === 'extension'">
+            <template v-else-if="col === 'extension' && !isEditing(row.id, col)">
               <span
                 v-if="isEditableColumn(col)"
                 class="cursor-pointer text-blue-600 hover:text-blue-800 hover:underline"
@@ -287,11 +291,12 @@ function onDelete(row) {
               </button>
               <span v-else>{{ row.extension || '—' }}</span>
             </template>
-            <template v-else-if="col === 'password'">
+            <template v-else-if="col === 'password' && !isEditing(row.id, col)">
               <span
                 v-if="isEditableColumn(col)"
                 class="cursor-pointer text-blue-600 hover:text-blue-800 hover:underline"
-                @click="openInputEdit(row, col)"
+                title="Double-click to edit password"
+                @dblclick="openInputEdit(row, col)"
               >{{ row.password ? '••••••••' : '—' }}</span>
               <span v-else-if="row.password" class="text-gray-500">••••••••</span>
               <span v-else>—</span>
@@ -345,14 +350,31 @@ function onDelete(row) {
               <span v-else class="inline-flex flex-wrap items-center gap-2">
                 <input
                   v-model="inlineEditValue"
-                  :type="editingCell?.col === 'password' ? 'password' : 'text'"
+                  type="text"
                   :maxlength="editingCell?.col === 'landline_number' ? 12 : undefined"
-                  :placeholder="editingCell?.col === 'password' ? 'Leave blank to keep current' : undefined"
+                  :placeholder="editingCell?.col === 'password' ? 'Enter password' : undefined"
+                  :style="editingCell?.col === 'password' && !showPasswordInline ? { WebkitTextSecurity: 'disc' } : undefined"
+                  :name="editingCell?.col === 'password' ? `ext_secret_${editingCell?.rowId || ''}` : undefined"
+                  :autocomplete="editingCell?.col === 'password' ? 'new-password' : 'off'"
+                  autocapitalize="off"
+                  autocorrect="off"
+                  spellcheck="false"
+                  data-lpignore="true"
+                  data-1p-ignore="true"
+                  data-bwignore="true"
                   class="min-w-[100px] rounded border border-gray-300 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
                   @input="editingCell?.col === 'landline_number' && (inlineEditValue = String(inlineEditValue ?? '').replace(/\D/g, '').slice(0, 12))"
                   @keydown.enter="saveInlineEdit"
                   @keydown.escape="cancelInlineEdit"
                 />
+                <button
+                  v-if="editingCell?.col === 'password'"
+                  type="button"
+                  class="rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                  @click="showPasswordInline = !showPasswordInline"
+                >
+                  {{ showPasswordInline ? 'Hide' : 'View' }}
+                </button>
                 <span class="inline-flex items-center gap-1 shrink-0">
                   <button type="button" class="rounded bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>

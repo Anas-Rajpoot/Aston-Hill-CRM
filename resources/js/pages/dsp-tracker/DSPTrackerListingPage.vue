@@ -44,6 +44,8 @@ const COLUMN_LABELS = {
 
 /** Optional CSV columns (not required in file): DSP OM ID, Uploaded By, Uploaded At. */
 const OPTIONAL_CSV_COLUMNS = ['dsp_om_id', 'uploaded_by', 'uploaded_at']
+/** Full CSV import schema used by sample generation + parsing. */
+const IMPORT_CSV_COLUMNS = [...COLUMNS, ...OPTIONAL_CSV_COLUMNS]
 
 /** Columns that must be present in the CSV header (normalized match). */
 const REQUIRED_CSV_COLUMNS = [...COLUMNS]
@@ -289,7 +291,12 @@ function csvEscape(val) {
 }
 
 function downloadCsvSample() {
-  const headers = COLUMNS.map((c) => COLUMN_LABELS[c] || c)
+  const headers = IMPORT_CSV_COLUMNS.map((c) => {
+    if (c === 'dsp_om_id') return 'DSP OM ID'
+    if (c === 'uploaded_by') return 'Uploaded By'
+    if (c === 'uploaded_at') return 'Uploaded At'
+    return COLUMN_LABELS[c] || c
+  })
   const sampleRow = [
     'ACT-1001',
     'ABC Trading LLC',
@@ -303,6 +310,9 @@ function downloadCsvSample() {
     '',
     'Ahmed',
     '971501234567',
+    'OM-1022',
+    'operations.user',
+    '24-Feb-2026 10:30',
   ]
   const csv = [headers.map(csvEscape).join(','), sampleRow.map(csvEscape).join(',')].join('\r\n')
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -344,11 +354,7 @@ function onCsvChange(e) {
 
     const rawHeaders = parseCsvLine(lines[0])
     const keyMap = {}
-    COLUMNS.forEach((col) => {
-      const i = rawHeaders.findIndex((h) => norm(h) === col)
-      if (i !== -1) keyMap[col] = i
-    })
-    OPTIONAL_CSV_COLUMNS.forEach((col) => {
+    IMPORT_CSV_COLUMNS.forEach((col) => {
       const i = rawHeaders.findIndex((h) => norm(h) === col)
       if (i !== -1) keyMap[col] = i
     })
@@ -367,11 +373,7 @@ function onCsvChange(e) {
       const lineNum = i + 1
       const cells = parseCsvLine(lines[i])
       const row = {}
-      COLUMNS.forEach((col) => {
-        const idx = keyMap[col]
-        row[col] = idx !== undefined && cells[idx] !== undefined ? String(cells[idx]).trim() : ''
-      })
-      OPTIONAL_CSV_COLUMNS.forEach((col) => {
+      IMPORT_CSV_COLUMNS.forEach((col) => {
         const idx = keyMap[col]
         row[col] = idx !== undefined && cells[idx] !== undefined ? String(cells[idx]).trim() : ''
       })
@@ -436,22 +438,22 @@ onMounted(() => load())
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-white py-6 px-4 sm:px-6">
     <div class="mx-auto max-w-7xl space-y-4">
-      <div class="flex flex-wrap items-start justify-between gap-4">
-        <div class="flex flex-wrap items-start gap-3">
+      <div class="flex items-start justify-between gap-4 overflow-x-auto">
+        <div class="flex items-start gap-3 shrink-0">
           <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-[#6BC100] text-white">
             <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
             </svg>
           </div>
           <div>
-            <div class="flex flex-wrap items-baseline gap-4">
+            <div class="flex items-baseline gap-4">
               <h1 class="text-xl font-bold text-gray-900 leading-tight">DSP Tracker - Status Check</h1>
               <Breadcrumbs class="text-sm text-gray-500" />
             </div>
             <p class="mt-0.5 text-sm text-gray-500">Search and track DSP-related activities and requests.</p>
           </div>
         </div>
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="flex items-center gap-2 shrink-0">
           <input
             ref="csvInputRef"
             type="file"
@@ -499,7 +501,7 @@ onMounted(() => load())
 
       <!-- Filters: Request Status, Company Name, Apply/Reset, Advanced Filters, Customize Columns (Activity Number only in Advanced) -->
       <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-        <div class="flex flex-wrap items-end gap-4">
+        <div class="flex items-end gap-4 overflow-x-auto">
           <div class="min-w-[140px] max-w-[180px]">
             <label class="mb-1 block text-xs font-medium text-gray-600">Request Status</label>
             <select
@@ -539,7 +541,7 @@ onMounted(() => load())
               Reset
             </button>
           </div>
-          <div class="flex gap-2 ml-auto">
+          <div class="flex gap-2 ml-auto shrink-0">
             <button
               type="button"
               class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -571,7 +573,7 @@ onMounted(() => load())
       />
 
       <div class="overflow-x-auto rounded-xl border-2 border-black bg-white shadow-sm">
-        <table class="min-w-full border-collapse">
+        <table class="dsp-tracker-table border-collapse">
           <thead>
             <tr class="border-b-2 border-black bg-sky-50">
               <th
@@ -686,3 +688,11 @@ onMounted(() => load())
     <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />
   </div>
 </template>
+
+<style scoped>
+/* Keep table visually full-width when empty, while still allowing horizontal overflow when needed. */
+.dsp-tracker-table {
+  width: max(100%, max-content) !important;
+  min-width: 100% !important;
+}
+</style>

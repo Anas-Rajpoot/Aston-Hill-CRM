@@ -69,7 +69,7 @@ const perPageOptions = ref([10, 20, 25, 50, 100])
 const allColumns = ref([])
 const visibleColumns = ref([
   'id', 'request_type', 'account_number', 'company_name', 'contact_number', 'description', 'additional_notes',
-  'manager', 'team_leader', 'sales_agent', 'executive', 'status', 'creator',
+  'manager', 'team_leader', 'sales_agent', 'executive', 'sla_timer', 'status', 'creator',
 ])
 const sort = ref('id')
 const order = ref('desc')
@@ -131,6 +131,7 @@ const COLUMN_LABELS = {
   team_leader: 'Team Leader',
   sales_agent: 'Sales Agent',
   executive: 'Back Office Executive',
+  sla_timer: 'SLA Timer',
   status: 'Status',
   creator: 'Created By',
 }

@@ -12,6 +12,7 @@ import { toDdMmYyyy } from '@/lib/dateFormat'
 import ClientTable from '@/components/clients/ClientTable.vue'
 import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
+import RecordHistoryModal from '@/components/RecordHistoryModal.vue'
 import Toast from '@/components/Toast.vue'
 import TruncatedText from '@/components/TruncatedText.vue'
 import api from '@/lib/axios'
@@ -87,15 +88,20 @@ const productsSort = ref('submitted_at')
 const productsOrder = ref('desc')
 const allColumns = ref([])
 const defaultColumns = ref([])
-const visibleColumns = ref([
-  'company_name', 'submitted_at', 'submission_type', 'service_category', 'manager', 'team_leader', 'sales_agent',
-  'service_type', 'product_type', 'address', 'product_name', 'mrc', 'quantity', 'other',
-  'migration_numbers', 'activity', 'account_number', 'wo_number', 'work_order_status', 'status', 'activation_date',
-  'contract_type', 'contract_end_date', 'clawback_chum', 'remarks',
-  'renewal_alert', 'additional_notes', 'creator',
-])
+const PRODUCT_SECTION_COLUMNS = [
+  'company_name', 'submitted_at', 'manager', 'team_leader', 'sales_agent',
+  'submission_type', 'service_category', 'service_type', 'product_type', 'address',
+  'product_name', 'mrc', 'quantity', 'other', 'migration_numbers', 'activity',
+  'account_number', 'wo_number', 'work_order_status', 'activation_date',
+  'contract_type', 'contract_end_date', 'clawback_chum', 'remarks', 'additional_notes',
+]
+
+const visibleColumns = ref([...PRODUCT_SECTION_COLUMNS])
 const columnModalVisible = ref(false)
 const profileFilterOptions = ref({ managers: [], team_leaders: [], sales_agents: [] })
+const productHistoryModalVisible = ref(false)
+const productHistoryRecordId = ref(null)
+const productHistoryRecordLabel = ref('')
 
 // VAS / Customer Support / Alerts
 const vasRequests = ref([])
@@ -275,29 +281,21 @@ async function loadTablePreference() {
   } catch { /* use system default */ }
 }
 
-const COLUMN_ORDER = [
-  'company_name', 'submitted_at', 'submission_type', 'service_category', 'manager', 'team_leader', 'sales_agent',
-  'service_type', 'product_type', 'address', 'product_name', 'mrc', 'quantity', 'other',
-  'migration_numbers', 'activity', 'account_number', 'wo_number', 'work_order_status', 'status', 'activation_date',
-  'contract_type', 'contract_end_date', 'clawback_chum', 'remarks',
-  'renewal_alert', 'additional_notes', 'creator',
-]
+const COLUMN_ORDER = [...PRODUCT_SECTION_COLUMNS]
 
 function enforceColumnOrder(cols) {
-  const set = new Set(cols)
-  set.delete('completion_date')
-  ;['activity', 'submission_type', 'service_category', 'work_order_status', 'activation_date', 'clawback_chum', 'remarks'].forEach((c) => set.add(c))
-  const ordered = COLUMN_ORDER.filter((c) => set.has(c))
-  const extra = [...set].filter((c) => !COLUMN_ORDER.includes(c))
-  return [...ordered, ...extra]
+  const allowed = new Set(PRODUCT_SECTION_COLUMNS)
+  const set = new Set((cols ?? []).filter((c) => allowed.has(c)))
+  PRODUCT_SECTION_COLUMNS.forEach((c) => set.add(c))
+  return COLUMN_ORDER.filter((c) => set.has(c))
 }
 
 async function loadColumns() {
   try {
     const data = await clientsApi.columns()
-    allColumns.value = data.all_columns ?? []
+    allColumns.value = (data.all_columns ?? []).filter((c) => PRODUCT_SECTION_COLUMNS.includes(c))
     visibleColumns.value = enforceColumnOrder(data.visible_columns ?? visibleColumns.value)
-    defaultColumns.value = data.default_columns ?? []
+    defaultColumns.value = (data.default_columns ?? []).filter((c) => PRODUCT_SECTION_COLUMNS.includes(c))
   } catch {}
 }
 
@@ -506,12 +504,50 @@ async function loadProfileFilterOptions() {
   } catch { /* silent */ }
 }
 
+async function refreshRevenueSummary() {
+  if (!id.value || !client.value) return
+  recomputeRevenueFromProducts()
+  try {
+    const fresh = await clientsApi.show(id.value)
+    client.value = {
+      ...client.value,
+      normal_revenue: fresh?.normal_revenue ?? client.value.normal_revenue,
+      churn_revenue: fresh?.churn_revenue ?? client.value.churn_revenue,
+      clawback_revenue: fresh?.clawback_revenue ?? client.value.clawback_revenue,
+    }
+  } catch {
+    // keep current values if refresh fails
+  }
+}
+
+function recomputeRevenueFromProducts() {
+  if (!client.value) return
+  const totals = { normal: 0, churn: 0, clawback: 0 }
+  for (const row of products.value || []) {
+    const status = String(row?.status || '').trim().toLowerCase()
+    const rawMrc = row?.mrc
+    const numericMrc = Number(String(rawMrc ?? '').replace(/,/g, ''))
+    const mrc = Number.isFinite(numericMrc) ? numericMrc : 0
+    if (status === 'normal') totals.normal += mrc
+    else if (status === 'churn') totals.churn += mrc
+    else if (status === 'clawback') totals.clawback += mrc
+  }
+  client.value = {
+    ...client.value,
+    normal_revenue: totals.normal,
+    churn_revenue: totals.churn,
+    clawback_revenue: totals.clawback,
+  }
+}
+
 async function onProductUpdateCell(clientId, field, value) {
   const isRenewal = field === 'service_category' && String(value ?? '').trim().toLowerCase() === 'renewal'
   if (isRenewal) {
     try {
       await clientsApi.inlineUpdate(clientId, { [field]: value, create_renewal_record: true })
       await loadProducts()
+      recomputeRevenueFromProducts()
+      await refreshRevenueSummary()
       toast('success', 'Renewal record created.')
     } catch {
       toast('error', 'Failed to create renewal record.')
@@ -535,13 +571,40 @@ async function onProductUpdateCell(clientId, field, value) {
     } else {
       row[field] = value
     }
+    if (field === 'mrc' || field === 'status') {
+      recomputeRevenueFromProducts()
+    }
   }
   try {
     await clientsApi.inlineUpdate(clientId, { [field]: value })
+    if (field === 'mrc' || field === 'status') {
+      recomputeRevenueFromProducts()
+    }
+    await refreshRevenueSummary()
   } catch {
     if (prev) Object.assign(row, prev)
+    if (field === 'mrc' || field === 'status') {
+      recomputeRevenueFromProducts()
+    }
     loadProducts()
   }
+}
+
+function openProductHistoryModal(row) {
+  if (!row?.id) return
+  productHistoryRecordId.value = row.id
+  productHistoryRecordLabel.value = row.company_name || `Client #${row.id}`
+  productHistoryModalVisible.value = true
+}
+
+function closeProductHistoryModal() {
+  productHistoryModalVisible.value = false
+  productHistoryRecordId.value = null
+  productHistoryRecordLabel.value = ''
+}
+
+async function fetchProductAudits(recordId) {
+  return await clientsApi.audits(recordId)
 }
 
 watch(activeTab, (tab) => {
@@ -1100,8 +1163,12 @@ onMounted(() => {
                   :current-page="productsMeta.current_page || 1"
                   :per-page="productsMeta.per_page || 10"
                   :edit-options="profileFilterOptions"
+                  view-mode="product-detail"
+                  :parent-client-id="id"
+                  :return-to="route.fullPath"
                   @sort="onProductsSort"
                   @update-cell="onProductUpdateCell"
+                  @view-history="openProductHistoryModal"
                 />
               </div>
               <div v-if="productsMeta.total > 0" class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 bg-white px-4 py-3">
@@ -1614,6 +1681,15 @@ onMounted(() => {
           :default-columns="defaultColumns"
           @update:visible="columnModalVisible = $event"
           @save="onSaveColumns"
+        />
+
+        <RecordHistoryModal
+          :visible="productHistoryModalVisible"
+          :record-id="productHistoryRecordId"
+          :record-label="productHistoryRecordLabel"
+          module-name="Clients"
+          :fetch-fn="fetchProductAudits"
+          @close="closeProductHistoryModal"
         />
 
         <ColumnCustomizerModal

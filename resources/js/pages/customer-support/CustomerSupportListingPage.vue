@@ -56,7 +56,7 @@ const perPageOptions = ref([10, 20, 25, 50, 100])
 const allColumns = ref([])
 const visibleColumns = ref([
   'id', 'submitted_at', 'ticket_number', 'account_number', 'company_name', 'issue_category',
-  'contact_number', 'creator', 'csr', 'status', 'workflow_status',
+  'contact_number', 'creator', 'csr', 'sla_timer', 'status', 'workflow_status',
   'pending', 'completion_date', 'updated_at',
   'trouble_ticket', 'activity', 'resolution_remarks', 'internal_remarks',
   'manager', 'team_leader', 'sales_agent',
@@ -140,6 +140,7 @@ const COLUMN_LABELS = {
   attachments: 'Attachments',
   creator: 'Submitted By',
   csr: 'CSR Name',
+  sla_timer: 'SLA Timer',
   manager: 'Manager',
   team_leader: 'Team Leader',
   sales_agent: 'Sales Agent',

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\FieldSubmissionController;
 use App\Http\Controllers\VasRequestController;
 use App\Jobs\BulkAssignVasJob;
+use App\Models\SlaRule;
 use App\Models\SystemAuditLog;
 use App\Models\User;
 use App\Models\UserColumnPreference;
@@ -29,7 +30,7 @@ class VasRequestApiController extends Controller
         'id', 'created_at', 'created_by', 'updated_at', 'approved_at', 'rejected_at',
         'request_type', 'account_number', 'contact_number', 'company_name', 'description', 'additional_notes',
         'manager_id', 'team_leader_id', 'sales_agent_id', 'back_office_executive_id',
-        'status',
+        'status', 'sla_timer',
     ];
 
     private const BASE_COLUMNS = ['id', 'status'];
@@ -252,6 +253,10 @@ class VasRequestApiController extends Controller
                 ->orderBy('creator_users.name', $direction);
             return;
         }
+        if ($sort === 'sla_timer') {
+            $query->orderBy('vas_request_submissions.created_at', $direction);
+            return;
+        }
         if (in_array($sort, ['manager', 'team_leader', 'sales_agent', 'executive'], true)) {
             $col = $sort === 'executive' ? 'back_office_executive_id' : $sort . '_id';
             $alias = $sort . '_users';
@@ -296,6 +301,10 @@ class VasRequestApiController extends Controller
                 $base[] = $map[$col];
             }
         }
+        if (in_array('sla_timer', $columns, true)) {
+            $base[] = "{$t}.created_at";
+            $base[] = "{$t}.back_office_executive_id";
+        }
         $qualified = array_unique($base);
         // Alias qualified columns so Eloquent hydrates model attributes correctly (id, status, etc.)
         $aliased = [];
@@ -333,6 +342,10 @@ class VasRequestApiController extends Controller
                 $out['creator'] = $row->creator?->name ?? null;
                 continue;
             }
+            if ($col === 'sla_timer') {
+                $out['sla_timer'] = $this->computeSlaTimer($row);
+                continue;
+            }
             if (in_array($col, ['created_at', 'approved_at', 'rejected_at', 'updated_at'], true)) {
                 $out[$col] = $row->$col ? $row->$col->format('d-M-Y H:i') : null;
                 continue;
@@ -340,6 +353,49 @@ class VasRequestApiController extends Controller
             $out[$col] = $row->$col ?? null;
         }
         return $out;
+    }
+
+    private function computeSlaTimer(VasRequestSubmission $row): ?string
+    {
+        $startAt = $row->submitted_at ?? $row->created_at;
+        if (! $startAt) {
+            return null;
+        }
+        if (! empty($row->back_office_executive_id)) {
+            return 'Assigned';
+        }
+
+        $rule = SlaRule::cached()->firstWhere('module_key', 'vas_requests');
+        $slaMinutes = ($rule && $rule->is_active)
+            ? max(1, (int) $rule->sla_duration_minutes)
+            : 960;
+        $warningMinutes = ($rule && $rule->is_active)
+            ? max(0, (int) $rule->warning_threshold_minutes)
+            : 90;
+
+        $elapsed = $startAt->diffInMinutes(now());
+        $remaining = $slaMinutes - $elapsed;
+        if ($remaining <= 0) {
+            return 'Overdue ' . $this->formatDuration(abs($remaining));
+        }
+        if ($warningMinutes > 0 && $remaining <= $warningMinutes) {
+            return 'Due in ' . $this->formatDuration($remaining);
+        }
+        return $this->formatDuration($remaining) . ' left';
+    }
+
+    private function formatDuration(int $minutes): string
+    {
+        $minutes = max(0, $minutes);
+        $h = intdiv($minutes, 60);
+        $m = $minutes % 60;
+        if ($h > 0 && $m > 0) {
+            return "{$h}h {$m}m";
+        }
+        if ($h > 0) {
+            return "{$h}h";
+        }
+        return "{$m}m";
     }
 
     public function filters(): JsonResponse

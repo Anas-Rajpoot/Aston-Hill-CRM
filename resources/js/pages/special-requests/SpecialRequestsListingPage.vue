@@ -59,7 +59,7 @@ const perPageOptions = ref([10, 20, 25, 50, 100])
 const allColumns = ref([])
 const visibleColumns = ref([
   'created_at', 'company_name', 'account_number', 'request_type',
-  'complete_address', 'special_instruction', 'sales_agent', 'team_leader', 'manager', 'status', 'creator', 'updated_at',
+  'complete_address', 'special_instruction', 'manager', 'team_leader', 'sales_agent', 'status', 'creator', 'updated_at',
 ])
 const sort = ref('created_at')
 const order = ref('desc')
@@ -126,8 +126,8 @@ const COLUMN_LABELS = {
 
 const COLUMN_ORDER = [
   'created_at', 'company_name', 'account_number', 'request_type',
-  'complete_address', 'special_instruction', 'sales_agent', 'team_leader',
-  'manager', 'status', 'creator', 'updated_at',
+  'complete_address', 'special_instruction', 'manager', 'team_leader',
+  'sales_agent', 'status', 'creator', 'updated_at',
 ]
 
 function normalizeVisibleColumns(cols) {

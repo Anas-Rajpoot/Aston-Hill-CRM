@@ -10,7 +10,7 @@ use App\Models\UserColumnPreference;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Validation\Rule;
 
 class ExtensionsApiController extends Controller
@@ -45,6 +45,8 @@ class ExtensionsApiController extends Controller
             'gateway' => ['sometimes', 'nullable', 'string', 'max:100'],
             'username' => ['sometimes', 'nullable', 'string', 'max:100'],
             'assigned_to_q' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'manager_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'team_leader_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'manager_q' => ['sometimes', 'nullable', 'string', 'max:200'],
             'team_leader_q' => ['sometimes', 'nullable', 'string', 'max:200'],
             'status' => ['sometimes', 'nullable', 'array'],
@@ -74,8 +76,9 @@ class ExtensionsApiController extends Controller
         $total = $query->count();
 
         $this->applySort($query, $sort, $order);
+        $canViewPassword = $request->user() && ($request->user()->hasRole('superadmin') || $request->user()->can('extensions.edit'));
         $items = $query->skip(($page - 1) * $perPage)->take($perPage)->get()
-            ->map(fn ($row) => $this->formatRow($row, $columns));
+            ->map(fn ($row) => $this->formatRow($row, $columns, (bool) $canViewPassword));
 
         $lastPage = $total > 0 ? (int) ceil($total / $perPage) : 1;
 
@@ -127,6 +130,12 @@ class ExtensionsApiController extends Controller
             $term = '%' . addcslashes($validated['assigned_to_q'], '%_\\') . '%';
             $query->whereHas('assignedToUser', fn ($q) => $q->where('name', 'like', $term));
         }
+        if (! empty($validated['manager_id'])) {
+            $query->whereHas('assignedToUser.manager', fn ($q) => $q->where('id', (int) $validated['manager_id']));
+        }
+        if (! empty($validated['team_leader_id'])) {
+            $query->whereHas('assignedToUser.teamLeader', fn ($q) => $q->where('id', (int) $validated['team_leader_id']));
+        }
         if (! empty($validated['manager_q'])) {
             $term = '%' . addcslashes($validated['manager_q'], '%_\\') . '%';
             $query->whereHas('assignedToUser.manager', fn ($q) => $q->where('name', 'like', $term));
@@ -170,7 +179,7 @@ class ExtensionsApiController extends Controller
         $query->orderBy('cisco_extensions.' . $sort, $direction);
     }
 
-    private function formatRow(CiscoExtension $row, array $columns): array
+    private function formatRow(CiscoExtension $row, array $columns, bool $canViewPassword = false): array
     {
         $assigned = $row->assignedToUser;
         $teamLeaderName = $row->teamLeader?->name;
@@ -188,6 +197,8 @@ class ExtensionsApiController extends Controller
             }
         }
 
+        $rawPassword = (string) ($row->getRawOriginal('password') ?? '');
+
         $out = [
             'id' => $row->id,
             'extension' => $row->extension,
@@ -204,9 +215,11 @@ class ExtensionsApiController extends Controller
             'manager_id' => $assigned?->manager_id,
             'team_leader_id' => $assigned?->team_leader_id,
             'comment' => $row->comment,
-            'updated_at' => $row->updated_at?->format('d-m-Y'),
+            'updated_at' => $row->updated_at?->format('d-M-Y'),
+            'can_view_password' => $canViewPassword,
+            'password_view' => $this->resolvePasswordForView($rawPassword, $canViewPassword),
         ];
-        $allowed = array_flip(array_merge($columns, ['id', 'assigned_to', 'manager_id', 'team_leader_id']));
+        $allowed = array_flip(array_merge($columns, ['id', 'assigned_to', 'manager_id', 'team_leader_id', 'can_view_password', 'password_view']));
         return array_intersect_key($out, $allowed);
     }
 
@@ -307,12 +320,13 @@ class ExtensionsApiController extends Controller
         return response()->json(['success' => true]);
     }
 
-    public function show(CiscoExtension $ciscoExtension): JsonResponse
+    public function show(Request $request, CiscoExtension $ciscoExtension): JsonResponse
     {
         $this->authorize('view', $ciscoExtension);
 
         $ciscoExtension->load(['assignedToUser:id,name,email', 'teamLeader:id,name', 'manager:id,name']);
-        $row = $this->formatRow($ciscoExtension, self::ALLOWED_COLUMNS);
+        $canViewPassword = $request->user() && ($request->user()->hasRole('superadmin') || $request->user()->can('extensions.edit'));
+        $row = $this->formatRow($ciscoExtension, self::ALLOWED_COLUMNS, (bool) $canViewPassword);
         $row['password'] = $ciscoExtension->password ? '********' : null;
         $row['created_at'] = $ciscoExtension->created_at?->format('Y-m-d');
         $row['updated_at_raw'] = $ciscoExtension->updated_at?->format('Y-m-d');
@@ -338,7 +352,7 @@ class ExtensionsApiController extends Controller
         ]);
 
         if (! empty($data['password'])) {
-            $data['password'] = Hash::make($data['password']);
+            $data['password'] = $this->encryptPasswordValue($data['password']);
         }
         $data['status'] = $data['status'] ?? CiscoExtension::STATUS_ACTIVE;
 
@@ -442,7 +456,7 @@ class ExtensionsApiController extends Controller
                 'comment' => $comment,
             ];
             if ($password !== '') {
-                $data['password'] = Hash::make($password);
+                $data['password'] = $this->encryptPasswordValue($password);
             }
 
             try {
@@ -480,15 +494,15 @@ class ExtensionsApiController extends Controller
 
         $old = $ciscoExtension->only(array_keys($data));
         if (! empty($data['password'])) {
-            $data['password'] = Hash::make($data['password']);
+            $data['password'] = $this->encryptPasswordValue($data['password']);
         } else {
             unset($data['password']);
         }
 
         $ciscoExtension->update($data);
         $this->writeAuditLog($ciscoExtension, 'updated', $old, $ciscoExtension->fresh()->only(array_keys($data)));
-
-        return response()->json(['message' => 'Updated.', 'data' => $this->formatRow($ciscoExtension->fresh(['assignedToUser', 'teamLeader', 'manager']), self::ALLOWED_COLUMNS)]);
+        $canViewPassword = $request->user() && ($request->user()->hasRole('superadmin') || $request->user()->can('extensions.edit'));
+        return response()->json(['message' => 'Updated.', 'data' => $this->formatRow($ciscoExtension->fresh(['assignedToUser', 'teamLeader', 'manager']), self::ALLOWED_COLUMNS, (bool) $canViewPassword)]);
     }
 
     public function patch(Request $request, CiscoExtension $ciscoExtension): JsonResponse
@@ -515,15 +529,45 @@ class ExtensionsApiController extends Controller
 
         $old = $ciscoExtension->only(array_keys($data));
         if (! empty($data['password'])) {
-            $data['password'] = Hash::make($data['password']);
+            $data['password'] = $this->encryptPasswordValue($data['password']);
         } else {
             unset($data['password']);
         }
 
         $ciscoExtension->update($data);
         $this->writeAuditLog($ciscoExtension, 'updated', $old, $ciscoExtension->fresh()->only(array_keys($data)));
+        $canViewPassword = $request->user() && ($request->user()->hasRole('superadmin') || $request->user()->can('extensions.edit'));
+        return response()->json(['message' => 'Updated.', 'data' => $this->formatRow($ciscoExtension->fresh($relationsForFormat), self::ALLOWED_COLUMNS, (bool) $canViewPassword)]);
+    }
 
-        return response()->json(['message' => 'Updated.', 'data' => $this->formatRow($ciscoExtension->fresh($relationsForFormat), self::ALLOWED_COLUMNS)]);
+    private function encryptPasswordValue(?string $plain): ?string
+    {
+        $value = trim((string) ($plain ?? ''));
+        if ($value === '') return null;
+        return Crypt::encryptString($value);
+    }
+
+    private function resolvePasswordForView(?string $storedValue, bool $canViewPassword): ?string
+    {
+        if (! $canViewPassword) return null;
+        $value = trim((string) ($storedValue ?? ''));
+        if ($value === '') return null;
+        if ($this->isLegacyHashedPassword($value)) return null;
+        try {
+            return Crypt::decryptString($value);
+        } catch (\Throwable $e) {
+            // Backward compatibility: historically plain text may exist.
+            return $value;
+        }
+    }
+
+    private function isLegacyHashedPassword(string $value): bool
+    {
+        return str_starts_with($value, '$2y$')
+            || str_starts_with($value, '$2a$')
+            || str_starts_with($value, '$2b$')
+            || str_starts_with($value, '$argon2i$')
+            || str_starts_with($value, '$argon2id$');
     }
 
     private function writeAuditLog(CiscoExtension $ext, string $action, ?array $oldValues, ?array $newValues): void

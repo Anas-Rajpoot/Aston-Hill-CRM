@@ -1,6 +1,6 @@
 <script setup>
 /**
- * Edit History modal – timeline of changes (like image 1), "View All" opens Change Details (like image 2).
+ * Edit History modal – timeline of changes (like image 1), "View in Detail" opens Change Details (like image 2).
  * Data from expense audit log API; field labels for Expense Tracker module.
  */
 import { ref, watch, computed } from 'vue'
@@ -231,7 +231,7 @@ watch(
                     class="text-sm font-medium text-green-600 hover:underline"
                     @click="openChangeDetails(entry)"
                   >
-                    View All
+                    View in Detail
                   </button>
                 </div>
                 <div class="mt-3 space-y-1.5">

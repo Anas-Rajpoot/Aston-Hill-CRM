@@ -500,7 +500,7 @@ onMounted(() => load())
 </script>
 
 <template>
-  <div class="space-y-6 bg-white -mx-4 -my-5 min-h-full px-6 py-6">
+  <div class="space-y-6 bg-white min-h-full px-6 py-6">
     <Toast
       :show="showToast"
       :type="toastType"
@@ -509,15 +509,15 @@ onMounted(() => load())
       @dismiss="dismissToast"
     />
 
-    <div class="flex flex-wrap items-center justify-between gap-4">
-      <div>
+    <div class="flex items-center justify-between gap-4 overflow-x-auto">
+      <div class="shrink-0">
         <div class="flex flex-wrap items-baseline gap-2">
           <h1 class="text-2xl font-bold text-gray-900 leading-tight">Verifiers Detail</h1>
           <Breadcrumbs />
         </div>
         <p class="mt-1 text-sm text-gray-500">Manage verifier directory for DSP Tracker integration.</p>
       </div>
-      <div class="flex flex-wrap items-center gap-2">
+      <div class="flex items-center gap-2 shrink-0">
         <input
           ref="csvInputRef"
           type="file"

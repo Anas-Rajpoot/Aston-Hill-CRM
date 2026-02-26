@@ -359,7 +359,7 @@ watch(
                     class="shrink-0 text-sm font-medium text-green-600 hover:underline"
                     @click="openChangeDetails(entry)"
                   >
-                    View All
+                    View in Detail
                   </button>
                 </div>
                 <div class="mt-3 space-y-1.5">
@@ -378,6 +378,15 @@ watch(
               </div>
             </div>
           </template>
+        </div>
+        <div class="flex justify-end border-t border-gray-200 px-6 py-4">
+          <button
+            type="button"
+            class="rounded bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
+            @click="$emit('close')"
+          >
+            Close
+          </button>
         </div>
       </div>
 

@@ -18,6 +18,8 @@ const props = defineProps({
       usage_options: [],
     }),
   },
+  managerOptions: { type: Array, default: () => [] },
+  teamLeaderOptions: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false },
 })
 
@@ -91,23 +93,25 @@ const createdToDisplay = computed({
         </div>
         <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Manager</label>
-          <input
-            v-model="filters.manager_q"
-            type="text"
-            placeholder="Search manager..."
+          <select
+            v-model="filters.manager_id"
             class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
-          />
+          >
+            <option value="">All Managers</option>
+            <option v-for="m in managerOptions" :key="m.id" :value="m.id">{{ m.name || m.label }}</option>
+          </select>
         </div>
         <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Team Leader</label>
-          <input
-            v-model="filters.team_leader_q"
-            type="text"
-            placeholder="Search team leader..."
+          <select
+            v-model="filters.team_leader_id"
             class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
-          />
+          >
+            <option value="">All Team Leaders</option>
+            <option v-for="t in teamLeaderOptions" :key="t.id" :value="t.id">{{ t.name || t.label }}</option>
+          </select>
         </div>
         <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Usage</label>

@@ -31,8 +31,10 @@ const auth = useAuthStore()
 const canInlineEdit = computed(() => {
   const roles = auth.user?.roles ?? []
   if (!Array.isArray(roles)) return false
-  const hasRole = (name) => roles.some((r) => (typeof r === 'string' ? r : r?.name) === name)
-  return hasRole('superadmin')
+  return roles.some((r) => {
+    const name = typeof r === 'string' ? r : r?.name
+    return name === 'superadmin' || name === 'backoffice' || name === 'back_office'
+  })
 })
 
 const COLUMN_LABELS = {
@@ -58,7 +60,23 @@ const SORTABLE = new Set([
 ])
 
 const editingCell = ref(null)
-const editingValue = ref(null)
+const editingValue = ref('')
+const inlineEditError = ref('')
+
+const DROPDOWN_COLUMNS = ['status', 'request_type', 'manager', 'team_leader', 'sales_agent']
+const READ_ONLY_COLUMNS = ['id', 'created_at', 'submitted_at', 'updated_at', 'creator']
+
+function isEditing(rowId, col) {
+  return editingCell.value && editingCell.value.rowId === rowId && editingCell.value.col === col
+}
+
+function isDropdownColumn(col) {
+  return DROPDOWN_COLUMNS.includes(col)
+}
+
+function isInputColumn(col) {
+  return !READ_ONLY_COLUMNS.includes(col) && !DROPDOWN_COLUMNS.includes(col)
+}
 
 function toggleSort(col) {
   if (!SORTABLE.has(col)) return
@@ -66,21 +84,52 @@ function toggleSort(col) {
   emit('sort', { sort: col, order: newOrder })
 }
 
-function startEdit(rowId, col, value) {
+function startEdit(row, col) {
   if (!canInlineEdit.value) return
-  editingCell.value = `${rowId}_${col}`
-  editingValue.value = value
+  editingCell.value = { rowId: row.id, col }
+  if (col === 'manager') editingValue.value = row.manager_id ?? ''
+  else if (col === 'team_leader') editingValue.value = row.team_leader_id ?? ''
+  else if (col === 'sales_agent') editingValue.value = row.sales_agent_id ?? ''
+  else editingValue.value = row[col] ?? ''
+  inlineEditError.value = ''
 }
 
 function saveEdit(rowId, col) {
-  emit('updateCell', rowId, col, editingValue.value)
+  const value = editingValue.value
+
+  if (col === 'company_name' && !String(value || '').trim()) {
+    inlineEditError.value = 'Company name is required.'
+    return
+  }
+  if (col === 'request_type' && !String(value || '').trim()) {
+    inlineEditError.value = 'Request type is required.'
+    return
+  }
+  if (['manager', 'team_leader', 'sales_agent'].includes(col) && !value) {
+    inlineEditError.value = `${(COLUMN_LABELS[col] || col)} is required.`
+    return
+  }
+
+  emit('updateCell', rowId, col, value)
   editingCell.value = null
-  editingValue.value = null
+  editingValue.value = ''
+  inlineEditError.value = ''
 }
 
 function cancelEdit() {
   editingCell.value = null
-  editingValue.value = null
+  editingValue.value = ''
+  inlineEditError.value = ''
+}
+
+function getOptionsForColumn(col) {
+  const opt = props.editOptions || {}
+  if (col === 'status') return [{ value: '', label: 'Select' }, ...(opt.statuses || [])]
+  if (col === 'request_type') return [{ value: '', label: 'Select' }, ...(opt.request_types || [])]
+  if (col === 'manager') return [{ value: '', label: 'Select' }, ...(opt.managers || []).map((m) => ({ value: m.id, label: m.name }))]
+  if (col === 'team_leader') return [{ value: '', label: 'Select' }, ...(opt.team_leaders || []).map((t) => ({ value: t.id, label: t.name }))]
+  if (col === 'sales_agent') return [{ value: '', label: 'Select' }, ...(opt.sales_agents || []).map((s) => ({ value: s.id, label: s.name }))]
+  return []
 }
 
 function statusClass(s) {
@@ -176,24 +225,59 @@ function toggleRow(id) {
             v-for="col in columns"
             :key="col"
             class="whitespace-nowrap border-b border-gray-200 px-3 py-2 text-sm text-gray-700"
-            @dblclick="startEdit(row.id, col, cellVal(row, col))"
+            :class="{ 'cursor-pointer': canInlineEdit && isDropdownColumn(col) && !isEditing(row.id, col), 'cursor-text': canInlineEdit && isInputColumn(col) && !isEditing(row.id, col) }"
           >
-            <template v-if="editingCell === `${row.id}_${col}`">
-              <input
-                v-model="editingValue"
-                class="w-full rounded border border-green-400 px-2 py-1 text-sm focus:ring-1 focus:ring-green-500"
-                @keydown.enter="saveEdit(row.id, col)"
-                @keydown.escape="cancelEdit"
-                @blur="saveEdit(row.id, col)"
-              />
+            <template v-if="canInlineEdit && isEditing(row.id, col) && isDropdownColumn(col)">
+              <div class="flex flex-col gap-1.5">
+                <select
+                  v-model="editingValue"
+                  class="w-full min-w-[160px] max-w-[220px] rounded border border-gray-300 bg-white px-3 py-1.5 pr-8 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  @keydown.enter="saveEdit(row.id, col)"
+                  @keydown.esc="cancelEdit"
+                >
+                  <option v-for="o in getOptionsForColumn(col)" :key="String(o.value)" :value="o.value">{{ o.label }}</option>
+                </select>
+                <p v-if="inlineEditError" class="text-xs text-red-600">{{ inlineEditError }}</p>
+                <div class="flex gap-1">
+                  <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelEdit">Cancel</button>
+                  <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveEdit(row.id, col)">Save</button>
+                </div>
+              </div>
+            </template>
+            <template v-else-if="canInlineEdit && isEditing(row.id, col) && isInputColumn(col)">
+              <div class="flex flex-col gap-1.5">
+                <input
+                  v-model="editingValue"
+                  class="w-full min-w-[160px] max-w-[220px] rounded border bg-white px-3 py-1.5 pr-8 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  :class="inlineEditError ? 'border-red-500' : 'border-gray-300'"
+                  @input="inlineEditError = ''"
+                  @keydown.enter="saveEdit(row.id, col)"
+                  @keydown.esc="cancelEdit"
+                />
+                <p v-if="inlineEditError" class="text-xs text-red-600">{{ inlineEditError }}</p>
+                <div class="flex gap-1">
+                  <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelEdit">Cancel</button>
+                  <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveEdit(row.id, col)">Save</button>
+                </div>
+              </div>
             </template>
             <template v-else-if="col === 'status'">
-              <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium" :class="statusClass(row.status)">
+              <span
+                class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
+                :class="[statusClass(row.status), canInlineEdit ? 'cursor-pointer hover:ring-2 hover:ring-green-400' : '']"
+                @click="canInlineEdit && startEdit(row, col)"
+              >
                 {{ row.status ? row.status.charAt(0).toUpperCase() + row.status.slice(1) : '—' }}
               </span>
             </template>
             <template v-else>
-              <span class="inline-block max-w-[220px] truncate align-middle" :title="cellTitle(row, col)">
+              <span
+                class="inline-block max-w-[220px] truncate align-middle"
+                :class="{ 'cursor-pointer hover:bg-gray-100 rounded px-0.5': canInlineEdit && isDropdownColumn(col), 'cursor-text hover:bg-gray-50 rounded px-0.5': canInlineEdit && isInputColumn(col) }"
+                :title="cellTitle(row, col)"
+                @click="canInlineEdit && isDropdownColumn(col) && startEdit(row, col)"
+                @dblclick="canInlineEdit && isInputColumn(col) && startEdit(row, col)"
+              >
                 {{ truncate(cellVal(row, col)) }}
               </span>
             </template>

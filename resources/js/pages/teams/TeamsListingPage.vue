@@ -52,14 +52,14 @@ const filters = ref({ status: '', department: '', manager_id: '', team_leader_id
 const columnModalVisible = ref(false)
 const allColumns = ref([])
 const visibleColumns = ref([
-  'id', 'name', 'manager', 'team_leader', 'department', 'status', 'members_count', 'created_at',
+  'sr', 'name', 'manager', 'team_leader', 'department', 'status', 'members_count', 'created_at',
 ])
 const defaultVisibleColumns = [
-  'id', 'name', 'manager', 'team_leader', 'department', 'status', 'members_count', 'created_at',
+  'sr', 'name', 'manager', 'team_leader', 'department', 'status', 'members_count', 'created_at',
 ]
 
 const COLUMN_LABELS = {
-  id: 'ID',
+  sr: 'SR',
   name: 'Team Name',
   description: 'Description',
   manager: 'Manager',
@@ -109,7 +109,7 @@ const params = computed(() => {
     per_page: tableMeta.value.per_page,
     sort: sort.value,
     order: order.value,
-    columns: visibleColumns.value,
+    columns: visibleColumns.value.map((c) => (c === 'sr' ? 'id' : c)),
   }
   if (searchQ.value?.trim()) p.q = searchQ.value.trim()
   if (filters.value.status) p.status = filters.value.status
@@ -146,9 +146,13 @@ async function loadTable() {
 async function loadColumns() {
   try {
     const data = await teamsApi.columns()
-    allColumns.value = data.all_columns ?? []
+    allColumns.value = (data.all_columns ?? []).map((col) =>
+      col?.key === 'id' ? { ...col, key: 'sr', label: 'SR' } : col
+    )
     const visible = data.visible_columns
-    if (Array.isArray(visible) && visible.length) visibleColumns.value = visible
+    if (Array.isArray(visible) && visible.length) {
+      visibleColumns.value = visible.map((c) => (c === 'id' ? 'sr' : c))
+    }
   } catch { /* keep defaults */ }
 }
 
@@ -171,6 +175,7 @@ function resetFilters() {
 }
 
 function onSort(colKey) {
+  if (colKey === 'sr') return
   if (sort.value === colKey) {
     order.value = order.value === 'asc' ? 'desc' : 'asc'
   } else {
@@ -197,7 +202,7 @@ watch(() => tableMeta.value.current_page, () => loadTable())
 
 async function onSaveColumns(cols) {
   try {
-    await teamsApi.saveColumns(cols)
+    await teamsApi.saveColumns(cols.map((c) => (c === 'sr' ? 'id' : c)))
     visibleColumns.value = cols
     tableMeta.value.current_page = 1
     loadTable()
@@ -306,8 +311,10 @@ onMounted(async () => {
     <!-- Header -->
     <div class="flex flex-wrap items-start justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900">Teams Management</h1>
-        <Breadcrumbs class="mt-1" />
+        <div class="flex items-center gap-2">
+          <h1 class="text-2xl font-bold text-gray-900">Teams Management</h1>
+          <Breadcrumbs />
+        </div>
         <p class="text-sm text-gray-500 mt-1">Manage teams, assign members, and organize your workforce.</p>
       </div>
       <button
@@ -477,13 +484,16 @@ onMounted(async () => {
             <tr v-else-if="!tableData.length" class="border-b border-black">
               <td :colspan="activeColumns.length + 2" class="px-4 py-12 text-center text-sm text-gray-400">No teams found</td>
             </tr>
-            <tr v-else v-for="row in tableData" :key="row.id" class="border-b border-black hover:bg-gray-50 transition-colors">
+            <tr v-else v-for="(row, rowIndex) in tableData" :key="row.id" class="border-b border-black hover:bg-gray-50 transition-colors">
               <td v-if="canDelete || canEdit" class="w-10 px-3 py-2.5">
                 <input type="checkbox" :value="row.id" v-model="selectedIds" class="rounded border-gray-300 text-green-600 focus:ring-green-500" />
               </td>
               <td v-for="col in activeColumns" :key="col.key" class="px-4 py-2.5 text-sm whitespace-nowrap">
+                <template v-if="col.key === 'sr'">
+                  <span class="text-gray-700">{{ ((tableMeta.current_page - 1) * tableMeta.per_page) + rowIndex + 1 }}</span>
+                </template>
                 <!-- Team Name: clickable link -->
-                <template v-if="col.key === 'name'">
+                <template v-else-if="col.key === 'name'">
                   <router-link :to="`/teams/${row.id}`" class="font-medium text-green-600 hover:text-green-700 hover:underline">{{ row.name || '—' }}</router-link>
                 </template>
 

@@ -109,6 +109,8 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::put('/special-requests/{specialRequest}', [\App\Http\Controllers\Api\SpecialRequestApiController::class, 'update'])->whereNumber('specialRequest');
     Route::patch('/special-requests/{specialRequest}', [\App\Http\Controllers\Api\SpecialRequestApiController::class, 'patch'])->whereNumber('specialRequest');
     Route::get('/special-requests/{specialRequest}/audits', [\App\Http\Controllers\Api\SpecialRequestApiController::class, 'audits'])->whereNumber('specialRequest');
+    Route::post('/special-requests/{specialRequest}/documents', [\App\Http\Controllers\Api\SpecialRequestApiController::class, 'uploadDocuments'])->whereNumber('specialRequest');
+    Route::delete('/special-requests/{specialRequest}/documents/{document}', [\App\Http\Controllers\Api\SpecialRequestApiController::class, 'deleteDocument'])->whereNumber('specialRequest');
     Route::get('/special-requests/{specialRequest}/documents/{document}/download', [\App\Http\Controllers\Api\SpecialRequestApiController::class, 'downloadDocument'])->whereNumber('specialRequest');
 
     // Customer support
@@ -145,6 +147,7 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::get('/clients/columns', [\App\Http\Controllers\Api\ClientApiController::class, 'columns']);
     Route::post('/clients/columns', [\App\Http\Controllers\Api\ClientApiController::class, 'saveColumns']);
     Route::post('/clients/import', [\App\Http\Controllers\Api\ClientApiController::class, 'importCsv']);
+    Route::post('/clients/{client}/products', [\App\Http\Controllers\Api\ClientApiController::class, 'storeProduct'])->whereNumber('client');
     Route::get('/clients/{client}/products', [\App\Http\Controllers\Api\ClientApiController::class, 'products'])->whereNumber('client');
     Route::get('/clients/{client}/vas-requests', [\App\Http\Controllers\Api\ClientApiController::class, 'vasRequests'])->whereNumber('client');
     Route::get('/clients/{client}/customer-support', [\App\Http\Controllers\Api\ClientApiController::class, 'customerSupport'])->whereNumber('client');

@@ -71,9 +71,33 @@ class ClientApiController extends Controller
             'company_name' => ['sometimes', 'nullable', 'string', 'max:200'],
             'account_number' => ['sometimes', 'nullable', 'string', 'max:100'],
             'wo_number' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'submission_type' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'service_category' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'service_type' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'product_type' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'product_name' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'work_order_status' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'payment_connection' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'contract_type' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'clawback_chum' => ['sometimes', 'nullable', 'string', 'max:10'],
+            'company_category' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'trade_license_number' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'establishment_card_number' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'account_manager_name' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'csr_name_1' => ['sometimes', 'nullable', 'string', 'max:100'],
             'status' => ['sometimes', 'nullable', 'string', Rule::in(Client::STATUSES)],
             'submitted_from' => ['sometimes', 'nullable', 'date'],
             'submitted_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:submitted_from'],
+            'activation_from' => ['sometimes', 'nullable', 'date'],
+            'activation_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:activation_from'],
+            'completion_from' => ['sometimes', 'nullable', 'date'],
+            'completion_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:completion_from'],
+            'contract_end_from' => ['sometimes', 'nullable', 'date'],
+            'contract_end_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:contract_end_from'],
+            'trade_license_expiry_from' => ['sometimes', 'nullable', 'date'],
+            'trade_license_expiry_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:trade_license_expiry_from'],
+            'establishment_card_expiry_from' => ['sometimes', 'nullable', 'date'],
+            'establishment_card_expiry_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:establishment_card_expiry_from'],
             'manager_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'team_leader_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'sales_agent_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
@@ -138,9 +162,12 @@ class ClientApiController extends Controller
 
         $offset = ($page - 1) * $perPage;
         $pageRows = $dataQuery->skip($offset)->take($perPage)->get();
-        $clientIds = $pageRows->pluck('id')->map(fn ($id) => (int) $id)->filter()->values()->all();
-        $this->syncRenewalAlertsForClientIds($clientIds);
-        $renewalAlertMap = $this->buildRenewalAlertMap($clientIds);
+        $renewalAlertMap = [];
+        if (in_array('renewal_alert', $columns, true)) {
+            $clientIds = $pageRows->pluck('id')->map(fn ($id) => (int) $id)->filter()->values()->all();
+            $this->syncRenewalAlertsForClientIds($clientIds);
+            $renewalAlertMap = $this->buildRenewalAlertMap($clientIds);
+        }
 
         $items = $pageRows->map(function ($row) use ($columns, $renewalAlertMap) {
             return $this->formatRow($row, $columns, $renewalAlertMap);
@@ -201,27 +228,44 @@ class ClientApiController extends Controller
 
     private function applyFilters($query, array $validated): void
     {
+        $applyLike = static function ($q, string $column, ?string $value): void {
+            if ($value === null || trim($value) === '') {
+                return;
+            }
+            $term = '%' . addcslashes($value, '%_\\') . '%';
+            $q->where($column, 'like', $term);
+        };
+        $applyDateRange = static function ($q, string $column, ?string $from, ?string $to): void {
+            if (! empty($from)) {
+                $q->whereDate($column, '>=', $from);
+            }
+            if (! empty($to)) {
+                $q->whereDate($column, '<=', $to);
+            }
+        };
+
         if (! empty($validated['status'])) {
             $query->where('status', $validated['status']);
         }
-        if (! empty($validated['submitted_from'])) {
-            $query->where('submitted_at', '>=', $validated['submitted_from'] . ' 00:00:00');
-        }
-        if (! empty($validated['submitted_to'])) {
-            $query->where('submitted_at', '<=', $validated['submitted_to'] . ' 23:59:59');
-        }
-        if (! empty($validated['company_name'])) {
-            $term = '%' . addcslashes($validated['company_name'], '%_\\') . '%';
-            $query->where('company_name', 'like', $term);
-        }
-        if (! empty($validated['account_number'])) {
-            $term = '%' . addcslashes($validated['account_number'], '%_\\') . '%';
-            $query->where('account_number', 'like', $term);
-        }
-        if (! empty($validated['wo_number'])) {
-            $term = '%' . addcslashes($validated['wo_number'], '%_\\') . '%';
-            $query->where('wo_number', 'like', $term);
-        }
+        $applyDateRange($query, 'submitted_at', $validated['submitted_from'] ?? null, $validated['submitted_to'] ?? null);
+        $applyDateRange($query, 'activation_date', $validated['activation_from'] ?? null, $validated['activation_to'] ?? null);
+        $applyDateRange($query, 'completion_date', $validated['completion_from'] ?? null, $validated['completion_to'] ?? null);
+        $applyDateRange($query, 'contract_end_date', $validated['contract_end_from'] ?? null, $validated['contract_end_to'] ?? null);
+
+        $applyLike($query, 'company_name', $validated['company_name'] ?? null);
+        $applyLike($query, 'account_number', $validated['account_number'] ?? null);
+        $applyLike($query, 'wo_number', $validated['wo_number'] ?? null);
+        $applyLike($query, 'submission_type', $validated['submission_type'] ?? null);
+        $applyLike($query, 'service_category', $validated['service_category'] ?? null);
+        $applyLike($query, 'service_type', $validated['service_type'] ?? null);
+        $applyLike($query, 'product_type', $validated['product_type'] ?? null);
+        $applyLike($query, 'product_name', $validated['product_name'] ?? null);
+        $applyLike($query, 'work_order_status', $validated['work_order_status'] ?? null);
+        $applyLike($query, 'payment_connection', $validated['payment_connection'] ?? null);
+        $applyLike($query, 'contract_type', $validated['contract_type'] ?? null);
+        $applyLike($query, 'clawback_chum', $validated['clawback_chum'] ?? null);
+        $applyLike($query, 'csr_name_1', $validated['csr_name_1'] ?? null);
+
         if (! empty($validated['manager_id'])) {
             $query->where('manager_id', $validated['manager_id']);
         }
@@ -232,13 +276,42 @@ class ClientApiController extends Controller
             $query->where('sales_agent_id', $validated['sales_agent_id']);
         }
         if (! empty($validated['alert_type'])) {
-            if ($validated['alert_type'] === '__any__') {
-                $query->whereHas('alerts');
-            } else {
-                $query->whereHas('alerts', function ($q) use ($validated) {
-                    $q->where('alert_type', $validated['alert_type']);
-                });
-            }
+            $query->whereHas('alerts', function ($q) use ($validated) {
+                $q->where('alert_type', $validated['alert_type']);
+            });
+        }
+
+        $companyDetailTextFilters = [
+            'company_category' => $validated['company_category'] ?? null,
+            'trade_license_number' => $validated['trade_license_number'] ?? null,
+            'establishment_card_number' => $validated['establishment_card_number'] ?? null,
+            'account_manager_name' => $validated['account_manager_name'] ?? null,
+        ];
+        $hasCompanyDetailTextFilters = collect($companyDetailTextFilters)->contains(
+            fn ($v) => $v !== null && trim((string) $v) !== ''
+        );
+        $hasCompanyDetailDateFilters = ! empty($validated['trade_license_expiry_from'])
+            || ! empty($validated['trade_license_expiry_to'])
+            || ! empty($validated['establishment_card_expiry_from'])
+            || ! empty($validated['establishment_card_expiry_to']);
+        if ($hasCompanyDetailTextFilters || $hasCompanyDetailDateFilters) {
+            $query->whereHas('companyDetail', function ($q) use ($companyDetailTextFilters, $validated, $applyLike, $applyDateRange) {
+                foreach ($companyDetailTextFilters as $column => $value) {
+                    $applyLike($q, $column, $value);
+                }
+                $applyDateRange(
+                    $q,
+                    'trade_license_expiry_date',
+                    $validated['trade_license_expiry_from'] ?? null,
+                    $validated['trade_license_expiry_to'] ?? null
+                );
+                $applyDateRange(
+                    $q,
+                    'establishment_card_expiry_date',
+                    $validated['establishment_card_expiry_from'] ?? null,
+                    $validated['establishment_card_expiry_to'] ?? null
+                );
+            });
         }
     }
 
@@ -596,6 +669,15 @@ class ClientApiController extends Controller
     public function filters(): JsonResponse
     {
         $this->authorize('viewAny', Client::class);
+        $distinctClientValues = static function (string $column) {
+            return Client::query()
+                ->whereNotNull($column)
+                ->where($column, '!=', '')
+                ->distinct()
+                ->orderBy($column)
+                ->pluck($column)
+                ->values();
+        };
 
         $teamOptions = app(FieldSubmissionController::class)->teamOptions(request());
         $teamData = $teamOptions->getData(true);
@@ -603,11 +685,28 @@ class ClientApiController extends Controller
         $teamLeaders = $teamData['team_leaders'] ?? [];
         $salesAgents = $teamData['sales_agents'] ?? [];
 
-        $accountNumbers = Client::whereNotNull('account_number')
-            ->where('account_number', '!=', '')
+        $accountNumbers = $distinctClientValues('account_number');
+        $submissionTypes = $distinctClientValues('submission_type');
+        $serviceCategories = $distinctClientValues('service_category');
+        $serviceTypes = $distinctClientValues('service_type');
+        $productTypes = $distinctClientValues('product_type');
+        $workOrderStatuses = $distinctClientValues('work_order_status');
+        $paymentConnections = $distinctClientValues('payment_connection');
+        $contractTypes = $distinctClientValues('contract_type');
+        $clawbackChumOptions = $distinctClientValues('clawback_chum');
+        $companyCategories = ClientCompanyDetail::query()
+            ->whereNotNull('company_category')
+            ->where('company_category', '!=', '')
             ->distinct()
-            ->orderBy('account_number')
-            ->pluck('account_number')
+            ->orderBy('company_category')
+            ->pluck('company_category')
+            ->values();
+        $accountManagerNames = ClientCompanyDetail::query()
+            ->whereNotNull('account_manager_name')
+            ->where('account_manager_name', '!=', '')
+            ->distinct()
+            ->orderBy('account_manager_name')
+            ->pluck('account_manager_name')
             ->values();
 
         $alertTypes = ClientAlert::query()
@@ -631,6 +730,16 @@ class ClientApiController extends Controller
             'sales_agents' => $salesAgents,
             'account_numbers' => $accountNumbers,
             'alert_types' => $alertTypes,
+            'submission_types' => $submissionTypes,
+            'service_categories' => $serviceCategories,
+            'service_types' => $serviceTypes,
+            'product_types' => $productTypes,
+            'work_order_statuses' => $workOrderStatuses,
+            'payment_connections' => $paymentConnections,
+            'contract_types' => $contractTypes,
+            'clawback_chum_options' => $clawbackChumOptions,
+            'company_categories' => $companyCategories,
+            'account_manager_names' => $accountManagerNames,
         ]);
     }
 
@@ -705,11 +814,34 @@ class ClientApiController extends Controller
         }
 
         $header = array_map('trim', $header);
-        $map = array_flip($header);
         $created = 0;
         $errors = [];
 
+        $pick = static function (array $data, array $keys, $default = null) {
+            foreach ($keys as $key) {
+                if (array_key_exists($key, $data) && $data[$key] !== null && $data[$key] !== '') {
+                    return trim((string) $data[$key]);
+                }
+            }
+
+            return $default;
+        };
+
+        $toNullableDate = static function (?string $value): ?string {
+            $v = trim((string) ($value ?? ''));
+            if ($v === '') {
+                return null;
+            }
+            try {
+                return \Carbon\Carbon::parse($v)->toDateString();
+            } catch (\Throwable $e) {
+                return null;
+            }
+        };
+
+        $rowNumber = 1; // includes header row
         while (($row = fgetcsv($handle)) !== false) {
+            $rowNumber++;
             if (count($row) !== count($header)) {
                 $row = array_pad($row, count($header), '');
             }
@@ -717,24 +849,160 @@ class ClientApiController extends Controller
             if ($data === false) {
                 continue;
             }
-            $companyName = trim($data['company_name'] ?? $data['Company Name'] ?? '');
+            $companyName = $pick($data, ['company_name', 'Company Name']);
             if ($companyName === '') {
                 continue;
             }
+            if (strtolower($companyName) === 'required') {
+                continue; // validation guide row from sample CSV
+            }
+
+            $status = $pick($data, ['status', 'Status'], null);
+            if (! in_array((string) $status, Client::STATUSES, true)) {
+                $status = 'Normal';
+            }
+
+            $quantityRaw = $pick($data, ['quantity', 'Quantity'], null);
+            $quantity = null;
+            if ($quantityRaw !== null && $quantityRaw !== '' && is_numeric($quantityRaw)) {
+                $quantity = (int) $quantityRaw;
+            }
+
+            $renewalAlertRaw = $pick($data, ['renewal_alert', 'Renewal Alert'], null);
+            $renewalAlert = null;
+            if ($renewalAlertRaw !== null && $renewalAlertRaw !== '' && is_numeric($renewalAlertRaw)) {
+                $renewalAlert = (int) $renewalAlertRaw;
+            }
+
+            $missing = [];
+            $requiredChecks = [
+                'account_number' => $pick($data, ['account_number', 'Account Number'], ''),
+                'company_category' => $pick($data, ['company_category', 'Company Category'], ''),
+                'trade_license_number' => $pick($data, ['trade_license_number', 'Trade License Number'], ''),
+                'first_bill' => $pick($data, ['first_bill', 'First Bill'], ''),
+                'second_bill' => $pick($data, ['second_bill', 'Second Bill'], ''),
+                'third_bill' => $pick($data, ['third_bill', 'Third Bill'], ''),
+                'fourth_bill' => $pick($data, ['fourth_bill', 'Fourth Bill'], ''),
+                'account_manager_name' => $pick($data, ['account_manager_name', 'Account Manager Name'], ''),
+                'csr_name_1' => $pick($data, ['csr_name_1', 'CSR Name 1', 'CSR Name'], ''),
+                'contact_1_name' => $pick($data, ['contact_1_name', 'Contact 1 Name', 'Contact Person Name'], ''),
+                'contact_1_contact_number' => $pick($data, ['contact_1_contact_number', 'Contact 1 Contact Number', 'Contact Number'], ''),
+                'contact_1_email' => $pick($data, ['contact_1_email', 'Contact 1 Email', 'Email ID'], ''),
+            ];
+            foreach ($requiredChecks as $k => $v) {
+                if (trim((string) $v) === '') {
+                    $missing[] = $k;
+                }
+            }
+            if (! empty($missing)) {
+                $errors[] = "Row {$rowNumber} skipped: missing required field(s): " . implode(', ', $missing);
+                continue;
+            }
+
+            $managerId = $pick($data, ['manager_id', 'Manager ID'], null);
+            $teamLeaderId = $pick($data, ['team_leader_id', 'Team Leader ID'], null);
+            $salesAgentId = $pick($data, ['sales_agent_id', 'Sales Agent ID'], null);
+
             $payload = [
                 'company_name' => $companyName,
-                'account_number' => trim($data['account_number'] ?? $data['Account Number'] ?? ''),
-                'status' => in_array(trim($data['status'] ?? ''), Client::STATUSES, true)
-                    ? trim($data['status'])
-                    : 'pending',
+                'account_number' => $pick($data, ['account_number', 'Account Number'], ''),
+                'status' => $status,
+                'submitted_at' => $toNullableDate($pick($data, ['submitted_at', 'Submission Date'])),
+                'manager_id' => is_numeric((string) $managerId) ? (int) $managerId : null,
+                'team_leader_id' => is_numeric((string) $teamLeaderId) ? (int) $teamLeaderId : null,
+                'sales_agent_id' => is_numeric((string) $salesAgentId) ? (int) $salesAgentId : null,
+                'submission_type' => $pick($data, ['submission_type', 'Submission Type']),
+                'service_category' => $pick($data, ['service_category', 'Service Category']),
+                'service_type' => $pick($data, ['service_type', 'Service Type']),
+                'product_type' => $pick($data, ['product_type', 'Product Type']),
+                'address' => $pick($data, ['address', 'Address']),
+                'product_name' => $pick($data, ['product_name', 'Product Name']),
+                'mrc' => $pick($data, ['mrc', 'MRC']),
+                'quantity' => $quantity,
+                'other' => $pick($data, ['other', 'Other', 'offer', 'Offer']),
+                'migration_numbers' => $pick($data, ['migration_numbers', 'Migration Numbers']),
+                'fiber' => $pick($data, ['fiber', 'Fiber']),
+                'order_number' => $pick($data, ['order_number', 'Order Number']),
+                'activity' => $pick($data, ['activity', 'Activity']),
+                'wo_number' => $pick($data, ['wo_number', 'WO Number', 'Work Order']),
+                'work_order_status' => $pick($data, ['work_order_status', 'Work Order Status']),
+                'activation_date' => $toNullableDate($pick($data, ['activation_date', 'Activation Date'])),
+                'completion_date' => $toNullableDate($pick($data, ['completion_date', 'Completion Date'])),
+                'payment_connection' => $pick($data, ['payment_connection', 'Payment Connection']),
+                'contract_type' => $pick($data, ['contract_type', 'Contract Type']),
+                'contract_end_date' => $toNullableDate($pick($data, ['contract_end_date', 'Contract End Date'])),
+                'clawback_chum' => $pick($data, ['clawback_chum', 'Clawback / Chum', 'Clawback/Chum']),
+                'remarks' => $pick($data, ['remarks', 'Remarks']),
+                'renewal_alert' => $renewalAlert,
+                'additional_notes' => $pick($data, ['additional_notes', 'Additional Notes']),
+                'csr_name_1' => $pick($data, ['csr_name_1', 'CSR Name 1', 'CSR Name']),
+                'csr_name_2' => $pick($data, ['csr_name_2', 'CSR Name 2']),
+                'csr_name_3' => $pick($data, ['csr_name_3', 'CSR Name 3']),
             ];
             $payload['created_by'] = $request->user()->id;
-            $payload['submitted_at'] = now();
             try {
-                Client::create($payload);
+                DB::transaction(function () use ($payload, $data, $pick, $toNullableDate) {
+                    $client = Client::create($this->onlyExistingClientColumns($payload));
+
+                    $companyDetail = [
+                        'trade_license_issuing_authority' => $pick($data, ['trade_license_issuing_authority', 'Trade License Issuing Authority']),
+                        'company_category' => $pick($data, ['company_category', 'Company Category']),
+                        'trade_license_number' => $pick($data, ['trade_license_number', 'Trade License Number']),
+                        'trade_license_expiry_date' => $toNullableDate($pick($data, ['trade_license_expiry_date', 'Trade License Expiry Date'])),
+                        'establishment_card_number' => $pick($data, ['establishment_card_number', 'Establishment Card Number']),
+                        'establishment_card_expiry_date' => $toNullableDate($pick($data, ['establishment_card_expiry_date', 'Establishment Card Expiry Date'])),
+                        'account_taken_from' => $pick($data, ['account_taken_from', 'Account Taken From']),
+                        'account_mapping_date' => $toNullableDate($pick($data, ['account_mapping_date', 'Account Mapping Date'])),
+                        'account_transfer_given_to' => $pick($data, ['account_transfer_given_to', 'Account Transfer Given To']),
+                        'account_transfer_given_date' => $toNullableDate($pick($data, ['account_transfer_given_date', 'Account Transfer Given Date'])),
+                        'account_manager_name' => $pick($data, ['account_manager_name', 'Account Manager Name']),
+                        'csr_name_1' => $pick($data, ['csr_name_1', 'CSR Name 1', 'CSR Name']),
+                        'csr_name_2' => $pick($data, ['csr_name_2', 'CSR Name 2']),
+                        'csr_name_3' => $pick($data, ['csr_name_3', 'CSR Name 3']),
+                        'first_bill' => $pick($data, ['first_bill', 'First Bill']),
+                        'second_bill' => $pick($data, ['second_bill', 'Second Bill']),
+                        'third_bill' => $pick($data, ['third_bill', 'Third Bill']),
+                        'fourth_bill' => $pick($data, ['fourth_bill', 'Fourth Bill']),
+                        'additional_comment_1' => $pick($data, ['additional_comment_1', 'Additional Comment 1', 'Additional Note 1']),
+                        'additional_comment_2' => $pick($data, ['additional_comment_2', 'Additional Comment 2', 'Additional Note 2']),
+                    ];
+                    if (collect($companyDetail)->filter(fn ($v) => $v !== null && $v !== '')->isNotEmpty()) {
+                        $companyDetail['client_id'] = $client->id;
+                        ClientCompanyDetail::create($companyDetail);
+                    }
+
+                    $contact = [
+                        'name' => $pick($data, ['contact_1_name', 'Contact 1 Name', 'Contact Person Name']),
+                        'designation' => $pick($data, ['contact_1_designation', 'Contact 1 Designation', 'Designation']),
+                        'contact_number' => $pick($data, ['contact_1_contact_number', 'Contact 1 Contact Number', 'Contact Number']),
+                        'alternate_number' => $pick($data, ['contact_1_alternate_number', 'Contact 1 Alternate Number', 'Alternate Contact Number']),
+                        'email' => $pick($data, ['contact_1_email', 'Contact 1 Email', 'Email ID']),
+                        'as_updated_or_not' => $pick($data, ['contact_1_as_updated_or_not', 'Contact 1 AS Updated or Not']),
+                        'as_expiry_date' => $toNullableDate($pick($data, ['contact_1_as_expiry_date', 'Contact 1 AS Expiry Date'])),
+                        'additional_note' => $pick($data, ['contact_1_additional_note', 'Contact 1 Additional Note']),
+                    ];
+                    if (collect($contact)->filter(fn ($v) => $v !== null && $v !== '')->isNotEmpty()) {
+                        $contact['client_id'] = $client->id;
+                        $contact['sort_order'] = 0;
+                        ClientContact::create($contact);
+                    }
+
+                    $address = [
+                        'full_address' => $pick($data, ['address_1_full_address', 'Address 1 Full Address', 'Full Address']),
+                        'area' => $pick($data, ['address_1_area', 'Address 1 Area', 'Area']),
+                        'building' => $pick($data, ['address_1_building', 'Address 1 Building', 'Building']),
+                        'unit' => $pick($data, ['address_1_unit', 'Address 1 Unit', 'Unit']),
+                        'emirates' => $pick($data, ['address_1_emirates', 'Address 1 Emirates', 'Emirates']),
+                    ];
+                    if (collect($address)->filter(fn ($v) => $v !== null && $v !== '')->isNotEmpty()) {
+                        $address['client_id'] = $client->id;
+                        $address['sort_order'] = 0;
+                        ClientAddress::create($address);
+                    }
+                });
                 $created++;
             } catch (\Throwable $e) {
-                $errors[] = "Row {$companyName}: " . $e->getMessage();
+                $errors[] = "Row {$rowNumber} ({$companyName}) failed: " . $e->getMessage();
             }
         }
         fclose($handle);
@@ -909,6 +1177,118 @@ class ClientApiController extends Controller
     }
 
     /**
+     * Add a new Product/Service row against an existing client account.
+     */
+    public function storeProduct(Request $request, Client $client): JsonResponse
+    {
+        $this->authorize('create', Client::class);
+
+        $validated = $request->validate([
+            'submitted_at' => ['sometimes', 'nullable', 'date'],
+            'manager_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'team_leader_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'sales_agent_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'status' => ['sometimes', 'string', Rule::in(Client::STATUSES)],
+            'submission_type' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'service_category' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'service_type' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'product_type' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'address' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'product_name' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'mrc' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'quantity' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'other' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'migration_numbers' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'activity' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'fiber' => ['sometimes', 'nullable', 'string', 'max:20'],
+            'order_number' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'wo_number' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'work_order_status' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'activation_date' => ['sometimes', 'nullable', 'date'],
+            'completion_date' => ['sometimes', 'nullable', 'date'],
+            'payment_connection' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'contract_type' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'contract_end_date' => ['sometimes', 'nullable', 'date'],
+            'clawback_chum' => ['sometimes', 'nullable', 'string', 'max:10'],
+            'remarks' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'renewal_alert' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'additional_notes' => ['sometimes', 'nullable', 'string'],
+            'csr_name_1' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'csr_name_2' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'csr_name_3' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'csrs' => ['sometimes', 'array', 'max:20'],
+            'csrs.*.user_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+        ]);
+
+        $user = $request->user();
+        $clientData = [
+            // Always attach new product to the same client identity.
+            'company_name' => $client->company_name,
+            'account_number' => $client->account_number,
+            'submitted_at' => $validated['submitted_at'] ?? now(),
+            'manager_id' => $validated['manager_id'] ?? $client->manager_id,
+            'account_manager_id' => $validated['manager_id'] ?? $client->account_manager_id ?? $client->manager_id,
+            'team_leader_id' => $validated['team_leader_id'] ?? $client->team_leader_id,
+            'sales_agent_id' => $validated['sales_agent_id'] ?? $client->sales_agent_id,
+            'status' => $validated['status'] ?? ($client->status ?: 'Normal'),
+            'created_by' => $user->id,
+        ];
+
+        $clientFields = [
+            'submission_type', 'service_category', 'service_type', 'product_type', 'address',
+            'product_name', 'mrc', 'quantity', 'other', 'migration_numbers', 'activity', 'fiber',
+            'order_number', 'wo_number', 'work_order_status', 'activation_date', 'completion_date',
+            'payment_connection', 'contract_type', 'contract_end_date', 'clawback_chum', 'remarks',
+            'renewal_alert', 'additional_notes', 'csr_name_1', 'csr_name_2', 'csr_name_3',
+        ];
+        foreach ($clientFields as $key) {
+            if (array_key_exists($key, $validated)) {
+                $clientData[$key] = $validated[$key];
+            }
+        }
+
+        $newProduct = DB::transaction(function () use ($validated, $clientData, $client) {
+            $newProduct = Client::create($this->onlyExistingClientColumns($clientData));
+
+            $incomingCsrs = $validated['csrs'] ?? [];
+            if (! empty($incomingCsrs)) {
+                foreach ($incomingCsrs as $i => $row) {
+                    if (! empty($row['user_id'])) {
+                        ClientCsr::create([
+                            'client_id' => $newProduct->id,
+                            'user_id' => $row['user_id'],
+                            'sort_order' => $i,
+                        ]);
+                    }
+                }
+            } else {
+                $parentCsrs = ClientCsr::query()
+                    ->where('client_id', $client->id)
+                    ->orderBy('sort_order')
+                    ->get(['user_id', 'sort_order']);
+                foreach ($parentCsrs as $csr) {
+                    ClientCsr::create([
+                        'client_id' => $newProduct->id,
+                        'user_id' => $csr->user_id,
+                        'sort_order' => $csr->sort_order,
+                    ]);
+                }
+            }
+
+            return $newProduct;
+        });
+
+        $newProduct->load(['manager:id,name', 'teamLeader:id,name', 'salesAgent:id,name', 'accountManager:id,name', 'csrs.user:id,name', 'companyDetail', 'contacts', 'addresses']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Product created successfully.',
+            'status' => 201,
+            'data' => $this->showPayload($newProduct),
+        ], 201);
+    }
+
+    /**
      * Normalize company_detail date fields: empty string to null, parse to Y-m-d for DB.
      */
     private static function normalizeCompanyDetailDates(array $cd): array
@@ -1050,6 +1430,8 @@ class ClientApiController extends Controller
             'sales_agent_id' => $client->sales_agent_id,
             'sales_agent' => $client->salesAgent?->name,
             'status' => $client->status,
+            'submission_type' => $client->submission_type,
+            'service_category' => $client->service_category,
             'service_type' => $client->service_type,
             'product_type' => $client->product_type,
             'address' => $client->address,
@@ -1058,13 +1440,18 @@ class ClientApiController extends Controller
             'quantity' => $client->quantity,
             'other' => $client->other,
             'migration_numbers' => $client->migration_numbers,
+            'activity' => $client->activity,
             'fiber' => $client->fiber,
             'order_number' => $client->order_number,
             'wo_number' => $client->wo_number,
+            'work_order_status' => $client->work_order_status,
+            'activation_date' => $client->activation_date?->format('Y-m-d'),
             'completion_date' => $client->completion_date?->format('Y-m-d'),
             'payment_connection' => $client->payment_connection,
             'contract_type' => $client->contract_type,
             'contract_end_date' => $client->contract_end_date?->format('Y-m-d'),
+            'clawback_chum' => $client->clawback_chum,
+            'remarks' => $client->remarks,
             'renewal_alert' => $client->renewal_alert,
             'additional_notes' => $client->additional_notes,
             'created_by' => $client->created_by,
@@ -1150,11 +1537,16 @@ class ClientApiController extends Controller
         $sort = $validated['sort'] ?? 'submitted_at';
         $order = strtolower($validated['order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
 
-        $query->with(['manager:id,name', 'teamLeader:id,name', 'salesAgent:id,name']);
+        $query->with([
+            'manager:id,name',
+            'teamLeader:id,name',
+            'salesAgent:id,name',
+            'creator:id,name,email',
+        ]);
         $query->orderBy($sort, $order);
 
         $paginated = $query->paginate($perPage, ['*'], 'page', $page);
-        $columns = array_merge(self::BASE_COLUMNS, self::ALLOWED_COLUMNS, ['manager', 'team_leader', 'sales_agent']);
+        $columns = array_merge(self::BASE_COLUMNS, self::ALLOWED_COLUMNS, ['manager', 'team_leader', 'sales_agent', 'creator']);
         $rows = $paginated->getCollection();
         $clientIds = $rows->pluck('id')->map(fn ($id) => (int) $id)->filter()->values()->all();
         $this->syncRenewalAlertsForClientIds($clientIds);
@@ -1410,7 +1802,8 @@ class ClientApiController extends Controller
             'create_renewal_record' => ['sometimes', 'boolean'],
         ]);
 
-        $isRenewal = array_key_exists('service_category', $data)
+        $isRenewal = ! empty($data['create_renewal_record'])
+            && array_key_exists('service_category', $data)
             && strcasecmp(trim((string) ($data['service_category'] ?? '')), 'Renewal') === 0;
 
         if ($isRenewal) {

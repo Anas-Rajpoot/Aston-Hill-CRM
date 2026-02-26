@@ -136,7 +136,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onClickOutside))
             class="w-full rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
             :disabled="loading"
           >
-            <option value="__any__">All Alert Types</option>
+            <option value="">Select</option>
             <option v-for="a in alertTypes" :key="a" :value="a">{{ a }}</option>
           </select>
         </div>

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\FieldSubmissionController;
 use App\Models\FieldSubmission;
 use App\Models\FieldSubmissionAudit;
+use App\Models\SlaRule;
 use App\Models\SystemAuditLog;
 use App\Models\User;
 use App\Models\UserColumnPreference;
@@ -219,7 +220,7 @@ class FieldSubmissionApiController extends Controller
             $query->leftJoin('users as field_agent_users', 'field_submissions.field_executive_id', '=', 'field_agent_users.id')
                 ->orderBy('field_agent_users.name', $order);
         } elseif (in_array($sort, ['target_date', 'sla_timer', 'sla_status', 'last_updated'], true)) {
-            $dbCol = $sort === 'target_date' ? 'meeting_date' : ($sort === 'last_updated' ? 'updated_at' : 'meeting_date');
+            $dbCol = $sort === 'target_date' ? 'meeting_date' : ($sort === 'last_updated' ? 'updated_at' : 'created_at');
             $query->orderBy('field_submissions.' . $dbCol, $order);
         } elseif (in_array($sort, self::ALLOWED_COLUMNS, true)) {
             $query->orderBy('field_submissions.' . $sort, $order);
@@ -242,6 +243,8 @@ class FieldSubmissionApiController extends Controller
         if (in_array('field_status', $columns, true) || in_array('target_date', $columns, true) || in_array('sla_timer', $columns, true) || in_array('sla_status', $columns, true)) {
             $base[] = 'meeting_date';
             $base[] = 'field_status';
+            $base[] = 'created_at';
+            $base[] = 'field_executive_id';
         }
         if (in_array('last_updated', $columns, true)) {
             $base[] = 'updated_at';
@@ -292,43 +295,63 @@ class FieldSubmissionApiController extends Controller
 
     private function computeSlaTimer(FieldSubmission $row): ?string
     {
-        $completedStatuses = ['Survey Completed', 'Completed', 'Visited'];
-        if (in_array($row->field_status, $completedStatuses, true)) {
-            return 'Completed';
-        }
-        if (! $row->meeting_date) {
+        if (! $row->created_at) {
             return null;
         }
-        $targetEnd = $row->meeting_date->endOfDay();
-        $now = now();
-        if ($targetEnd->isPast()) {
-            $totalMins = $targetEnd->diffInMinutes($now);
-            $h = (int) floor($totalMins / 60);
-            $m = $totalMins % 60;
-            return "Breached by {$h}h {$m}m";
+        if (! empty($row->field_executive_id)) {
+            return 'Assigned';
         }
-        $totalMins = $now->diffInMinutes($targetEnd, false);
-        $h = (int) floor($totalMins / 60);
-        $m = $totalMins % 60;
-        return "{$h}h {$m}m remaining";
+
+        $rule = SlaRule::cached()->firstWhere('module_key', 'field_submissions');
+        $slaMinutes = ($rule && $rule->is_active)
+            ? max(1, (int) $rule->sla_duration_minutes)
+            : 240;
+
+        $elapsed = $row->created_at->diffInMinutes(now());
+        $remaining = $slaMinutes - $elapsed;
+        if ($remaining <= 0) {
+            return 'Breached by ' . $this->formatDuration(abs($remaining));
+        }
+        return $this->formatDuration($remaining) . ' remaining';
     }
 
     private function computeSlaStatus(FieldSubmission $row): ?string
     {
-        $completedStatuses = ['Survey Completed', 'Completed', 'Visited'];
-        if (in_array($row->field_status, $completedStatuses, true)) {
-            return 'Completed';
-        }
-        if (! $row->meeting_date) {
+        if (! $row->created_at) {
             return null;
         }
-        $targetEnd = $row->meeting_date->endOfDay();
-        $now = now();
-        if ($targetEnd->isPast()) {
+        if (! empty($row->field_executive_id)) {
+            return 'Assigned';
+        }
+
+        $rule = SlaRule::cached()->firstWhere('module_key', 'field_submissions');
+        $slaMinutes = ($rule && $rule->is_active)
+            ? max(1, (int) $rule->sla_duration_minutes)
+            : 240;
+        $warningMinutes = ($rule && $rule->is_active)
+            ? max(0, (int) $rule->warning_threshold_minutes)
+            : 30;
+
+        $elapsed = $row->created_at->diffInMinutes(now());
+        $remaining = $slaMinutes - $elapsed;
+        if ($remaining <= 0) {
             return 'Breached';
         }
-        $hoursRemaining = $now->diffInHours($targetEnd, false) + $now->diffInMinutes($targetEnd, false) / 60;
-        return $hoursRemaining <= 4 ? 'Approaching' : 'On Time';
+        return $remaining <= $warningMinutes ? 'Approaching' : 'On Time';
+    }
+
+    private function formatDuration(int $minutes): string
+    {
+        $minutes = max(0, $minutes);
+        $h = intdiv($minutes, 60);
+        $m = $minutes % 60;
+        if ($h > 0 && $m > 0) {
+            return "{$h}h {$m}m";
+        }
+        if ($h > 0) {
+            return "{$h}h";
+        }
+        return "{$m}m";
     }
 
     public function filters(): JsonResponse

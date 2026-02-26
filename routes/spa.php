@@ -76,6 +76,8 @@ Route::get('/order-status', $spa);
 Route::get('/all-clients', $spa);
 Route::get('/clients', $spa);
 Route::get('/clients/create', $spa);
+Route::get('/clients/products/{id}', $spa)->whereNumber('id');
+Route::get('/clients/products/{id}/edit', $spa)->whereNumber('id');
 Route::get('/clients/{id}', $spa)->whereNumber('id');
 Route::get('/clients/{id}/edit', $spa)->whereNumber('id');
 Route::get('/dsp-tracker', $spa);

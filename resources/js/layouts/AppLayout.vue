@@ -13,7 +13,10 @@ const { showWarning, countdownSecs, totalWarningSecs, extending, staySignedIn, l
 
     <div class="flex min-w-0 flex-1 flex-col min-h-0 overflow-hidden">
       <main class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-gray-100 p-2">
-        <router-view />
+        <!-- Keep a stable content canvas; sidebar toggle should not collapse module layouts -->
+        <div class="min-w-0">
+          <router-view />
+        </div>
       </main>
 
       <footer class="flex-shrink-0 z-10">
@@ -32,3 +35,11 @@ const { showWarning, countdownSecs, totalWarningSecs, extending, staySignedIn, l
     />
   </div>
 </template>
+
+<style scoped>
+/* Datatables: keep empty/loading rows compact and consistent. */
+main :deep(.overflow-x-auto table tbody td[colspan]) {
+  padding-top: 2rem !important;
+  padding-bottom: 2rem !important;
+}
+</style>

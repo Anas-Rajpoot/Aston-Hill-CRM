@@ -58,6 +58,18 @@ export default {
     return data
   },
 
+  async uploadDocuments(requestId, formData) {
+    const { data } = await api.post(`/special-requests/${requestId}/documents`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return data
+  },
+
+  async deleteDocument(requestId, documentId) {
+    const { data } = await api.delete(`/special-requests/${requestId}/documents/${documentId}`)
+    return data
+  },
+
   getTeamOptions() {
     return api.get('/field-submissions/team-options')
   },

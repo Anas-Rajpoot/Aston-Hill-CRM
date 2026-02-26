@@ -9,6 +9,7 @@ import ClientsFiltersBar from '@/components/clients/ClientsFiltersBar.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import ClientTable from '@/components/clients/ClientTable.vue'
 import RenewalAlertsModal from '@/components/clients/RenewalAlertsModal.vue'
+import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import RecordHistoryModal from '@/components/RecordHistoryModal.vue'
 import api from '@/lib/axios'
@@ -43,20 +44,20 @@ const meta = ref({ current_page: 1, last_page: 1, per_page: authStore.defaultTab
 const allColumns = ref([])
 const defaultColumns = ref([])
 const visibleColumns = ref([
-  'company_name', 'account_number', 'status', 'creator',
-  'trade_license_number', 'trade_license_expiry_date', 'establishment_card_number', 'establishment_card_expiry_date',
-  'account_manager_name', 'csr_name_1', 'csr_name_2', 'csr_name_3', 'full_address',
-  'submitted_at', 'submission_type', 'service_category', 'manager', 'team_leader', 'sales_agent',
-  'service_type', 'product_type', 'address', 'product_name', 'mrc', 'quantity',
-  'other', 'migration_numbers', 'activity', 'wo_number', 'work_order_status',
-  'activation_date', 'completion_date', 'payment_connection', 'contract_type', 'contract_end_date',
-  'clawback_chum', 'remarks', 'additional_notes',
+  'company_name', 'account_number',
+  'submitted_at',
+  'submission_type', 'service_category', 'service_type',
+  'manager', 'team_leader', 'sales_agent', 'product_type',
+  'address', 'product_name', 'mrc', 'quantity', 'other',
+  'migration_numbers', 'activity', 'wo_number', 'work_order_status',
+  'activation_date', 'contract_type', 'contract_end_date', 'clawback_chum',
+  'remarks', 'additional_notes',
 ])
 const sort = ref('submitted_at')
 const order = ref('desc')
+const advancedVisible = ref(false)
 const columnModalVisible = ref(false)
 const exportLoading = ref(false)
-const generateAlertsLoading = ref(false)
 const importLoading = ref(false)
 const importFileInputRef = ref(null)
 const pageTitle = ref('Clients')
@@ -66,13 +67,40 @@ const renewalAlertsModalItems = ref([])
 
 const accountNumbers = ref([])
 const alertTypes = ref([])
-const filterOptions = ref({ managers: [], team_leaders: [], sales_agents: [] })
+const filterOptions = ref({
+  managers: [],
+  team_leaders: [],
+  sales_agents: [],
+  submission_types: [],
+  service_categories: [],
+  service_types: [],
+  product_types: [],
+  work_order_statuses: [],
+  contract_types: [],
+  clawback_chum_options: [],
+})
 
 const filters = ref({
   company_name: '',
   account_number: '',
   submitted_from: '',
   submitted_to: '',
+  manager_id: '',
+  team_leader_id: '',
+  sales_agent_id: '',
+  submission_type: '',
+  service_category: '',
+  service_type: '',
+  product_type: '',
+  product_name: '',
+  wo_number: '',
+  work_order_status: '',
+  contract_type: '',
+  clawback_chum: '',
+  activation_from: '',
+  activation_to: '',
+  contract_end_from: '',
+  contract_end_to: '',
 })
 
 function buildParams() {
@@ -88,6 +116,22 @@ function buildParams() {
   if (f.account_number) p.account_number = f.account_number
   if (f.submitted_from) p.submitted_from = f.submitted_from
   if (f.submitted_to) p.submitted_to = f.submitted_to
+  if (f.manager_id) p.manager_id = f.manager_id
+  if (f.team_leader_id) p.team_leader_id = f.team_leader_id
+  if (f.sales_agent_id) p.sales_agent_id = f.sales_agent_id
+  if (f.submission_type) p.submission_type = f.submission_type
+  if (f.service_category) p.service_category = f.service_category
+  if (f.service_type) p.service_type = f.service_type
+  if (f.product_type) p.product_type = f.product_type
+  if (f.product_name) p.product_name = f.product_name
+  if (f.wo_number) p.wo_number = f.wo_number
+  if (f.work_order_status) p.work_order_status = f.work_order_status
+  if (f.contract_type) p.contract_type = f.contract_type
+  if (f.clawback_chum) p.clawback_chum = f.clawback_chum
+  if (f.activation_from) p.activation_from = f.activation_from
+  if (f.activation_to) p.activation_to = f.activation_to
+  if (f.contract_end_from) p.contract_end_from = f.contract_end_from
+  if (f.contract_end_to) p.contract_end_to = f.contract_end_to
   return p
 }
 
@@ -192,20 +236,6 @@ function closeRenewalAlertsModal() {
   renewalAlertsModalItems.value = []
 }
 
-async function generateRenewalAlerts() {
-  generateAlertsLoading.value = true
-  try {
-    await clientsApi.generateRenewalAlerts(buildParams())
-    await load()
-    alert('Renewal alerts generated successfully.')
-  } catch (err) {
-    const msg = err?.response?.data?.message ?? 'Failed to generate renewal alerts.'
-    alert(msg)
-  } finally {
-    generateAlertsLoading.value = false
-  }
-}
-
 async function load() {
   window.scrollTo(0, 0)
   loading.value = true
@@ -227,33 +257,40 @@ async function loadFilters() {
       managers: data.managers ?? [],
       team_leaders: data.team_leaders ?? [],
       sales_agents: data.sales_agents ?? [],
+      submission_types: data.submission_types ?? [],
+      service_categories: data.service_categories ?? [],
+      service_types: data.service_types ?? [],
+      product_types: data.product_types ?? [],
+      work_order_statuses: data.work_order_statuses ?? [],
+      contract_types: data.contract_types ?? [],
+      clawback_chum_options: data.clawback_chum_options ?? [],
     }
   } catch { /* silent */ }
 }
 
 const COLUMN_ORDER = [
-  'company_name', 'account_number', 'status', 'creator',
-  'trade_license_number', 'trade_license_expiry_date', 'establishment_card_number', 'establishment_card_expiry_date',
-  'account_manager_name', 'csr_name_1', 'csr_name_2', 'csr_name_3', 'full_address',
-  'submitted_at', 'submission_type', 'service_category', 'manager', 'team_leader', 'sales_agent',
-  'service_type', 'product_type', 'address', 'product_name', 'mrc', 'quantity', 'other',
-  'migration_numbers', 'activity', 'wo_number', 'work_order_status', 'activation_date', 'completion_date',
-  'payment_connection', 'contract_type', 'contract_end_date', 'clawback_chum', 'remarks',
-  'additional_notes',
+  'company_name', 'account_number',
+  'submitted_at',
+  'submission_type', 'service_category', 'service_type',
+  'manager', 'team_leader', 'sales_agent', 'product_type',
+  'address', 'product_name', 'mrc', 'quantity', 'other',
+  'migration_numbers', 'activity', 'wo_number', 'work_order_status',
+  'activation_date', 'contract_type', 'contract_end_date', 'clawback_chum',
+  'remarks', 'additional_notes',
 ]
 
 function enforceColumnOrder(cols) {
   const set = new Set(cols)
-  // Always keep required Products & Services columns and key company fields visible.
+  // Keep Products & Services fields + minimal company info for this page.
   ;[
-    'company_name', 'account_number', 'status', 'creator',
-    'trade_license_number', 'trade_license_expiry_date', 'establishment_card_number', 'establishment_card_expiry_date',
-    'account_manager_name', 'csr_name_1', 'full_address',
-    'submission_type', 'service_category', 'manager', 'team_leader', 'sales_agent',
-    'service_type', 'product_type', 'address', 'product_name', 'mrc', 'quantity',
-    'other', 'migration_numbers', 'activity', 'wo_number', 'work_order_status',
-    'activation_date', 'completion_date', 'payment_connection', 'contract_type', 'contract_end_date',
-    'clawback_chum', 'remarks', 'additional_notes',
+    'company_name', 'account_number',
+    'submitted_at',
+    'submission_type', 'service_category', 'service_type',
+    'manager', 'team_leader', 'sales_agent', 'product_type',
+    'address', 'product_name', 'mrc', 'quantity', 'other',
+    'migration_numbers', 'activity', 'wo_number', 'work_order_status',
+    'activation_date', 'contract_type', 'contract_end_date', 'clawback_chum',
+    'remarks', 'additional_notes',
   ].forEach((c) => set.add(c))
   set.delete('renewal_alert')
   const ordered = COLUMN_ORDER.filter((c) => set.has(c))
@@ -281,6 +318,24 @@ function applyFilters() {
 function clearSearch() {
   filters.value.company_name = ''
   filters.value.account_number = ''
+  filters.value.submitted_from = ''
+  filters.value.submitted_to = ''
+  filters.value.manager_id = ''
+  filters.value.team_leader_id = ''
+  filters.value.sales_agent_id = ''
+  filters.value.submission_type = ''
+  filters.value.service_category = ''
+  filters.value.service_type = ''
+  filters.value.product_type = ''
+  filters.value.product_name = ''
+  filters.value.wo_number = ''
+  filters.value.work_order_status = ''
+  filters.value.contract_type = ''
+  filters.value.clawback_chum = ''
+  filters.value.activation_from = ''
+  filters.value.activation_to = ''
+  filters.value.contract_end_from = ''
+  filters.value.contract_end_to = ''
   meta.value.current_page = 1
   load()
 }
@@ -291,6 +346,22 @@ function resetFilters() {
     account_number: '',
     submitted_from: '',
     submitted_to: '',
+    manager_id: '',
+    team_leader_id: '',
+    sales_agent_id: '',
+    submission_type: '',
+    service_category: '',
+    service_type: '',
+    product_type: '',
+    product_name: '',
+    wo_number: '',
+    work_order_status: '',
+    contract_type: '',
+    clawback_chum: '',
+    activation_from: '',
+    activation_to: '',
+    contract_end_from: '',
+    contract_end_to: '',
   }
   meta.value.current_page = 1
   load()
@@ -454,21 +525,6 @@ onMounted(() => {
           </button>
           <button
             type="button"
-            class="inline-flex items-center rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-60"
-            :disabled="loading || generateAlertsLoading"
-            @click="generateRenewalAlerts"
-          >
-            <svg v-if="generateAlertsLoading" class="mr-1.5 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-            <svg v-else class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            {{ generateAlertsLoading ? 'Generating...' : 'Generate Alerts' }}
-          </button>
-          <button
-            type="button"
             class="inline-flex items-center rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70 disabled:cursor-wait"
             :disabled="loading"
             @click="goToAddClient"
@@ -496,6 +552,13 @@ onMounted(() => {
           <button
             type="button"
             class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            @click="advancedVisible = !advancedVisible"
+          >
+            Advanced Filters
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
             @click="columnModalVisible = true"
           >
             Customize Columns
@@ -505,6 +568,117 @@ onMounted(() => {
           </button>
         </template>
       </ClientsFiltersBar>
+
+      <div v-if="advancedVisible" class="rounded-lg border border-gray-200 bg-white p-4">
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Manager</label>
+            <select v-model="filters.manager_id" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <option value="">All Managers</option>
+              <option v-for="u in filterOptions.managers" :key="u.id" :value="u.id">{{ u.name }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Team Leader</label>
+            <select v-model="filters.team_leader_id" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <option value="">All Team Leaders</option>
+              <option v-for="u in filterOptions.team_leaders" :key="u.id" :value="u.id">{{ u.name }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Sales Agent</label>
+            <select v-model="filters.sales_agent_id" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <option value="">All Sales Agents</option>
+              <option v-for="u in filterOptions.sales_agents" :key="u.id" :value="u.id">{{ u.name }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Submission Type</label>
+            <select v-model="filters.submission_type" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <option value="">All Submission Types</option>
+              <option v-for="v in filterOptions.submission_types" :key="v" :value="v">{{ v }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Service Category</label>
+            <select v-model="filters.service_category" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <option value="">All Service Categories</option>
+              <option v-for="v in filterOptions.service_categories" :key="v" :value="v">{{ v }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Service Type</label>
+            <select v-model="filters.service_type" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <option value="">All Service Types</option>
+              <option v-for="v in filterOptions.service_types" :key="v" :value="v">{{ v }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Product Type</label>
+            <select v-model="filters.product_type" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <option value="">All Product Types</option>
+              <option v-for="v in filterOptions.product_types" :key="v" :value="v">{{ v }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Product Name</label>
+            <input v-model="filters.product_name" type="text" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" placeholder="Product name" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Work Order</label>
+            <input v-model="filters.wo_number" type="text" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" placeholder="WO number" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Work Order Status</label>
+            <select v-model="filters.work_order_status" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <option value="">All Work Order Statuses</option>
+              <option v-for="v in filterOptions.work_order_statuses" :key="v" :value="v">{{ v }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Contract Type</label>
+            <select v-model="filters.contract_type" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <option value="">All Contract Types</option>
+              <option v-for="v in filterOptions.contract_types" :key="v" :value="v">{{ v }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Clawback / Chum</label>
+            <select v-model="filters.clawback_chum" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <option value="">All</option>
+              <option v-for="v in filterOptions.clawback_chum_options" :key="v" :value="v">{{ v }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Submitted From</label>
+            <DateInputDdMmYyyy v-model="filters.submitted_from" placeholder="dd-Mon-yyyy" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Submitted To</label>
+            <DateInputDdMmYyyy v-model="filters.submitted_to" placeholder="dd-Mon-yyyy" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Activation From</label>
+            <DateInputDdMmYyyy v-model="filters.activation_from" placeholder="dd-Mon-yyyy" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Activation To</label>
+            <DateInputDdMmYyyy v-model="filters.activation_to" placeholder="dd-Mon-yyyy" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Contract End From</label>
+            <DateInputDdMmYyyy v-model="filters.contract_end_from" placeholder="dd-Mon-yyyy" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Contract End To</label>
+            <DateInputDdMmYyyy v-model="filters.contract_end_to" placeholder="dd-Mon-yyyy" />
+          </div>
+        </div>
+        <div class="mt-3 flex items-center gap-2">
+          <button type="button" class="rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700" @click="applyFilters">Apply</button>
+          <button type="button" class="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50" @click="resetFilters">Reset</button>
+        </div>
+      </div>
 
       <div class="overflow-hidden rounded-lg border-2 border-black bg-white shadow-sm">
         <ClientTable

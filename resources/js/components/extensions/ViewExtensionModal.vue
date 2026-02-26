@@ -20,6 +20,7 @@ const auth = useAuthStore()
 const extension = ref(null)
 const loading = ref(false)
 const loadError = ref(null)
+const showPassword = ref(false)
 
 const permissions = computed(() => auth.user?.permissions ?? [])
 const isSuperAdmin = computed(() => {
@@ -32,10 +33,12 @@ watch(
   () => [props.visible, props.extensionId],
   ([visible, id]) => {
     if (visible && id) {
+      showPassword.value = false
       load()
     } else {
       extension.value = null
       loadError.value = null
+      showPassword.value = false
     }
   },
   { immediate: true }
@@ -105,6 +108,13 @@ function openEditModal() {
     emit('close')
     emit('edit')
   }
+}
+
+function onPasswordDoubleClick() {
+  if (!canEdit.value) return
+  if (!extension.value?.password) return
+  if (!extension.value?.password_view) return
+  showPassword.value = !showPassword.value
 }
 </script>
 
@@ -187,7 +197,14 @@ function openEditModal() {
                   <dl class="mt-3">
                     <div>
                       <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Password</dt>
-                      <dd class="mt-0.5 text-sm font-mono text-gray-600">{{ extension.password ? '••••••••' : '—' }}</dd>
+                      <dd
+                        class="mt-0.5 text-sm font-mono"
+                        :class="canEdit && extension.password_view ? 'cursor-pointer text-blue-600 hover:underline' : 'text-gray-600'"
+                        :title="canEdit && extension.password_view ? 'Double-click to view/hide password' : undefined"
+                        @dblclick="onPasswordDoubleClick"
+                      >
+                        {{ extension.password ? (showPassword ? extension.password_view : '••••••••') : '—' }}
+                      </dd>
                     </div>
                   </dl>
                 </section>

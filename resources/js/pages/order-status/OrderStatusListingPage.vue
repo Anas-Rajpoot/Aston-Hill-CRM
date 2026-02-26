@@ -210,7 +210,7 @@ onMounted(async () => {
 
       <!-- Filters card: Activity, Account Number, Work Order + Search, Clear, Advanced Filters, Customize Columns -->
       <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-        <div class="flex flex-wrap items-end gap-4">
+        <div class="flex items-end gap-4 overflow-x-auto">
           <div class="min-w-[140px] max-w-[200px] flex-1">
             <label for="os-activity" class="mb-0.5 block text-xs text-gray-700">Activity</label>
             <input
@@ -235,7 +235,7 @@ onMounted(async () => {
               @keyup.enter="applyFilters"
             />
           </div>
-          <div class="ml-auto flex flex-wrap items-center gap-2">
+          <div class="ml-auto flex items-center gap-2 shrink-0">
             <button
               type="button"
               class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 disabled:opacity-50"
@@ -255,7 +255,7 @@ onMounted(async () => {
             >
               Clear
             </button>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 shrink-0">
             <button
               type="button"
               class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"

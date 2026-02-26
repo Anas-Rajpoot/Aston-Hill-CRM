@@ -37,7 +37,6 @@ const navItems = [
   { to: '/order-status', label: 'Order Status', abbr: 'OS' },
   { to: '/dsp-tracker', label: 'DSP Tracker', abbr: 'DT' },
   { to: '/verifiers-detail', label: 'Verifiers Detail', abbr: 'VD' },
-  { to: '/employees', label: 'Employees', abbr: 'Em' },
   { to: '/cisco-extensions', label: 'Cisco Extensions', abbr: 'CE' },
   { to: '/attendance-log', label: 'Attendance Log', abbr: 'AL' },
   { to: '/expenses', label: 'Expense Tracker', abbr: 'ET' },

@@ -43,6 +43,10 @@ const props = defineProps({
   currentPage: { type: Number, default: 1 },
   perPage: { type: Number, default: 15 },
   editOptions: { type: Object, default: () => ({}) },
+  viewTab: { type: String, default: 'products-services' },
+  viewMode: { type: String, default: 'client-tab' }, // client-tab | product-detail
+  parentClientId: { type: [Number, String], default: null },
+  returnTo: { type: String, default: '' },
 })
 
 const emit = defineEmits(['sort', 'updateCell', 'viewHistory', 'show-renewal-alerts'])
@@ -248,6 +252,21 @@ function statusBadgeClass(status) {
 
 function goToDetail(row) {
   if (row?.id) router.push(`/clients/${row.id}`)
+}
+
+function viewRoute(row) {
+  if (!row?.id) return '/clients'
+  if (props.viewMode === 'product-detail') {
+    const query = new URLSearchParams()
+    if (props.parentClientId != null && String(props.parentClientId) !== '') {
+      query.set('parent_client_id', String(props.parentClientId))
+    }
+    if (props.returnTo) query.set('return_to', props.returnTo)
+    const qs = query.toString()
+    return qs ? `/clients/products/${row.id}?${qs}` : `/clients/products/${row.id}`
+  }
+  if (!props.viewTab) return `/clients/${row.id}`
+  return `/clients/${row.id}?tab=${encodeURIComponent(props.viewTab)}`
 }
 
 function isReadOnly(col) {
@@ -583,7 +602,7 @@ function onCellDblClick(e, row, col) {
           <td class="whitespace-nowrap border-r border-gray-200 px-4 py-3 text-right text-sm last:border-r-0" @click.stop>
             <div class="inline-flex items-center gap-2">
               <router-link
-                :to="`/clients/${row.id}?tab=products-services`"
+                :to="viewRoute(row)"
                 class="text-green-600 hover:text-green-800 font-medium"
               >
                 View

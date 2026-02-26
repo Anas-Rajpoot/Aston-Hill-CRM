@@ -7,6 +7,7 @@ use App\Http\Controllers\FieldSubmissionController;
 use App\Models\SpecialRequest;
 use App\Models\SpecialRequestAudit;
 use App\Models\SpecialRequestDocument;
+use App\Rules\AllowedDocumentFile;
 use App\Models\User;
 use App\Models\UserColumnPreference;
 use Illuminate\Http\JsonResponse;
@@ -306,6 +307,59 @@ class SpecialRequestApiController extends Controller
             'creator_name' => $specialRequest->creator?->name,
             'documents' => $documents,
         ]);
+    }
+
+    public function uploadDocuments(Request $request, SpecialRequest $specialRequest): JsonResponse
+    {
+        $this->authorize('update', $specialRequest);
+
+        $request->validate([
+            'documents' => ['required', 'array', 'min:1'],
+            'documents.*' => ['required', 'file', new AllowedDocumentFile()],
+        ]);
+
+        $files = $request->file('documents', []);
+        if (is_array($files)) {
+            foreach ($files as $file) {
+                if (! $file || ! $file->isValid()) {
+                    continue;
+                }
+                $path = $file->store('special-request-documents', 'public');
+                SpecialRequestDocument::create([
+                    'special_request_id' => $specialRequest->id,
+                    'doc_key' => 'additional_document',
+                    'label' => 'Additional Document',
+                    'file_path' => $path,
+                    'file_name' => $file->getClientOriginalName(),
+                    'mime' => $file->getMimeType(),
+                    'size' => $file->getSize(),
+                ]);
+            }
+        }
+
+        return response()->json(['message' => 'Documents added.']);
+    }
+
+    public function deleteDocument(Request $request, SpecialRequest $specialRequest, int $document): JsonResponse
+    {
+        $this->authorize('update', $specialRequest);
+
+        $doc = SpecialRequestDocument::query()
+            ->where('special_request_id', $specialRequest->id)
+            ->where('id', $document)
+            ->first();
+
+        if (! $doc) {
+            return response()->json(['message' => 'Document not found.'], 404);
+        }
+
+        if (! empty($doc->file_path) && Storage::disk('public')->exists($doc->file_path)) {
+            Storage::disk('public')->delete($doc->file_path);
+        }
+
+        $doc->delete();
+
+        return response()->json(['message' => 'Document removed.']);
     }
 
     public function update(Request $request, SpecialRequest $specialRequest): JsonResponse

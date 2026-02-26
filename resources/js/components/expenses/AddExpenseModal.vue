@@ -6,7 +6,7 @@
  */
 import { ref, computed, watch } from 'vue'
 import expensesApi from '@/services/expensesApi'
-import { fromDdMmYyyy, fromDdMonYyyyLower } from '@/lib/dateFormat'
+import { fromDdMmYyyy, fromDdMonYyyyLower, toDdMonYyyyDash } from '@/lib/dateFormat'
 
 const VAT_OPTIONS_DEFAULT = [
   { value: 0, label: '0% (Exempt)' },
@@ -42,8 +42,10 @@ const supportingFile = ref(null)
 const invoiceInputRef = ref(null)
 const supportingInputRef = ref(null)
 const dateInputRef = ref(null)
+const nativeDateInputRef = ref(null)
 const submitting = ref(false)
 const error = ref(null)
+const fieldErrors = ref({})
 
 const vatAmountCurrency = computed(() => {
   const amount = parseFloat(form.value.amount_without_vat)
@@ -74,6 +76,7 @@ watch(() => props.visible, (visible) => {
     invoiceFile.value = null
     supportingFile.value = null
     error.value = null
+    clearFieldErrors()
   }
 })
 
@@ -97,7 +100,22 @@ function onExpenseDateInput() {
 }
 
 function openDatePicker() {
-  dateInputRef.value?.focus()
+  if (nativeDateInputRef.value?.showPicker) {
+    nativeDateInputRef.value.showPicker()
+    return
+  }
+  nativeDateInputRef.value?.focus()
+  nativeDateInputRef.value?.click()
+}
+
+function onNativeDateChange(e) {
+  const value = e?.target?.value || ''
+  form.value.expense_date = value
+  form.value.expense_date_display = value ? (toDdMonYyyyDash(value) || '') : ''
+}
+
+function clearFieldErrors() {
+  fieldErrors.value = {}
 }
 
 function triggerInvoiceUpload() {
@@ -120,13 +138,16 @@ function onSupportingChange(e) {
 
 async function submit() {
   error.value = null
+  clearFieldErrors()
   const d = form.value.expense_date || parseExpenseDate(form.value.expense_date_display)
   if (!d) {
-    error.value = 'Expense Date is required.'
+    fieldErrors.value.expense_date = 'Expense Date is required.'
+    error.value = 'Please fill all required fields.'
     return
   }
   if (!form.value.product_category?.trim()) {
-    error.value = 'Product Category is required.'
+    fieldErrors.value.product_category = 'Product Category is required.'
+    error.value = 'Please fill all required fields.'
     return
   }
   const amount = parseFloat(form.value.amount_without_vat)
@@ -135,11 +156,13 @@ async function submit() {
     return
   }
   if (!form.value.product_description?.trim()) {
-    error.value = 'Product Description is required.'
+    fieldErrors.value.product_description = 'Product Description is required.'
+    error.value = 'Please fill all required fields.'
     return
   }
   if (!form.value.comment?.trim()) {
-    error.value = 'Comment / Remarks is required.'
+    fieldErrors.value.comment = 'Comment / Remarks is required.'
+    error.value = 'Please fill all required fields.'
     return
   }
 
@@ -179,7 +202,16 @@ async function submit() {
     emit('created')
     close()
   } catch (e) {
-    const msg = e?.response?.data?.message || e?.response?.data?.errors
+    const apiErrors = e?.response?.data?.errors
+    if (apiErrors && typeof apiErrors === 'object') {
+      fieldErrors.value = {
+        expense_date: apiErrors.expense_date?.[0],
+        product_category: apiErrors.product_category?.[0],
+        product_description: apiErrors.product_description?.[0],
+        comment: apiErrors.comment?.[0],
+      }
+    }
+    const msg = e?.response?.data?.message || apiErrors
     error.value = typeof msg === 'string' ? msg : (msg && Object.values(msg).flat?.().length ? Object.values(msg).flat().join(' ') : 'Failed to create expense.')
   } finally {
     submitting.value = false
@@ -239,8 +271,19 @@ async function submit() {
                     v-model="form.expense_date_display"
                     type="text"
                     placeholder="DD-MMM-YYYY"
-                    class="w-full rounded border border-gray-300 bg-white px-3 py-2 pr-9 text-sm text-gray-900 placeholder-gray-400 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                    readonly
+                    class="w-full cursor-pointer rounded border border-gray-300 bg-white px-3 py-2 pr-9 text-sm text-gray-900 placeholder-gray-400 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                    :class="fieldErrors.expense_date ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : ''"
                     @input="onExpenseDateInput"
+                    @click="openDatePicker"
+                  />
+                  <input
+                    ref="nativeDateInputRef"
+                    type="date"
+                    tabindex="-1"
+                    class="pointer-events-none absolute opacity-0"
+                    :value="form.expense_date"
+                    @change="onNativeDateChange"
                   />
                   <button
                     type="button"
@@ -253,6 +296,7 @@ async function submit() {
                     </svg>
                   </button>
                 </div>
+                <p v-if="fieldErrors.expense_date" class="mt-1 text-xs text-red-600">{{ fieldErrors.expense_date }}</p>
               </div>
               <div>
                 <label for="add-expense-category" class="mb-1 block text-sm font-medium text-gray-700">
@@ -263,6 +307,7 @@ async function submit() {
                   id="add-expense-category"
                   v-model="form.product_category"
                   class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  :class="fieldErrors.product_category ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : ''"
                 >
                   <option value="">Select Category</option>
                   <option v-for="opt in categories" :key="opt.value" :value="opt.value">
@@ -275,8 +320,10 @@ async function submit() {
                   v-model="form.product_category"
                   type="text"
                   class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  :class="fieldErrors.product_category ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : ''"
                   placeholder="Select Category"
                 />
+                <p v-if="fieldErrors.product_category" class="mt-1 text-xs text-red-600">{{ fieldErrors.product_category }}</p>
               </div>
               <div>
                 <label for="add-expense-invoice" class="mb-1 block text-sm font-medium text-gray-700">
@@ -365,8 +412,10 @@ async function submit() {
                 v-model="form.product_description"
                 type="text"
                 class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                :class="fieldErrors.product_description ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : ''"
                 placeholder="Enter detailed description of the expense"
               />
+              <p v-if="fieldErrors.product_description" class="mt-1 text-xs text-red-600">{{ fieldErrors.product_description }}</p>
             </div>
 
             <!-- Comment / Remarks -->
@@ -379,8 +428,10 @@ async function submit() {
                 v-model="form.comment"
                 rows="3"
                 class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-green-500 focus:ring-1 focus:ring-green-500 resize-none"
+                :class="fieldErrors.comment ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : ''"
                 placeholder="Add any additional notes or remarks"
               />
+              <p v-if="fieldErrors.comment" class="mt-1 text-xs text-red-600">{{ fieldErrors.comment }}</p>
             </div>
 
             <!-- Attachments: horizontal layout, document icon + Upload (light blue) -->

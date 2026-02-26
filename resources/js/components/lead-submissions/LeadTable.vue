@@ -751,7 +751,15 @@ function statusBadgeClass(status) {
                 v-if="row[col]"
                 :class="[
                   'inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap',
-                  String(row[col]).startsWith('Overdue') ? 'bg-red-100 text-red-800' : String(row[col]).includes('h left') ? 'bg-orange-100 text-orange-800' : 'bg-green-100 text-green-800',
+                  String(row[col]).startsWith('Overdue')
+                    ? 'bg-red-100 text-red-800'
+                    : String(row[col]).includes('passed of')
+                      ? 'bg-blue-100 text-blue-800'
+                    : String(row[col]).startsWith('Due in')
+                      ? 'bg-orange-100 text-orange-800'
+                      : String(row[col]).includes('h left')
+                        ? 'bg-orange-100 text-orange-800'
+                        : 'bg-green-100 text-green-800',
                 ]"
                 :title="cellTitle(row, col)"
               >

@@ -8,6 +8,7 @@ use App\Http\Controllers\FieldSubmissionController;
 use App\Jobs\BulkAssignCsrJob;
 use App\Models\CustomerSupportSubmission;
 use App\Models\CustomerSupportSubmissionAudit;
+use App\Models\SlaRule;
 use App\Models\SystemAuditLog;
 use App\Models\Client;
 use App\Models\User;
@@ -35,7 +36,7 @@ class CustomerSupportApiController extends Controller
         'csr_id', 'csr_name', 'status', 'workflow_status',
         'completion_date', 'updated_at',
         'trouble_ticket', 'activity', 'pending',
-        'resolution_remarks', 'internal_remarks',
+        'resolution_remarks', 'internal_remarks', 'sla_timer',
     ];
 
     private const BASE_COLUMNS = ['id', 'status'];
@@ -260,6 +261,10 @@ class CustomerSupportApiController extends Controller
                 ->orderBy('csr_users.name', $direction);
             return;
         }
+        if ($sort === 'sla_timer') {
+            $query->orderBy('customer_support_submissions.submitted_at', $direction);
+            return;
+        }
         $query->orderBy('customer_support_submissions.' . $sort, $direction);
     }
 
@@ -304,6 +309,11 @@ class CustomerSupportApiController extends Controller
                 $base[] = $map[$col];
             }
         }
+        if (in_array('sla_timer', $columns, true)) {
+            $base[] = 'customer_support_submissions.submitted_at';
+            $base[] = 'customer_support_submissions.created_at';
+            $base[] = 'customer_support_submissions.csr_id';
+        }
         return array_unique($base);
     }
 
@@ -335,6 +345,10 @@ class CustomerSupportApiController extends Controller
                 $out['creator'] = $row->creator?->name ?? null;
                 continue;
             }
+            if ($col === 'sla_timer') {
+                $out['sla_timer'] = $this->computeSlaTimer($row);
+                continue;
+            }
             if ($col === 'attachments') {
                 $att = $row->attachments;
                 $out['attachments'] = is_array($att) ? count($att) : 0;
@@ -351,6 +365,49 @@ class CustomerSupportApiController extends Controller
             $out[$col] = $row->$col ?? null;
         }
         return $out;
+    }
+
+    private function computeSlaTimer(CustomerSupportSubmission $row): ?string
+    {
+        $startAt = $row->submitted_at ?? $row->created_at;
+        if (! $startAt) {
+            return null;
+        }
+        if (! empty($row->csr_id)) {
+            return 'Assigned';
+        }
+
+        $rule = SlaRule::cached()->firstWhere('module_key', 'customer_support_requests');
+        $slaMinutes = ($rule && $rule->is_active)
+            ? max(1, (int) $rule->sla_duration_minutes)
+            : 1440;
+        $warningMinutes = ($rule && $rule->is_active)
+            ? max(0, (int) $rule->warning_threshold_minutes)
+            : 120;
+
+        $elapsed = $startAt->diffInMinutes(now());
+        $remaining = $slaMinutes - $elapsed;
+        if ($remaining <= 0) {
+            return 'Overdue ' . $this->formatDuration($remaining * -1);
+        }
+        if ($warningMinutes > 0 && $remaining <= $warningMinutes) {
+            return 'Due in ' . $this->formatDuration($remaining);
+        }
+        return $this->formatDuration($remaining) . ' left';
+    }
+
+    private function formatDuration(int $minutes): string
+    {
+        $minutes = max(0, $minutes);
+        $h = intdiv($minutes, 60);
+        $m = $minutes % 60;
+        if ($h > 0 && $m > 0) {
+            return "{$h}h {$m}m";
+        }
+        if ($h > 0) {
+            return "{$h}h";
+        }
+        return "{$m}m";
     }
 
     public function filters(): JsonResponse

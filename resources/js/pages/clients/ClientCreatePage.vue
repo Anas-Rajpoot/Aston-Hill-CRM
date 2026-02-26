@@ -57,7 +57,10 @@ const originIsAllClients = computed(() => {
   )
 })
 const listingRouteName = computed(() => (originIsAllClients.value ? 'clients.all' : 'clients.index'))
-const goToListingLabel = computed(() => (originIsAllClients.value ? 'Go to All Clients' : 'Go to Clients'))
+const goToListingLabel = computed(() => {
+  if (isProductMode.value) return 'Go to Client Profile'
+  return originIsAllClients.value ? 'Go to All Clients' : 'Go to Clients'
+})
 const backToListingLabel = computed(() => (originIsAllClients.value ? '← Back to All Clients' : '← Back to Clients'))
 
 function resolveListingTarget() {
@@ -357,6 +360,7 @@ onMounted(async () => {
     try {
       const raw = await clientsApi.show(sourceClientId.value)
       const d = raw?.data ?? raw ?? {}
+      form.value.company_name = d.company_name ?? form.value.company_name
       form.value.account_number = d.account_number ?? form.value.account_number
       if (Array.isArray(d.csrs) && d.csrs.length) {
         form.value.csrs = d.csrs.map((c) => ({ user_id: c.user_id || null }))
@@ -506,9 +510,11 @@ function buildPayload() {
 }
 
 function resetForm() {
+  const lockedCompanyName = isProductMode.value ? form.value.company_name : ''
+  const lockedAccountNumber = isProductMode.value ? form.value.account_number : ''
   form.value = {
-    company_name: '',
-    account_number: '',
+    company_name: lockedCompanyName,
+    account_number: lockedAccountNumber,
     status: 'Normal',
     submitted_at: todayYmd(),
     manager_id: null,
@@ -589,10 +595,11 @@ function validateForm() {
     if (!cd.account_manager_name?.trim()) errs.account_manager_name = 'Account Manager Name is required.'
   }
 
-  const hasCsr = f.csrs.some((c) => c.user_id)
-  if (!hasCsr) errs.csr = 'At least one CSR is required.'
-
-  if (!f.status?.trim()) errs.status = 'After Sales Status is required.'
+  if (!isProductMode.value) {
+    const hasCsr = f.csrs.some((c) => c.user_id)
+    if (!hasCsr) errs.csr = 'At least one CSR is required.'
+    if (!f.status?.trim()) errs.status = 'After Sales Status is required.'
+  }
 
   const c0 = f.contacts[0]
   if (!isProductMode.value && c0) {
@@ -654,7 +661,9 @@ async function submit(andAddAnother = false) {
   if (toastRedirectTimer) clearTimeout(toastRedirectTimer)
   try {
     const payload = buildPayload()
-    const raw = await clientsApi.store(payload)
+    const raw = isProductMode.value && sourceClientId.value > 0
+      ? await clientsApi.storeProduct(sourceClientId.value, payload)
+      : await clientsApi.store(payload)
     const inner = raw?.data
     const success =
       raw?.success === true ||
@@ -665,13 +674,17 @@ async function submit(andAddAnother = false) {
       error.value = ''
       await clearDraft()
       if (andAddAnother) {
-        successMessage.value = 'New client is added successfully. You can add another below.'
+        successMessage.value = isProductMode.value
+          ? 'New product is added successfully. You can add another below.'
+          : 'New client is added successfully. You can add another below.'
         resetForm()
         setTimeout(() => { successMessage.value = '' }, 4000)
       } else {
         resultModalType.value = 'success'
-        resultModalMessage.value = 'New client is added successfully'
-        successMessage.value = 'New client is added successfully'
+        resultModalMessage.value = isProductMode.value
+          ? 'New product is added successfully'
+          : 'New client is added successfully'
+        successMessage.value = resultModalMessage.value
         showResultModal.value = true
         startRedirectCountdown(3)
         successRedirectFallbackId = setTimeout(() => {
@@ -833,18 +846,28 @@ function closeToast() {
     </Teleport>
 
     <div class="max-w-full space-y-4">
-      <router-link :to="resolveListingTarget()" class="inline-block text-sm text-blue-600 hover:text-blue-700">
+      <router-link v-if="!isProductMode" :to="resolveListingTarget()" class="inline-block text-sm text-blue-600 hover:text-blue-700">
         {{ backToListingLabel }}
       </router-link>
       <div>
-        <div class="flex flex-wrap items-baseline gap-2">
-          <h1 class="text-2xl font-semibold text-gray-900">{{ isProductMode ? 'Add Product' : 'Add New Client' }}</h1>
-          <span v-if="draftSavedAt" class="text-xs text-gray-400 flex items-center gap-1">
-            <svg v-if="draftSaving" class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="4" class="opacity-25" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-            <svg v-else class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-            Draft saved
-          </span>
-          <Breadcrumbs />
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div class="flex flex-wrap items-baseline gap-2">
+            <h1 class="text-2xl font-semibold text-gray-900">{{ isProductMode ? 'Add Product' : 'Add New Client' }}</h1>
+            <span v-if="draftSavedAt" class="text-xs text-gray-400 flex items-center gap-1">
+              <svg v-if="draftSaving" class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="4" class="opacity-25" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+              <svg v-else class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+              Draft saved
+            </span>
+            <Breadcrumbs />
+          </div>
+          <button
+            v-if="isProductMode"
+            type="button"
+            class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            @click="cancel"
+          >
+            Close
+          </button>
         </div>
         <p class="mt-2 text-sm text-gray-500">
           {{ isProductMode ? 'Create a product/service record for this client.' : 'Create a new client master record.' }}
@@ -1093,7 +1116,10 @@ function closeToast() {
                 v-model="form.company_name"
                 type="text"
                 placeholder="Enter company name"
-                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                :readonly="isProductMode"
+                :class="isProductMode
+                  ? 'mt-1 block w-full rounded border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-700'
+                  : 'mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500'"
               />
             </div>
             <div>
@@ -1218,7 +1244,15 @@ function closeToast() {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Account Number</label>
-              <input v-model="form.account_number" type="text" placeholder="Enter Account Number" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+              <input
+                v-model="form.account_number"
+                type="text"
+                placeholder="Enter Account Number"
+                :readonly="isProductMode"
+                :class="isProductMode
+                  ? 'mt-1 block w-full rounded border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-700'
+                  : 'mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500'"
+              />
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Work Order</label>
@@ -1266,7 +1300,7 @@ function closeToast() {
         </div>
 
         <!-- Account Manager & CSR -->
-        <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div v-if="!isProductMode" class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <div class="flex flex-wrap items-start justify-between gap-4 border-b border-gray-200 pb-3">
             <div class="flex items-start gap-3">
               <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-[#EFE6FF]">
@@ -1313,7 +1347,7 @@ function closeToast() {
         </div>
 
         <!-- Status & Notes -->
-        <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div v-if="!isProductMode" class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <div class="flex items-start gap-3">
             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#D1FAE5]">
               <svg class="h-5 w-5 text-[#34D399]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -1351,7 +1385,7 @@ function closeToast() {
         </div>
 
         <!-- System Metadata (per 1st image: info icon in light gray box, description under heading, then line) -->
-        <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div v-if="!isProductMode" class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <div class="flex items-start gap-3">
             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-200">
               <svg class="h-5 w-5 text-gray-600" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -1381,7 +1415,7 @@ function closeToast() {
           <p class="mb-4 text-sm text-gray-500">All actions will be logged in Audit Logs.</p>
           <div class="flex flex-wrap items-center justify-end gap-3">
             <button type="button" class="inline-flex items-center rounded-lg border border-blue-500 bg-white px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50" :disabled="loading" @click="cancel">
-              Cancel
+              {{ isProductMode ? 'Close' : 'Cancel' }}
             </button>
             <button type="submit" class="inline-flex items-center rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50" :disabled="loading">
               {{ loading ? 'Creating…' : (isProductMode ? 'Create Product' : 'Create Client') }}

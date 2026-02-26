@@ -9,6 +9,7 @@ import ClientsFiltersBar from '@/components/clients/ClientsFiltersBar.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import ClientTable from '@/components/clients/ClientTable.vue'
 import RenewalAlertsModal from '@/components/clients/RenewalAlertsModal.vue'
+import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import RecordHistoryModal from '@/components/RecordHistoryModal.vue'
 import api from '@/lib/axios'
@@ -69,7 +70,22 @@ const renewalAlertsModalItems = ref([])
 
 const accountNumbers = ref([])
 const alertTypes = ref([])
-const filterOptions = ref({ statuses: [], managers: [], team_leaders: [], sales_agents: [] })
+const filterOptions = ref({
+  statuses: [],
+  managers: [],
+  team_leaders: [],
+  sales_agents: [],
+  submission_types: [],
+  service_categories: [],
+  service_types: [],
+  product_types: [],
+  work_order_statuses: [],
+  payment_connections: [],
+  contract_types: [],
+  clawback_chum_options: [],
+  company_categories: [],
+  account_manager_names: [],
+})
 
 const filters = ref({
   company_name: '',
@@ -81,6 +97,31 @@ const filters = ref({
   sales_agent_id: '',
   submitted_from: '',
   submitted_to: '',
+  submission_type: '',
+  service_category: '',
+  service_type: '',
+  product_type: '',
+  product_name: '',
+  wo_number: '',
+  work_order_status: '',
+  payment_connection: '',
+  contract_type: '',
+  clawback_chum: '',
+  company_category: '',
+  trade_license_number: '',
+  establishment_card_number: '',
+  account_manager_name: '',
+  csr_name_1: '',
+  activation_from: '',
+  activation_to: '',
+  completion_from: '',
+  completion_to: '',
+  contract_end_from: '',
+  contract_end_to: '',
+  trade_license_expiry_from: '',
+  trade_license_expiry_to: '',
+  establishment_card_expiry_from: '',
+  establishment_card_expiry_to: '',
 })
 
 function buildParams() {
@@ -101,6 +142,31 @@ function buildParams() {
   if (f.sales_agent_id) p.sales_agent_id = f.sales_agent_id
   if (f.submitted_from) p.submitted_from = f.submitted_from
   if (f.submitted_to) p.submitted_to = f.submitted_to
+  if (f.submission_type) p.submission_type = f.submission_type
+  if (f.service_category) p.service_category = f.service_category
+  if (f.service_type) p.service_type = f.service_type
+  if (f.product_type) p.product_type = f.product_type
+  if (f.product_name) p.product_name = f.product_name
+  if (f.wo_number) p.wo_number = f.wo_number
+  if (f.work_order_status) p.work_order_status = f.work_order_status
+  if (f.payment_connection) p.payment_connection = f.payment_connection
+  if (f.contract_type) p.contract_type = f.contract_type
+  if (f.clawback_chum) p.clawback_chum = f.clawback_chum
+  if (f.company_category) p.company_category = f.company_category
+  if (f.trade_license_number) p.trade_license_number = f.trade_license_number
+  if (f.establishment_card_number) p.establishment_card_number = f.establishment_card_number
+  if (f.account_manager_name) p.account_manager_name = f.account_manager_name
+  if (f.csr_name_1) p.csr_name_1 = f.csr_name_1
+  if (f.activation_from) p.activation_from = f.activation_from
+  if (f.activation_to) p.activation_to = f.activation_to
+  if (f.completion_from) p.completion_from = f.completion_from
+  if (f.completion_to) p.completion_to = f.completion_to
+  if (f.contract_end_from) p.contract_end_from = f.contract_end_from
+  if (f.contract_end_to) p.contract_end_to = f.contract_end_to
+  if (f.trade_license_expiry_from) p.trade_license_expiry_from = f.trade_license_expiry_from
+  if (f.trade_license_expiry_to) p.trade_license_expiry_to = f.trade_license_expiry_to
+  if (f.establishment_card_expiry_from) p.establishment_card_expiry_from = f.establishment_card_expiry_from
+  if (f.establishment_card_expiry_to) p.establishment_card_expiry_to = f.establishment_card_expiry_to
   return p
 }
 
@@ -162,6 +228,228 @@ function escapeCsv(val) {
   const s = String(val)
   if (s.includes(',') || s.includes('"') || s.includes('\n')) return '"' + s.replace(/"/g, '""') + '"'
   return s
+}
+
+function downloadSampleCsv() {
+  const headers = [
+    'company_name',
+    'account_number',
+    'status',
+    'submitted_at',
+    'manager_id',
+    'team_leader_id',
+    'sales_agent_id',
+    'submission_type',
+    'service_category',
+    'service_type',
+    'product_type',
+    'address',
+    'product_name',
+    'mrc',
+    'quantity',
+    'offer',
+    'other',
+    'migration_numbers',
+    'fiber',
+    'order_number',
+    'activity',
+    'wo_number',
+    'work_order_status',
+    'activation_date',
+    'completion_date',
+    'payment_connection',
+    'contract_type',
+    'contract_end_date',
+    'clawback_chum',
+    'remarks',
+    'renewal_alert',
+    'additional_notes',
+    'trade_license_issuing_authority',
+    'company_category',
+    'trade_license_number',
+    'trade_license_expiry_date',
+    'establishment_card_number',
+    'establishment_card_expiry_date',
+    'account_taken_from',
+    'account_mapping_date',
+    'account_transfer_given_to',
+    'account_transfer_given_date',
+    'account_manager_name',
+    'first_bill',
+    'second_bill',
+    'third_bill',
+    'fourth_bill',
+    'additional_comment_1',
+    'additional_comment_2',
+    'csr_name_1',
+    'csr_name_2',
+    'csr_name_3',
+    'contact_1_name',
+    'contact_1_designation',
+    'contact_1_contact_number',
+    'contact_1_alternate_number',
+    'contact_1_email',
+    'contact_1_as_updated_or_not',
+    'contact_1_as_expiry_date',
+    'contact_1_additional_note',
+    'address_1_full_address',
+    'address_1_area',
+    'address_1_building',
+    'address_1_unit',
+    'address_1_emirates',
+  ]
+
+  const validationGuideRow = [
+    'REQUIRED',
+    'REQUIRED',
+    'REQUIRED (Normal/Churn/Clawback)',
+    'OPTIONAL (YYYY-MM-DD)',
+    'OPTIONAL (user id)',
+    'OPTIONAL (user id)',
+    'OPTIONAL (user id)',
+    'OPTIONAL',
+    'OPTIONAL',
+    'OPTIONAL',
+    'OPTIONAL',
+    'OPTIONAL',
+    'OPTIONAL',
+    'OPTIONAL',
+    'OPTIONAL (integer)',
+    'OPTIONAL',
+    'OPTIONAL',
+    'OPTIONAL',
+    'OPTIONAL',
+    'OPTIONAL',
+    'OPTIONAL',
+    'OPTIONAL',
+    'OPTIONAL (YYYY-MM-DD)',
+    'OPTIONAL (YYYY-MM-DD)',
+    'OPTIONAL',
+    'OPTIONAL',
+    'OPTIONAL (YYYY-MM-DD)',
+    'OPTIONAL',
+    'OPTIONAL',
+    'OPTIONAL (integer)',
+    'OPTIONAL',
+    'OPTIONAL',
+    'RECOMMENDED',
+    'REQUIRED',
+    'REQUIRED',
+    'OPTIONAL (YYYY-MM-DD)',
+    'OPTIONAL',
+    'OPTIONAL (YYYY-MM-DD)',
+    'OPTIONAL',
+    'OPTIONAL (YYYY-MM-DD)',
+    'OPTIONAL',
+    'OPTIONAL (YYYY-MM-DD)',
+    'REQUIRED',
+    'REQUIRED (paid/unpaid)',
+    'REQUIRED (paid/unpaid)',
+    'REQUIRED (paid/unpaid)',
+    'REQUIRED (paid/unpaid)',
+    'OPTIONAL',
+    'OPTIONAL',
+    'REQUIRED (at least one CSR)',
+    'OPTIONAL',
+    'OPTIONAL',
+    'REQUIRED',
+    'OPTIONAL',
+    'REQUIRED',
+    'OPTIONAL',
+    'REQUIRED',
+    'OPTIONAL (yes/no)',
+    'OPTIONAL (YYYY-MM-DD)',
+    'OPTIONAL',
+    'OPTIONAL',
+    'OPTIONAL',
+    'OPTIONAL',
+    'OPTIONAL',
+    'OPTIONAL',
+  ]
+
+  const sampleRows = [
+    [
+      'Demo Company LLC',
+      'ACCT-10001',
+      'Normal',
+      '2026-03-01',
+      '',
+      '',
+      '',
+      'New',
+      'Internet',
+      'Fiber',
+      'Business',
+      'Dubai, UAE',
+      'Business Internet Plan',
+      '999',
+      '1',
+      'Promo Offer',
+      'N/A',
+      'MN-001',
+      'No',
+      'ORD-1001',
+      'Initial activation',
+      'WO-12345',
+      'Completed',
+      '2026-03-01',
+      '2026-03-05',
+      'Connected',
+      '12 Months',
+      '2027-03-01',
+      'No',
+      'Imported from sample CSV',
+      '0',
+      'Sample note',
+      'DED',
+      'LLC',
+      'TL-12345',
+      '2027-03-01',
+      'EC-7788',
+      '2027-03-01',
+      'Referral',
+      '2026-03-01',
+      'Operations Team',
+      '2026-03-03',
+      'Imran Siddiqui',
+      'paid',
+      'paid',
+      'paid',
+      'paid',
+      'Additional comment 1',
+      'Additional comment 2',
+      'CSR A',
+      'CSR B',
+      '',
+      'John Doe',
+      'Admin',
+      '971501112233',
+      '971509998877',
+      'john.doe@example.com',
+      'yes',
+      '2027-03-01',
+      'Primary contact',
+      '1205, Example Tower, Business Bay, Dubai',
+      'Business Bay',
+      'Example Tower',
+      '1205',
+      'Dubai',
+    ],
+  ]
+
+  const csvRows = [
+    headers.map(escapeCsv).join(','),
+    validationGuideRow.map(escapeCsv).join(','),
+    ...sampleRows.map((row) => row.map(escapeCsv).join(',')),
+  ]
+
+  const blob = new Blob([csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'clients-import-sample.csv'
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 async function onExport() {
@@ -241,6 +529,16 @@ async function loadFilters() {
       managers: data.managers ?? [],
       team_leaders: data.team_leaders ?? [],
       sales_agents: data.sales_agents ?? [],
+      submission_types: data.submission_types ?? [],
+      service_categories: data.service_categories ?? [],
+      service_types: data.service_types ?? [],
+      product_types: data.product_types ?? [],
+      work_order_statuses: data.work_order_statuses ?? [],
+      payment_connections: data.payment_connections ?? [],
+      contract_types: data.contract_types ?? [],
+      clawback_chum_options: data.clawback_chum_options ?? [],
+      company_categories: data.company_categories ?? [],
+      account_manager_names: data.account_manager_names ?? [],
     }
   } catch { /* silent */ }
 }
@@ -305,6 +603,31 @@ function clearSearch() {
   filters.value.sales_agent_id = ''
   filters.value.submitted_from = ''
   filters.value.submitted_to = ''
+  filters.value.submission_type = ''
+  filters.value.service_category = ''
+  filters.value.service_type = ''
+  filters.value.product_type = ''
+  filters.value.product_name = ''
+  filters.value.wo_number = ''
+  filters.value.work_order_status = ''
+  filters.value.payment_connection = ''
+  filters.value.contract_type = ''
+  filters.value.clawback_chum = ''
+  filters.value.company_category = ''
+  filters.value.trade_license_number = ''
+  filters.value.establishment_card_number = ''
+  filters.value.account_manager_name = ''
+  filters.value.csr_name_1 = ''
+  filters.value.activation_from = ''
+  filters.value.activation_to = ''
+  filters.value.completion_from = ''
+  filters.value.completion_to = ''
+  filters.value.contract_end_from = ''
+  filters.value.contract_end_to = ''
+  filters.value.trade_license_expiry_from = ''
+  filters.value.trade_license_expiry_to = ''
+  filters.value.establishment_card_expiry_from = ''
+  filters.value.establishment_card_expiry_to = ''
   meta.value.current_page = 1
   load()
 }
@@ -320,6 +643,31 @@ function resetFilters() {
     sales_agent_id: '',
     submitted_from: '',
     submitted_to: '',
+    submission_type: '',
+    service_category: '',
+    service_type: '',
+    product_type: '',
+    product_name: '',
+    wo_number: '',
+    work_order_status: '',
+    payment_connection: '',
+    contract_type: '',
+    clawback_chum: '',
+    company_category: '',
+    trade_license_number: '',
+    establishment_card_number: '',
+    account_manager_name: '',
+    csr_name_1: '',
+    activation_from: '',
+    activation_to: '',
+    completion_from: '',
+    completion_to: '',
+    contract_end_from: '',
+    contract_end_to: '',
+    trade_license_expiry_from: '',
+    trade_license_expiry_to: '',
+    establishment_card_expiry_from: '',
+    establishment_card_expiry_to: '',
   }
   meta.value.current_page = 1
   load()
@@ -468,6 +816,17 @@ onMounted(() => {
           <button
             type="button"
             class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            :disabled="loading || importLoading"
+            @click="downloadSampleCsv"
+          >
+            <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v12m0 0l-4-4m4 4l4-4M5 20h14" />
+            </svg>
+            Sample CSV
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             :disabled="loading || exportLoading"
             @click="onExport"
           >
@@ -528,13 +887,45 @@ onMounted(() => {
       </ClientsFiltersBar>
 
       <div v-if="advancedVisible" class="rounded-lg border border-gray-200 bg-white p-4">
-        <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
           <div>
             <label class="mb-1 block text-xs text-gray-600">Status</label>
             <select v-model="filters.status" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
               <option value="">All Statuses</option>
               <option v-for="s in filterOptions.statuses" :key="s.value || s" :value="s.value || s">{{ s.label || s }}</option>
             </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Submission Type</label>
+            <select v-model="filters.submission_type" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <option value="">All Submission Types</option>
+              <option v-for="v in filterOptions.submission_types" :key="v" :value="v">{{ v }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Service Category</label>
+            <select v-model="filters.service_category" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <option value="">All Service Categories</option>
+              <option v-for="v in filterOptions.service_categories" :key="v" :value="v">{{ v }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Service Type</label>
+            <select v-model="filters.service_type" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <option value="">All Service Types</option>
+              <option v-for="v in filterOptions.service_types" :key="v" :value="v">{{ v }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Product Type</label>
+            <select v-model="filters.product_type" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <option value="">All Product Types</option>
+              <option v-for="v in filterOptions.product_types" :key="v" :value="v">{{ v }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Product Name</label>
+            <input v-model="filters.product_name" type="text" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" placeholder="Product name" />
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Manager</label>
@@ -558,12 +949,110 @@ onMounted(() => {
             </select>
           </div>
           <div>
+            <label class="mb-1 block text-xs text-gray-600">Work Order</label>
+            <input v-model="filters.wo_number" type="text" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" placeholder="WO number" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Work Order Status</label>
+            <select v-model="filters.work_order_status" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <option value="">All Work Order Statuses</option>
+              <option v-for="v in filterOptions.work_order_statuses" :key="v" :value="v">{{ v }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Payment Connection</label>
+            <select v-model="filters.payment_connection" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <option value="">All Payment Connection</option>
+              <option v-for="v in filterOptions.payment_connections" :key="v" :value="v">{{ v }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Contract Type</label>
+            <select v-model="filters.contract_type" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <option value="">All Contract Types</option>
+              <option v-for="v in filterOptions.contract_types" :key="v" :value="v">{{ v }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Clawback / Chum</label>
+            <select v-model="filters.clawback_chum" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <option value="">All</option>
+              <option v-for="v in filterOptions.clawback_chum_options" :key="v" :value="v">{{ v }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Company Category</label>
+            <select v-model="filters.company_category" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <option value="">All Company Categories</option>
+              <option v-for="v in filterOptions.company_categories" :key="v" :value="v">{{ v }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Trade License Number</label>
+            <input v-model="filters.trade_license_number" type="text" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" placeholder="Trade license number" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Establishment Card Number</label>
+            <input v-model="filters.establishment_card_number" type="text" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" placeholder="Establishment card number" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Account Manager Name</label>
+            <select v-model="filters.account_manager_name" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <option value="">All Account Managers</option>
+              <option v-for="v in filterOptions.account_manager_names" :key="v" :value="v">{{ v }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">CSR Name</label>
+            <input v-model="filters.csr_name_1" type="text" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" placeholder="CSR Name" />
+          </div>
+          <div>
             <label class="mb-1 block text-xs text-gray-600">Submitted From</label>
-            <input v-model="filters.submitted_from" type="date" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+            <DateInputDdMmYyyy v-model="filters.submitted_from" placeholder="dd-Mon-yyyy" />
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Submitted To</label>
-            <input v-model="filters.submitted_to" type="date" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+            <DateInputDdMmYyyy v-model="filters.submitted_to" placeholder="dd-Mon-yyyy" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Activation From</label>
+            <DateInputDdMmYyyy v-model="filters.activation_from" placeholder="dd-Mon-yyyy" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Activation To</label>
+            <DateInputDdMmYyyy v-model="filters.activation_to" placeholder="dd-Mon-yyyy" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Completion From</label>
+            <DateInputDdMmYyyy v-model="filters.completion_from" placeholder="dd-Mon-yyyy" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Completion To</label>
+            <DateInputDdMmYyyy v-model="filters.completion_to" placeholder="dd-Mon-yyyy" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Contract End From</label>
+            <DateInputDdMmYyyy v-model="filters.contract_end_from" placeholder="dd-Mon-yyyy" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Contract End To</label>
+            <DateInputDdMmYyyy v-model="filters.contract_end_to" placeholder="dd-Mon-yyyy" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Trade License Expiry From</label>
+            <DateInputDdMmYyyy v-model="filters.trade_license_expiry_from" placeholder="dd-Mon-yyyy" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Trade License Expiry To</label>
+            <DateInputDdMmYyyy v-model="filters.trade_license_expiry_to" placeholder="dd-Mon-yyyy" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Establishment Card Expiry From</label>
+            <DateInputDdMmYyyy v-model="filters.establishment_card_expiry_from" placeholder="dd-Mon-yyyy" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-600">Establishment Card Expiry To</label>
+            <DateInputDdMmYyyy v-model="filters.establishment_card_expiry_to" placeholder="dd-Mon-yyyy" />
           </div>
         </div>
         <div class="mt-3 flex items-center gap-2">

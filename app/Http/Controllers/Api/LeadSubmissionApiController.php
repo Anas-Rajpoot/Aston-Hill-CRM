@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\LeadSubmission;
 use App\Models\LeadSubmissionAudit;
+use App\Models\SlaRule;
 use App\Models\ServiceCategory;
 use App\Models\ServiceType;
 use App\Models\SystemAuditLog;
@@ -259,6 +260,8 @@ class LeadSubmissionApiController extends Controller
             $alias = $sort . '_users';
             $query->leftJoin("users as {$alias}", "lead_submissions.{$col}", '=', "{$alias}.id")
                 ->orderBy("{$alias}.name", $order);
+        } elseif ($sort === 'sla_timer') {
+            $query->orderBy('lead_submissions.submitted_at', $order);
         } else {
             $query->orderBy('lead_submissions.' . $sort, $order);
         }
@@ -286,6 +289,8 @@ class LeadSubmissionApiController extends Controller
         }
         if (in_array('sla_timer', $columns, true)) {
             $base[] = 'submitted_at';
+            $base[] = 'created_at';
+            $base[] = 'executive_id';
         }
         foreach (['sales_agent', 'team_leader', 'manager'] as $rel) {
             if (in_array($rel, $columns, true)) {
@@ -348,28 +353,49 @@ class LeadSubmissionApiController extends Controller
         return $row;
     }
 
-    /**
-     * SLA Timer for lead submission: due = submitted_at + SLA days. Returns "Xd left", "Xh left", or "Overdue Xd".
-     */
     private function computeLeadSlaTimer(LeadSubmission $lead): ?string
     {
-        $submittedAt = $lead->submitted_at ?? $lead->created_at;
-        if (! $submittedAt) {
+        $startAt = $lead->submitted_at ?? $lead->created_at;
+        if (! $startAt) {
             return null;
         }
-        $slaDays = (int) config('modules.lead_submissions.sla_days', 7);
-        $due = $submittedAt->copy()->addDays($slaDays)->endOfDay();
-        $now = now();
-        if ($due->isPast()) {
-            $daysOverdue = (int) $now->diffInDays($due);
-            return 'Overdue ' . $daysOverdue . 'd';
+        if (! empty($lead->executive_id)) {
+            return 'Assigned';
         }
-        $totalHours = (int) $now->diffInHours($due, false);
-        $totalDays = (int) floor($totalHours / 24);
-        if ($totalDays >= 1) {
-            return $totalDays . 'd left';
+
+        $rule = SlaRule::cached()->firstWhere('module_key', 'lead_submissions');
+        $fallbackMinutes = ((int) config('modules.lead_submissions.sla_days', 7)) * 24 * 60;
+        $slaMinutes = ($rule && $rule->is_active)
+            ? max(1, (int) $rule->sla_duration_minutes)
+            : max(1, $fallbackMinutes);
+        $warningMinutes = ($rule && $rule->is_active)
+            ? max(0, (int) $rule->warning_threshold_minutes)
+            : 0;
+
+        $elapsed = $startAt->diffInMinutes(now());
+        if ($elapsed <= $slaMinutes) {
+            return $this->formatDuration($elapsed) . ' passed of ' . $this->formatDuration($slaMinutes);
         }
-        return $totalHours . 'h left';
+
+        $overdue = $elapsed - $slaMinutes;
+        if ($warningMinutes > 0) {
+            return 'Overdue by ' . $this->formatDuration($overdue) . ' (' . $this->formatDuration($elapsed) . ' passed)';
+        }
+        return 'Overdue by ' . $this->formatDuration($overdue);
+    }
+
+    private function formatDuration(int $minutes): string
+    {
+        $minutes = max(0, $minutes);
+        $h = intdiv($minutes, 60);
+        $m = $minutes % 60;
+        if ($h > 0 && $m > 0) {
+            return "{$h}h {$m}m";
+        }
+        if ($h > 0) {
+            return "{$h}h";
+        }
+        return "{$m}m";
     }
 
     /**

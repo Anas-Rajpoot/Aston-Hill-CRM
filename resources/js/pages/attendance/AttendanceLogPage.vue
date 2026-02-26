@@ -1,6 +1,6 @@
 <script setup>
 /**
- * Attendance Log – table from login logs: Employee Name, ID, Role, Department, Login Date/Time, Logout Time, Duration, Status.
+ * Attendance Log – table from login logs: Employee Name, ID, Role, Login Date/Time, Logout Time, Duration, Status.
  * Filters, Advanced Filters, Customize Columns, sortable columns, Export. Force Logout for active/missing sessions.
  * Permissions: view_attendance_logs, force_logout, export_attendance_data.
  */
@@ -8,7 +8,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useTablePageSize } from '@/composables/useTablePageSize'
 import attendanceLogApi from '@/services/attendanceLogApi'
 import { useAuthStore } from '@/stores/auth'
-import { toDdMmYyyy, fromDdMmYyyy, formatDateDdMmYyyy } from '@/lib/dateFormat'
+import { toDdMmYyyy, fromDdMmYyyy, toDdMonYyyyDash } from '@/lib/dateFormat'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import FiltersBar from '@/components/attendance/FiltersBar.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
@@ -25,10 +25,10 @@ const canForceLogout = computed(() => isSuperAdmin.value || permissions.value.in
 const canExport = computed(() => isSuperAdmin.value || permissions.value.includes('export_attendance_data'))
 
 const ATTENDANCE_COLUMNS = [
+  { key: 'sr', label: 'SR' },
   { key: 'employee_name', label: 'Employee Name' },
   { key: 'employee_id', label: 'Employee ID' },
   { key: 'role', label: 'Role' },
-  { key: 'department', label: 'Department' },
   { key: 'login_date', label: 'Login Date' },
   { key: 'login_time', label: 'Login Time' },
   { key: 'logout_time', label: 'Logout Time' },
@@ -36,7 +36,7 @@ const ATTENDANCE_COLUMNS = [
   { key: 'status', label: 'Status' },
 ]
 
-const SORTABLE_COLUMNS = ['employee_name', 'employee_id', 'role', 'department', 'login_date', 'login_time', 'status']
+const SORTABLE_COLUMNS = ['employee_name', 'employee_id', 'role', 'login_date', 'login_time', 'status']
 /** Map visible column key to API sort param (backend uses login_at for date ordering). */
 function sortKey(col) {
   if (col === 'login_date' || col === 'login_time') return 'login_at'
@@ -188,12 +188,20 @@ function columnLabel(key) {
   return ATTENDANCE_COLUMNS.find((c) => c.key === key)?.label ?? key
 }
 
-/** Display API login_date (e.g. "06 Feb 2025") as dd-mm-yyyy */
+/** Display API login_date as dd-MMM-yyyy (e.g. 02-Feb-2027). */
 function formatLoginDateDisplay(str) {
   if (!str) return '—'
+  if (typeof str === 'string') {
+    const ymd = str.trim().slice(0, 10)
+    const formatted = toDdMonYyyyDash(ymd)
+    if (formatted) return formatted
+  }
   const d = new Date(str)
   if (Number.isNaN(d.getTime())) return str
-  return formatDateDdMmYyyy(d)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return toDdMonYyyyDash(`${y}-${m}-${day}`) || '—'
 }
 
 const fromDisplay = computed({
@@ -257,7 +265,7 @@ async function onExport() {
     const params = { ...buildParams(), page: 1, per_page: 5000 }
     const { data } = await attendanceLogApi.index(params)
     const rows = data.data ?? []
-    const headers = ['Employee Name', 'Employee ID', 'Role', 'Department', 'Login Date', 'Login Time', 'Logout Time', 'Total Duration', 'Status']
+    const headers = ['Employee Name', 'Employee ID', 'Role', 'Login Date', 'Login Time', 'Logout Time', 'Total Duration', 'Status']
     const escape = (v) => (v == null ? '' : String(v).includes(',') || String(v).includes('"') ? '"' + String(v).replace(/"/g, '""') + '"' : v)
     const lines = [headers.map(escape).join(',')]
     for (const r of rows) {
@@ -265,7 +273,6 @@ async function onExport() {
         r.employee_name,
         r.employee_id,
         r.role,
-        r.department,
         formatLoginDateDisplay(r.login_date),
         r.login_time,
         r.logout_time || 'Not logged out',
@@ -391,7 +398,7 @@ onMounted(() => {
           <template #after-reset>
             <button
               type="button"
-              class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-sm text-gray-700 hover:bg-gray-50"
               @click="advancedVisible = !advancedVisible"
             >
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
@@ -399,7 +406,7 @@ onMounted(() => {
             </button>
             <button
               type="button"
-              class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              class="inline-flex shrink-0 items-center whitespace-nowrap rounded border border-gray-300 bg-white px-2.5 py-2 text-sm text-gray-700 hover:bg-gray-50"
               @click="columnModalVisible = true"
             >
               Customize Columns
@@ -506,13 +513,16 @@ onMounted(() => {
                   <td :colspan="visibleColumns.length + (canForceLogout ? 1 : 0)" class="px-4 py-12 text-center text-sm text-gray-500">No attendance records found.</td>
                 </tr>
                 <tr
-                  v-for="row in logs"
+                  v-for="(row, rowIndex) in logs"
                   :key="row.id"
                   class="border-b border-black bg-white hover:bg-gray-50/50"
                   :class="rowClass(row)"
                 >
                   <td v-for="col in visibleColumns" :key="col" class="whitespace-nowrap border-black px-4 py-3 text-sm text-gray-900">
-                    <template v-if="col === 'login_date'">
+                    <template v-if="col === 'sr'">
+                      {{ (meta.current_page - 1) * meta.per_page + rowIndex + 1 }}
+                    </template>
+                    <template v-else-if="col === 'login_date'">
                       {{ formatLoginDateDisplay(row.login_date) }}
                     </template>
                     <template v-else-if="col === 'logout_time'">

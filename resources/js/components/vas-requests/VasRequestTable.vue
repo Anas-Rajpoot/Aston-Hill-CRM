@@ -67,6 +67,7 @@ const columnLabels = {
   team_leader: 'Team Leader',
   sales_agent: 'Sales Agent',
   executive: 'Back Office Executive',
+  sla_timer: 'SLA Timer',
   status: 'Status',
   approved_at: 'Completion Date',
   rejected_at: 'Rejected Date',
@@ -461,6 +462,21 @@ function formatStatus(status) {
               <span :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', statusBadgeClass(row.status)]">
                 {{ formatStatus(row.status) }}
               </span>
+            </template>
+            <template v-else-if="col === 'sla_timer'">
+              <span
+                v-if="row.sla_timer"
+                :class="[
+                  'inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium',
+                  String(row.sla_timer).startsWith('Overdue') ? 'bg-red-100 text-red-700'
+                    : String(row.sla_timer) === 'Assigned' ? 'bg-green-100 text-green-700'
+                      : String(row.sla_timer).startsWith('Due in') ? 'bg-orange-100 text-orange-700'
+                        : 'bg-blue-100 text-blue-700',
+                ]"
+              >
+                {{ row.sla_timer }}
+              </span>
+              <span v-else class="text-gray-400">—</span>
             </template>
             <template v-else-if="canInlineEdit && isDropdownColumn(col)">
               <span
