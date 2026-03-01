@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SendUserPasswordResetLink;
 use App\Http\Resources\UserResource;
 use App\Models\SystemAuditLog;
 use App\Models\TeamRoleMapping;
@@ -11,11 +12,12 @@ use App\Models\UserAudit;
 use App\Models\UserColumnPreference;
 use App\Models\UserLoginLog;
 use App\Notifications\UserApprovalStatusNotification;
+use App\Rules\MeetsPasswordPolicy;
+use App\Support\RbacPermission;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
@@ -32,11 +34,31 @@ class UserController extends Controller
         'manager', 'team_leader',
     ];
 
+    public function __construct()
+    {
+        $this->middleware(['auth:sanctum']);
+        $this->middleware(function (Request $request, $next) {
+            [$action, $legacy] = $this->resolveActionForMethod((string) ($request->route()?->getActionMethod() ?? ''));
+            $this->authorizeAction($request, $action, $legacy);
+
+            return $next($request);
+        });
+    }
+
+    private function cachedRolesList()
+    {
+        return Cache::remember('users.roles_list_v1', 600, function () {
+            return Role::where('guard_name', 'web')
+                ->orderBy('name')
+                ->get(['id', 'name', 'description']);
+        });
+    }
+
     public function index(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'page' => ['sometimes', 'integer', 'min:1'],
-            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:200'],
             'sort' => ['sometimes', 'string', Rule::in(array_merge(self::ALLOWED_COLUMNS, ['manager_id', 'team_leader_id']))],
             'order' => ['sometimes', 'string', Rule::in(['asc', 'desc'])],
             'columns' => ['sometimes', 'array'],
@@ -79,14 +101,20 @@ class UserController extends Controller
                 ->keyBy('user_id');
         }
 
-        $roles = Role::where('guard_name', 'web')->orderBy('name')->get(['id', 'name', 'description']);
+        $roles = $this->cachedRolesList();
         $statsQuery = User::query()
             ->when(! $requestUser->hasRole('superadmin'), fn ($q) => $q->whereDoesntHave('roles', fn ($r) => $r->where('name', 'superadmin')));
+        $statsRow = $statsQuery
+            ->selectRaw('COUNT(*) as total')
+            ->selectRaw("SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as active")
+            ->selectRaw("SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as inactive")
+            ->selectRaw("SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending")
+            ->first();
         $stats = [
-            'total' => (clone $statsQuery)->count(),
-            'active' => (clone $statsQuery)->where('status', 'approved')->count(),
-            'inactive' => (clone $statsQuery)->where('status', 'rejected')->count(),
-            'pending' => (clone $statsQuery)->where('status', 'pending')->count(),
+            'total' => (int) ($statsRow->total ?? 0),
+            'active' => (int) ($statsRow->active ?? 0),
+            'inactive' => (int) ($statsRow->inactive ?? 0),
+            'pending' => (int) ($statsRow->pending ?? 0),
         ];
 
         $items = $users->map(function ($u) use ($lastLogins, $columns) {
@@ -206,7 +234,10 @@ class UserController extends Controller
         $user = $request->user();
         $baseQuery = User::query()
             ->when(! $user->hasRole('superadmin'), fn ($q) => $q->whereDoesntHave('roles', fn ($r) => $r->where('name', 'superadmin')));
-        $roles = Role::where('guard_name', 'web')->orderBy('name')->get(['id', 'name'])->map(fn ($r) => ['value' => $r->name, 'label' => $r->name])->all();
+        $roles = $this->cachedRolesList()
+            ->map(fn ($r) => ['value' => $r->name, 'label' => $r->name])
+            ->values()
+            ->all();
 
         return response()->json([
             'statuses' => [
@@ -260,8 +291,8 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'string', 'confirmed', new \App\Rules\MeetsPasswordPolicy],
-            'phone' => ['nullable', 'string', 'max:20', 'regex:/^[+]?[\d\s()\-]+$/'],
+            'password' => ['required', 'string', 'confirmed', new MeetsPasswordPolicy],
+            'phone' => ['nullable', 'string', 'regex:/^971\d{9}$/'],
             'country' => ['nullable', 'string', 'max:100'],
             'roles' => ['nullable', 'array'],
             'roles.*' => ['exists:roles,id'],
@@ -360,22 +391,32 @@ class UserController extends Controller
 
         $user->load('roles:id,name');
         $lastLog = UserLoginLog::where('user_id', $user->id)->orderByDesc('login_at')->first();
-        $user->last_login_at = $lastLog?->login_at ? (is_object($lastLog->login_at) ? $lastLog->login_at->format('c') : (string) $lastLog->login_at) : null;
-        $roles = Role::where('guard_name', 'web')->orderBy('name')->get(['id', 'name', 'description']);
+        $lastLoginAt = $lastLog?->login_at ? (is_object($lastLog->login_at) ? $lastLog->login_at->format('c') : (string) $lastLog->login_at) : null;
+        $userData = $user->toArray();
+        $userData['last_login_at'] = $lastLoginAt;
+        $roles = $this->cachedRolesList();
         $mappings = TeamRoleMapping::allMappings();
         $managerRoleId = TeamRoleMapping::roleIdFor('manager');
         $teamLeaderRoleId = TeamRoleMapping::roleIdFor('team_leader');
         $salesAgentRoleId = TeamRoleMapping::roleIdFor('sales_agent');
-        $managerRole = $managerRoleId ? Role::find($managerRoleId) : null;
-        $teamLeaderRole = $teamLeaderRoleId ? Role::find($teamLeaderRoleId) : null;
-        $managers = $managerRole
-            ? User::role($managerRole)->where('status', 'approved')->where('id', '!=', $user->id)->orderBy('name')->get(['id', 'name', 'email'])
+        $managers = $managerRoleId
+            ? User::query()
+                ->where('status', 'approved')
+                ->where('id', '!=', $user->id)
+                ->whereHas('roles', fn ($q) => $q->where('id', $managerRoleId))
+                ->orderBy('name')
+                ->get(['id', 'name', 'email'])
             : collect();
-        $teamLeaders = $teamLeaderRole
-            ? User::role($teamLeaderRole)->where('status', 'approved')->where('id', '!=', $user->id)->orderBy('name')->get(['id', 'name', 'email', 'manager_id'])
+        $teamLeaders = $teamLeaderRoleId
+            ? User::query()
+                ->where('status', 'approved')
+                ->where('id', '!=', $user->id)
+                ->whereHas('roles', fn ($q) => $q->where('id', $teamLeaderRoleId))
+                ->orderBy('name')
+                ->get(['id', 'name', 'email', 'manager_id'])
             : collect();
         return response()->json([
-            'user' => $user,
+            'user' => $userData,
             'roles' => $roles,
             'managers' => $managers,
             'team_leaders' => $teamLeaders,
@@ -428,15 +469,23 @@ class UserController extends Controller
             $managerRoleId = TeamRoleMapping::roleIdFor('manager');
             $teamLeaderRoleId = TeamRoleMapping::roleIdFor('team_leader');
             $salesAgentRoleId = TeamRoleMapping::roleIdFor('sales_agent');
-            $managerRole = $managerRoleId ? Role::find($managerRoleId) : null;
-            $teamLeaderRole = $teamLeaderRoleId ? Role::find($teamLeaderRoleId) : null;
-            $managers = $managerRole
-                ? User::role($managerRole)->where('status', 'approved')->where('id', '!=', $user->id)->orderBy('name')->get(['id', 'name', 'email'])
+            $managers = $managerRoleId
+                ? User::query()
+                    ->where('status', 'approved')
+                    ->where('id', '!=', $user->id)
+                    ->whereHas('roles', fn ($q) => $q->where('id', $managerRoleId))
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'email'])
                 : collect();
-            $teamLeaders = $teamLeaderRole
-                ? User::role($teamLeaderRole)->where('status', 'approved')->where('id', '!=', $user->id)->orderBy('name')->get(['id', 'name', 'email', 'manager_id'])
+            $teamLeaders = $teamLeaderRoleId
+                ? User::query()
+                    ->where('status', 'approved')
+                    ->where('id', '!=', $user->id)
+                    ->whereHas('roles', fn ($q) => $q->where('id', $teamLeaderRoleId))
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'email', 'manager_id'])
                 : collect();
-            $roles = Role::where('guard_name', 'web')->orderBy('name')->get(['id', 'name', 'description']);
+            $roles = $this->cachedRolesList();
             return [
                 'roles' => $roles,
                 'managers' => $managers,
@@ -460,11 +509,11 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,' . $user->id],
-            'phone' => ['nullable', 'string', 'max:20', 'regex:/^[+]?[\d\s()\-]+$/'],
+            'phone' => ['nullable', 'string', 'regex:/^971\d{9}$/'],
             'country' => ['nullable', 'string', 'max:100'],
             'cnic_number' => ['nullable', 'string', 'max:20'],
             'additional_notes' => ['nullable', 'string', 'max:2000'],
-            'password' => ['nullable', 'confirmed', 'min:8'],
+            'password' => ['nullable', 'string', 'confirmed', new MeetsPasswordPolicy],
             'roles' => ['nullable', 'array'],
             'roles.*' => ['exists:roles,id'],
             'manager_id' => ['nullable', 'integer', 'exists:users,id'],
@@ -486,30 +535,6 @@ class UserController extends Controller
                 ['roles' => ['required', 'array', 'min:1']],
                 ['roles.required' => 'Please select at least one role.']
             );
-            $mappings = TeamRoleMapping::allMappings();
-            $teamLeaderRoleId = TeamRoleMapping::roleIdFor('team_leader');
-            $salesAgentRoleId = TeamRoleMapping::roleIdFor('sales_agent');
-            $selectedRoleIds = array_map('intval', $validated['roles'] ?? []);
-            $managerLabel = $mappings['manager']['label'] ?? 'Manager';
-            $teamLeaderLabel = $mappings['team_leader']['label'] ?? 'Team Leader';
-            if ($teamLeaderRoleId !== null && in_array($teamLeaderRoleId, $selectedRoleIds, true)) {
-                $request->validate(
-                    ['manager_id' => ['required', 'integer', 'exists:users,id']],
-                    ['manager_id.required' => "Please select a {$managerLabel} when assigning this role."]
-                );
-            }
-            if ($salesAgentRoleId !== null && in_array($salesAgentRoleId, $selectedRoleIds, true)) {
-                $request->validate(
-                    [
-                        'manager_id' => ['required', 'integer', 'exists:users,id'],
-                        'team_leader_id' => ['required', 'integer', 'exists:users,id'],
-                    ],
-                    [
-                        'manager_id.required' => "Please select a {$managerLabel}.",
-                        'team_leader_id.required' => "Please select a {$teamLeaderLabel}.",
-                    ]
-                );
-            }
             $user->status = 'approved';
             $user->approved_by = auth()->id();
             $user->approved_at = now();
@@ -537,11 +562,27 @@ class UserController extends Controller
             $selectedRoleIds = $roles->pluck('id')->map(fn ($id) => (int) $id)->toArray();
             $hasTeamLeader = $teamLeaderRoleId !== null && in_array($teamLeaderRoleId, $selectedRoleIds, true);
             $hasSalesAgent = $salesAgentRoleId !== null && in_array($salesAgentRoleId, $selectedRoleIds, true);
-            if ($hasSalesAgent && !empty($validated['manager_id']) && !empty($validated['team_leader_id'])) {
-                $user->manager_id = (int) $validated['manager_id'];
-                $user->team_leader_id = (int) $validated['team_leader_id'];
-            } elseif ($hasTeamLeader && !empty($validated['manager_id'])) {
-                $user->manager_id = (int) $validated['manager_id'];
+            $managerProvided = array_key_exists('manager_id', $validated);
+            $teamLeaderProvided = array_key_exists('team_leader_id', $validated);
+            if ($hasSalesAgent) {
+                // Keep existing hierarchy when fields are omitted from UI.
+                if ($managerProvided && !empty($validated['manager_id'])) {
+                    $user->manager_id = (int) $validated['manager_id'];
+                } elseif ($managerProvided) {
+                    $user->manager_id = null;
+                }
+                if ($teamLeaderProvided && !empty($validated['team_leader_id'])) {
+                    $user->team_leader_id = (int) $validated['team_leader_id'];
+                } elseif ($teamLeaderProvided) {
+                    $user->team_leader_id = null;
+                }
+            } elseif ($hasTeamLeader) {
+                if ($managerProvided && !empty($validated['manager_id'])) {
+                    $user->manager_id = (int) $validated['manager_id'];
+                } elseif ($managerProvided) {
+                    $user->manager_id = null;
+                }
+                // Team leaders should not have a team leader parent.
                 $user->team_leader_id = null;
             } else {
                 $user->manager_id = null;
@@ -620,6 +661,9 @@ class UserController extends Controller
                 $request->validate(['value' => ['required', 'string', 'max:255']]);
             }
             if (in_array($field, ['phone', 'country', 'employee_number', 'department', 'extension'], true)) {
+                if ($field === 'phone' && $value !== '' && $value !== null) {
+                    $request->validate(['value' => ['nullable', 'string', 'regex:/^971\d{9}$/']]);
+                }
                 $user->$field = $value === '' || $value === null ? null : (string) $value;
             } else {
                 $user->$field = $value;
@@ -680,12 +724,38 @@ class UserController extends Controller
             }
         }
 
-        $status = Password::sendResetLink(['email' => $user->email]);
-
-        if ($status !== Password::RESET_LINK_SENT) {
-            return response()->json(['message' => __($status)], 422);
+        // Keep API response fast; send email in background.
+        if (config('queue.default') === 'sync') {
+            // Even on sync queue, defer work until after response.
+            SendUserPasswordResetLink::dispatchAfterResponse($user->email);
+        } else {
+            SendUserPasswordResetLink::dispatch($user->email)->onQueue('emails');
         }
 
-        return response()->json(['message' => __('Password reset link sent. They will receive an email with instructions to set a new password.')]);
+        return response()->json(['message' => __('Password reset request queued. The user will receive an email with instructions shortly.')]);
+    }
+
+    /**
+     * @return array{0:string,1:array<int,string>}
+     */
+    private function resolveActionForMethod(string $method): array
+    {
+        return match ($method) {
+            'store' => ['create', ['users.create', 'users.add']],
+            'update', 'patch', 'bulkActivate', 'bulkDeactivate', 'sendPasswordReset' => ['update', ['users.edit', 'users.update']],
+            'destroy' => ['delete', ['users.delete']],
+            default => ['read', ['users.list', 'users.view']],
+        };
+    }
+
+    /**
+     * @param  array<int,string>  $legacy
+     */
+    private function authorizeAction(Request $request, string $action, array $legacy = []): void
+    {
+        $user = $request->user();
+        if (! $user || ! RbacPermission::can($user, 'users', $action, $legacy)) {
+            abort(403, 'Unauthorized');
+        }
     }
 }

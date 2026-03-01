@@ -19,6 +19,10 @@ class EnsureTwoFactorVerified
      */
     public function handle(Request $request, Closure $next): Response
     {
+        if ((bool) config('auth.disable_google_authentication', false)) {
+            return $next($request);
+        }
+
         $user = $request->user();
 
         if (! $user) {

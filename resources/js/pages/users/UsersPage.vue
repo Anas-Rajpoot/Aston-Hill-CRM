@@ -3,7 +3,7 @@
  * Users listing: Customize columns + Advance filters; two quick filters (User, Status);
  * sortable datatable; editable cells (input/dropdown) with Save/Cancel; permissions (super admin only by self, else users.edit); history/audit.
  */
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import usersApi from '@/services/usersApi'
@@ -11,9 +11,11 @@ import api from '@/lib/axios'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import Toast from '@/components/Toast.vue'
-import { toDdMmYyyy, toDdMonYyyy } from '@/lib/dateFormat'
+import { toDdMmYyyy, toDdMonYyyy, toDdMonYyyyDash } from '@/lib/dateFormat'
 import TruncatedText from '@/components/TruncatedText.vue'
 import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
+import { useProgressiveHydration } from '@/composables/useProgressiveHydration'
+import { useDeferredQuery } from '@/composables/useDeferredQuery'
 
 const router = useRouter()
 const route = useRoute()
@@ -23,6 +25,9 @@ const showToast = ref(false)
 const toastType = ref('success')
 const toastMsg  = ref('')
 function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
+
+const statsHydration = useProgressiveHydration({ strategy: 'visible-or-idle', idleTimeout: 900 })
+const advancedFiltersHydration = useProgressiveHydration({ strategy: 'visible-or-idle', idleTimeout: 1200 })
 
 const TABLE_MODULE = 'users'
 const perPageOptions = ref([10, 20, 25, 50, 100])
@@ -94,6 +99,39 @@ const addUserFieldErrors = ref({})
 const addUserSuccess = ref(false)
 const addUserCountries = ref([])
 const addUserRolesDropdownRef = ref(null)
+const editUserModalOpen = ref(false)
+const editUserId = ref(null)
+const editUserLoading = ref(false)
+const editUserSaving = ref(false)
+const editUserError = ref('')
+const editUserFieldErrors = ref({})
+const editUserRolesDropdownOpen = ref(false)
+const editUserRolesDropdownRef = ref(null)
+const editUserCountries = ref([])
+const editUserForm = ref({
+  name: '',
+  email: '',
+  phone: '',
+  country: '',
+  department: '',
+  status: 'approved',
+  roles: [],
+  password: '',
+  password_confirmation: '',
+})
+const passwordPolicy = ref({
+  min_length: 8,
+  require_uppercase: true,
+  require_number: true,
+  require_special: true,
+})
+const passwordPolicyHint = computed(() => {
+  const parts = [`Minimum ${passwordPolicy.value.min_length || 8} characters`]
+  if (passwordPolicy.value.require_uppercase) parts.push('1 uppercase letter')
+  if (passwordPolicy.value.require_number) parts.push('1 number')
+  if (passwordPolicy.value.require_special) parts.push('1 special character')
+  return parts.join(', ')
+})
 const ADD_USER_DEPARTMENTS = [
   { value: 'sales', label: 'Sales' },
   { value: 'backoffice', label: 'Back Office' },
@@ -158,11 +196,23 @@ const formatDate = (d) => {
 }
 const formatDateTime = (d) => {
   if (!d) return '-'
+  const raw = typeof d === 'string' ? d.trim() : ''
+
+  // Prefer parsing from the original string to avoid timezone/date shifts.
+  if (raw) {
+    const ymd = raw.match(/(\d{4}-\d{2}-\d{2})/)?.[1] || ''
+    const time = raw.match(/\b(\d{2}:\d{2})(?::\d{2})?\b/)?.[1] || ''
+    const datePart = ymd ? toDdMonYyyyDash(ymd) : ''
+    if (datePart && time) return `${datePart} ${time}`
+    if (datePart) return datePart
+  }
+
   const date = new Date(d)
   if (Number.isNaN(date.getTime())) return '-'
-  const dateStr = date.toISOString().slice(0, 10)
-  const timeStr = date.toTimeString().slice(0, 5)
-  return `${toDdMmYyyy(dateStr) || ''} ${timeStr}`.trim() || '-'
+  const ymd = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  const datePart = toDdMonYyyyDash(ymd)
+  const timePart = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  return `${datePart || '-'} ${timePart}`.trim()
 }
 /** Format for detail modal: "15 Jan 2024, 14:30" */
 const formatDetailDateTime = (iso) => {
@@ -225,6 +275,35 @@ async function loadColumns() {
     allColumns.value = data.all_columns ?? []
     visibleColumns.value = data.visible_columns ?? visibleColumns.value
   } catch {}
+}
+
+async function loadPasswordPolicy() {
+  try {
+    const { data } = await api.get('/security-settings')
+    const policy = data?.data ?? {}
+    const min = Number(policy.min_length)
+    passwordPolicy.value = {
+      min_length: Number.isFinite(min) && min > 0 ? min : 8,
+      require_uppercase: Boolean(policy.require_uppercase ?? true),
+      require_number: Boolean(policy.require_number ?? true),
+      require_special: Boolean(policy.require_special ?? true),
+    }
+  } catch {
+    passwordPolicy.value = {
+      min_length: 8,
+      require_uppercase: true,
+      require_number: true,
+      require_special: true,
+    }
+  }
+}
+
+const deferredSecondaryBootstrap = useDeferredQuery(async () => {
+  await Promise.all([loadFilters(), loadPasswordPolicy()])
+})
+
+function hydrateSecondaryData() {
+  deferredSecondaryBootstrap.run().catch(() => {})
 }
 
 function applyFilters() {
@@ -437,8 +516,9 @@ function closeUserDetail() {
 
 function fromDetailEditUser() {
   const u = detailUser.value
-  if (u?.id) router.push(`/users/${u.id}/edit`)
+  if (!u?.id) return
   closeUserDetail()
+  openEditUserModal(u)
 }
 
 function fromDetailResetPassword() {
@@ -466,6 +546,7 @@ const assignableRolesForAdd = computed(() => {
 })
 
 async function openAddUserModal() {
+  hydrateSecondaryData()
   addUserError.value = ''
   addUserFieldErrors.value = {}
   addUserSuccess.value = false
@@ -481,6 +562,11 @@ async function openAddUserModal() {
     password_confirmation: '',
   }
   addUserModalOpen.value = true
+  await nextTick()
+  // Guard against browser autofill when opening modal.
+  addUserForm.value.email = ''
+  addUserForm.value.password = ''
+  addUserForm.value.password_confirmation = ''
   if (addUserCountries.value.length === 0) {
     try {
       const { data } = await api.get('/countries')
@@ -510,6 +596,170 @@ function hasAddUserRole(roleId) {
   return addUserForm.value.roles.includes(roleId)
 }
 
+function getRoleIdsFromUserRoles(userRoles) {
+  if (!Array.isArray(userRoles)) return []
+  const roleLookup = new Map((roles.value ?? []).map((r) => [String(r?.name ?? '').toLowerCase(), r?.id]))
+  return userRoles
+    .map((role) => {
+      if (role && typeof role === 'object') return Number(role.id) || null
+      const key = String(role ?? '').toLowerCase()
+      return roleLookup.get(key) || null
+    })
+    .filter((id) => Number.isFinite(id))
+}
+
+function validatePhoneForUser(value) {
+  if (!value) return null
+  if (!/^\d{12}$/.test(value)) return 'Must be exactly 12 digits with no spaces (e.g. 971XXXXXXXXX).'
+  if (!value.startsWith('971')) return 'Must start with 971.'
+  return null
+}
+
+function onAddUserPhoneInput(event) {
+  addUserForm.value.phone = String(event?.target?.value ?? '').replace(/\D/g, '').slice(0, 12)
+  if (addUserFieldErrors.value.phone) {
+    addUserFieldErrors.value = { ...addUserFieldErrors.value, phone: '' }
+  }
+}
+
+function onEditUserPhoneInput(event) {
+  editUserForm.value.phone = String(event?.target?.value ?? '').replace(/\D/g, '').slice(0, 12)
+  if (editUserFieldErrors.value.phone) {
+    editUserFieldErrors.value = { ...editUserFieldErrors.value, phone: '' }
+  }
+}
+
+async function openEditUserModal(user) {
+  hydrateSecondaryData()
+  if (!user?.id || !canEditRow(user)) return
+  closeActionMenu()
+  editUserId.value = user.id
+  editUserLoading.value = true
+  editUserError.value = ''
+  editUserFieldErrors.value = {}
+  editUserRolesDropdownOpen.value = false
+  editUserModalOpen.value = true
+  try {
+    const [{ data }, countriesResponse] = await Promise.all([
+      usersApi.show(user.id),
+      editUserCountries.value.length ? Promise.resolve(null) : api.get('/countries'),
+    ])
+    if (countriesResponse) {
+      const countryData = countriesResponse?.data
+      editUserCountries.value = Array.isArray(countryData) ? countryData : (countryData?.data ?? [])
+    }
+    const userData = data?.user
+    if (!userData) throw new Error('missing user data')
+    editUserForm.value = {
+      name: userData.name ?? '',
+      email: userData.email ?? '',
+      phone: userData.phone ?? '',
+      country: userData.country ?? '',
+      department: userData.department ?? '',
+      status: userData.status ?? 'approved',
+      roles: getRoleIdsFromUserRoles(userData.roles),
+      password: '',
+      password_confirmation: '',
+    }
+  } catch (e) {
+    editUserError.value = e?.response?.data?.message || 'Failed to load user details.'
+  } finally {
+    editUserLoading.value = false
+  }
+}
+
+function closeEditUserModal() {
+  if (editUserSaving.value) return
+  editUserModalOpen.value = false
+  editUserId.value = null
+  editUserError.value = ''
+  editUserFieldErrors.value = {}
+  editUserRolesDropdownOpen.value = false
+}
+
+function toggleEditUserRole(role) {
+  const id = role.id
+  const idx = editUserForm.value.roles.indexOf(id)
+  if (idx === -1) editUserForm.value.roles = [...editUserForm.value.roles, id]
+  else editUserForm.value.roles = editUserForm.value.roles.filter((r) => r !== id)
+}
+
+function hasEditUserRole(roleId) {
+  return editUserForm.value.roles.includes(roleId)
+}
+
+async function submitEditUser() {
+  if (!editUserId.value) return
+  editUserError.value = ''
+  editUserFieldErrors.value = {}
+  const f = editUserForm.value
+  const errs = {}
+  if (!f.name?.trim()) errs.name = 'Full name is required.'
+  if (!f.email?.trim()) errs.email = 'Email address is required.'
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim())) errs.email = 'Please enter a valid email address.'
+  if (f.phone?.trim()) {
+    const phoneErr = validatePhoneForUser(f.phone.trim())
+    if (phoneErr) errs.phone = phoneErr
+  }
+  if (f.password?.length) {
+    const minLength = Number(passwordPolicy.value.min_length) || 8
+    if (f.password.length < minLength) errs.password = `Password must be at least ${minLength} characters.`
+    if (!errs.password && passwordPolicy.value.require_uppercase && !/[A-Z]/.test(f.password)) {
+      errs.password = 'Password must contain at least one uppercase letter.'
+    }
+    if (!errs.password && passwordPolicy.value.require_number && !/[0-9]/.test(f.password)) {
+      errs.password = 'Password must contain at least one number.'
+    }
+    if (!errs.password && passwordPolicy.value.require_special && !/[^A-Za-z0-9]/.test(f.password)) {
+      errs.password = 'Password must contain at least one special character.'
+    }
+    if (f.password !== f.password_confirmation) {
+      errs.password_confirmation = 'Password and confirmation do not match.'
+    }
+  }
+  if (Object.keys(errs).length) {
+    editUserFieldErrors.value = errs
+    editUserError.value = 'Please fix the highlighted errors below.'
+    return
+  }
+
+  editUserSaving.value = true
+  try {
+    const payload = {
+      name: f.name.trim(),
+      email: f.email.trim(),
+      phone: f.phone?.trim() || null,
+      country: f.country || null,
+      department: f.department || null,
+      status: f.status || 'approved',
+      roles: f.roles,
+    }
+    if (f.password?.length) {
+      payload.password = f.password
+      payload.password_confirmation = f.password_confirmation
+    }
+    await usersApi.update(editUserId.value, payload)
+    closeEditUserModal()
+    toast('success', 'User updated successfully.')
+    await load()
+  } catch (e) {
+    const msg = e?.response?.data?.message || 'Failed to update user.'
+    const serverErrs = e?.response?.data?.errors
+    if (serverErrs) {
+      const mapped = {}
+      for (const [key, msgs] of Object.entries(serverErrs)) {
+        mapped[key] = Array.isArray(msgs) ? msgs[0] : msgs
+      }
+      editUserFieldErrors.value = mapped
+      editUserError.value = msg
+    } else {
+      editUserError.value = msg
+    }
+  } finally {
+    editUserSaving.value = false
+  }
+}
+
 async function submitAddUser() {
   addUserError.value = ''
   addUserFieldErrors.value = {}
@@ -520,15 +770,27 @@ async function submitAddUser() {
 
   if (!f.name?.trim()) errs.name = 'Full name is required.'
   if (!f.email?.trim()) errs.email = 'Email address is required.'
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim())) errs.email = 'Please enter a valid email address.'
   if (!f.phone?.trim()) {
     errs.phone = 'Phone number is required.'
-  } else if (!/^[+]?[\d\s()-]+$/.test(f.phone.trim())) {
-    errs.phone = 'Phone number must contain only digits, +, spaces, ( ) or -.'
+  } else {
+    const phoneErr = validatePhoneForUser(f.phone.trim())
+    if (phoneErr) errs.phone = phoneErr
   }
   if (!f.country) errs.country = 'Please select a country.'
   if (!f.department) errs.department = 'Please select a department.'
   if (!(f.roles?.length)) errs.roles = 'Please assign at least one role.'
-  if (!f.password || f.password.length < 8) errs.password = 'Password must be at least 8 characters.'
+  const minLength = Number(passwordPolicy.value.min_length) || 8
+  if (!f.password || f.password.length < minLength) errs.password = `Password must be at least ${minLength} characters.`
+  if (!errs.password && passwordPolicy.value.require_uppercase && !/[A-Z]/.test(f.password || '')) {
+    errs.password = 'Password must contain at least one uppercase letter.'
+  }
+  if (!errs.password && passwordPolicy.value.require_number && !/[0-9]/.test(f.password || '')) {
+    errs.password = 'Password must contain at least one number.'
+  }
+  if (!errs.password && passwordPolicy.value.require_special && !/[^A-Za-z0-9]/.test(f.password || '')) {
+    errs.password = 'Password must contain at least one special character.'
+  }
   if (f.password && f.password !== f.password_confirmation) errs.password_confirmation = 'Password and confirmation do not match.'
 
   if (Object.keys(errs).length) {
@@ -545,7 +807,7 @@ async function submitAddUser() {
       phone: f.phone.trim(),
       country: f.country,
       department: f.department,
-      status: 'approved',
+      status: f.status || 'approved',
       roles: f.roles,
       password: f.password,
       password_confirmation: f.password_confirmation,
@@ -644,7 +906,7 @@ const editableFields = ['name', 'email', 'phone', 'country', 'status', 'employee
 
 onMounted(() => {
   loadTablePreference().then(() => {
-    loadFilters()
+    hydrateSecondaryData()
     loadColumns().then(() => load())
   })
   document.addEventListener('click', handleClickOutside)
@@ -660,6 +922,12 @@ onUnmounted(() => {
 
 watch(() => pagination.value.current_page, load)
 watch(() => route.path, (path) => { if (path === '/users') load() })
+watch(filtersVisible, (visible) => {
+  if (visible) {
+    advancedFiltersHydration.hydrateNow()
+    hydrateSecondaryData()
+  }
+})
 
 function closeAddUserRolesDropdownOnOutsideClick() {
   if (!addUserRolesDropdownOpen.value) return
@@ -674,6 +942,21 @@ function closeAddUserRolesDropdownOnOutsideClick() {
 }
 watch(addUserRolesDropdownOpen, (open) => {
   if (open) closeAddUserRolesDropdownOnOutsideClick()
+})
+
+function closeEditUserRolesDropdownOnOutsideClick() {
+  if (!editUserRolesDropdownOpen.value) return
+  const el = editUserRolesDropdownRef.value
+  const handler = (e) => {
+    if (el && !el.contains(e.target)) {
+      editUserRolesDropdownOpen.value = false
+      document.removeEventListener('click', handler)
+    }
+  }
+  setTimeout(() => document.addEventListener('click', handler), 0)
+}
+watch(editUserRolesDropdownOpen, (open) => {
+  if (open) closeEditUserRolesDropdownOnOutsideClick()
 })
 </script>
 
@@ -720,23 +1003,31 @@ watch(addUserRolesDropdownOpen, (open) => {
 
     <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />
 
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm border-t-4 border-t-blue-500">
-        <p class="text-xs font-medium text-gray-500">Total Users</p>
-        <p class="mt-1 text-2xl font-bold text-blue-600">{{ stats.total }}</p>
-      </div>
-      <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm border-t-4 border-t-green-500">
-        <p class="text-xs font-medium text-gray-500">Active Users</p>
-        <p class="mt-1 text-2xl font-bold text-green-600">{{ stats.active }}</p>
-      </div>
-      <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm border-t-4 border-t-red-500">
-        <p class="text-xs font-medium text-gray-500">Inactive Users</p>
-        <p class="mt-1 text-2xl font-bold text-red-600">{{ stats.inactive }}</p>
-      </div>
-      <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm border-t-4 border-t-gray-400">
-        <p class="text-xs font-medium text-gray-500">Pending Approval</p>
-        <p class="mt-1 text-2xl font-bold text-gray-600">{{ stats.pending }}</p>
-      </div>
+    <div ref="statsHydration.targetRef" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <template v-if="statsHydration.isHydrated">
+        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm border-t-4 border-t-blue-500">
+          <p class="text-xs font-medium text-gray-500">Total Users</p>
+          <p class="mt-1 text-2xl font-bold text-blue-600">{{ stats.total }}</p>
+        </div>
+        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm border-t-4 border-t-green-500">
+          <p class="text-xs font-medium text-gray-500">Active Users</p>
+          <p class="mt-1 text-2xl font-bold text-green-600">{{ stats.active }}</p>
+        </div>
+        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm border-t-4 border-t-red-500">
+          <p class="text-xs font-medium text-gray-500">Inactive Users</p>
+          <p class="mt-1 text-2xl font-bold text-red-600">{{ stats.inactive }}</p>
+        </div>
+        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm border-t-4 border-t-gray-400">
+          <p class="text-xs font-medium text-gray-500">Pending Approval</p>
+          <p class="mt-1 text-2xl font-bold text-gray-600">{{ stats.pending }}</p>
+        </div>
+      </template>
+      <template v-else>
+        <div v-for="n in 4" :key="`stats-skeleton-${n}`" class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div class="h-3 w-20 animate-pulse rounded bg-gray-200" />
+          <div class="mt-2 h-7 w-12 animate-pulse rounded bg-gray-100" />
+        </div>
+      </template>
     </div>
 
     <!-- General toolbar + advanced filters + customize columns -->
@@ -761,7 +1052,7 @@ watch(addUserRolesDropdownOpen, (open) => {
         <button
           type="button"
           class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-          @click="filtersVisible = !filtersVisible"
+          @click="filtersVisible = !filtersVisible; advancedFiltersHydration.hydrateNow(); hydrateSecondaryData()"
         >
           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
           Advanced Filters
@@ -777,47 +1068,57 @@ watch(addUserRolesDropdownOpen, (open) => {
     </div>
 
     <!-- Advanced filters panel: all supported users filters. -->
-    <div v-show="filtersVisible" class="rounded-lg border border-gray-200 bg-white p-4">
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">User Name</label>
-          <input v-model="filters.name" type="text" placeholder="Search by user name" class="w-full rounded-lg border-gray-300 text-sm" />
+    <div v-show="filtersVisible" ref="advancedFiltersHydration.targetRef" class="rounded-lg border border-gray-200 bg-white p-4">
+      <template v-if="advancedFiltersHydration.isHydrated">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">User Name</label>
+            <input v-model="filters.name" type="text" placeholder="Search by user name" class="w-full rounded-lg border-gray-300 text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Email</label>
+            <input v-model="filters.email" type="text" placeholder="Search by email" class="w-full rounded-lg border-gray-300 text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Role</label>
+            <select v-model="filters.role" class="w-full rounded-lg border-gray-300 text-sm">
+              <option value="">All roles</option>
+              <option v-for="r in filterOptions.roles" :key="r.value" :value="r.value">{{ r.label }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Country</label>
+            <input v-model="filters.country" type="text" placeholder="Search by country" class="w-full rounded-lg border-gray-300 text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Status</label>
+            <select v-model="filters.status" class="w-full rounded-lg border-gray-300 bg-white text-sm">
+              <option value="">All status</option>
+              <option v-for="s in filterOptions.statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Created From</label>
+            <DateInputDdMmYyyy v-model="filters.created_from" placeholder="dd-Mon-yyyy" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Created To</label>
+            <DateInputDdMmYyyy v-model="filters.created_to" placeholder="dd-Mon-yyyy" />
+          </div>
         </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">Email</label>
-          <input v-model="filters.email" type="text" placeholder="Search by email" class="w-full rounded-lg border-gray-300 text-sm" />
+        <div class="mt-3 flex gap-2">
+          <button type="button" @click="applyFilters" class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">Apply Filters</button>
+          <button type="button" @click="resetFilters" class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Reset</button>
         </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">Role</label>
-          <select v-model="filters.role" class="w-full rounded-lg border-gray-300 text-sm">
-            <option value="">All roles</option>
-            <option v-for="r in filterOptions.roles" :key="r.value" :value="r.value">{{ r.label }}</option>
-          </select>
+      </template>
+      <template v-else>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div v-for="n in 6" :key="`user-advanced-skeleton-${n}`" class="space-y-2">
+            <div class="h-3 w-20 animate-pulse rounded bg-gray-200" />
+            <div class="h-9 w-full animate-pulse rounded bg-gray-100" />
+          </div>
         </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">Country</label>
-          <input v-model="filters.country" type="text" placeholder="Search by country" class="w-full rounded-lg border-gray-300 text-sm" />
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">Status</label>
-          <select v-model="filters.status" class="w-full rounded-lg border-gray-300 bg-white text-sm">
-            <option value="">All status</option>
-            <option v-for="s in filterOptions.statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">Created From</label>
-          <DateInputDdMmYyyy v-model="filters.created_from" placeholder="dd-Mon-yyyy" />
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">Created To</label>
-          <DateInputDdMmYyyy v-model="filters.created_to" placeholder="dd-Mon-yyyy" />
-        </div>
-      </div>
-      <div class="mt-3 flex gap-2">
-        <button type="button" @click="applyFilters" class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">Apply Filters</button>
-        <button type="button" @click="resetFilters" class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Reset</button>
-      </div>
+      </template>
     </div>
 
     <!-- Table: sortable + editable -->
@@ -924,7 +1225,7 @@ watch(addUserRolesDropdownOpen, (open) => {
                       {{ statusLabel(user.status) }}
                     </span>
                   </span>
-                  <span v-else class="text-sm text-gray-700">{{ displayCellValue(user, col) }}</span>
+                  <span v-else class="text-sm text-gray-700" :class="{ 'whitespace-nowrap': col === 'last_login_at' }">{{ displayCellValue(user, col) }}</span>
                 </template>
               </td>
               <td class="px-4 py-3 text-right align-top">
@@ -956,17 +1257,17 @@ watch(addUserRolesDropdownOpen, (open) => {
                       </svg>
                       View Details
                     </button>
-                    <router-link
+                    <button
                       v-if="canEditRow(user)"
-                      :to="`/users/${user.id}/edit`"
-                      class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                      @click="closeActionMenu"
+                      type="button"
+                      class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      @click="openEditUserModal(user)"
                     >
                       <svg class="h-4 w-4 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                       </svg>
-                      Edit User
-                    </router-link>
+                      Edit Employee
+                    </button>
                     <button
                       v-if="canEditRow(user) && !(user.roles || []).includes('superadmin')"
                       type="button"
@@ -1064,7 +1365,9 @@ watch(addUserRolesDropdownOpen, (open) => {
                 <p class="text-sm text-gray-500 mt-0.5">Create a new user account and assign roles</p>
               </div>
             </div>
-            <form @submit.prevent="submitAddUser" class="flex-1 min-h-0 flex flex-col overflow-hidden">
+            <form autocomplete="off" @submit.prevent="submitAddUser" class="flex-1 min-h-0 flex flex-col overflow-hidden">
+              <input type="text" name="fake_username" autocomplete="username" class="hidden" tabindex="-1" aria-hidden="true" />
+              <input type="password" name="fake_password" autocomplete="current-password" class="hidden" tabindex="-1" aria-hidden="true" />
               <div class="overflow-y-auto flex-1 min-h-0 p-6 space-y-6 relative">
               <!-- Loading overlay -->
               <div v-if="addUserLoading" class="absolute inset-0 z-20 flex items-center justify-center bg-white/80 rounded-b-xl">
@@ -1114,6 +1417,14 @@ watch(addUserRolesDropdownOpen, (open) => {
                       id="add-user-email"
                       v-model="addUserForm.email"
                       type="email"
+                      name="add_user_email"
+                      autocomplete="off"
+                      autocapitalize="off"
+                      autocorrect="off"
+                      spellcheck="false"
+                      data-lpignore="true"
+                      data-1p-ignore="true"
+                      data-bwignore="true"
                       class="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                       :class="addUserFieldErrors.email ? 'border-red-400 bg-red-50' : 'border-gray-300'"
                       placeholder="Enter email address"
@@ -1126,9 +1437,11 @@ watch(addUserRolesDropdownOpen, (open) => {
                       id="add-user-phone"
                       v-model="addUserForm.phone"
                       type="text"
+                      maxlength="12"
                       class="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                       :class="addUserFieldErrors.phone ? 'border-red-400 bg-red-50' : 'border-gray-300'"
-                      placeholder="Enter phone number (digits only)"
+                      placeholder="971XXXXXXXXX"
+                      @input="onAddUserPhoneInput"
                     />
                     <p v-if="addUserFieldErrors.phone" class="mt-1 text-xs text-red-600">{{ addUserFieldErrors.phone }}</p>
                   </div>
@@ -1164,9 +1477,10 @@ watch(addUserRolesDropdownOpen, (open) => {
                       id="add-user-status"
                       v-model="addUserForm.status"
                       class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                      disabled
                     >
                       <option value="approved">Active</option>
+                      <option value="rejected">In Active</option>
+                      <option value="pending">Pending Approval</option>
                     </select>
                   </div>
                 </div>
@@ -1242,12 +1556,20 @@ watch(addUserRolesDropdownOpen, (open) => {
                       id="add-user-password"
                       v-model="addUserForm.password"
                       type="password"
+                      name="add_user_password"
+                      autocomplete="new-password"
+                      autocapitalize="off"
+                      autocorrect="off"
+                      spellcheck="false"
+                      data-lpignore="true"
+                      data-1p-ignore="true"
+                      data-bwignore="true"
                       class="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                       :class="addUserFieldErrors.password ? 'border-red-400 bg-red-50' : 'border-gray-300'"
                       placeholder="Enter password"
                     />
                     <p v-if="addUserFieldErrors.password" class="mt-1 text-xs text-red-600">{{ addUserFieldErrors.password }}</p>
-                    <p v-else class="mt-1 text-xs text-gray-500">Minimum 8 characters</p>
+                    <p v-else class="mt-1 text-xs text-gray-500">{{ passwordPolicyHint }}</p>
                   </div>
                   <div>
                     <label for="add-user-password-confirm" class="block text-sm font-medium text-gray-700 mb-1">Confirm Password <span class="text-red-500">*</span></label>
@@ -1255,6 +1577,14 @@ watch(addUserRolesDropdownOpen, (open) => {
                       id="add-user-password-confirm"
                       v-model="addUserForm.password_confirmation"
                       type="password"
+                      name="add_user_password_confirmation"
+                      autocomplete="new-password"
+                      autocapitalize="off"
+                      autocorrect="off"
+                      spellcheck="false"
+                      data-lpignore="true"
+                      data-1p-ignore="true"
+                      data-bwignore="true"
                       class="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                       :class="addUserFieldErrors.password_confirmation ? 'border-red-400 bg-red-50' : 'border-gray-300'"
                       placeholder="Confirm password"
@@ -1290,6 +1620,133 @@ watch(addUserRolesDropdownOpen, (open) => {
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
                   {{ addUserLoading ? 'Creating...' : addUserSuccess ? 'Created!' : 'Create User' }}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- Edit User modal -->
+    <Teleport to="body">
+      <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition ease-in duration-150" leave-from-class="opacity-100" leave-to-class="opacity-0">
+        <div
+          v-if="editUserModalOpen"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/30 backdrop-blur-sm p-4 overflow-y-auto"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="edit-user-modal-title"
+          @click.self="closeEditUserModal"
+        >
+          <div class="w-full max-w-2xl my-8 max-h-[90vh] flex flex-col rounded-xl bg-white shadow-xl border border-gray-200 overflow-hidden">
+            <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <h2 id="edit-user-modal-title" class="text-xl font-bold text-gray-900">Edit Employee</h2>
+              <button type="button" class="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors" :disabled="editUserSaving" @click="closeEditUserModal">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <form autocomplete="off" class="flex-1 min-h-0 flex flex-col overflow-hidden" @submit.prevent="submitEditUser">
+              <div class="overflow-y-auto flex-1 min-h-0 p-6 space-y-5">
+                <div v-if="editUserLoading" class="flex justify-center py-10">
+                  <svg class="h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                </div>
+                <template v-else>
+                  <p v-if="editUserError" class="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{{ editUserError }}</p>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Full Name <span class="text-red-500">*</span></label>
+                      <input v-model="editUserForm.name" type="text" class="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500" :class="editUserFieldErrors.name ? 'border-red-400 bg-red-50' : 'border-gray-300'" />
+                      <p v-if="editUserFieldErrors.name" class="mt-1 text-xs text-red-600">{{ editUserFieldErrors.name }}</p>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Email Address <span class="text-red-500">*</span></label>
+                      <input v-model="editUserForm.email" type="email" autocomplete="off" class="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500" :class="editUserFieldErrors.email ? 'border-red-400 bg-red-50' : 'border-gray-300'" />
+                      <p v-if="editUserFieldErrors.email" class="mt-1 text-xs text-red-600">{{ editUserFieldErrors.email }}</p>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number <span class="text-red-500">*</span></label>
+                      <input v-model="editUserForm.phone" type="text" maxlength="12" placeholder="971XXXXXXXXX" class="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500" :class="editUserFieldErrors.phone ? 'border-red-400 bg-red-50' : 'border-gray-300'" @input="onEditUserPhoneInput" />
+                      <p v-if="editUserFieldErrors.phone" class="mt-1 text-xs text-red-600">{{ editUserFieldErrors.phone }}</p>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Country <span class="text-red-500">*</span></label>
+                      <select v-model="editUserForm.country" class="w-full rounded-lg border bg-white px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500" :class="editUserFieldErrors.country ? 'border-red-400 bg-red-50' : 'border-gray-300'">
+                        <option value="">Select country</option>
+                        <option v-for="c in editUserCountries" :key="c.id" :value="c.code || c.name">{{ c.name }}</option>
+                      </select>
+                      <p v-if="editUserFieldErrors.country" class="mt-1 text-xs text-red-600">{{ editUserFieldErrors.country }}</p>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Department <span class="text-red-500">*</span></label>
+                      <select v-model="editUserForm.department" class="w-full rounded-lg border bg-white px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500" :class="editUserFieldErrors.department ? 'border-red-400 bg-red-50' : 'border-gray-300'">
+                        <option value="">Select department</option>
+                        <option v-for="d in ADD_USER_DEPARTMENTS" :key="d.value" :value="d.value">{{ d.label }}</option>
+                      </select>
+                      <p v-if="editUserFieldErrors.department" class="mt-1 text-xs text-red-600">{{ editUserFieldErrors.department }}</p>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Account Status <span class="text-red-500">*</span></label>
+                      <select v-model="editUserForm.status" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                        <option value="approved">Active</option>
+                        <option value="rejected">Inactive</option>
+                        <option value="pending">Pending Approval</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div ref="editUserRolesDropdownRef" class="relative">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Assigned Roles <span class="text-red-500">*</span></label>
+                    <button type="button" class="w-full rounded-lg border bg-white px-3 py-2 text-left text-sm flex items-center justify-between focus:border-blue-500 focus:ring-1 focus:ring-blue-500" :class="editUserFieldErrors.roles ? 'border-red-400 bg-red-50' : 'border-gray-300'" @click="editUserRolesDropdownOpen = !editUserRolesDropdownOpen">
+                      <span :class="editUserForm.roles.length ? 'text-gray-900' : 'text-gray-500'" class="truncate">
+                        {{ editUserForm.roles.length ? assignableRolesForAdd.filter(r => editUserForm.roles.includes(r.id)).map(r => formatRoleNameForAdd(r.name)).join(', ') : 'Select roles to assign' }}
+                      </span>
+                      <svg class="h-4 w-4 text-gray-400 shrink-0 transition-transform" :class="editUserRolesDropdownOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    <p v-if="editUserFieldErrors.roles" class="mt-1 text-xs text-red-600">{{ editUserFieldErrors.roles }}</p>
+                    <div v-show="editUserRolesDropdownOpen" class="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
+                      <div class="max-h-48 overflow-y-auto">
+                        <button v-for="r in assignableRolesForAdd" :key="r.id" type="button" class="w-full px-3 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-2" :class="hasEditUserRole(r.id) ? 'bg-blue-50 text-blue-800' : 'text-gray-700'" @click="toggleEditUserRole(r)">
+                          <span class="w-4 h-4 flex items-center justify-center shrink-0 rounded border" :class="hasEditUserRole(r.id) ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-300'">
+                            <svg v-if="hasEditUserRole(r.id)" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
+                          </span>
+                          {{ formatRoleNameForAdd(r.name) }}
+                        </button>
+                      </div>
+                      <div class="border-t border-gray-200 px-3 py-2 flex justify-end">
+                        <button type="button" class="rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-blue-700" @click="editUserRolesDropdownOpen = false">Done</button>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+                      <input v-model="editUserForm.password" type="password" name="edit_user_new_password_modal" autocomplete="new-password" class="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500" :class="editUserFieldErrors.password ? 'border-red-400 bg-red-50' : 'border-gray-300'" placeholder="Leave blank to keep current password" />
+                      <p v-if="editUserFieldErrors.password" class="mt-1 text-xs text-red-600">{{ editUserFieldErrors.password }}</p>
+                      <p v-else class="mt-1 text-xs text-gray-500">{{ passwordPolicyHint }}</p>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
+                      <input v-model="editUserForm.password_confirmation" type="password" name="edit_user_new_password_confirmation_modal" autocomplete="new-password" class="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500" :class="editUserFieldErrors.password_confirmation ? 'border-red-400 bg-red-50' : 'border-gray-300'" />
+                      <p v-if="editUserFieldErrors.password_confirmation" class="mt-1 text-xs text-red-600">{{ editUserFieldErrors.password_confirmation }}</p>
+                    </div>
+                  </div>
+                </template>
+              </div>
+              <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
+                <button type="button" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50" :disabled="editUserSaving" @click="closeEditUserModal">Cancel</button>
+                <button type="submit" :disabled="editUserSaving || editUserLoading" class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70">
+                  <svg v-if="editUserSaving" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  {{ editUserSaving ? 'Saving...' : 'Update User' }}
                 </button>
               </div>
             </form>
@@ -1467,19 +1924,7 @@ watch(addUserRolesDropdownOpen, (open) => {
                       <dd class="font-medium text-gray-900">{{ detailUser.name ?? '—' }}</dd>
                     </div>
                     <div>
-                      <dt class="text-gray-500">Status</dt>
-                      <dd class="font-medium text-gray-900">{{ statusLabel(detailUser.status) }}</dd>
-                    </div>
-                    <div>
-                      <dt class="text-gray-500">Last Login</dt>
-                      <dd class="text-gray-700">{{ formatDetailDateTime(detailUser.last_login_at) }}</dd>
-                    </div>
-                    <div>
-                      <dt class="text-gray-500">Created Date</dt>
-                      <dd class="text-gray-700">{{ formatDetailDateTime(detailUser.created_at) }}</dd>
-                    </div>
-                    <div class="col-span-2">
-                      <dt class="text-gray-500">Email</dt>
+                      <dt class="text-gray-500">Email Address</dt>
                       <dd class="text-gray-700">{{ detailUser.email ?? '—' }}</dd>
                     </div>
                     <div>
@@ -1490,25 +1935,36 @@ watch(addUserRolesDropdownOpen, (open) => {
                       <dt class="text-gray-500">Country</dt>
                       <dd class="text-gray-700">{{ detailUser.country ?? '—' }}</dd>
                     </div>
+                    <div>
+                      <dt class="text-gray-500">Department</dt>
+                      <dd class="text-gray-700">{{ detailUser.department ?? '—' }}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-gray-500">Account Status</dt>
+                      <dd class="font-medium text-gray-900">{{ statusLabel(detailUser.status) }}</dd>
+                    </div>
+                    <div class="col-span-2">
+                      <dt class="text-gray-500">Assigned Roles</dt>
+                      <dd class="mt-1 flex flex-wrap gap-2">
+                        <span
+                          v-for="role in (detailUser.roles || []).map(r => typeof r === 'string' ? r : r.name)"
+                          :key="role"
+                          class="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800"
+                        >
+                          {{ role }}
+                        </span>
+                        <span v-if="!(detailUser.roles || []).length" class="text-sm text-gray-500">No roles assigned</span>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt class="text-gray-500">Last Login</dt>
+                      <dd class="text-gray-700">{{ formatDetailDateTime(detailUser.last_login_at) }}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-gray-500">Created Date</dt>
+                      <dd class="text-gray-700">{{ formatDetailDateTime(detailUser.created_at) }}</dd>
+                    </div>
                   </dl>
-                </div>
-                <div class="border-t border-gray-100 px-6 py-4">
-                  <h3 class="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900">
-                    <svg class="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                    </svg>
-                    Assigned Roles
-                  </h3>
-                  <div class="flex flex-wrap gap-2">
-                    <span
-                      v-for="role in (detailUser.roles || []).map(r => typeof r === 'string' ? r : r.name)"
-                      :key="role"
-                      class="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800"
-                    >
-                      {{ role }}
-                    </span>
-                    <span v-if="!(detailUser.roles || []).length" class="text-sm text-gray-500">No roles assigned</span>
-                  </div>
                 </div>
               </div>
               <div class="flex flex-wrap items-center gap-3 border-t border-gray-200 px-6 py-4">
@@ -1521,7 +1977,7 @@ watch(addUserRolesDropdownOpen, (open) => {
                   <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                   </svg>
-                  Edit User
+                  Edit Employee
                 </button>
                 <button
                   v-if="canEditRow(detailUser)"

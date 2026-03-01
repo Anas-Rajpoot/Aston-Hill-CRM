@@ -101,7 +101,7 @@ class VasRequestSubmission extends Model
         }
 
         // Back office sees ALL VAS request submissions (assigned + unassigned)
-        if ($user->hasRole('back_office')) {
+        if ($user->hasRole('back_office') || $user->hasRole('backoffice') || $user->hasRole('back_office_executive')) {
             return $q;
         }
 

@@ -46,6 +46,8 @@ const isSuperAdmin = computed(() => {
   return Array.isArray(r) && r.some((x) => (typeof x === 'string' ? x === 'superadmin' : x?.name === 'superadmin'))
 })
 const canEdit = computed(() => isSuperAdmin.value || permissions.value.includes('expense_tracker.edit') || permissions.value.includes('expense_tracker.update'))
+const loggedInUserId = computed(() => auth.user?.id ?? null)
+const addedByDisplayName = computed(() => auth.user?.name || '—')
 
 const vatOptions = computed(() => (filterOptions.value.vat_percent_options?.length ? filterOptions.value.vat_percent_options : VAT_OPTIONS_DEFAULT))
 
@@ -108,13 +110,13 @@ function populateForm() {
     expense_date_display: rawDate ? toDdMonYyyyDash(rawDate) : '',
     product_category: e.product_category ?? '',
     invoice_number: e.invoice_number ?? '',
-    user_id: e.user_id ?? null,
+    user_id: loggedInUserId.value,
     vat_percent: e.vat_percent != null ? Number(e.vat_percent) : 0,
     amount_without_vat: e.amount_without_vat != null ? String(e.amount_without_vat) : '',
     product_description: e.product_description ?? '',
     comment: e.comment ?? '',
   }
-  form.value.user_id = e.user_id ?? null
+  form.value.user_id = loggedInUserId.value
 }
 
 async function loadExpense() {
@@ -191,8 +193,8 @@ async function submit() {
       vat_percent: Number(form.value.vat_percent) || 0,
       amount_without_vat: amount,
     }
-    if (isSuperAdmin.value && filterOptions.value.added_by_users?.length && form.value.user_id != null && form.value.user_id !== '') {
-      payload.user_id = form.value.user_id
+    if (loggedInUserId.value != null && loggedInUserId.value !== '') {
+      payload.user_id = loggedInUserId.value
     }
     await expensesApi.update(expenseId.value, payload)
     await loadExpense()
@@ -225,7 +227,13 @@ async function removeAttachment(att) {
   removingAttachmentId.value = att.id
   try {
     await expensesApi.deleteAttachment(expenseId.value, att.id)
-    await loadExpense()
+    const current = Array.isArray(expense.value?.attachments) ? expense.value.attachments : []
+    if (expense.value) {
+      expense.value = {
+        ...expense.value,
+        attachments: current.filter((x) => x?.id !== att.id),
+      }
+    }
   } catch (e) {
     error.value = e?.response?.data?.message || 'Failed to remove attachment.'
   } finally {
@@ -250,10 +258,16 @@ async function uploadNewAttachments() {
   uploadingAttachments.value = true
   error.value = null
   try {
-    await expensesApi.addAttachments(expenseId.value, fd)
+    const res = await expensesApi.addAttachments(expenseId.value, fd)
     newInvoiceFile.value = null
     if (invoiceInputRef.value) invoiceInputRef.value.value = ''
-    await loadExpense()
+    const updated = res?.data?.data
+    if (updated?.attachments && expense.value) {
+      expense.value = {
+        ...expense.value,
+        attachments: updated.attachments,
+      }
+    }
   } catch (e) {
     error.value = e?.response?.data?.message || 'Failed to add attachment.'
   } finally {
@@ -343,7 +357,7 @@ async function uploadNewAttachments() {
                 :class="fieldErrors.product_category ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : ''"
                 :disabled="!canEdit"
               >
-                <option value="">Select Category</option>
+                <option disabled value="">Select Category</option>
                 <option v-for="opt in filterOptions.categories" :key="opt.value" :value="opt.value">{{ opt.label || opt.value }}</option>
               </select>
               <input
@@ -371,15 +385,13 @@ async function uploadNewAttachments() {
             </div>
             <div>
               <label for="edit-expense-added-by" class="mb-1 block text-sm font-medium text-gray-700">Added By</label>
-              <select
+              <input
                 id="edit-expense-added-by"
-                v-model="form.user_id"
-                class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-                :disabled="!canEdit || !isSuperAdmin"
-              >
-                <option :value="null">Select</option>
-                <option v-for="u in filterOptions.added_by_users" :key="u.value" :value="u.value">{{ u.label }}</option>
-              </select>
+                :value="addedByDisplayName"
+                type="text"
+                readonly
+                class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              />
             </div>
           </div>
 

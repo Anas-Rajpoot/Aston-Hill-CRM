@@ -115,8 +115,8 @@ class FieldSubmission extends Model
             return $query;
         }
 
-        // Field agents see ALL field submissions (assigned + unassigned)
-        if ($user->hasRole('field_agent')) {
+        // Field roles see ALL field submissions (assigned + unassigned)
+        if ($user->hasRole('field_agent') || $user->hasRole('field_executive') || $user->hasRole('field')) {
             return $query;
         }
 

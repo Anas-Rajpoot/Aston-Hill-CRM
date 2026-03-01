@@ -10,6 +10,7 @@ use App\Models\SlaRule;
 use App\Models\SystemAuditLog;
 use App\Models\User;
 use App\Models\UserColumnPreference;
+use App\Policies\FieldSubmissionPolicy;
 use App\Traits\StoresFieldSubmissionDocuments;
 use App\Models\FieldSubmissionDocument;
 use Illuminate\Http\JsonResponse;
@@ -220,8 +221,12 @@ class FieldSubmissionApiController extends Controller
             $query->leftJoin('users as field_agent_users', 'field_submissions.field_executive_id', '=', 'field_agent_users.id')
                 ->orderBy('field_agent_users.name', $order);
         } elseif (in_array($sort, ['target_date', 'sla_timer', 'sla_status', 'last_updated'], true)) {
-            $dbCol = $sort === 'target_date' ? 'meeting_date' : ($sort === 'last_updated' ? 'updated_at' : 'created_at');
-            $query->orderBy('field_submissions.' . $dbCol, $order);
+            if ($sort === 'sla_timer' || $sort === 'sla_status') {
+                $query->orderByRaw("COALESCE(field_submissions.submitted_at, field_submissions.created_at) {$order}");
+            } else {
+                $dbCol = $sort === 'target_date' ? 'meeting_date' : 'updated_at';
+                $query->orderBy('field_submissions.' . $dbCol, $order);
+            }
         } elseif (in_array($sort, self::ALLOWED_COLUMNS, true)) {
             $query->orderBy('field_submissions.' . $sort, $order);
         }
@@ -244,6 +249,7 @@ class FieldSubmissionApiController extends Controller
             $base[] = 'meeting_date';
             $base[] = 'field_status';
             $base[] = 'created_at';
+            $base[] = 'submitted_at';
             $base[] = 'field_executive_id';
         }
         if (in_array('last_updated', $columns, true)) {
@@ -295,7 +301,8 @@ class FieldSubmissionApiController extends Controller
 
     private function computeSlaTimer(FieldSubmission $row): ?string
     {
-        if (! $row->created_at) {
+        $startAt = $row->submitted_at ?? $row->created_at;
+        if (! $startAt) {
             return null;
         }
         if (! empty($row->field_executive_id)) {
@@ -307,17 +314,19 @@ class FieldSubmissionApiController extends Controller
             ? max(1, (int) $rule->sla_duration_minutes)
             : 240;
 
-        $elapsed = $row->created_at->diffInMinutes(now());
-        $remaining = $slaMinutes - $elapsed;
-        if ($remaining <= 0) {
-            return 'Breached by ' . $this->formatDuration(abs($remaining));
+        $elapsed = $startAt->diffInMinutes(now());
+        if ($elapsed <= $slaMinutes) {
+            return $this->formatDuration($elapsed) . ' passed of ' . $this->formatDuration($slaMinutes);
         }
-        return $this->formatDuration($remaining) . ' remaining';
+
+        $overdue = $elapsed - $slaMinutes;
+        return 'Breached by ' . $this->formatDuration($overdue);
     }
 
     private function computeSlaStatus(FieldSubmission $row): ?string
     {
-        if (! $row->created_at) {
+        $startAt = $row->submitted_at ?? $row->created_at;
+        if (! $startAt) {
             return null;
         }
         if (! empty($row->field_executive_id)) {
@@ -332,7 +341,7 @@ class FieldSubmissionApiController extends Controller
             ? max(0, (int) $rule->warning_threshold_minutes)
             : 30;
 
-        $elapsed = $row->created_at->diffInMinutes(now());
+        $elapsed = $startAt->diffInMinutes(now());
         $remaining = $slaMinutes - $elapsed;
         if ($remaining <= 0) {
             return 'Breached';
@@ -523,7 +532,15 @@ class FieldSubmissionApiController extends Controller
      */
     public function update(Request $request, FieldSubmission $fieldSubmission): JsonResponse
     {
-        $this->authorize('update', $fieldSubmission);
+        $isAssignmentOnly = $request->exists('field_executive_id')
+            && count(array_diff(array_keys($request->all()), ['field_executive_id'])) === 0;
+
+        if ($request->exists('field_executive_id')) {
+            $this->authorize('assign', $fieldSubmission);
+        }
+        if (! $isAssignmentOnly) {
+            $this->authorize('update', $fieldSubmission);
+        }
 
         $rules = [
             'company_name' => ['sometimes', 'required', 'string', 'max:255'],
@@ -546,6 +563,15 @@ class FieldSubmissionApiController extends Controller
         ];
 
         $data = $request->validate($rules);
+
+        if (array_key_exists('field_executive_id', $data) && ! empty($data['field_executive_id'])) {
+            $assignee = User::find((int) $data['field_executive_id']);
+            if (! $assignee || ! FieldSubmissionPolicy::isValidAssignee($assignee)) {
+                return response()->json([
+                    'message' => 'Selected assignee must be a field agent or field operations head.',
+                ], 422);
+            }
+        }
 
         $documents = $request->file('documents', []);
         $documents = is_array($documents) ? $documents : [];
@@ -588,7 +614,15 @@ class FieldSubmissionApiController extends Controller
      */
     public function patch(Request $request, FieldSubmission $fieldSubmission): JsonResponse
     {
-        $this->authorize('update', $fieldSubmission);
+        $isAssignmentOnly = $request->exists('field_executive_id')
+            && count(array_diff(array_keys($request->all()), ['field_executive_id'])) === 0;
+
+        if ($request->exists('field_executive_id')) {
+            $this->authorize('assign', $fieldSubmission);
+        }
+        if (! $isAssignmentOnly) {
+            $this->authorize('update', $fieldSubmission);
+        }
 
         $rules = [
             'company_name' => ['sometimes', 'string', 'max:255'],
@@ -605,6 +639,14 @@ class FieldSubmissionApiController extends Controller
         ];
 
         $data = $request->validate($rules);
+        if (array_key_exists('field_executive_id', $data) && ! empty($data['field_executive_id'])) {
+            $assignee = User::find((int) $data['field_executive_id']);
+            if (! $assignee || ! FieldSubmissionPolicy::isValidAssignee($assignee)) {
+                return response()->json([
+                    'message' => 'Selected assignee must be a field agent or field operations head.',
+                ], 422);
+            }
+        }
         if (! empty($data)) {
             $this->applyHierarchyCascade($fieldSubmission, $data);
             $fieldSubmission->update($data);
@@ -691,11 +733,18 @@ class FieldSubmissionApiController extends Controller
      */
     public function assignFieldTechnician(Request $request, FieldSubmission $fieldSubmission): JsonResponse
     {
-        $this->authorize('update', $fieldSubmission);
+        $this->authorize('assign', $fieldSubmission);
 
         $data = $request->validate([
             'field_executive_id' => ['required', 'integer', 'exists:users,id'],
         ]);
+
+        $assignee = User::find((int) $data['field_executive_id']);
+        if (! $assignee || ! FieldSubmissionPolicy::isValidAssignee($assignee)) {
+            return response()->json([
+                'message' => 'Selected assignee must be a field agent or field operations head.',
+            ], 422);
+        }
 
         $fieldSubmission->update(['field_executive_id' => $data['field_executive_id']]);
 
@@ -846,17 +895,7 @@ class FieldSubmissionApiController extends Controller
      */
     public function fieldAgentOptions(Request $request): JsonResponse
     {
-        $userId = $request->user()->id;
-        $allowed = DB::table('model_has_roles')
-            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
-            ->where('model_has_roles.model_id', $userId)
-            ->where('model_has_roles.model_type', (new \App\Models\User)->getMorphClass())
-            ->whereIn('roles.name', ['superadmin', 'field_agent', 'field_operations_head', 'manager', 'team_leader'])
-            ->exists();
-
-        if (! $allowed) {
-            abort(403, 'Unauthorized.');
-        }
+        $this->authorize('assignAny', FieldSubmission::class);
 
         $agents = Cache::remember('field_agent_options', 600, function () {
             return DB::table('users')
@@ -866,7 +905,7 @@ class FieldSubmissionApiController extends Controller
                 })
                 ->join('roles', function ($j) {
                     $j->on('model_has_roles.role_id', '=', 'roles.id')
-                      ->where('roles.name', 'field_agent');
+                      ->whereIn('roles.name', ['field_agent', 'field_executive', 'field']);
                 })
                 ->where('users.status', 'approved')
                 ->orderBy('users.name')
@@ -887,17 +926,8 @@ class FieldSubmissionApiController extends Controller
      */
     public function bulkAssign(Request $request): JsonResponse
     {
+        $this->authorize('assignAny', FieldSubmission::class);
         $user = $request->user();
-        $allowed = DB::table('model_has_roles')
-            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
-            ->where('model_has_roles.model_id', $user->id)
-            ->where('model_has_roles.model_type', (new User)->getMorphClass())
-            ->whereIn('roles.name', ['superadmin', 'field_agent', 'field_operations_head'])
-            ->exists();
-
-        if (! $allowed) {
-            abort(403, 'Only superadmin, field operations head, or field agent can bulk assign.');
-        }
 
         $data = $request->validate([
             'submission_ids' => ['required', 'array', 'min:1'],
@@ -907,6 +937,13 @@ class FieldSubmissionApiController extends Controller
 
         $ids = array_unique(array_map('intval', $data['submission_ids']));
         $agentId = (int) $data['field_executive_id'];
+        $agent = User::find($agentId);
+
+        if (! $agent || ! FieldSubmissionPolicy::isValidAssignee($agent)) {
+            return response()->json([
+                'message' => 'Selected assignee must be a field agent or field operations head.',
+            ], 422);
+        }
 
         $existingCount = \DB::table('field_submissions')->whereIn('id', $ids)->count();
         if ($existingCount !== count($ids)) {
@@ -975,12 +1012,7 @@ class FieldSubmissionApiController extends Controller
         // Include field agent options (for assign modal) — use same cache as fieldAgentOptions()
         $fieldAgentData = [];
         $user = $request->user();
-        $canAssign = DB::table('model_has_roles')
-            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
-            ->where('model_has_roles.model_id', $user->id)
-            ->where('model_has_roles.model_type', (new User)->getMorphClass())
-            ->whereIn('roles.name', ['superadmin', 'field_agent', 'field_operations_head', 'manager', 'team_leader'])
-            ->exists();
+        $canAssign = $user->can('assignAny', FieldSubmission::class);
 
         if ($canAssign) {
             try {
@@ -992,7 +1024,7 @@ class FieldSubmissionApiController extends Controller
                         })
                         ->join('roles', function ($j) {
                             $j->on('model_has_roles.role_id', '=', 'roles.id')
-                              ->where('roles.name', 'field_agent');
+                              ->whereIn('roles.name', ['field_agent', 'field_executive', 'field']);
                         })
                         ->where('users.status', 'approved')
                         ->orderBy('users.name')

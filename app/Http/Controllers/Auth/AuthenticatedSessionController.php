@@ -69,6 +69,11 @@ class AuthenticatedSessionController extends Controller
             return redirect()->route('login')->with('status', $message);
         }
 
+        if ((bool) config('auth.disable_google_authentication', false)) {
+            $request->session()->put('2fa_passed', true);
+            return $this->loginResponse($request, '/');
+        }
+
         if ($user->two_factor_enabled) {
             $request->session()->forget('2fa_passed');
             return $this->loginResponse($request, '/2fa/verify');

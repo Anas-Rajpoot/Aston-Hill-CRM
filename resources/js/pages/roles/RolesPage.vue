@@ -64,7 +64,7 @@ async function saveEdit() {
   if (!role) return
   savingCell.value = true
   try {
-    const name = field === 'name' ? (editValue.value?.trim() || role.name) : role.name
+    const name = field === 'name' ? (normalizeRoleName(editValue.value) || role.name) : role.name
     const description = field === 'description' ? (editValue.value?.trim() || null) : (role.description ?? null)
     const status = field === 'status' ? (editValue.value || 'active') : (role.status || 'active')
     await api.put(`/super-admin/roles/${roleId}`, { name, description, status })
@@ -91,6 +91,12 @@ const editRole = ref(null)
 const editForm = ref({ name: '', description: '', status: 'active' })
 const editSaving = ref(false)
 const editError = ref('')
+
+// Create Role modal (popup)
+const createRoleOpen = ref(false)
+const createForm = ref({ name: '', description: '', status: 'active' })
+const createSaving = ref(false)
+const createError = ref('')
 
 const load = async () => {
   loading.value = true
@@ -129,7 +135,20 @@ const truncateDescription = (text) => {
   return { short: t.slice(0, DESCRIPTION_MAX) + '...', full: t }
 }
 
-const goToCreate = () => router.push('/roles/create')
+const normalizeRoleName = (value) => {
+  const input = String(value || '').trim().toLowerCase()
+  return input
+    .replace(/[\s-]+/g, '_')
+    .replace(/[^a-z0-9_]/g, '')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '')
+}
+
+const goToCreate = () => {
+  createError.value = ''
+  createForm.value = { name: '', description: '', status: 'active' }
+  createRoleOpen.value = true
+}
 const goToEdit = (role) => {
   actionMenuOpen.value = null
   router.push(`/roles/${role.id}/edit`)
@@ -173,8 +192,8 @@ const openEditRoleModal = (role) => {
   editError.value = ''
 }
 
-const closeEditRoleModal = () => {
-  if (editSaving.value) return
+const closeEditRoleModal = (force = false) => {
+  if (editSaving.value && !force) return
   editRole.value = null
   editError.value = ''
 }
@@ -184,19 +203,55 @@ const saveEditRole = async () => {
   editSaving.value = true
   editError.value = ''
   try {
+    const normalizedName = normalizeRoleName(editForm.value.name)
+    if (!normalizedName) {
+      editError.value = 'Role name is required.'
+      return
+    }
     await api.put(`/super-admin/roles/${editRole.value.id}`, {
-      name: editForm.value.name?.trim() || editRole.value.name,
+      name: normalizedName,
       description: editForm.value.description?.trim() || null,
       status: editForm.value.status
     })
+    closeEditRoleModal(true)
     await load()
-    closeEditRoleModal()
     successMessage.value = 'Role updated.'
     setTimeout(() => { successMessage.value = '' }, 3000)
   } catch (e) {
     editError.value = e?.response?.data?.message || 'Failed to update role.'
   } finally {
     editSaving.value = false
+  }
+}
+
+const closeCreateRoleModal = (force = false) => {
+  if (createSaving.value && !force) return
+  createRoleOpen.value = false
+  createError.value = ''
+}
+
+const saveCreateRole = async () => {
+  createSaving.value = true
+  createError.value = ''
+  try {
+    const normalizedName = normalizeRoleName(createForm.value.name)
+    if (!normalizedName) {
+      createError.value = 'Role name is required.'
+      return
+    }
+    await api.post('/super-admin/roles', {
+      name: normalizedName,
+      description: createForm.value.description?.trim() || null,
+      status: createForm.value.status || 'active',
+    })
+    closeCreateRoleModal(true)
+    await load()
+    successMessage.value = 'Role created successfully.'
+    setTimeout(() => { successMessage.value = '' }, 4000)
+  } catch (e) {
+    createError.value = e?.response?.data?.errors?.name?.[0] || e?.response?.data?.message || 'Failed to create role.'
+  } finally {
+    createSaving.value = false
   }
 }
 
@@ -427,8 +482,7 @@ onUnmounted(() => {
                   <button
                     type="button"
                     @click="openEditRoleModal(role)"
-                    :disabled="role.name === 'superadmin'"
-                    class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   >
                     Edit Role
                   </button>
@@ -448,6 +502,91 @@ onUnmounted(() => {
       </div>
     </div>
 
+    <!-- Add Role modal (popup) -->
+    <Teleport to="body">
+      <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition ease-in duration-150" leave-from-class="opacity-100" leave-to-class="opacity-0">
+        <div
+          v-if="createRoleOpen"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/30 backdrop-blur-sm p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="create-role-modal-title"
+          @click.self="closeCreateRoleModal"
+        >
+          <div class="w-full max-w-md max-h-[90vh] flex flex-col rounded-xl bg-white shadow-xl border border-gray-200 overflow-hidden">
+            <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <h2 id="create-role-modal-title" class="text-lg font-bold text-gray-900">Add New Role</h2>
+              <button
+                type="button"
+                class="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                aria-label="Close"
+                :disabled="createSaving"
+                @click="closeCreateRoleModal"
+              >
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <form @submit.prevent="saveCreateRole" class="flex-1 min-h-0 overflow-y-auto p-6 space-y-5">
+              <p v-if="createError" class="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{{ createError }}</p>
+              <div>
+                <label for="create-role-name" class="block text-sm font-medium text-gray-700 mb-1">Role name <span class="text-red-500">*</span></label>
+                <input
+                  id="create-role-name"
+                  v-model="createForm.name"
+                  type="text"
+                  required
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  placeholder="e.g. sales_agent"
+                  @blur="createForm.name = normalizeRoleName(createForm.name)"
+                />
+                <p class="mt-1 text-xs text-gray-500">Use lowercase with underscores only (example: `sales_agent`).</p>
+              </div>
+              <div>
+                <label for="create-role-description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea
+                  id="create-role-description"
+                  v-model="createForm.description"
+                  rows="4"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 resize-y min-h-[80px]"
+                  placeholder="Describe the role..."
+                />
+              </div>
+              <div>
+                <label for="create-role-status" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select
+                  id="create-role-status"
+                  v-model="createForm.status"
+                  class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+              <div class="flex flex-wrap items-center gap-3 pt-2">
+                <button
+                  type="submit"
+                  :disabled="createSaving"
+                  class="rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-70"
+                >
+                  {{ createSaving ? 'Creating…' : 'Create Role' }}
+                </button>
+                <button
+                  type="button"
+                  class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                  :disabled="createSaving"
+                  @click="closeCreateRoleModal"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <!-- Edit Role modal (popup) -->
     <Teleport to="body">
       <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition ease-in duration-150" leave-from-class="opacity-100" leave-to-class="opacity-0">
@@ -459,7 +598,7 @@ onUnmounted(() => {
           aria-labelledby="edit-role-modal-title"
           @click.self="closeEditRoleModal"
         >
-          <div class="w-full max-w-md rounded-xl bg-white shadow-xl border border-gray-200 overflow-hidden">
+          <div class="w-full max-w-md max-h-[90vh] flex flex-col rounded-xl bg-white shadow-xl border border-gray-200 overflow-hidden">
             <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
               <h2 id="edit-role-modal-title" class="text-lg font-bold text-gray-900">Edit Role</h2>
               <button
@@ -474,20 +613,23 @@ onUnmounted(() => {
                 </svg>
               </button>
             </div>
-            <form @submit.prevent="saveEditRole" class="p-6 space-y-5">
+            <form @submit.prevent="saveEditRole" class="flex-1 min-h-0 overflow-y-auto p-6 space-y-5">
               <p v-if="editError" class="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{{ editError }}</p>
               <div>
-                <label for="edit-role-name" class="block text-sm font-medium text-gray-700 mb-1">Role name</label>
+                <label for="edit-role-name" class="block text-sm font-medium text-gray-700 mb-1">Role name <span class="text-red-500">*</span></label>
                 <input
                   id="edit-role-name"
                   v-model="editForm.name"
                   type="text"
+                  required
                   class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                   placeholder="e.g. support_manager"
+                  @blur="editForm.name = normalizeRoleName(editForm.name)"
                 />
+                <p class="mt-1 text-xs text-gray-500">Use lowercase with underscores only (example: `support_manager`).</p>
               </div>
               <div>
-                <label for="edit-role-description" class="block text-sm font-medium text-gray-700 mb-1">Description (optional)</label>
+                <label for="edit-role-description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
                 <textarea
                   id="edit-role-description"
                   v-model="editForm.description"
@@ -513,7 +655,7 @@ onUnmounted(() => {
                   :disabled="editSaving"
                   class="rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-70"
                 >
-                  {{ editSaving ? 'Saving…' : 'Save' }}
+                  {{ editSaving ? 'Saving…' : 'Update' }}
                 </button>
                 <button
                   type="button"

@@ -13,7 +13,21 @@ return new class extends Migration
 {
     private function indexExists(string $table, string $name): bool
     {
+        $driver = Schema::getConnection()->getDriverName();
+
+        if ($driver === 'sqlite') {
+            $indexes = DB::select("PRAGMA index_list('{$table}')");
+            foreach ($indexes as $index) {
+                if (($index->name ?? null) === $name) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         $indexes = DB::select("SHOW INDEX FROM `{$table}` WHERE Key_name = ?", [$name]);
+
         return count($indexes) > 0;
     }
 

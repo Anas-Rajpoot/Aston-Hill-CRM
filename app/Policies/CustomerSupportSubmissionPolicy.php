@@ -9,6 +9,18 @@ use App\Support\RbacPermission;
 
 class CustomerSupportSubmissionPolicy
 {
+    private static function hasCsrRole(User $user): bool
+    {
+        return $user->hasRole('customer_support_representative')
+            || $user->hasRole('support_manager')
+            || $user->hasRole('csr');
+    }
+
+    public static function isValidAssignee(User $assignee): bool
+    {
+        return self::hasCsrRole($assignee);
+    }
+
     public function viewAny(User $user): bool
     {
         return RbacPermission::can($user, 'customer_support_requests', 'read', [
@@ -19,8 +31,16 @@ class CustomerSupportSubmissionPolicy
 
     public function view(User $user, CustomerSupportSubmission $submission): bool
     {
-        return $this->viewAny($user)
-            && SubmissionAccessService::canAccessRecord($user, $submission, ['csr_id']);
+        if (! $this->viewAny($user)) {
+            return false;
+        }
+
+        // CSR team can view all customer support requests.
+        if (self::hasCsrRole($user)) {
+            return true;
+        }
+
+        return SubmissionAccessService::canAccessRecord($user, $submission, ['csr_id']);
     }
 
     public function create(User $user): bool
@@ -44,5 +64,21 @@ class CustomerSupportSubmissionPolicy
         return RbacPermission::can($user, 'customer_support_requests', 'delete', [
             'customer_support_requests.delete',
         ]) && $this->view($user, $submission);
+    }
+
+    public function assignAny(User $user): bool
+    {
+        if (! self::hasCsrRole($user)) {
+            return false;
+        }
+
+        return RbacPermission::can($user, 'customer_support_requests', 'update', [
+            'customer_support_requests.assign_csr',
+        ]);
+    }
+
+    public function assign(User $user, CustomerSupportSubmission $submission): bool
+    {
+        return $this->assignAny($user) && $this->view($user, $submission);
     }
 }

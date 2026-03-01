@@ -23,6 +23,29 @@ const saving = ref(false)
 const successMessage = ref('')
 const errorMessage = ref('')
 
+const MODULE_DISPLAY_ORDER = [
+  'submissions',
+  'lead-submissions',
+  'field-submissions',
+  'customer_support_requests',
+  'vas_requests',
+  'special_requests',
+  'accounts',
+  'clients',
+  'order_status',
+  'dsp_tracker',
+  'gsm_verifiers',
+  'extensions',
+  'expense_tracker',
+  'personal_notes',
+  'emails_followup',
+  'reports',
+  'users',
+  'teams',
+]
+
+const moduleOrderIndex = new Map(MODULE_DISPLAY_ORDER.map((key, idx) => [key, idx]))
+
 const priorityClass = (p) => {
   if (p === 'high') return 'bg-red-100 text-red-800'
   if (p === 'medium') return 'bg-amber-100 text-amber-800'
@@ -32,8 +55,13 @@ const priorityClass = (p) => {
 /** Filter modules by search; each module keeps full permissions for counts but exposes filtered list for display. */
 const filteredModules = computed(() => {
   const q = (searchQuery.value || '').trim().toLowerCase()
-  if (!q) return modules.value.map((mod) => ({ ...mod, filteredPermissions: mod.permissions || [] }))
-  return modules.value
+  const ordered = [...modules.value].sort((a, b) => {
+    const ai = moduleOrderIndex.has(a?.key) ? moduleOrderIndex.get(a?.key) : Number.MAX_SAFE_INTEGER
+    const bi = moduleOrderIndex.has(b?.key) ? moduleOrderIndex.get(b?.key) : Number.MAX_SAFE_INTEGER
+    return ai - bi
+  })
+  if (!q) return ordered.map((mod) => ({ ...mod, filteredPermissions: mod.permissions || [] }))
+  return ordered
     .map((mod) => {
       const perms = mod.permissions || []
       const filteredPerms = perms.filter(

@@ -12,11 +12,16 @@ use App\Services\UserPermissionResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    /** @var array<string,bool> */
+    private static array $userColumnExistsCache = [];
+
     /**
      * Login – supports both session and token auth.
      * Enforces: account locking, status check, password change redirect.
@@ -30,7 +35,7 @@ class AuthController extends Controller
         ]);
 
         // ── Load security settings once for the entire login flow ──
-        $security = SecuritySetting::current();
+        $security = $this->resolveSecuritySettings();
 
         // ── Check account lock BEFORE attempting auth ──
         $targetUser = User::where('email', $request->email)->first();
@@ -43,10 +48,10 @@ class AuthController extends Controller
 
         // Clear an expired lock so the user can attempt again
         if ($targetUser && $targetUser->locked_until && $targetUser->locked_until->isPast()) {
-            $targetUser->forceFill([
+            $this->safeFillAndSaveUser($targetUser, [
                 'locked_until'         => null,
                 'failed_login_attempts' => 0,
-            ])->saveQuietly();
+            ]);
         }
 
         if (! Auth::attempt($request->only('email', 'password'))) {
@@ -69,7 +74,7 @@ class AuthController extends Controller
                     );
                 }
 
-                $targetUser->forceFill($update)->saveQuietly();
+                $this->safeFillAndSaveUser($targetUser, $update);
 
                 // If we just locked, return the lock message instead of generic error
                 if (isset($lockUntil)) {
@@ -88,10 +93,10 @@ class AuthController extends Controller
 
         // ── Successful login: reset failed attempts and clear any lock ──
         if ($user->failed_login_attempts > 0 || $user->locked_until) {
-            $user->forceFill([
+            $this->safeFillAndSaveUser($user, [
                 'failed_login_attempts' => 0,
                 'locked_until'          => null,
-            ])->saveQuietly();
+            ]);
         }
 
         if ($user->status !== 'approved') {
@@ -111,13 +116,22 @@ class AuthController extends Controller
         $terminatedCount = 0;
 
         if (! $security->prevent_multiple_sessions) {
-            // Revoke all existing Sanctum tokens for this user
-            $terminatedCount = $user->tokens()->count();
-            $user->tokens()->delete();
+            // Revoke all existing Sanctum tokens for this user.
+            // Guard against partially-migrated environments where Sanctum tables may be missing.
+            try {
+                $terminatedCount = $user->tokens()->count();
+                $user->tokens()->delete();
+            } catch (\Throwable $e) {
+                Log::warning('Auth login: failed to clear previous Sanctum tokens.', [
+                    'user_id' => $user->id,
+                    'error' => $e->getMessage(),
+                ]);
+                $terminatedCount = 0;
+            }
         }
 
         // Always rotate the session token so the middleware can validate
-        $user->forceFill(['active_session_token' => $sessionToken])->saveQuietly();
+        $this->safeFillAndSaveUser($user, ['active_session_token' => $sessionToken]);
 
         if ($terminatedCount > 0) {
             SystemAuditLog::record(
@@ -145,7 +159,7 @@ class AuthController extends Controller
         if ($wantsToken) {
             $token = $user->createToken('api')->plainTextToken;
             Auth::logout();
-            $resolved = UserPermissionResolver::getRolesAndPermissions((int) $user->id, $user->getMorphClass());
+            $resolved = $this->safeResolveRolesAndPermissions($user);
             return response()->json([
                 'token' => $token,
                 'token_type' => 'Bearer',
@@ -174,7 +188,7 @@ class AuthController extends Controller
             ->update(['session_id' => $request->session()->getId()]);
 
         // One resolution for both superadmin check and response payload (no hasRole()).
-        $resolved = UserPermissionResolver::getRolesAndPermissions((int) $user->id, $user->getMorphClass());
+        $resolved = $this->safeResolveRolesAndPermissions($user);
         $roles = $resolved['roles'];
         $permissions = $resolved['permissions'];
 
@@ -191,7 +205,9 @@ class AuthController extends Controller
             ]);
         }
 
-        if ($user->two_factor_enabled) {
+        if ((bool) config('auth.disable_google_authentication', false)) {
+            $request->session()->put('2fa_passed', true);
+        } elseif ($user->two_factor_enabled) {
             $request->session()->forget('2fa_passed');
             return response()->json(['redirect' => '/2fa/verify']);
         }
@@ -212,7 +228,7 @@ class AuthController extends Controller
     private function resolvePasswordAction(User $user): ?string
     {
         try {
-            $settings = SecuritySetting::current();
+            $settings = $this->resolveSecuritySettings();
 
             // First-login password reset
             if ($settings->force_password_reset_on_first_login && $user->must_change_password) {
@@ -239,6 +255,70 @@ class AuthController extends Controller
         }
 
         return null;
+    }
+
+    /**
+     * Resolve SecuritySetting singleton, but never let DB/config errors crash auth.
+     */
+    private function resolveSecuritySettings()
+    {
+        try {
+            return SecuritySetting::current();
+        } catch (\Throwable $e) {
+            Log::warning('Auth login: failed to load security settings, using defaults.', [
+                'error' => $e->getMessage(),
+            ]);
+            return (object) SecuritySetting::DEFAULTS;
+        }
+    }
+
+    /**
+     * Resolve roles/permissions without allowing resolver errors to 500 login.
+     *
+     * @return array{roles: array<int,string>, permissions: array<int,string>}
+     */
+    private function safeResolveRolesAndPermissions(User $user): array
+    {
+        try {
+            return UserPermissionResolver::getRolesAndPermissions((int) $user->id, $user->getMorphClass());
+        } catch (\Throwable $e) {
+            Log::warning('Auth login: failed to resolve roles/permissions.', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+            return ['roles' => [], 'permissions' => []];
+        }
+    }
+
+    private function safeFillAndSaveUser(User $user, array $attributes): void
+    {
+        $filtered = [];
+        foreach ($attributes as $column => $value) {
+            if ($this->hasUserColumn((string) $column)) {
+                $filtered[$column] = $value;
+            }
+        }
+        if ($filtered === []) {
+            return;
+        }
+        $user->forceFill($filtered)->saveQuietly();
+    }
+
+    private function hasUserColumn(string $column): bool
+    {
+        if (array_key_exists($column, self::$userColumnExistsCache)) {
+            return self::$userColumnExistsCache[$column];
+        }
+        try {
+            self::$userColumnExistsCache[$column] = Schema::hasColumn('users', $column);
+        } catch (\Throwable $e) {
+            self::$userColumnExistsCache[$column] = false;
+            Log::warning('Auth login: failed to inspect users column.', [
+                'column' => $column,
+                'error' => $e->getMessage(),
+            ]);
+        }
+        return self::$userColumnExistsCache[$column];
     }
 
     /**
@@ -271,6 +351,11 @@ class AuthController extends Controller
      */
     public function verify2FA(Request $request): JsonResponse
     {
+        if ((bool) config('auth.disable_google_authentication', false)) {
+            $request->session()->put('2fa_passed', true);
+            return response()->json(['redirect' => '/']);
+        }
+
         $request->validate(['otp' => ['required', 'string']]);
 
         $user = $request->user();

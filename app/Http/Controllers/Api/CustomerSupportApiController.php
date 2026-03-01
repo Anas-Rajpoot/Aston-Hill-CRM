@@ -13,6 +13,7 @@ use App\Models\SystemAuditLog;
 use App\Models\Client;
 use App\Models\User;
 use App\Models\UserColumnPreference;
+use App\Policies\CustomerSupportSubmissionPolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -262,7 +263,7 @@ class CustomerSupportApiController extends Controller
             return;
         }
         if ($sort === 'sla_timer') {
-            $query->orderBy('customer_support_submissions.submitted_at', $direction);
+            $query->orderByRaw("COALESCE(customer_support_submissions.submitted_at, customer_support_submissions.created_at) {$direction}");
             return;
         }
         $query->orderBy('customer_support_submissions.' . $sort, $direction);
@@ -386,14 +387,16 @@ class CustomerSupportApiController extends Controller
             : 120;
 
         $elapsed = $startAt->diffInMinutes(now());
-        $remaining = $slaMinutes - $elapsed;
-        if ($remaining <= 0) {
-            return 'Overdue ' . $this->formatDuration($remaining * -1);
+        if ($elapsed <= $slaMinutes) {
+            $remaining = $slaMinutes - $elapsed;
+            if ($warningMinutes > 0 && $remaining <= $warningMinutes) {
+                return 'Due in ' . $this->formatDuration($remaining);
+            }
+            return $this->formatDuration($elapsed) . ' passed of ' . $this->formatDuration($slaMinutes);
         }
-        if ($warningMinutes > 0 && $remaining <= $warningMinutes) {
-            return 'Due in ' . $this->formatDuration($remaining);
-        }
-        return $this->formatDuration($remaining) . ' left';
+
+        $overdue = $elapsed - $slaMinutes;
+        return 'Breached by ' . $this->formatDuration($overdue);
     }
 
     private function formatDuration(int $minutes): string
@@ -484,7 +487,15 @@ class CustomerSupportApiController extends Controller
 
     public function patch(Request $request, CustomerSupportSubmission $customerSupportSubmission): JsonResponse
     {
-        $this->authorize('update', $customerSupportSubmission);
+        $isAssignmentOnly = $request->exists('csr_id')
+            && count(array_diff(array_keys($request->all()), ['csr_id', 'csr_name'])) === 0;
+
+        if ($request->exists('csr_id')) {
+            $this->authorize('assign', $customerSupportSubmission);
+        }
+        if (! $isAssignmentOnly) {
+            $this->authorize('update', $customerSupportSubmission);
+        }
 
         $categories = CustomerSupportController::issueCategories();
         $rules = [
@@ -522,6 +533,14 @@ class CustomerSupportApiController extends Controller
         ];
 
         $data = $request->validate($rules, $messages);
+        if (array_key_exists('csr_id', $data) && ! empty($data['csr_id'])) {
+            $assignee = User::find((int) $data['csr_id']);
+            if (! $assignee || ! CustomerSupportSubmissionPolicy::isValidAssignee($assignee)) {
+                return response()->json([
+                    'message' => 'Selected assignee must be a CSR or support manager.',
+                ], 422);
+            }
+        }
         if (! empty($data)) {
             if (isset($data['status']) && $data['status'] === 'submitted' && ! $customerSupportSubmission->submitted_at) {
                 $data['submitted_at'] = now();
@@ -720,17 +739,7 @@ class CustomerSupportApiController extends Controller
      */
     public function csrOptions(Request $request): JsonResponse
     {
-        $userId = $request->user()->id;
-        $allowed = DB::table('model_has_roles')
-            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
-            ->where('model_has_roles.model_id', $userId)
-            ->where('model_has_roles.model_type', (new \App\Models\User)->getMorphClass())
-            ->whereIn('roles.name', ['superadmin', 'customer_support_representative', 'support_manager', 'manager', 'team_leader'])
-            ->exists();
-
-        if (! $allowed) {
-            abort(403, 'Unauthorized.');
-        }
+        $this->authorize('assignAny', CustomerSupportSubmission::class);
 
         $csrs = Cache::remember('csr_options', 600, function () {
             return DB::table('users')
@@ -740,7 +749,7 @@ class CustomerSupportApiController extends Controller
                 })
                 ->join('roles', function ($j) {
                     $j->on('model_has_roles.role_id', '=', 'roles.id')
-                      ->where('roles.name', 'customer_support_representative');
+                      ->whereIn('roles.name', ['customer_support_representative', 'csr', 'support_manager']);
                 })
                 ->where('users.status', 'approved')
                 ->orderBy('users.name')
@@ -786,17 +795,8 @@ class CustomerSupportApiController extends Controller
      */
     public function bulkAssign(Request $request): JsonResponse
     {
+        $this->authorize('assignAny', CustomerSupportSubmission::class);
         $user = $request->user();
-        $allowed = DB::table('model_has_roles')
-            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
-            ->where('model_has_roles.model_id', $user->id)
-            ->where('model_has_roles.model_type', (new User)->getMorphClass())
-            ->whereIn('roles.name', ['superadmin', 'customer_support_representative', 'support_manager'])
-            ->exists();
-
-        if (! $allowed) {
-            abort(403, 'Only superadmin, support manager, or CSR can bulk assign.');
-        }
 
         $data = $request->validate([
             'submission_ids' => ['required', 'array', 'min:1'],
@@ -806,6 +806,13 @@ class CustomerSupportApiController extends Controller
 
         $ids = array_unique(array_map('intval', $data['submission_ids']));
         $csrId = (int) $data['csr_id'];
+        $csrUser = User::find($csrId);
+
+        if (! $csrUser || ! CustomerSupportSubmissionPolicy::isValidAssignee($csrUser)) {
+            return response()->json([
+                'message' => 'Selected assignee must be a CSR or support manager.',
+            ], 422);
+        }
 
         $existingCount = DB::table('customer_support_submissions')->whereIn('id', $ids)->count();
         if ($existingCount !== count($ids)) {
@@ -852,23 +859,18 @@ class CustomerSupportApiController extends Controller
      */
     public function assignCsr(Request $request, CustomerSupportSubmission $customerSupportSubmission): JsonResponse
     {
-        $user = $request->user();
-        $allowed = DB::table('model_has_roles')
-            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
-            ->where('model_has_roles.model_id', $user->id)
-            ->where('model_has_roles.model_type', (new User)->getMorphClass())
-            ->whereIn('roles.name', ['superadmin', 'customer_support_representative', 'support_manager'])
-            ->exists();
-
-        if (! $allowed) {
-            abort(403, 'Unauthorized.');
-        }
+        $this->authorize('assign', $customerSupportSubmission);
 
         $data = $request->validate([
             'csr_id' => ['required', 'integer', 'exists:users,id'],
         ]);
 
         $csrUser = User::find($data['csr_id']);
+        if (! $csrUser || ! CustomerSupportSubmissionPolicy::isValidAssignee($csrUser)) {
+            return response()->json([
+                'message' => 'Selected assignee must be a CSR or support manager.',
+            ], 422);
+        }
 
         $customerSupportSubmission->update([
             'csr_id' => $data['csr_id'],
@@ -910,12 +912,7 @@ class CustomerSupportApiController extends Controller
         // Include CSR options (for assign modal) — use same cache as csrOptions()
         $csrData = [];
         $user = $request->user();
-        $canAssign = DB::table('model_has_roles')
-            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
-            ->where('model_has_roles.model_id', $user->id)
-            ->where('model_has_roles.model_type', (new User)->getMorphClass())
-            ->whereIn('roles.name', ['superadmin', 'customer_support_representative', 'support_manager', 'manager', 'team_leader'])
-            ->exists();
+        $canAssign = $user->can('assignAny', CustomerSupportSubmission::class);
 
         if ($canAssign) {
             try {
@@ -927,7 +924,7 @@ class CustomerSupportApiController extends Controller
                         })
                         ->join('roles', function ($j) {
                             $j->on('model_has_roles.role_id', '=', 'roles.id')
-                              ->where('roles.name', 'customer_support_representative');
+                              ->whereIn('roles.name', ['customer_support_representative', 'csr', 'support_manager']);
                         })
                         ->where('users.status', 'approved')
                         ->orderBy('users.name')

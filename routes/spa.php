@@ -22,6 +22,11 @@ Route::get('/users', $spa);
 Route::get('/users/create', $spa);
 Route::get('/users/{user}', $spa)->whereNumber('user');
 Route::get('/users/{user}/edit', $spa)->whereNumber('user');
+Route::get('/teams', $spa);
+Route::get('/teams/create', $spa);
+Route::get('/teams/{id}', $spa)->whereNumber('id');
+Route::get('/teams/{id}/edit', $spa)->whereNumber('id');
+Route::get('/teams/{id}/members', $spa)->whereNumber('id');
 
 Route::get('/submissions', $spa);
 Route::get('/lead-submissions', $spa);

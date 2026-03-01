@@ -37,6 +37,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             '2fa_or_superadmin' => \App\Http\Middleware\EnsureTwoFactorVerified::class,
             'etag.cache' => \App\Http\Middleware\EtagCache::class,
+            'etag.response' => \App\Http\Middleware\ETagMiddleware::class,
             'api.cache' => \App\Http\Middleware\ApiCacheHeaders::class,
             'role' => RoleMiddleware::class,
             'permission' => PermissionMiddleware::class,
@@ -102,10 +103,19 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null;
             }
 
-            return response()->json([
+            $payload = [
                 'status' => 'fail',
                 'message' => 'Request failed. Please contact support if the issue persists.',
-            ], 500);
+            ];
+
+            if (config('app.debug')) {
+                $payload['debug'] = [
+                    'error' => $e->getMessage(),
+                    'sql_state' => $e->errorInfo[0] ?? null,
+                ];
+            }
+
+            return response()->json($payload, 500);
         });
 
         $exceptions->render(function (\Throwable $e, Request $request) use ($isApiRequest) {

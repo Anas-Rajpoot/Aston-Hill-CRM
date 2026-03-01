@@ -399,10 +399,10 @@ const warningOptions = [
             </div>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 items-start">
             <!-- Minimum Password Length -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1.5">Minimum Password Length</label>
+            <div class="flex h-full flex-col">
+              <label class="block min-h-[3rem] text-sm font-medium text-gray-700 mb-1.5">Minimum Password Length</label>
               <input
                 v-model.number="form.min_length"
                 type="number"
@@ -416,9 +416,9 @@ const warningOptions = [
             </div>
 
             <!-- Require Uppercase Letter -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1.5">Require Uppercase Letter</label>
-              <div class="flex items-center gap-2.5 mt-2">
+            <div class="flex h-full flex-col">
+              <label class="block min-h-[3rem] text-sm font-medium text-gray-700 mb-1.5">Require Uppercase Letter</label>
+              <div class="flex h-[42px] items-center gap-2.5">
                 <button
                   type="button"
                   role="switch"
@@ -436,9 +436,9 @@ const warningOptions = [
             </div>
 
             <!-- Require Number -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1.5">Require Number</label>
-              <div class="flex items-center gap-2.5 mt-2">
+            <div class="flex h-full flex-col">
+              <label class="block min-h-[3rem] text-sm font-medium text-gray-700 mb-1.5">Require Number</label>
+              <div class="flex h-[42px] items-center gap-2.5">
                 <button
                   type="button"
                   role="switch"
@@ -456,9 +456,9 @@ const warningOptions = [
             </div>
 
             <!-- Require Special Character -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1.5">Require Special Character</label>
-              <div class="flex items-center gap-2.5 mt-2">
+            <div class="flex h-full flex-col">
+              <label class="block min-h-[3rem] text-sm font-medium text-gray-700 mb-1.5">Require Special Character</label>
+              <div class="flex h-[42px] items-center gap-2.5">
                 <button
                   type="button"
                   role="switch"
@@ -476,8 +476,8 @@ const warningOptions = [
             </div>
 
             <!-- Password Expiry (Days) -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1.5">Password Expiry (Days)</label>
+            <div class="flex h-full flex-col">
+              <label class="block min-h-[3rem] text-sm font-medium text-gray-700 mb-1.5">Password Expiry (Days)</label>
               <input
                 v-model.number="form.password_expiry_days"
                 type="number"

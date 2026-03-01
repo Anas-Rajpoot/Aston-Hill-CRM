@@ -9,8 +9,24 @@ use App\Models\VasRequestSubmission;
 
 class VasRequestPolicy
 {
+    private static function hasBackOfficeRole(User $user): bool
+    {
+        return $user->hasRole('back_office')
+            || $user->hasRole('backoffice')
+            || $user->hasRole('back_office_executive');
+    }
+
+    public static function isValidAssignee(User $assignee): bool
+    {
+        return self::hasBackOfficeRole($assignee);
+    }
+
     public function viewAny(User $user): bool
     {
+        if (self::hasBackOfficeRole($user)) {
+            return true;
+        }
+
         return RbacPermission::can($user, ['vas', 'vas_requests'], 'read', [
             'vas.view',
             'vas.view.all',
@@ -26,6 +42,11 @@ class VasRequestPolicy
         }
 
         if ($user->can('vas.view.all')) {
+            return true;
+        }
+
+        // Back office users can view all VAS requests.
+        if (self::hasBackOfficeRole($user)) {
             return true;
         }
 
@@ -63,5 +84,22 @@ class VasRequestPolicy
     public function reject(User $user): bool
     {
         return $user->can('vas.reject');
+    }
+
+    public function assignAny(User $user): bool
+    {
+        if (! self::hasBackOfficeRole($user)) {
+            return false;
+        }
+
+        return RbacPermission::can($user, ['vas_requests', 'back_office'], 'update', [
+            'back_office.assign_bo_executive',
+            'vas_requests.process_vas_requests',
+        ]);
+    }
+
+    public function assign(User $user, VasRequestSubmission $vas): bool
+    {
+        return $this->assignAny($user) && $this->view($user, $vas);
     }
 }

@@ -5,7 +5,6 @@
  * Attachments (all uploaded images + documents with download). Product Description after Category; Added By after Invoice.
  */
 import { ref, watch, computed, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import expensesApi from '@/services/expensesApi'
 import api from '@/lib/axios'
@@ -15,9 +14,7 @@ const props = defineProps({
   expenseId: { type: [Number, String], default: null },
 })
 
-const emit = defineEmits(['close'])
-
-const router = useRouter()
+const emit = defineEmits(['close', 'open-edit'])
 const auth = useAuthStore()
 
 const expense = ref(null)
@@ -44,8 +41,7 @@ function close() {
 
 function goToEdit() {
   if (expense.value?.id && canEdit.value) {
-    close()
-    router.push(`/expenses/${expense.value.id}/edit`)
+    emit('open-edit', expense.value)
   }
 }
 

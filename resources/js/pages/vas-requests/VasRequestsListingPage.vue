@@ -332,11 +332,10 @@ async function loadTablePreference() {
 
 const canBulkAssign = (() => {
   const roles = auth.user?.roles ?? []
-  if (!Array.isArray(roles)) return false
-  return roles.some((r) => {
-    const name = typeof r === 'string' ? r : r?.name
-    return name === 'superadmin' || name === 'back_office' || name === 'backoffice'
-  })
+  const perms = auth.user?.permissions ?? []
+  const isSuperAdmin = Array.isArray(roles) && roles.some((r) => (typeof r === 'string' ? r : r?.name) === 'superadmin')
+  if (isSuperAdmin) return true
+  return perms.includes('back_office.assign_bo_executive') || perms.includes('vas_requests.process_vas_requests')
 })()
 
 function goToResubmit(row) {

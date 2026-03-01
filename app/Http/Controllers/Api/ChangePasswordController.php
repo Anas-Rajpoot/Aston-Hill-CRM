@@ -28,16 +28,18 @@ class ChangePasswordController extends Controller
         $user = $request->user();
 
         // Super admins are exempt from password expiry – they change when they choose to.
-        $isSuperAdmin = $user->hasRole('superadmin');
+        $isSuperAdmin = $user?->hasRole('superadmin') ?? false;
 
         $reason = null;
-        if ($user->must_change_password) {
-            $reason = 'must_change_password';
-        } elseif (! $isSuperAdmin && $settings->password_expiry_days > 0) {
-            if (! $user->password_changed_at) {
-                $reason = 'password_expired';
-            } elseif ($user->password_changed_at->addDays($settings->password_expiry_days)->isPast()) {
-                $reason = 'password_expired';
+        if ($user) {
+            if ($user->must_change_password) {
+                $reason = 'must_change_password';
+            } elseif (! $isSuperAdmin && $settings->password_expiry_days > 0) {
+                if (! $user->password_changed_at) {
+                    $reason = 'password_expired';
+                } elseif ($user->password_changed_at->addDays($settings->password_expiry_days)->isPast()) {
+                    $reason = 'password_expired';
+                }
             }
         }
 

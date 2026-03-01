@@ -126,7 +126,7 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-6">
-    <Toast v-model:visible="showToast" :type="toastType" :message="toastMsg" />
+    <Toast :show="showToast" :type="toastType" :message="toastMsg" @dismiss="showToast = false" />
 
     <router-link :to="`/teams/${route.params.id}`" class="inline-flex items-center gap-1 text-sm text-green-600 hover:text-green-700 font-medium">
       <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>

@@ -18,10 +18,7 @@ class EmailFollowUpPolicy
 
     public function view(User $user, EmailFollowUp $emailFollowUp): bool
     {
-        if ($user->hasRole('superadmin')) {
-            return true;
-        }
-        return (int) $emailFollowUp->created_by === (int) $user->id;
+        return $this->viewAny($user);
     }
 
     public function create(User $user): bool
@@ -35,13 +32,13 @@ class EmailFollowUpPolicy
     {
         return RbacPermission::can($user, 'emails_followup', 'update', [
             'emails_followup.edit',
-        ]) && $this->view($user, $emailFollowUp);
+        ]);
     }
 
     public function delete(User $user, EmailFollowUp $emailFollowUp): bool
     {
         return RbacPermission::can($user, 'emails_followup', 'delete', [
             'emails_followup.delete',
-        ]) && $this->view($user, $emailFollowUp);
+        ]);
     }
 }

@@ -70,7 +70,7 @@ class DspTrackerApiController extends Controller
         $order = $validated['order'] ?? 'asc';
         $query->orderBy($sort, $order);
 
-        $rows = $query->get();
+        $rows = $query->get(array_merge(['id'], self::ALLOWED_COLUMNS));
         $verifierNumberByName = $this->buildVerifierNumberMap(
             $rows->pluck('verifier_name')->all()
         );

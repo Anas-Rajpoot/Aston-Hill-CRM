@@ -109,7 +109,7 @@ const save = async () => {
     </div>
     <Breadcrumbs />
 
-    <form @submit.prevent="save" class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-4 max-w-2xl">
+    <form autocomplete="off" @submit.prevent="save" class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-4 max-w-2xl">
       <div v-if="error" class="rounded-lg bg-red-50 border border-red-200 p-4 text-sm text-red-700">{{ error }}</div>
       <div v-if="successMessage" class="rounded-lg bg-green-50 border border-green-200 p-4 text-sm text-green-700">{{ successMessage }}</div>
 
@@ -120,15 +120,15 @@ const save = async () => {
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-          <input v-model="form.email" type="email" required class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500" placeholder="email@example.com" />
+          <input v-model="form.email" type="email" name="new_user_email" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" required class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500" placeholder="email@example.com" />
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Password *</label>
-          <input v-model="form.password" type="password" required class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500" placeholder="Min 8 characters" />
+          <input v-model="form.password" type="password" name="new_user_password" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" required class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500" placeholder="Enter password" />
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Confirm Password *</label>
-          <input v-model="form.password_confirmation" type="password" required class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500" placeholder="Confirm password" />
+          <input v-model="form.password_confirmation" type="password" name="new_user_password_confirmation" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" required class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500" placeholder="Confirm password" />
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>

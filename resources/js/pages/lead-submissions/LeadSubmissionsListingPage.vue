@@ -78,11 +78,12 @@ async function fetchLeadAudits(id) {
 }
 const canBulkAssign = (() => {
   const roles = auth.user?.roles ?? []
-  if (!Array.isArray(roles)) return false
-  return roles.some((r) => {
-    const name = typeof r === 'string' ? r : r?.name
-    return name === 'superadmin' || name === 'back_office' || name === 'backoffice'
-  })
+  const perms = auth.user?.permissions ?? []
+  const isSuperAdmin = Array.isArray(roles) && roles.some((r) => (typeof r === 'string' ? r : r?.name) === 'superadmin')
+  if (isSuperAdmin) return true
+  return perms.includes('back_office.assign_bo_executive')
+    || perms.includes('lead.assign_bo_executive')
+    || perms.includes('lead-submissions.assign_bo_executive')
 })()
 
 const filters = ref({

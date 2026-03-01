@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\VasRequestAudit;
 use App\Models\VasRequestDocument;
 use App\Models\VasRequestSubmission;
+use App\Models\User;
+use App\Policies\VasRequestPolicy;
 use App\Services\VasRequestService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -273,7 +275,15 @@ class VasRequestController extends Controller
      */
     public function update(Request $request, VasRequestSubmission $vasRequest): JsonResponse
     {
-        $this->authorize('update', $vasRequest);
+        $isAssignmentOnly = $request->exists('back_office_executive_id')
+            && count(array_diff(array_keys($request->all()), ['back_office_executive_id'])) === 0;
+
+        if ($request->exists('back_office_executive_id')) {
+            $this->authorize('assign', $vasRequest);
+        }
+        if (! $isAssignmentOnly) {
+            $this->authorize('update', $vasRequest);
+        }
 
         $types = self::requestTypes();
         $data = $request->validate([
@@ -296,6 +306,15 @@ class VasRequestController extends Controller
             unset($data['request_description']);
         }
 
+        if (array_key_exists('back_office_executive_id', $data) && ! empty($data['back_office_executive_id'])) {
+            $assignee = User::find((int) $data['back_office_executive_id']);
+            if (! $assignee || ! VasRequestPolicy::isValidAssignee($assignee)) {
+                return response()->json([
+                    'message' => 'Selected assignee must be a back office user.',
+                ], 422);
+            }
+        }
+
         $vasRequest->update($data);
         return response()->json([
             'message' => 'VAS request updated.',
@@ -309,6 +328,9 @@ class VasRequestController extends Controller
      */
     public function resubmit(Request $request, VasRequestSubmission $vasRequest): JsonResponse
     {
+        if ($request->exists('back_office_executive_id')) {
+            $this->authorize('assign', $vasRequest);
+        }
         $this->authorize('update', $vasRequest);
 
         if ($vasRequest->status === 'approved') {
@@ -328,6 +350,15 @@ class VasRequestController extends Controller
             'sales_agent_id' => ['required', 'exists:users,id'],
             'back_office_executive_id' => ['nullable', 'exists:users,id'],
         ]);
+
+        if (array_key_exists('back_office_executive_id', $data) && ! empty($data['back_office_executive_id'])) {
+            $assignee = User::find((int) $data['back_office_executive_id']);
+            if (! $assignee || ! VasRequestPolicy::isValidAssignee($assignee)) {
+                return response()->json([
+                    'message' => 'Selected assignee must be a back office user.',
+                ], 422);
+            }
+        }
 
         $vasRequest->update(array_merge($data, [
             'status' => 'submitted_under_process',

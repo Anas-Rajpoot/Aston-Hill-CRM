@@ -5,6 +5,7 @@
  * Comment/Remarks; Attachments (Invoice + Supporting); Cancel + Add Expense. Green primary button, light blue uploads.
  */
 import { ref, computed, watch } from 'vue'
+import { useAuthStore } from '@/stores/auth'
 import expensesApi from '@/services/expensesApi'
 import { fromDdMmYyyy, fromDdMonYyyyLower, toDdMonYyyyDash } from '@/lib/dateFormat'
 
@@ -22,7 +23,13 @@ const props = defineProps({
   currentUserId: { type: [Number, String], default: null },
 })
 
+const auth = useAuthStore()
 const vatOptions = computed(() => (props.vatPercentOptions?.length ? props.vatPercentOptions : VAT_OPTIONS_DEFAULT))
+const loggedInUserId = computed(() => props.currentUserId ?? auth.user?.id ?? null)
+const addedByDisplayName = computed(() => {
+  const byId = props.addedByUsers?.find?.((u) => String(u.value) === String(loggedInUserId.value))?.label
+  return byId || auth.user?.name || '—'
+})
 
 const emit = defineEmits(['close', 'created'])
 
@@ -67,7 +74,7 @@ watch(() => props.visible, (visible) => {
       expense_date_display: '',
       product_category: '',
       invoice_number: '',
-      user_id: props.currentUserId ?? null,
+      user_id: loggedInUserId.value,
       vat_percent: 0,
       amount_without_vat: '',
       product_description: '',
@@ -178,7 +185,7 @@ async function submit() {
       fd.append('comment', form.value.comment.trim())
       fd.append('vat_percent', String(Number(form.value.vat_percent) || 0))
       fd.append('amount_without_vat', String(amount))
-      if (props.addedByUsers?.length && form.value.user_id != null && form.value.user_id !== '') {
+      if (form.value.user_id != null && form.value.user_id !== '') {
         fd.append('user_id', String(form.value.user_id))
       }
       if (invoiceFile.value) fd.append('invoice', invoiceFile.value)
@@ -194,7 +201,7 @@ async function submit() {
         vat_percent: Number(form.value.vat_percent) || 0,
         amount_without_vat: amount,
       }
-      if (props.addedByUsers?.length && form.value.user_id != null && form.value.user_id !== '') {
+      if (form.value.user_id != null && form.value.user_id !== '') {
         payload.user_id = form.value.user_id
       }
       await expensesApi.create(payload)
@@ -309,7 +316,7 @@ async function submit() {
                   class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-green-500 focus:ring-1 focus:ring-green-500"
                   :class="fieldErrors.product_category ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : ''"
                 >
-                  <option value="">Select Category</option>
+                  <option disabled value="">Select Category</option>
                   <option v-for="opt in categories" :key="opt.value" :value="opt.value">
                     {{ opt.label || opt.value }}
                   </option>
@@ -341,16 +348,13 @@ async function submit() {
                 <label for="add-expense-added-by" class="mb-1 block text-sm font-medium text-gray-700">
                   Added By
                 </label>
-                <select
+                <input
                   id="add-expense-added-by"
-                  v-model="form.user_id"
+                  :value="addedByDisplayName"
+                  type="text"
+                  readonly
                   class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-green-500 focus:ring-1 focus:ring-green-500"
-                >
-                  <option :value="null">Select</option>
-                  <option v-for="u in addedByUsers" :key="u.value" :value="u.value">
-                    {{ u.label }}
-                  </option>
-                </select>
+                />
               </div>
             </div>
 

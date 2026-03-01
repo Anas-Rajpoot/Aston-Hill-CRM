@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Models\Client;
 use App\Models\ClientAudit;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
 class ClientObserver
 {
@@ -42,6 +43,35 @@ class ClientObserver
             }
             $oldValue = array_key_exists($field, $oldSnapshot) ? $oldSnapshot[$field] : null;
             $this->auditRow($client->id, $field, $oldValue, $newValue, $changedAt, $changedBy);
+        }
+
+        $this->flushClientCaches();
+    }
+
+    public function created(Client $client): void
+    {
+        $this->flushClientCaches();
+    }
+
+    public function deleted(Client $client): void
+    {
+        $this->flushClientCaches();
+    }
+
+    private function flushClientCaches(): void
+    {
+        $store = Cache::getStore();
+        if (method_exists($store, 'tags')) {
+            Cache::tags(['clients', 'filters'])->flush();
+            return;
+        }
+
+        Cache::forget('clients:last-modified');
+        Cache::forget('clients:filters:last-modified');
+        if (! Cache::has('cache_version:clients')) {
+            Cache::forever('cache_version:clients', 1);
+        } else {
+            Cache::increment('cache_version:clients');
         }
     }
 

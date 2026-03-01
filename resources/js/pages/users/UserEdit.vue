@@ -149,15 +149,13 @@ const selectedRolesLabel = computed(() => {
 
 function validatePhone(value) {
   if (!value || !value.trim()) return null
-  if (/\s/.test(value)) return 'Must not contain spaces.'
-  if (!/^\d+$/.test(value)) return 'Must contain only digits.'
-  if (!value.startsWith('971')) return 'Must start with 971.'
-  if (value.length !== 12) return 'Must be exactly 12 digits.'
+  if (!/^\d{12}$/.test(value.trim())) return 'Must be exactly 12 digits with no spaces (e.g. 971XXXXXXXXX).'
+  if (!value.trim().startsWith('971')) return 'Must start with 971.'
   return null
 }
 
 function onPhoneInput(event) {
-  form.value.phone = event.target.value.replace(/\D/g, '')
+  form.value.phone = event.target.value.replace(/\D/g, '').slice(0, 12)
   phoneError.value = ''
 }
 
@@ -481,7 +479,7 @@ onUnmounted(() => {
           <h2 class="text-base font-semibold text-gray-900">Role & Hierarchy</h2>
         </div>
         <div class="px-6 py-5">
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
             <div ref="rolesDropdownRef" class="relative">
               <label class="block text-sm font-medium text-gray-700 mb-1">Role(s) <span class="text-red-500">*</span></label>
               <button
@@ -527,20 +525,6 @@ onUnmounted(() => {
               </div>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Manager Name</label>
-              <select v-model="form.manager_id" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                <option value="">Select manager</option>
-                <option v-for="m in managersFiltered" :key="m.id" :value="m.id">{{ m.name }}</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Team Leader Name</label>
-              <select v-model="form.team_leader_id" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                <option value="">Select team leader</option>
-                <option v-for="t in filteredTeamLeaders" :key="t.id" :value="t.id">{{ t.name }}</option>
-              </select>
-            </div>
-            <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Extension</label>
               <select v-model="form.extension" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500">
                 <option value="">Select extension</option>
@@ -562,7 +546,7 @@ onUnmounted(() => {
         <div class="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Email ID</label>
-            <input v-model="form.email" type="email" required class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="employee@company.com" />
+            <input v-model="form.email" type="email" name="edit_user_contact_email" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" required class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="employee@company.com" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Contact Number</label>
@@ -602,22 +586,22 @@ onUnmounted(() => {
         <div class="px-6 py-5 space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">System Login Email <span class="text-red-500">*</span></label>
-            <input v-model="form.email" type="email" required class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="login@company.com" />
+            <input v-model="form.email" type="email" name="edit_user_login_email" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" required class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="login@company.com" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">System Password</label>
             <div class="relative">
-              <input v-model="form.password" :type="showPassword ? 'text' : 'password'" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 pr-10" placeholder="Enter secure password (leave blank to keep current)" />
+              <input v-model="form.password" :type="showPassword ? 'text' : 'password'" name="edit_user_new_password" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 pr-10" placeholder="Enter secure password (leave blank to keep current)" />
               <button type="button" @click="showPassword = !showPassword" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                 <svg v-if="!showPassword" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                 <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
               </button>
             </div>
-            <p class="mt-1 text-xs text-gray-500">Leave blank to keep current password. Min 8 characters if changing.</p>
+            <p class="mt-1 text-xs text-gray-500">Leave blank to keep current password. If changed, it must follow Security password policy settings.</p>
           </div>
           <div v-if="form.password">
             <label class="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
-            <input v-model="form.password_confirmation" type="password" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Confirm new password" />
+            <input v-model="form.password_confirmation" type="password" name="edit_user_new_password_confirmation" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Confirm new password" />
           </div>
           <label class="flex items-center gap-2 cursor-pointer">
             <input v-model="form.force_password_reset" type="checkbox" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />

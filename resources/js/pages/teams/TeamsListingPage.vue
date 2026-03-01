@@ -31,7 +31,6 @@ const perms = computed(() => auth.user?.permissions ?? [])
 const canCreate = computed(() => isSuperAdmin.value || perms.value.includes('teams.create'))
 const canEdit = computed(() => isSuperAdmin.value || perms.value.includes('teams.edit'))
 const canDelete = computed(() => isSuperAdmin.value || perms.value.includes('teams.delete'))
-const canManageMembers = computed(() => isSuperAdmin.value || perms.value.includes('teams.manage_members'))
 
 /* ───── State ───── */
 const loading = ref(true)
@@ -306,7 +305,7 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-6 bg-white -mx-4 -my-5 min-h-full px-6 py-6">
-    <Toast v-model:visible="showToast" :type="toastType" :message="toastMsg" />
+    <Toast :show="showToast" :type="toastType" :message="toastMsg" @dismiss="showToast = false" />
 
     <!-- Header -->
     <div class="flex flex-wrap items-start justify-between gap-4">
@@ -548,10 +547,6 @@ onMounted(async () => {
                       <router-link v-if="canEdit" :to="`/teams/${row.id}/edit`" class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
                         <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                         Edit Team
-                      </router-link>
-                      <router-link v-if="canManageMembers" :to="`/teams/${row.id}/members`" class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                        <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
-                        Manage Members
                       </router-link>
                       <div v-if="canDelete" class="border-t border-gray-100 mt-1 pt-1">
                         <button type="button" class="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50" @click="confirmDelete(row)">

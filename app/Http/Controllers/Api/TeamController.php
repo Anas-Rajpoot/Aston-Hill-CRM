@@ -52,6 +52,7 @@ class TeamController extends Controller
             'team_leader_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
         ]);
 
+        $user = $request->user();
         $columns = $this->resolveColumns($user, $validated['columns'] ?? null);
         $perPage = (int) ($validated['per_page'] ?? 15);
         $page = (int) ($validated['page'] ?? 1);
@@ -94,6 +95,8 @@ class TeamController extends Controller
 
     public function store(StoreTeamRequest $request): JsonResponse
     {
+        $this->authorizeAction($request, 'create', ['teams.create', 'teams.add']);
+
         $data = $request->validated();
         [$managerIds, $leaderIds, $memberIds] = $this->resolveRoleAssignments($data);
         $data['manager_id'] = $managerIds[0] ?? null;
@@ -156,6 +159,8 @@ class TeamController extends Controller
 
     public function update(UpdateTeamRequest $request, Team $team): JsonResponse
     {
+        $this->authorizeAction($request, 'update', ['teams.edit', 'teams.update']);
+
         $oldData = $team->toArray();
         $data = $request->validated();
         [$managerIds, $leaderIds, $memberIds] = $this->resolveRoleAssignments($data);

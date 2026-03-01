@@ -4,7 +4,6 @@ namespace App\Policies;
 
 use App\Models\SpecialRequest;
 use App\Models\User;
-use App\Services\SubmissionAccessService;
 use App\Support\RbacPermission;
 
 class SpecialRequestPolicy
@@ -19,8 +18,7 @@ class SpecialRequestPolicy
 
     public function view(User $user, SpecialRequest $specialRequest): bool
     {
-        return $this->viewAny($user)
-            && SubmissionAccessService::canAccessRecord($user, $specialRequest);
+        return $this->viewAny($user);
     }
 
     public function update(User $user, SpecialRequest $specialRequest): bool

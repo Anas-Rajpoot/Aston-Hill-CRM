@@ -42,9 +42,12 @@ class RegisteredUserController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:'.User::class],
             'password' => ['required', 'confirmed', new \App\Rules\MeetsPasswordPolicy],
-            'phone' => ['required'],
+            'phone' => ['required', 'string', 'regex:/^971\d{9}$/'],
             'country' => ['required'],
             'cnic_number' => ['required'],
+        ], [
+            'phone.required' => 'Contact Number is required.',
+            'phone.regex' => 'Contact Number must be exactly 12 digits and start with 971.',
         ]);
 
         // Set must_change_password if security settings require it for first login

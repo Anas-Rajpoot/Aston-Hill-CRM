@@ -71,11 +71,10 @@ async function fetchFieldAudits(id) {
 
 const canBulkAssign = (() => {
   const roles = auth.user?.roles ?? []
-  if (!Array.isArray(roles)) return false
-  return roles.some((r) => {
-    const name = typeof r === 'string' ? r : r?.name
-    return name === 'superadmin' || name === 'field_agent' || name === 'field_operations_head'
-  })
+  const perms = auth.user?.permissions ?? []
+  const isSuperAdmin = Array.isArray(roles) && roles.some((r) => (typeof r === 'string' ? r : r?.name) === 'superadmin')
+  if (isSuperAdmin) return true
+  return perms.includes('field_head.assign_field_agent') || perms.includes('field-submissions.assign_field_agent')
 })()
 const sort = ref('created_at')
 const order = ref('desc')

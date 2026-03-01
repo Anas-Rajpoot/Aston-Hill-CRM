@@ -35,6 +35,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/countries', function () {
     return Cache::remember('api_countries', 3600, fn () => Country::where('is_active', true)->orderBy('name')->get(['id', 'name', 'code', 'timezone']));
 });
+Route::get('/password-policy', [\App\Http\Controllers\Api\ChangePasswordController::class, 'policy']);
 
 // ----- Auth (guest) – login needs session for same-origin SPA -----
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('web');
@@ -141,9 +142,10 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
         ->whereNumber('customerSupportSubmission');
 
     // Clients
-    Route::get('/clients', [\App\Http\Controllers\Api\ClientApiController::class, 'index']);
+    Route::get('/clients', [\App\Http\Controllers\Api\ClientApiController::class, 'index'])->middleware('etag.response');
     Route::post('/clients', [\App\Http\Controllers\Api\ClientApiController::class, 'store']);
-    Route::get('/clients/filters', [\App\Http\Controllers\Api\ClientApiController::class, 'filters']);
+    Route::get('/clients/filters', [\App\Http\Controllers\Api\ClientApiController::class, 'filters'])->middleware('etag.response');
+    Route::get('/clients+filters', [\App\Http\Controllers\Api\ClientApiController::class, 'clientsAndFilters'])->middleware('etag.response');
     Route::get('/clients/columns', [\App\Http\Controllers\Api\ClientApiController::class, 'columns']);
     Route::post('/clients/columns', [\App\Http\Controllers\Api\ClientApiController::class, 'saveColumns']);
     Route::post('/clients/import', [\App\Http\Controllers\Api\ClientApiController::class, 'importCsv']);

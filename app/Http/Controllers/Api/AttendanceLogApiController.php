@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\SystemAuditLog;
 use App\Models\User;
 use App\Models\UserLoginLog;
+use App\Support\RbacPermission;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -23,7 +24,7 @@ class AttendanceLogApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $this->authorizeView();
+        $this->authorizeView($request);
 
         $validated = $request->validate([
             'page' => ['sometimes', 'integer', 'min:1'],
@@ -111,7 +112,7 @@ class AttendanceLogApiController extends Controller
      */
     public function summary(Request $request): JsonResponse
     {
-        $this->authorizeView();
+        $this->authorizeView($request);
 
         $todayStart = now()->startOfDay();
 
@@ -135,7 +136,7 @@ class AttendanceLogApiController extends Controller
      */
     public function filters(Request $request): JsonResponse
     {
-        $this->authorizeView();
+        $this->authorizeView($request);
 
         $data = Cache::remember('attendance_log_filters', 600, function () {
             $users = User::query()
@@ -164,7 +165,7 @@ class AttendanceLogApiController extends Controller
      */
     public function forceLogoutLog(Request $request, UserLoginLog $userLoginLog): JsonResponse
     {
-        $this->authorizeForceLogout();
+        $this->authorizeForceLogout($request);
 
         if ($userLoginLog->session_id) {
             DB::table('sessions')->where('id', $userLoginLog->session_id)->delete();
@@ -195,7 +196,7 @@ class AttendanceLogApiController extends Controller
      */
     public function forceLogoutUser(Request $request, User $user): JsonResponse
     {
-        $this->authorizeForceLogout();
+        $this->authorizeForceLogout($request);
 
         DB::table('sessions')->where('user_id', $user->id)->delete();
 
@@ -219,16 +220,18 @@ class AttendanceLogApiController extends Controller
         return response()->json(['message' => 'User logged out from all sessions.']);
     }
 
-    private function authorizeView(): void
+    private function authorizeView(Request $request): void
     {
-        if (! (request()->user()->hasRole('superadmin') || request()->user()->can('view_attendance_logs'))) {
+        $user = $request->user();
+        if (! $user || ! RbacPermission::can($user, 'attendance', 'read', ['view_attendance_logs'])) {
             abort(403, 'Unauthorized.');
         }
     }
 
-    private function authorizeForceLogout(): void
+    private function authorizeForceLogout(Request $request): void
     {
-        if (! (request()->user()->hasRole('superadmin') || request()->user()->can('force_logout'))) {
+        $user = $request->user();
+        if (! $user || ! RbacPermission::can($user, 'attendance', 'update', ['force_logout'])) {
             abort(403, 'Unauthorized.');
         }
     }

@@ -139,7 +139,7 @@ class CustomerSupportSubmission extends Model
     public function scopeVisibleTo($q, User $user)
     {
         // CSR and support managers see ALL customer support submissions
-        if ($user->hasRole('customer_support_representative') || $user->hasRole('support_manager')) {
+        if ($user->hasRole('customer_support_representative') || $user->hasRole('support_manager') || $user->hasRole('csr')) {
             return $q;
         }
 

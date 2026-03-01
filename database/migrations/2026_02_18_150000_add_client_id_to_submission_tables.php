@@ -30,20 +30,54 @@ return new class extends Migration
         }
 
         // Backfill: link existing records by account_number
+        $driver = DB::getDriverName();
         foreach (self::TABLES as $table) {
             $accountCol = Schema::hasColumn($table, 'account_number') ? 'account_number' : null;
             if (! $accountCol) {
                 continue;
             }
 
-            DB::statement("
-                UPDATE `{$table}` AS s
-                INNER JOIN `clients` AS c ON LOWER(TRIM(s.`account_number`)) = LOWER(TRIM(c.`account_number`))
-                SET s.`client_id` = c.`id`
-                WHERE s.`client_id` IS NULL
-                  AND s.`account_number` IS NOT NULL
-                  AND s.`account_number` != ''
-            ");
+            if (in_array($driver, ['mysql', 'mariadb'], true)) {
+                DB::statement("
+                    UPDATE `{$table}` AS s
+                    INNER JOIN `clients` AS c ON LOWER(TRIM(s.`account_number`)) = LOWER(TRIM(c.`account_number`))
+                    SET s.`client_id` = c.`id`
+                    WHERE s.`client_id` IS NULL
+                      AND s.`account_number` IS NOT NULL
+                      AND s.`account_number` != ''
+                ");
+                continue;
+            }
+
+            // SQLite/Postgres-safe fallback backfill for tests and non-MySQL drivers.
+            $accountMap = DB::table('clients')
+                ->whereNotNull('account_number')
+                ->where('account_number', '!=', '')
+                ->pluck('id', 'account_number')
+                ->all();
+
+            $normalizedMap = [];
+            foreach ($accountMap as $accountNumber => $clientId) {
+                $normalizedMap[strtolower(trim((string) $accountNumber))] = (int) $clientId;
+            }
+
+            DB::table($table)
+                ->whereNull('client_id')
+                ->whereNotNull('account_number')
+                ->where('account_number', '!=', '')
+                ->orderBy('id')
+                ->select(['id', 'account_number'])
+                ->chunkById(500, function ($rows) use ($table, $normalizedMap) {
+                    foreach ($rows as $row) {
+                        $key = strtolower(trim((string) $row->account_number));
+                        $clientId = $normalizedMap[$key] ?? null;
+                        if (! $clientId) {
+                            continue;
+                        }
+
+                        DB::table($table)->where('id', $row->id)->update(['client_id' => $clientId]);
+                    }
+                });
         }
     }
 

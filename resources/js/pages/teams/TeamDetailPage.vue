@@ -16,7 +16,6 @@ const auth = useAuthStore()
 
 const isSuperAdmin = computed(() => auth.user?.roles?.includes('superadmin') ?? false)
 const canEdit = computed(() => isSuperAdmin.value || (auth.user?.permissions ?? []).includes('teams.edit'))
-const canManageMembers = computed(() => isSuperAdmin.value || (auth.user?.permissions ?? []).includes('teams.manage_members'))
 const canDelete = computed(() => isSuperAdmin.value || (auth.user?.permissions ?? []).includes('teams.delete'))
 
 const showToast = ref(false)
@@ -86,7 +85,7 @@ async function executeDelete() {
 
 <template>
   <div class="space-y-6">
-    <Toast v-model:visible="showToast" :type="toastType" :message="toastMsg" />
+    <Toast :show="showToast" :type="toastType" :message="toastMsg" @dismiss="showToast = false" />
 
     <div v-if="loading" class="flex justify-center py-16">
       <svg class="animate-spin h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
@@ -107,10 +106,6 @@ async function executeDelete() {
           <Breadcrumbs class="mt-1" />
         </div>
         <div class="flex items-center gap-2">
-          <button v-if="canManageMembers" type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="router.push(`/teams/${team.id}/members`)">
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
-            Manage Members
-          </button>
           <button v-if="canEdit" type="button" class="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700" @click="router.push(`/teams/${team.id}/edit`)">
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
             Edit Team
@@ -166,13 +161,11 @@ async function executeDelete() {
       <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
         <div class="px-5 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
           <h2 class="text-sm font-semibold text-gray-900">Team Members ({{ members.length }})</h2>
-          <button v-if="canManageMembers" type="button" class="text-sm text-green-600 hover:text-green-700 font-medium" @click="router.push(`/teams/${team.id}/members`)">Manage Members</button>
         </div>
 
         <div v-if="!members.length" class="px-5 py-10 text-center text-sm text-gray-400">
           <svg class="mx-auto h-10 w-10 text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
           No members in this team yet.
-          <button v-if="canManageMembers" type="button" class="block mx-auto mt-2 text-green-600 hover:text-green-700 font-medium" @click="router.push(`/teams/${team.id}/members`)">Add Members</button>
         </div>
 
         <!-- Group members by role -->

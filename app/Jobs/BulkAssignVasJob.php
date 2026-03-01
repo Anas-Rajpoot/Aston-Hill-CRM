@@ -40,6 +40,7 @@ class BulkAssignVasJob implements ShouldQueue
         foreach (array_chunk($this->submissionIds, $chunkSize) as $chunk) {
             $updated = VasRequestSubmission::query()
                 ->whereIn('id', $chunk)
+                ->when($user, fn ($q) => $q->visibleTo($user))
                 ->update(['back_office_executive_id' => $this->executiveId]);
 
             $totalUpdated += $updated;

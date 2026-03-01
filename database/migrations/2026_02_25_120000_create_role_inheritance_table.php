@@ -20,7 +20,10 @@ return new class extends Migration
         });
 
         // Prevent self-referential inheritance edges at DB level.
-        DB::statement('ALTER TABLE role_inheritance ADD CONSTRAINT role_inheritance_no_self_edge CHECK (parent_role_id <> child_role_id)');
+        // SQLite does not support adding table constraints via ALTER TABLE.
+        if (in_array(DB::getDriverName(), ['mysql', 'mariadb', 'pgsql'], true)) {
+            DB::statement('ALTER TABLE role_inheritance ADD CONSTRAINT role_inheritance_no_self_edge CHECK (parent_role_id <> child_role_id)');
+        }
     }
 
     public function down(): void

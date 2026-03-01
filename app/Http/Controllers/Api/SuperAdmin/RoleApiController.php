@@ -24,6 +24,8 @@ class RoleApiController extends Controller
      */
     public function index(): JsonResponse
     {
+        $this->authorizeRoleRead(request()->user());
+
         $result = $this->cache->getRolesList();
         return response()->json($result);
     }
@@ -35,10 +37,16 @@ class RoleApiController extends Controller
     {
         $this->authorizeRolePermissionAssignment($request->user());
 
+        $request->merge([
+            'name' => $this->normalizeRoleName((string) $request->input('name', '')),
+        ]);
+
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:190', 'unique:roles,name'],
+            'name' => ['required', 'string', 'max:190', 'regex:/^[a-z][a-z0-9_]*$/', 'unique:roles,name'],
             'description' => ['nullable', 'string', 'max:500'],
             'status' => ['nullable', 'string', 'in:active,inactive'],
+        ], [
+            'name.regex' => 'Role name must use lowercase letters, numbers, and underscores only (e.g. sales_agent).',
         ]);
         $role = Role::create([
             'name' => $data['name'],
@@ -56,6 +64,8 @@ class RoleApiController extends Controller
      */
     public function show(Role $role): JsonResponse
     {
+        $this->authorizeRoleRead(request()->user());
+
         return response()->json([
             'data' => [
                 'id' => $role->id,
@@ -76,10 +86,16 @@ class RoleApiController extends Controller
     {
         $this->authorizeRolePermissionAssignment($request->user());
 
+        $request->merge([
+            'name' => $this->normalizeRoleName((string) $request->input('name', '')),
+        ]);
+
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:190', 'unique:roles,name,' . $role->id],
+            'name' => ['required', 'string', 'max:190', 'regex:/^[a-z][a-z0-9_]*$/', 'unique:roles,name,' . $role->id],
             'description' => ['nullable', 'string', 'max:500'],
             'status' => ['nullable', 'string', 'in:active,inactive'],
+        ], [
+            'name.regex' => 'Role name must use lowercase letters, numbers, and underscores only (e.g. sales_agent).',
         ]);
 
         // Prevent renaming system role used by middleware, policies, and Blade directives
@@ -120,6 +136,8 @@ class RoleApiController extends Controller
      */
     public function permissionsStructure(): JsonResponse
     {
+        $this->authorizeRoleRead(request()->user());
+
         return response()->json(['data' => $this->cache->getStructure()]);
     }
 
@@ -128,6 +146,8 @@ class RoleApiController extends Controller
      */
     public function permissionsPageData(Role $role): JsonResponse
     {
+        $this->authorizeRoleRead(request()->user());
+
         $payload = $this->cache->getPermissionsPageData((int) $role->id);
         return response()->json(['data' => $payload]);
     }
@@ -137,6 +157,8 @@ class RoleApiController extends Controller
      */
     public function rolePermissions(Role $role): JsonResponse
     {
+        $this->authorizeRoleRead(request()->user());
+
         $payload = $this->cache->getPermissionsPageData((int) $role->id);
         return response()->json([
             'data' => [
@@ -223,5 +245,24 @@ class RoleApiController extends Controller
         ])) {
             abort(403, 'Unauthorized');
         }
+    }
+
+    private function authorizeRoleRead($user): void
+    {
+        if (! $user || ! RbacPermission::can($user, 'roles', 'read', [
+            'roles.list',
+            'roles.view',
+        ])) {
+            abort(403, 'Unauthorized');
+        }
+    }
+
+    private function normalizeRoleName(string $name): string
+    {
+        $value = strtolower(trim($name));
+        $value = preg_replace('/[\s\-]+/', '_', $value) ?? $value;
+        $value = preg_replace('/[^a-z0-9_]/', '', $value) ?? $value;
+        $value = preg_replace('/_+/', '_', $value) ?? $value;
+        return trim($value, '_');
     }
 }

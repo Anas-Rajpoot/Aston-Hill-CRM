@@ -28,6 +28,48 @@ const ACCOUNT_MANAGER_OPTIONS = [
   'Mohamed Shanib',
   'Tanveer Mirza',
 ]
+const ACCOUNT_TRANSFER_GIVEN_TO_OPTIONS = [
+  'ASTON HILL INTERNATIONAL GENERAL TRADING L.L.C',
+  'DTD',
+  'Retail',
+  'TAM',
+  'LE-GOV',
+  'ARKTEL TECHNOLOGIES L.L.C',
+  'BRANDZ MANAGEMENT CONSULTANCY',
+  'BROUD VISSION SIM TRADING LLC',
+  'CAREER HOUSE COMMUNICATIONS LLC',
+  'DARKBLUE TECHNOLOGY L.L.C',
+  'DIGITWISE TRADING',
+  'EMPEROR COM TECHNOLOGIES L.L.C',
+  'FLY LIGHT ELECTRONICS TRADING LLC',
+  'GRID TECHNOLOGY SOLUTIONS',
+  'HADAF AL KHALEEJ MANAGEMENT CONSULTANCY',
+  'INFINITY HUB TECHNOLOGY',
+  'INFO X COMMUNICATIONS L.L.C',
+  'M B M AL SHARQ GENERAL TRADING L.L.C',
+  'NEW HEIGHTS TECHNOLOGIES LLC',
+  'SAWA INTERNATIONAL GENERAL TRADING  LLC',
+  'SHAUN TECHNOLOGIES TRADING LLC',
+  'SMART LINK TELECOMMUNICATIONS TRADING LLC',
+  'S R J ELECTRONIC TRADING LLC',
+  'STALWART MOBILE TRADING LLC',
+  'STONE HOUSE TELECOM',
+  'STRATEGIC TECHNOLOGY SOLUTION',
+  'TALACO L.L.C',
+  'TANSHEET AL MUBASHIR TECHNOLOGY LLC',
+  'TAYA INFORMATION TECHNOLOGY SERVICES LLC',
+  'TELBIZ COMMUNICATION LLC',
+  'VEGA GLOBAL BUSINESS SERVICES FZ LLE',
+  'VISIONTEL TECHNOLOGY',
+  'X SAT FZE',
+]
+const accountTransferGivenToOptions = computed(() => {
+  const current = String(form.value.account_transfer_given_to || '').trim()
+  if (!current) return ACCOUNT_TRANSFER_GIVEN_TO_OPTIONS
+  return ACCOUNT_TRANSFER_GIVEN_TO_OPTIONS.includes(current)
+    ? ACCOUNT_TRANSFER_GIVEN_TO_OPTIONS
+    : [current, ...ACCOUNT_TRANSFER_GIVEN_TO_OPTIONS]
+})
 
 const form = ref({
   company_name: '',
@@ -300,7 +342,10 @@ onMounted(() => load())
               </div>
               <div>
                 <label class="text-xs font-medium text-gray-500">Account Transfer Given To</label>
-                <input v-model="form.account_transfer_given_to" type="text" placeholder="Enter value" :class="inputClass('account_transfer_given_to')" />
+                <select v-model="form.account_transfer_given_to" :class="selectClass('account_transfer_given_to')">
+                  <option value="">Select account transfer given to</option>
+                  <option v-for="opt in accountTransferGivenToOptions" :key="opt" :value="opt">{{ opt }}</option>
+                </select>
               </div>
               <div>
                 <label class="text-xs font-medium text-gray-500">Account Transfer Given Date</label>

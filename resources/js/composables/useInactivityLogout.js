@@ -104,11 +104,10 @@ export function useInactivityLogout() {
 
   // ── Activity tracking ────────────────────────────────
   function onActivity() {
-    // Only reset if warning is NOT showing
-    // When warning is showing, user must click "Stay Signed In"
-    if (!showWarning.value) {
-      resetTimers()
-    }
+    // Any user activity means the session is not inactive.
+    // Keep logout strictly inactivity-based, even during warning countdown.
+    if (!auth.isAuthenticated) return
+    resetTimers()
   }
 
   // ── Tab visibility ───────────────────────────────────

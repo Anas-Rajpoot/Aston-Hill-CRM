@@ -9,6 +9,7 @@ use App\Models\ExpenseAttachment;
 use App\Models\SystemAuditLog;
 use App\Models\User;
 use App\Models\UserColumnPreference;
+use App\Support\RbacPermission;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -21,6 +22,7 @@ class ExpenseApiController extends Controller
     use \App\Traits\ResolvesAuditDisplayValues;
 
     private const MODULE = 'expenses';
+    private const PRODUCT_CATEGORIES = ['Staionary', 'water', 'It', 'telecom', 'nol/taxi', 'others'];
 
     private const ALLOWED_COLUMNS = [
         'id', 'expense_date', 'product_category', 'product_description', 'invoice_number',
@@ -35,9 +37,7 @@ class ExpenseApiController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        if (! $request->user()->can('expense_tracker.list') && ! $request->user()->hasRole('superadmin')) {
-            abort(403);
-        }
+        $this->authorizeAction($request, 'read', ['expense_tracker.list', 'expense_tracker.view']);
 
         $validated = $request->validate([
             'page' => ['sometimes', 'integer', 'min:1'],
@@ -50,7 +50,7 @@ class ExpenseApiController extends Controller
             'expense_date_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:expense_date_from'],
             'created_from' => ['sometimes', 'nullable', 'date'],
             'created_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:created_from'],
-            'product_category' => ['sometimes', 'nullable', 'string', 'max:190'],
+            'product_category' => ['sometimes', 'nullable', 'string', Rule::in(self::PRODUCT_CATEGORIES)],
             'added_by' => ['sometimes', 'nullable', 'string', 'max:200'],
             'amount_min' => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'amount_max' => ['sometimes', 'nullable', 'numeric', 'min:0'],
@@ -95,9 +95,7 @@ class ExpenseApiController extends Controller
 
     public function summary(Request $request): JsonResponse
     {
-        if (! $request->user()->can('expense_tracker.list') && ! $request->user()->hasRole('superadmin')) {
-            abort(403);
-        }
+        $this->authorizeAction($request, 'read', ['expense_tracker.list', 'expense_tracker.view']);
 
         $query = Expense::query()->selectRaw('COUNT(*) as total, COALESCE(SUM(full_amount), 0) as sum_amount, SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as pending_count, SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as approved_count', [Expense::STATUS_PENDING, Expense::STATUS_APPROVED]);
         if (! $request->user()->hasRole('superadmin')) {
@@ -115,19 +113,15 @@ class ExpenseApiController extends Controller
 
     public function filters(Request $request): JsonResponse
     {
-        if (! $request->user()->can('expense_tracker.list') && ! $request->user()->hasRole('superadmin')) {
-            abort(403);
-        }
+        $this->authorizeAction($request, 'read', ['expense_tracker.list', 'expense_tracker.view']);
 
         $user = $request->user();
         $cacheKey = 'expense_filters_' . ($user->hasRole('superadmin') ? 'sa' : $user->id);
         $data = Cache::remember($cacheKey, 600, function () use ($request) {
-            $query = Expense::query();
-            if (! $request->user()->hasRole('superadmin')) {
-                $query->where('user_id', $request->user()->id);
-            }
-            $categories = $query->clone()->distinct()->pluck('product_category')->filter()->sort()->values()
-                ->map(fn ($c) => ['value' => $c, 'label' => $c])->all();
+            $categories = collect(self::PRODUCT_CATEGORIES)
+                ->map(fn ($c) => ['value' => $c, 'label' => $this->formatProductCategoryLabel($c)])
+                ->values()
+                ->all();
 
             $vatPercentOptions = [
                 ['value' => 0, 'label' => '0% (Exempt)'],
@@ -166,9 +160,7 @@ class ExpenseApiController extends Controller
 
     public function columns(Request $request): JsonResponse
     {
-        if (! $request->user()->can('expense_tracker.list') && ! $request->user()->hasRole('superadmin')) {
-            abort(403);
-        }
+        $this->authorizeAction($request, 'read', ['expense_tracker.list', 'expense_tracker.view']);
 
         $config = config('modules.expenses.columns', []);
         $allColumns = [];
@@ -192,9 +184,7 @@ class ExpenseApiController extends Controller
 
     public function saveColumns(Request $request): JsonResponse
     {
-        if (! $request->user()->can('expense_tracker.list') && ! $request->user()->hasRole('superadmin')) {
-            abort(403);
-        }
+        $this->authorizeAction($request, 'read', ['expense_tracker.list', 'expense_tracker.view']);
 
         $data = $request->validate([
             'visible_columns' => ['required', 'array', 'min:1'],
@@ -213,13 +203,11 @@ class ExpenseApiController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        if (! $request->user()->can('expense_tracker.create') && ! $request->user()->hasRole('superadmin')) {
-            abort(403);
-        }
+        $this->authorizeAction($request, 'create', ['expense_tracker.create']);
 
         $validated = $request->validate([
             'expense_date' => ['required', 'date'],
-            'product_category' => ['required', 'string', 'max:190'],
+            'product_category' => ['required', 'string', Rule::in(self::PRODUCT_CATEGORIES)],
             'product_description' => ['required', 'string', 'max:65535'],
             'invoice_number' => ['nullable', 'string', 'max:190'],
             'comment' => ['required', 'string', 'max:65535'],
@@ -299,27 +287,23 @@ class ExpenseApiController extends Controller
         }
     }
 
-    public function show(Expense $expense): JsonResponse
+    public function show(Request $request, Expense $expense): JsonResponse
     {
-        if (! request()->user()->can('expense_tracker.view') && ! request()->user()->can('expense_tracker.list') && ! request()->user()->hasRole('superadmin')) {
-            abort(403);
-        }
-        if ($expense->user_id !== request()->user()->id && ! request()->user()->hasRole('superadmin')) {
+        $this->authorizeAction($request, 'read', ['expense_tracker.view', 'expense_tracker.list']);
+        if ($expense->user_id !== $request->user()->id && ! $request->user()->hasRole('superadmin')) {
             abort(403);
         }
         $expense->load(['user:id,name', 'attachments']);
         return response()->json(['data' => $this->formatShowData($expense)]);
     }
 
-    public function downloadAttachment(Expense $expense, ExpenseAttachment $attachment): StreamedResponse
+    public function downloadAttachment(Request $request, Expense $expense, ExpenseAttachment $attachment): StreamedResponse
     {
         if ($attachment->expense_id !== $expense->id) {
             abort(404);
         }
-        if (! request()->user()->can('expense_tracker.view') && ! request()->user()->can('expense_tracker.list') && ! request()->user()->hasRole('superadmin')) {
-            abort(403);
-        }
-        if ($expense->user_id !== request()->user()->id && ! request()->user()->hasRole('superadmin')) {
+        $this->authorizeAction($request, 'read', ['expense_tracker.view', 'expense_tracker.list']);
+        if ($expense->user_id !== $request->user()->id && ! $request->user()->hasRole('superadmin')) {
             abort(403);
         }
         $path = $attachment->path;
@@ -334,13 +318,12 @@ class ExpenseApiController extends Controller
 
     public function destroyAttachment(Expense $expense, ExpenseAttachment $attachment): JsonResponse
     {
+        $request = request();
         if ($attachment->expense_id !== $expense->id) {
             abort(404);
         }
-        if (! request()->user()->can('expense_tracker.edit') && ! request()->user()->can('expense_tracker.update') && ! request()->user()->hasRole('superadmin')) {
-            abort(403);
-        }
-        if ($expense->user_id !== request()->user()->id && ! request()->user()->hasRole('superadmin')) {
+        $this->authorizeAction($request, 'update', ['expense_tracker.edit', 'expense_tracker.update']);
+        if ($expense->user_id !== $request->user()->id && ! $request->user()->hasRole('superadmin')) {
             abort(403);
         }
         $disk = $attachment->disk ?? 'local';
@@ -348,7 +331,7 @@ class ExpenseApiController extends Controller
             Storage::disk($disk)->delete($attachment->path);
         }
         try {
-            SystemAuditLog::record('expense.attachment_deleted', ['expense_id' => $expense->id, 'attachment_id' => $attachment->id, 'attachment_name' => $attachment->original_name], null, request()->user()->id, 'expense', $expense->id);
+            SystemAuditLog::record('expense.attachment_deleted', ['expense_id' => $expense->id, 'attachment_id' => $attachment->id, 'attachment_name' => $attachment->original_name], null, $request->user()->id, 'expense', $expense->id);
         } catch (\Throwable $e) {}
         $attachment->delete();
         return response()->json(['message' => 'Attachment removed.']);
@@ -356,17 +339,15 @@ class ExpenseApiController extends Controller
 
     public function addAttachments(Request $request, Expense $expense): JsonResponse
     {
-        if (! request()->user()->can('expense_tracker.edit') && ! request()->user()->can('expense_tracker.update') && ! request()->user()->hasRole('superadmin')) {
-            abort(403);
-        }
-        if ($expense->user_id !== request()->user()->id && ! request()->user()->hasRole('superadmin')) {
+        $this->authorizeAction($request, 'update', ['expense_tracker.edit', 'expense_tracker.update']);
+        if ($expense->user_id !== $request->user()->id && ! $request->user()->hasRole('superadmin')) {
             abort(403);
         }
         $this->storeAttachments($request, $expense);
         $expense->load(['user:id,name', 'attachments']);
         $attachmentCount = $expense->attachments->count();
         try {
-            SystemAuditLog::record('expense.attachments_added', null, ['expense_id' => $expense->id, 'attachment_count' => $attachmentCount], request()->user()->id, 'expense', $expense->id);
+            SystemAuditLog::record('expense.attachments_added', null, ['expense_id' => $expense->id, 'attachment_count' => $attachmentCount], $request->user()->id, 'expense', $expense->id);
         } catch (\Throwable $e) {}
         $data = $this->formatShowData($expense);
         return response()->json(['message' => 'Attachments added.', 'data' => $data]);
@@ -374,16 +355,14 @@ class ExpenseApiController extends Controller
 
     public function update(Request $request, Expense $expense): JsonResponse
     {
-        if (! request()->user()->can('expense_tracker.edit') && ! request()->user()->can('expense_tracker.update') && ! request()->user()->hasRole('superadmin')) {
-            abort(403);
-        }
-        if ($expense->user_id !== request()->user()->id && ! request()->user()->hasRole('superadmin')) {
+        $this->authorizeAction($request, 'update', ['expense_tracker.edit', 'expense_tracker.update']);
+        if ($expense->user_id !== $request->user()->id && ! $request->user()->hasRole('superadmin')) {
             abort(403);
         }
 
         $validated = $request->validate([
             'expense_date' => ['sometimes', 'required', 'date'],
-            'product_category' => ['sometimes', 'required', 'string', 'max:190'],
+            'product_category' => ['sometimes', 'required', 'string', Rule::in(self::PRODUCT_CATEGORIES)],
             'product_description' => ['sometimes', 'required', 'string', 'max:65535'],
             'invoice_number' => ['nullable', 'string', 'max:190'],
             'comment' => ['sometimes', 'required', 'string', 'max:65535'],
@@ -395,9 +374,9 @@ class ExpenseApiController extends Controller
 
         $old = $expense->only(array_keys($validated));
         $userId = $expense->user_id;
-        if (request()->user()->hasRole('superadmin') && array_key_exists('user_id', $validated)) {
+        if ($request->user()->hasRole('superadmin') && array_key_exists('user_id', $validated)) {
             $userId = $validated['user_id'] ? (int) $validated['user_id'] : $expense->user_id;
-        } elseif (! request()->user()->hasRole('superadmin')) {
+        } elseif (! $request->user()->hasRole('superadmin')) {
             unset($validated['user_id']);
         }
 
@@ -490,12 +469,10 @@ class ExpenseApiController extends Controller
         ]);
     }
 
-    public function auditLog(Expense $expense): JsonResponse
+    public function auditLog(Request $request, Expense $expense): JsonResponse
     {
-        if (! request()->user()->can('expense_tracker.view') && ! request()->user()->can('expense_tracker.list') && ! request()->user()->hasRole('superadmin')) {
-            abort(403);
-        }
-        if ($expense->user_id !== request()->user()->id && ! request()->user()->hasRole('superadmin')) {
+        $this->authorizeAction($request, 'read', ['expense_tracker.view', 'expense_tracker.list']);
+        if ($expense->user_id !== $request->user()->id && ! $request->user()->hasRole('superadmin')) {
             abort(403);
         }
         $audits = $expense->audits()
@@ -522,12 +499,10 @@ class ExpenseApiController extends Controller
         return response()->json(['data' => $audits]);
     }
 
-    public function destroy(Expense $expense): JsonResponse
+    public function destroy(Request $request, Expense $expense): JsonResponse
     {
-        if (! request()->user()->can('expense_tracker.delete') && ! request()->user()->hasRole('superadmin')) {
-            abort(403);
-        }
-        if ($expense->user_id !== request()->user()->id && ! request()->user()->hasRole('superadmin')) {
+        $this->authorizeAction($request, 'delete', ['expense_tracker.delete']);
+        if ($expense->user_id !== $request->user()->id && ! $request->user()->hasRole('superadmin')) {
             abort(403);
         }
         $userId = $expense->user_id;
@@ -535,10 +510,19 @@ class ExpenseApiController extends Controller
         $this->writeAuditLog($expense, 'deleted', $old, null);
         $expense->delete();
         Cache::forget('expense_filters_' . $userId);
-        if (request()->user()?->hasRole('superadmin')) {
+        if ($request->user()?->hasRole('superadmin')) {
             Cache::forget('expense_filters_sa');
         }
         return response()->json(['message' => 'Expense deleted.']);
+    }
+
+    private function authorizeAction(Request $request, string $action, array $legacy = []): void
+    {
+        $user = $request->user();
+
+        if (! $user || ! RbacPermission::can($user, ['expense_tracker', 'expenses'], $action, $legacy)) {
+            abort(403, 'Unauthorized.');
+        }
     }
 
     private function applyFilters($query, array $validated, $user): void
@@ -634,5 +618,29 @@ class ExpenseApiController extends Controller
         $allowed = array_flip($columns);
         $allowed['id'] = $allowed['expense_id'] = $allowed['expense_date_raw'] = $allowed['vat_amount_raw'] = $allowed['amount_without_vat_raw'] = true;
         return array_intersect_key($out, $allowed);
+    }
+
+    private function formatProductCategoryLabel(string $value): string
+    {
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return $value;
+        }
+        if (strtolower($trimmed) === 'it') {
+            return 'IT';
+        }
+
+        return collect(explode('/', $trimmed))
+            ->map(function (string $part): string {
+                $part = trim($part);
+                if ($part === '') {
+                    return $part;
+                }
+                if (strtolower($part) === 'it') {
+                    return 'IT';
+                }
+                return ucfirst(strtolower($part));
+            })
+            ->implode('/');
     }
 }

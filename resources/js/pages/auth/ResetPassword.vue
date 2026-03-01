@@ -27,7 +27,7 @@ const policy = reactive({
 
 onMounted(async () => {
   try {
-    const { data } = await api.get('/change-password/policy')
+    const { data } = await api.get('/password-policy')
     Object.assign(policy, data.data)
   } catch { /* use defaults */ }
 })

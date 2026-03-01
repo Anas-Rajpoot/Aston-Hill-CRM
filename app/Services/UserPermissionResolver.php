@@ -30,25 +30,31 @@ class UserPermissionResolver
             ->values()
             ->all();
 
-        // Permissions: via roles + direct model_has_permissions. Single query with UNION.
-        $permissionNames = DB::select(
-            "
-            (SELECT p.name
-             FROM role_has_permissions rhp
-             INNER JOIN model_has_roles mhr ON mhr.role_id = rhp.role_id
-                 AND mhr.model_id = ? AND mhr.model_type = ?
-             INNER JOIN permissions p ON p.id = rhp.permission_id
-             WHERE p.guard_name = ?)
-            UNION
-            (SELECT p.name
-             FROM model_has_permissions mhp
-             INNER JOIN permissions p ON p.id = mhp.permission_id
-             WHERE mhp.model_id = ? AND mhp.model_type = ? AND p.guard_name = ?)
-            ",
-            [$userId, $modelType, self::GUARD, $userId, $modelType, self::GUARD]
-        );
+        // Permissions: via roles + direct model_has_permissions. Cross-DB union query.
+        $viaRoles = DB::table('role_has_permissions as rhp')
+            ->join('model_has_roles as mhr', function ($join) use ($userId, $modelType) {
+                $join->on('mhr.role_id', '=', 'rhp.role_id')
+                    ->where('mhr.model_id', $userId)
+                    ->where('mhr.model_type', $modelType);
+            })
+            ->join('permissions as p', 'p.id', '=', 'rhp.permission_id')
+            ->where('p.guard_name', self::GUARD)
+            ->select('p.name');
 
-        $permissions = array_values(array_unique(array_map(fn ($row) => $row->name, $permissionNames)));
+        $direct = DB::table('model_has_permissions as mhp')
+            ->join('permissions as p', 'p.id', '=', 'mhp.permission_id')
+            ->where('mhp.model_id', $userId)
+            ->where('mhp.model_type', $modelType)
+            ->where('p.guard_name', self::GUARD)
+            ->select('p.name');
+
+        $permissions = $viaRoles
+            ->union($direct)
+            ->pluck('name')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
 
         return ['roles' => $roles, 'permissions' => $permissions];
     }

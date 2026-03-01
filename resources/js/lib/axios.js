@@ -11,6 +11,22 @@ const csrfToken = () => {
   return meta ? meta.getAttribute('content') : null
 }
 
+const MUTATION_METHODS = new Set(['post', 'put', 'patch', 'delete'])
+
+function emitGlobalToast(type, message) {
+  if (typeof window === 'undefined') return
+  const text = String(message || '').trim()
+  if (!text) return
+  window.dispatchEvent(new CustomEvent('app:toast', { detail: { type, message: text } }))
+}
+
+function getErrorMessage(err) {
+  const data = err?.response?.data
+  if (typeof data?.message === 'string' && data.message.trim()) return data.message.trim()
+  if (typeof err?.message === 'string' && err.message.trim()) return err.message.trim()
+  return 'Request failed. Please try again.'
+}
+
 // API axios – baseURL /api for all API calls (session or token auth)
 export const api = axios.create({
   baseURL: '/api',
@@ -91,8 +107,12 @@ api.interceptors.response.use(
 api.interceptors.response.use(
   (res) => res,
   (err) => {
+    const status = err.response?.status
+    const requestUrl = String(err?.config?.url || '')
+    const isAuthLoginRequest = /\/auth\/login$/i.test(requestUrl)
+
     if (
-      err.response?.status === 401 &&
+      status === 401 &&
       err.response?.data?.reason === 'session_terminated'
     ) {
       import('@/stores/auth').then(({ useAuthStore }) => {
@@ -116,6 +136,29 @@ api.interceptors.response.use(
       window.location.href = '/login'
       return new Promise(() => {}) // never resolves – page is navigating away
     }
+
+    // Generic unauthorized handler: redirect to login for protected API calls.
+    // Skip auth/login call so invalid credentials can still show inline error on login page.
+    if (status === 401 && !isAuthLoginRequest) {
+      import('@/stores/auth').then(({ useAuthStore }) => {
+        const auth = useAuthStore()
+        auth.user = null
+        auth.token = null
+        auth.passwordAction = null
+        auth._lastFetchedAt = 0
+        sessionStorage.removeItem('api_token')
+        localStorage.removeItem('api_token')
+        try {
+          sessionStorage.removeItem('auth_bootstrap')
+          localStorage.removeItem('auth_bootstrap')
+          sessionStorage.removeItem('force_logout_on_close')
+        } catch { /* */ }
+      })
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login'
+        return new Promise(() => {}) // never resolves – page is navigating away
+      }
+    }
     return Promise.reject(err)
   }
 )
@@ -138,6 +181,26 @@ api.interceptors.response.use(
     await new Promise((r) => setTimeout(r, delay))
     if (config.signal?.aborted) return Promise.reject(err)
     return api.request(config)
+  }
+)
+
+// Global create/update/delete toasts across the app.
+api.interceptors.response.use(
+  (res) => {
+    const method = String(res?.config?.method || 'get').toLowerCase()
+    const notify = MUTATION_METHODS.has(method) && res?.config?.showToast !== false
+    if (notify) {
+      const serverMessage = res?.data?.message
+      const fallback = method === 'post' ? 'Created successfully.' : 'Updated successfully.'
+      emitGlobalToast('success', serverMessage || fallback)
+    }
+    return res
+  },
+  (err) => {
+    const method = String(err?.config?.method || 'get').toLowerCase()
+    const notify = MUTATION_METHODS.has(method) && err?.config?.showToast !== false
+    if (notify) emitGlobalToast('error', getErrorMessage(err))
+    return Promise.reject(err)
   }
 )
 

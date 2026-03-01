@@ -19,6 +19,7 @@ const form = ref({
 })
 const error = ref(null)
 const loading = ref(false)
+const fieldErrors = reactive({})
 
 const policy = reactive({
   min_length: 8,
@@ -30,7 +31,7 @@ const policy = reactive({
 onMounted(async () => {
   const [countriesRes] = await Promise.allSettled([
     api.get('/countries'),
-    api.get('/change-password/policy').then(({ data }) => Object.assign(policy, data.data)),
+    api.get('/password-policy').then(({ data }) => Object.assign(policy, data.data)),
   ])
   if (countriesRes.status === 'fulfilled') countries.value = countriesRes.value.data
 })
@@ -40,8 +41,53 @@ const onCountryChange = () => {
   form.value.timezone = c?.timezone || ''
 }
 
+const onContactNumberInput = (event) => {
+  form.value.phone = String(event?.target?.value ?? '').replace(/\D/g, '').slice(0, 12)
+  if (fieldErrors.phone) delete fieldErrors.phone
+}
+
+const validatePhone = (value) => {
+  if (!/^\d{12}$/.test(value)) return 'Must be exactly 12 digits with no spaces (e.g. 971XXXXXXXXX).'
+  if (!value.startsWith('971')) return 'Must start with 971.'
+  return null
+}
+
+const validatePasswordAgainstPolicy = (value) => {
+  const minLength = Number(policy.min_length) || 8
+  if (!value || value.length < minLength) return `Password must be at least ${minLength} characters.`
+  if (policy.require_uppercase && !/[A-Z]/.test(value)) return 'Password must contain at least one uppercase letter.'
+  if (policy.require_number && !/[0-9]/.test(value)) return 'Password must contain at least one number.'
+  if (policy.require_special && !/[^A-Za-z0-9]/.test(value)) return 'Password must contain at least one special character.'
+  return null
+}
+
 const submit = async () => {
   error.value = null
+  Object.keys(fieldErrors).forEach((k) => delete fieldErrors[k])
+
+  if (!form.value.name?.trim()) fieldErrors.name = 'Name is required.'
+  if (!form.value.email?.trim()) fieldErrors.email = 'Email is required.'
+  if (!form.value.phone?.trim()) {
+    fieldErrors.phone = 'Contact Number is required.'
+  } else {
+    const phoneErr = validatePhone(form.value.phone.trim())
+    if (phoneErr) fieldErrors.phone = phoneErr
+  }
+  if (!form.value.country) fieldErrors.country = 'Country is required.'
+  if (!form.value.cnic_number?.trim()) fieldErrors.cnic_number = 'CNIC Number is required.'
+  const passwordErr = validatePasswordAgainstPolicy(form.value.password || '')
+  if (passwordErr) fieldErrors.password = passwordErr
+  if (!form.value.password_confirmation) {
+    fieldErrors.password_confirmation = 'Confirm Password is required.'
+  } else if (form.value.password !== form.value.password_confirmation) {
+    fieldErrors.password_confirmation = 'Password and confirmation do not match.'
+  }
+
+  if (Object.keys(fieldErrors).length > 0) {
+    error.value = 'Please fix the highlighted errors.'
+    return
+  }
+
   loading.value = true
   try {
     await web.get('/sanctum/csrf-cookie')
@@ -64,39 +110,55 @@ const submit = async () => {
 
       <form @submit.prevent="submit" class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-          <input v-model="form.name" type="text" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+          <label class="block text-sm font-medium text-gray-700 mb-1">Name <span class="text-red-500">*</span></label>
+          <input v-model="form.name" type="text" required class="w-full rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500" :class="fieldErrors.name ? 'border-red-400 bg-red-50' : 'border-gray-300'" />
+          <p v-if="fieldErrors.name" class="mt-1 text-xs text-red-600">{{ fieldErrors.name }}</p>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-          <input v-model="form.email" type="email" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+          <label class="block text-sm font-medium text-gray-700 mb-1">Email <span class="text-red-500">*</span></label>
+          <input v-model="form.email" type="email" required class="w-full rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500" :class="fieldErrors.email ? 'border-red-400 bg-red-50' : 'border-gray-300'" />
+          <p v-if="fieldErrors.email" class="mt-1 text-xs text-red-600">{{ fieldErrors.email }}</p>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
-          <input v-model="form.phone" type="tel" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+          <label class="block text-sm font-medium text-gray-700 mb-1">Contact Number <span class="text-red-500">*</span></label>
+          <input
+            v-model="form.phone"
+            type="text"
+            maxlength="12"
+            required
+            placeholder="971XXXXXXXXX"
+            class="w-full rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            :class="fieldErrors.phone ? 'border-red-400 bg-red-50' : 'border-gray-300'"
+            @input="onContactNumberInput"
+          />
+          <p v-if="fieldErrors.phone" class="mt-1 text-xs text-red-600">{{ fieldErrors.phone }}</p>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Country *</label>
-          <select v-model="form.country" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" @change="onCountryChange">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Country <span class="text-red-500">*</span></label>
+          <select v-model="form.country" required class="w-full rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500" :class="fieldErrors.country ? 'border-red-400 bg-red-50' : 'border-gray-300'" @change="onCountryChange">
             <option value="">Select your country</option>
             <option v-for="c in countries" :key="c.id" :value="c.code" :data-timezone="c.timezone">{{ c.name }}</option>
           </select>
+          <p v-if="fieldErrors.country" class="mt-1 text-xs text-red-600">{{ fieldErrors.country }}</p>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
           <input v-model="form.timezone" type="text" readonly class="w-full rounded-lg border-gray-300 bg-gray-50" />
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">CNIC Number *</label>
-          <input v-model="form.cnic_number" type="text" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+          <label class="block text-sm font-medium text-gray-700 mb-1">CNIC Number <span class="text-red-500">*</span></label>
+          <input v-model="form.cnic_number" type="text" required class="w-full rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500" :class="fieldErrors.cnic_number ? 'border-red-400 bg-red-50' : 'border-gray-300'" />
+          <p v-if="fieldErrors.cnic_number" class="mt-1 text-xs text-red-600">{{ fieldErrors.cnic_number }}</p>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Password *</label>
-          <input v-model="form.password" type="password" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+          <label class="block text-sm font-medium text-gray-700 mb-1">Password <span class="text-red-500">*</span></label>
+          <input v-model="form.password" type="password" required class="w-full rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500" :class="fieldErrors.password ? 'border-red-400 bg-red-50' : 'border-gray-300'" />
+          <p v-if="fieldErrors.password" class="mt-1 text-xs text-red-600">{{ fieldErrors.password }}</p>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Confirm Password *</label>
-          <input v-model="form.password_confirmation" type="password" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+          <label class="block text-sm font-medium text-gray-700 mb-1">Confirm Password <span class="text-red-500">*</span></label>
+          <input v-model="form.password_confirmation" type="password" required class="w-full rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500" :class="fieldErrors.password_confirmation ? 'border-red-400 bg-red-50' : 'border-gray-300'" />
+          <p v-if="fieldErrors.password_confirmation" class="mt-1 text-xs text-red-600">{{ fieldErrors.password_confirmation }}</p>
         </div>
         <PasswordStrengthMeter ref="strengthMeter" :password="form.password" :policy="policy" />
         <p v-if="error" class="text-sm text-red-600">{{ error }}</p>

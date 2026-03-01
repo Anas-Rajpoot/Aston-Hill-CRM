@@ -360,7 +360,7 @@ class LeadSubmissionController extends Controller
     /** STEP 2 */
     public function createStep2(LeadSubmission $leadSubmission, Request $request)
     {
-        $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
+        $this->authorizeLeadSubmissionAccess($request, $leadSubmission, 'view');
 
         $categories = ServiceCategory::orderBy('name')->get(['id','name']);
         return view('lead-submission.wizard.step2', compact('leadSubmission','categories'));
@@ -368,7 +368,7 @@ class LeadSubmissionController extends Controller
 
     public function storeStep2(Request $request, LeadSubmission $lead)
     {
-        $this->authorizeLeadSubmissionAccess($request, $lead);
+        $this->authorizeLeadSubmissionAccess($request, $lead, 'update');
 
         $data = $request->validate([
             'service_category_id' => ['required', 'integer', 'exists:service_categories,id'],
@@ -408,7 +408,7 @@ class LeadSubmissionController extends Controller
     /** STEP 3 (dynamic fields from service_types.schema) */
     public function createStep3(LeadSubmission $leadSubmission, Request $request)
     {
-        $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
+        $this->authorizeLeadSubmissionAccess($request, $leadSubmission, 'view');
 
         // types dropdown depends on selected category
         $types = collect();
@@ -428,7 +428,7 @@ class LeadSubmissionController extends Controller
 
     public function storeStep3(Request $request, LeadSubmission $leadSubmission)
     {
-        $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
+        $this->authorizeLeadSubmissionAccess($request, $leadSubmission, 'update');
 
         $base = $request->validate([
             'service_type_id' => ['required','exists:service_types,id'],
@@ -466,7 +466,7 @@ class LeadSubmissionController extends Controller
     /** STEP 4 (documents from schema) */
     public function createStep4(LeadSubmission $leadSubmission, Request $request)
     {
-        $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
+        $this->authorizeLeadSubmissionAccess($request, $leadSubmission, 'view');
 
         $docDefs = [];
         if ($leadSubmission->service_type_id) {
@@ -481,7 +481,7 @@ class LeadSubmissionController extends Controller
 
     public function storeStep4(Request $request, LeadSubmission $lead)
     {
-        $this->authorizeLeadSubmissionAccess($request, $lead);
+        $this->authorizeLeadSubmissionAccess($request, $lead, 'update');
 
         $docDefs = $lead->service_type_id
             ? LeadSubmissionSchema::documents(ServiceType::findOrFail($lead->service_type_id))
@@ -597,7 +597,7 @@ if ($request->expectsJson() || $request->ajax()) {
             return response()->json(['message' => 'Lead submission not found.'], 404);
         }
 
-        $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
+        $this->authorizeLeadSubmissionAccess($request, $leadSubmission, 'view');
 
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json((new LeadSubmissionShowResource($leadSubmission))->resolve());
@@ -614,7 +614,7 @@ if ($request->expectsJson() || $request->ajax()) {
     /** EDIT (single page edit for primary + category + type + meta + upload new docs) */
     public function edit(Request $request, LeadSubmission $leadSubmission)
     {
-        $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
+        $this->authorizeLeadSubmissionAccess($request, $leadSubmission, 'view');
 
         $categories = ServiceCategory::orderBy('name')->get(['id','name']);
         $types = $leadSubmission->service_category_id
@@ -631,7 +631,7 @@ if ($request->expectsJson() || $request->ajax()) {
 
     public function update(Request $request, LeadSubmission $leadSubmission)
     {
-        $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
+        $this->authorizeLeadSubmissionAccess($request, $leadSubmission, 'update');
 
         $base = $request->validate([
             'company_name' => ['required','string','max:255'],
@@ -687,7 +687,7 @@ if ($request->expectsJson() || $request->ajax()) {
     /** DELETE */
     public function destroy(Request $request, LeadSubmission $leadSubmission)
     {
-        $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
+        $this->authorizeLeadSubmissionAccess($request, $leadSubmission, 'delete');
 
         // delete documents files
         $docs = LeadSubmissionDocument::where('lead_submission_id', $leadSubmission->id)->get();
@@ -755,7 +755,7 @@ if ($request->expectsJson() || $request->ajax()) {
         if (! $leadSubmission) {
             return response()->json(['message' => 'Lead submission not found.'], 404);
         }
-        $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
+        $this->authorizeLeadSubmissionAccess($request, $leadSubmission, 'view');
 
         $doc = LeadSubmissionDocument::where('lead_submission_id', $leadSubmission->id)
             ->where('id', (int) $document)
@@ -783,7 +783,7 @@ if ($request->expectsJson() || $request->ajax()) {
         if (! $leadSubmission) {
             abort(404, 'Lead submission not found.');
         }
-        $this->authorizeLeadSubmissionAccess($request, $leadSubmission);
+        $this->authorizeLeadSubmissionAccess($request, $leadSubmission, 'view');
 
         $documents = $leadSubmission->documents->filter(fn ($d) => $d->file_path && is_file(Storage::disk('public')->path($d->file_path)));
         if ($documents->isEmpty()) {
@@ -813,18 +813,10 @@ if ($request->expectsJson() || $request->ajax()) {
         ]);
     }
 
-    /** ACCESS CONTROL: owner-only unless superadmin or leads.view_all */
-    private function authorizeLeadSubmissionAccess(Request $request, LeadSubmission $leadSubmission): void
+    /** Access control delegates to LeadSubmissionPolicy. */
+    private function authorizeLeadSubmissionAccess(Request $request, LeadSubmission $leadSubmission, string $ability = 'view'): void
     {
-        $user = $request->user();
-
-        if ($user->hasRole('superadmin') || $user->hasRole('back_office') || $user->can('lead.view.all')) {
-            return;
-        }
-
-        if ((int)$leadSubmission->created_by !== (int)$user->id) {
-            abort(403);
-        }
+        $this->authorize($ability, $leadSubmission);
     }
 
     /** dynamic rules builder */

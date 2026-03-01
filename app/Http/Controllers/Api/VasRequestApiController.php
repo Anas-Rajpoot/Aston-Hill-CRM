@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Models\UserColumnPreference;
 use App\Models\VasRequestAudit;
 use App\Models\VasRequestSubmission;
+use App\Policies\VasRequestPolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -254,7 +255,7 @@ class VasRequestApiController extends Controller
             return;
         }
         if ($sort === 'sla_timer') {
-            $query->orderBy('vas_request_submissions.created_at', $direction);
+            $query->orderByRaw("COALESCE(vas_request_submissions.submitted_at, vas_request_submissions.created_at) {$direction}");
             return;
         }
         if (in_array($sort, ['manager', 'team_leader', 'sales_agent', 'executive'], true)) {
@@ -303,6 +304,7 @@ class VasRequestApiController extends Controller
         }
         if (in_array('sla_timer', $columns, true)) {
             $base[] = "{$t}.created_at";
+            $base[] = "{$t}.submitted_at";
             $base[] = "{$t}.back_office_executive_id";
         }
         $qualified = array_unique($base);
@@ -374,14 +376,16 @@ class VasRequestApiController extends Controller
             : 90;
 
         $elapsed = $startAt->diffInMinutes(now());
-        $remaining = $slaMinutes - $elapsed;
-        if ($remaining <= 0) {
-            return 'Overdue ' . $this->formatDuration(abs($remaining));
+        if ($elapsed <= $slaMinutes) {
+            $remaining = $slaMinutes - $elapsed;
+            if ($warningMinutes > 0 && $remaining <= $warningMinutes) {
+                return 'Due in ' . $this->formatDuration($remaining);
+            }
+            return $this->formatDuration($elapsed) . ' passed of ' . $this->formatDuration($slaMinutes);
         }
-        if ($warningMinutes > 0 && $remaining <= $warningMinutes) {
-            return 'Due in ' . $this->formatDuration($remaining);
-        }
-        return $this->formatDuration($remaining) . ' left';
+
+        $overdue = $elapsed - $slaMinutes;
+        return 'Breached by ' . $this->formatDuration($overdue);
     }
 
     private function formatDuration(int $minutes): string
@@ -476,7 +480,14 @@ class VasRequestApiController extends Controller
 
     public function patch(Request $request, VasRequestSubmission $vasRequest): JsonResponse
     {
-        $this->authorize('update', $vasRequest);
+        $isAssignmentOnly = $request->exists('back_office_executive_id')
+            && count(array_diff(array_keys($request->all()), ['back_office_executive_id'])) === 0;
+        if ($request->exists('back_office_executive_id')) {
+            $this->authorize('assign', $vasRequest);
+        }
+        if (! $isAssignmentOnly) {
+            $this->authorize('update', $vasRequest);
+        }
 
         $types = VasRequestController::requestTypes();
         $rules = [
@@ -492,6 +503,14 @@ class VasRequestApiController extends Controller
         ];
 
         $data = $request->validate($rules);
+        if (array_key_exists('back_office_executive_id', $data) && ! empty($data['back_office_executive_id'])) {
+            $assignee = User::find((int) $data['back_office_executive_id']);
+            if (! $assignee || ! VasRequestPolicy::isValidAssignee($assignee)) {
+                return response()->json([
+                    'message' => 'Selected assignee must be a back office user.',
+                ], 422);
+            }
+        }
         if (! empty($data)) {
             $vasRequest->update($data);
         }
@@ -518,17 +537,7 @@ class VasRequestApiController extends Controller
      */
     public function backOfficeOptions(Request $request): JsonResponse
     {
-        $userId = $request->user()->id;
-        $allowed = DB::table('model_has_roles')
-            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
-            ->where('model_has_roles.model_id', $userId)
-            ->where('model_has_roles.model_type', (new \App\Models\User)->getMorphClass())
-            ->whereIn('roles.name', ['superadmin', 'back_office', 'manager', 'team_leader'])
-            ->exists();
-
-        if (! $allowed) {
-            abort(403, 'Unauthorized.');
-        }
+        $this->authorize('assignAny', VasRequestSubmission::class);
 
         $executives = Cache::remember('vas_back_office_options', 600, function () {
             return DB::table('users')
@@ -538,7 +547,7 @@ class VasRequestApiController extends Controller
                 })
                 ->join('roles', function ($j) {
                     $j->on('model_has_roles.role_id', '=', 'roles.id')
-                      ->where('roles.name', 'back_office');
+                      ->whereIn('roles.name', ['back_office', 'backoffice', 'back_office_executive']);
                 })
                 ->where('users.status', 'approved')
                 ->orderBy('users.name')
@@ -558,17 +567,8 @@ class VasRequestApiController extends Controller
      */
     public function bulkAssign(Request $request): JsonResponse
     {
+        $this->authorize('assignAny', VasRequestSubmission::class);
         $user = $request->user();
-        $allowed = DB::table('model_has_roles')
-            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
-            ->where('model_has_roles.model_id', $user->id)
-            ->where('model_has_roles.model_type', (new User)->getMorphClass())
-            ->whereIn('roles.name', ['superadmin', 'back_office', 'backoffice'])
-            ->exists();
-
-        if (! $allowed) {
-            abort(403, 'Only superadmin or back office can bulk assign.');
-        }
 
         $data = $request->validate([
             'vas_request_ids' => ['required', 'array', 'min:1'],
@@ -578,6 +578,13 @@ class VasRequestApiController extends Controller
 
         $ids = array_unique(array_map('intval', $data['vas_request_ids']));
         $executiveId = (int) $data['executive_id'];
+        $executive = User::find($executiveId);
+
+        if (! $executive || ! VasRequestPolicy::isValidAssignee($executive)) {
+            return response()->json([
+                'message' => 'Selected assignee must be a back office user.',
+            ], 422);
+        }
 
         $existingCount = DB::table('vas_request_submissions')->whereIn('id', $ids)->count();
         if ($existingCount !== count($ids)) {
@@ -678,12 +685,7 @@ class VasRequestApiController extends Controller
         // Include back office options (for assign modal) — use same cache as backOfficeOptions()
         $boData = [];
         $user = $request->user();
-        $canAssign = DB::table('model_has_roles')
-            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
-            ->where('model_has_roles.model_id', $user->id)
-            ->where('model_has_roles.model_type', (new User)->getMorphClass())
-            ->whereIn('roles.name', ['superadmin', 'back_office', 'backoffice', 'manager', 'team_leader'])
-            ->exists();
+        $canAssign = $user->can('assignAny', VasRequestSubmission::class);
 
         if ($canAssign) {
             try {
@@ -695,7 +697,7 @@ class VasRequestApiController extends Controller
                         })
                         ->join('roles', function ($j) {
                             $j->on('model_has_roles.role_id', '=', 'roles.id')
-                              ->where('roles.name', 'back_office');
+                              ->whereIn('roles.name', ['back_office', 'backoffice', 'back_office_executive']);
                         })
                         ->where('users.status', 'approved')
                         ->orderBy('users.name')

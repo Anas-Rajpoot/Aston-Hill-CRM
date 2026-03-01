@@ -264,90 +264,90 @@ onMounted(() => loadData())
               Back to List
             </router-link>
           </div>
+          </div>
         </div>
-      </div>
 
       <div v-if="loading" class="flex justify-center py-16">
-        <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-      </div>
+          <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+        </div>
 
       <div v-else class="space-y-6">
         <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
           <div class="px-6 py-4 space-y-6">
-            <div v-if="generalMessage || Object.keys(errors).length" class="rounded-lg border border-red-200 bg-red-50 p-4">
-              <p class="text-sm font-medium text-red-800">{{ generalMessage }}</p>
-              <ul class="mt-2 list-inside list-disc space-y-0.5 text-sm text-red-700">
-                <li v-for="(msgs, field) in errors" :key="field">{{ getError(field) }}</li>
-              </ul>
-            </div>
+          <div v-if="generalMessage || Object.keys(errors).length" class="rounded-lg border border-red-200 bg-red-50 p-4">
+            <p class="text-sm font-medium text-red-800">{{ generalMessage }}</p>
+            <ul class="mt-2 list-inside list-disc space-y-0.5 text-sm text-red-700">
+              <li v-for="(msgs, field) in errors" :key="field">{{ getError(field) }}</li>
+            </ul>
+          </div>
 
-            <!-- Primary Information -->
-            <section>
+          <!-- Primary Information -->
+          <section>
               <h2 class="mb-3 text-sm font-semibold text-gray-900">Primary Information</h2>
               <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <div>
+              <div>
                   <label class="block text-xs font-medium text-gray-500">Company Name <span class="text-red-500">*</span></label>
                   <input v-model="form.company_name" type="text" placeholder="Enter company name" :class="`${inputClass('company_name')} mt-0.5`" @input="clearFieldError('company_name')" />
                   <p v-if="getError('company_name')" class="mt-1 text-xs text-red-600">{{ getError('company_name') }}</p>
-                </div>
-                <div>
+              </div>
+              <div>
                   <label class="block text-xs font-medium text-gray-500">Account Number</label>
                   <input v-model="form.account_number" type="text" placeholder="Enter account number" :class="`${inputClass('account_number')} mt-0.5`" />
-                </div>
-                <div>
+              </div>
+              <div>
                   <label class="block text-xs font-medium text-gray-500">Request Type <span class="text-red-500">*</span></label>
                   <select v-model="form.request_type" :class="`${selectClass('request_type')} mt-0.5`" @change="clearFieldError('request_type')">
-                    <option value="">Select</option>
-                    <option v-for="t in REQUEST_TYPES" :key="t" :value="t">{{ t }}</option>
-                  </select>
+                  <option value="">Select</option>
+                  <option v-for="t in REQUEST_TYPES" :key="t" :value="t">{{ t }}</option>
+                </select>
                   <p v-if="getError('request_type')" class="mt-1 text-xs text-red-600">{{ getError('request_type') }}</p>
-                </div>
-                <div>
+              </div>
+              <div>
                   <label class="block text-xs font-medium text-gray-500">Status</label>
                   <select v-model="form.status" :class="`${selectClass('status')} mt-0.5`">
-                    <option value="">Select</option>
-                    <option v-for="s in STATUSES" :key="s" :value="s">{{ s.charAt(0).toUpperCase() + s.slice(1) }}</option>
-                  </select>
-                </div>
+                  <option value="">Select</option>
+                  <option v-for="s in STATUSES" :key="s" :value="s">{{ s.charAt(0).toUpperCase() + s.slice(1) }}</option>
+                </select>
               </div>
+            </div>
               <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
+              <div>
                   <label class="block text-xs font-medium text-gray-500">Complete Address</label>
                   <textarea v-model="form.complete_address" rows="3" placeholder="Enter complete address" :class="`${inputClass('complete_address')} mt-0.5`" />
-                </div>
-                <div>
+              </div>
+              <div>
                   <label class="block text-xs font-medium text-gray-500">Any Special Instruction</label>
                   <textarea v-model="form.special_instruction" rows="3" placeholder="Enter Special Instruction" :class="`${inputClass('special_instruction')} mt-0.5`" />
                 </div>
-              </div>
-            </section>
+            </div>
+          </section>
 
-            <!-- Team Information -->
-            <section>
+          <!-- Team Information -->
+          <section>
               <h2 class="mb-3 text-sm font-semibold text-gray-900">Team Information</h2>
               <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div>
+              <div>
                   <label class="block text-xs font-medium text-gray-500">Manager <span class="text-red-500">*</span></label>
                   <select v-model="form.manager_id" :class="`${selectClass('manager_id')} mt-0.5`" @change="clearFieldError('manager_id')">
-                    <option value="">Select Manager</option>
-                    <option v-for="u in teamOptions.managers" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
-                  </select>
+                  <option value="">Select Manager</option>
+                  <option v-for="u in teamOptions.managers" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
+                </select>
                   <p v-if="getError('manager_id')" class="mt-1 text-xs text-red-600">{{ getError('manager_id') }}</p>
-                </div>
-                <div>
+              </div>
+              <div>
                   <label class="block text-xs font-medium text-gray-500">Team Leader <span class="text-red-500">*</span></label>
                   <select v-model="form.team_leader_id" :class="`${selectClass('team_leader_id')} mt-0.5`" @change="clearFieldError('team_leader_id')">
-                    <option value="">Select Team Leader</option>
-                    <option v-for="u in filteredTeamLeaders" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
-                  </select>
+                  <option value="">Select Team Leader</option>
+                  <option v-for="u in filteredTeamLeaders" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
+                </select>
                   <p v-if="getError('team_leader_id')" class="mt-1 text-xs text-red-600">{{ getError('team_leader_id') }}</p>
-                </div>
-                <div>
+              </div>
+              <div>
                   <label class="block text-xs font-medium text-gray-500">Sales Agent <span class="text-red-500">*</span></label>
                   <select v-model="form.sales_agent_id" :class="`${selectClass('sales_agent_id')} mt-0.5`" @change="clearFieldError('sales_agent_id')">
-                    <option value="">Select Sales Agent</option>
-                    <option v-for="u in filteredSalesAgents" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
-                  </select>
+                  <option value="">Select Sales Agent</option>
+                  <option v-for="u in filteredSalesAgents" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
+                </select>
                   <p v-if="getError('sales_agent_id')" class="mt-1 text-xs text-red-600">{{ getError('sales_agent_id') }}</p>
                 </div>
               </div>
@@ -427,9 +427,9 @@ onMounted(() => loadData())
                       <input type="file" class="hidden" accept=".pdf,.doc,.docx,.eml" multiple @change="uploadFromInput" />
                     </label>
                   </div>
-                </div>
               </div>
-            </section>
+            </div>
+          </section>
 
             <div class="mt-6 flex flex-wrap items-center justify-end gap-3 border-t border-gray-200 pt-4">
               <button type="button" class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="goBack">Cancel</button>
@@ -439,14 +439,14 @@ onMounted(() => loadData())
                 class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
                 @click="save"
               >
-                {{ saving ? 'Saving...' : 'Save Changes' }}
-              </button>
-            </div>
+              {{ saving ? 'Saving...' : 'Save Changes' }}
+            </button>
           </div>
         </div>
       </div>
+    </div>
 
-      <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />
+    <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />
     </div>
   </div>
 </template>

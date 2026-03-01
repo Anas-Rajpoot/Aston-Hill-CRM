@@ -122,17 +122,7 @@ class LeadSubmission extends Model
      */
     public function scopeVisibleTo($q, User $user)
     {
-        if ($user->can('lead.view.all')) {
-            return $q;
-        }
-
-        // Back office sees ALL lead submissions (assigned + unassigned)
-        if ($user->hasRole('back_office')) {
-            return $q;
-        }
-
-        \App\Services\TeamHierarchyService::scopeSubmissionsForUser($q, $user, ['executive_id']);
-
+        // Business requirement: listing should be visible to all roles like super admin.
         return $q;
     }
 

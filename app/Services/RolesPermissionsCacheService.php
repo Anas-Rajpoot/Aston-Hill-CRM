@@ -19,6 +19,15 @@ class RolesPermissionsCacheService
     private const TTL_SECONDS = 3600; // 1 hour for structure (static until sync)
     private const TTL_ROLES = 300;   // 5 min for roles list
     private const TTL_PAGE = 600;    // 10 min for permissions-page payload per role
+    /** System-only modules are not assignable from Roles & Permissions UI. */
+    private const EXCLUDED_PERMISSION_MODULES = [
+        'system',
+        'settings',
+        'attendance',
+        'roles',
+        'notification_rules',
+        'permissions',
+    ];
 
     public function getStructure(): array
     {
@@ -113,42 +122,22 @@ class RolesPermissionsCacheService
         $structure = config('permissions.structure', []);
         $guard = 'web';
 
-        $allNames = [];
-        foreach ($structure as $moduleKey => $moduleDef) {
-            foreach ($moduleDef['permissions'] ?? [] as $permDef) {
-                $key = $permDef['key'] ?? '';
-                $allNames[] = $moduleKey . '.' . $key;
-            }
-        }
-        $allNames = array_values(array_unique(array_filter($allNames)));
-
-        $existing = Permission::where('guard_name', $guard)
-            ->whereIn('name', $allNames)
-            ->get(['id', 'name'])
-            ->keyBy('name');
-
-        $missing = array_diff($allNames, $existing->keys()->toArray());
-        if (count($missing) > 0) {
-            $now = now();
-            $inserts = [];
-            foreach ($missing as $name) {
-                $inserts[] = ['name' => $name, 'guard_name' => $guard, 'created_at' => $now, 'updated_at' => $now];
-            }
-            Permission::insert($inserts);
-            $newPerms = Permission::where('guard_name', $guard)->whereIn('name', $missing)->get(['id', 'name'])->keyBy('name');
-            $existing = $existing->merge($newPerms);
-        }
-
         $modules = [];
         foreach ($structure as $moduleKey => $moduleDef) {
+            if (in_array((string) $moduleKey, self::EXCLUDED_PERMISSION_MODULES, true)) {
+                continue;
+            }
             $permissions = [];
             foreach ($moduleDef['permissions'] ?? [] as $permDef) {
                 $key = $permDef['key'] ?? '';
-                $name = $moduleKey . '.' . $key;
-                $perm = $existing->get($name);
-                if (! $perm) {
+                if (! is_string($key) || trim($key) === '') {
                     continue;
                 }
+                $name = $moduleKey . '.' . $key;
+                $perm = Permission::firstOrCreate([
+                    'name' => $name,
+                    'guard_name' => $guard,
+                ]);
                 $permissions[] = [
                     'id' => $perm->id,
                     'name' => $perm->name,
@@ -165,6 +154,11 @@ class RolesPermissionsCacheService
         }
 
         return $modules;
+    }
+
+    private function isExcludedModule(string $moduleKey): bool
+    {
+        return in_array((string) $moduleKey, self::EXCLUDED_PERMISSION_MODULES, true);
     }
 
     /**

@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use App\Models\Account;
 use App\Models\Client;
 use App\Models\CustomerSupportSubmission;
@@ -52,6 +54,24 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if ($this->app->isLocal()) {
+            DB::listen(function ($query): void {
+                $path = request()?->path() ?? '';
+                if (! in_array($path, ['api/clients', 'api/clients/filters', 'api/clients+filters'], true)) {
+                    return;
+                }
+                if ($query->time <= 50) {
+                    return;
+                }
+
+                Log::warning('Slow query detected on clients endpoint', [
+                    'path' => $path,
+                    'time_ms' => $query->time,
+                    'sql' => $query->sql,
+                ]);
+            });
+        }
+
         LeadSubmission::observe(LeadSubmissionObserver::class);
         FieldSubmission::observe(FieldSubmissionObserver::class);
         VasRequestSubmission::observe(VasRequestSubmissionObserver::class);

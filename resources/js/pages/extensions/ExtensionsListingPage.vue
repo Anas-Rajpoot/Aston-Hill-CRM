@@ -2,20 +2,23 @@
 /**
  * Cisco Extensions listing – Advanced Filters, sortable table, Import/Export, Add Extension (modal), Customize Columns, Delete.
  */
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import extensionsApi from '@/services/extensionsApi'
 import { useAuthStore } from '@/stores/auth'
-import FiltersBar from '@/components/extensions/AdvancedFilters.vue'
-import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
-import AddExtensionModal from '@/components/extensions/AddExtensionModal.vue'
-import EditExtensionModal from '@/components/extensions/EditExtensionModal.vue'
-import ViewExtensionModal from '@/components/extensions/ViewExtensionModal.vue'
-import ExtensionsTable from '@/components/extensions/ExtensionsTable.vue'
-import RecordHistoryModal from '@/components/RecordHistoryModal.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import api from '@/lib/axios'
 import Toast from '@/components/Toast.vue'
+import { useProgressiveHydration } from '@/composables/useProgressiveHydration'
+import { useDeferredQuery } from '@/composables/useDeferredQuery'
+
+const FiltersBar = defineAsyncComponent(() => import('@/components/extensions/AdvancedFilters.vue'))
+const ColumnCustomizerModal = defineAsyncComponent(() => import('@/components/lead-submissions/ColumnCustomizerModal.vue'))
+const AddExtensionModal = defineAsyncComponent(() => import('@/components/extensions/AddExtensionModal.vue'))
+const EditExtensionModal = defineAsyncComponent(() => import('@/components/extensions/EditExtensionModal.vue'))
+const ViewExtensionModal = defineAsyncComponent(() => import('@/components/extensions/ViewExtensionModal.vue'))
+const ExtensionsTable = defineAsyncComponent(() => import('@/components/extensions/ExtensionsTable.vue'))
+const RecordHistoryModal = defineAsyncComponent(() => import('@/components/RecordHistoryModal.vue'))
 
 const route = useRoute()
 const router = useRouter()
@@ -26,6 +29,8 @@ const isSuperAdmin = computed(() => {
   return Array.isArray(r) && r.some((x) => (typeof x === 'string' ? x === 'superadmin' : x?.name === 'superadmin'))
 })
 const canCreate = computed(() => isSuperAdmin.value || permissions.value.includes('extensions.create'))
+const summaryHydration = useProgressiveHydration({ strategy: 'visible-or-idle', idleTimeout: 900 })
+const advancedFiltersHydration = useProgressiveHydration({ strategy: 'visible-or-idle', idleTimeout: 1200 })
 
 const loading = ref(true)
 const loadError = ref(null)
@@ -205,6 +210,27 @@ async function loadColumns() {
   }
 }
 
+const deferredSecondaryBootstrap = useDeferredQuery(async () => {
+  await Promise.all([loadFilters(), loadColumns(), loadAssignableEmployees()])
+})
+
+function hydrateSecondaryData() {
+  deferredSecondaryBootstrap.run().catch(() => {})
+}
+
+function openAdvancedFilters() {
+  advancedVisible.value = !advancedVisible.value
+  if (advancedVisible.value) {
+    advancedFiltersHydration.hydrateNow()
+    hydrateSecondaryData()
+  }
+}
+
+function openColumnCustomizer() {
+  hydrateSecondaryData()
+  columnModalVisible.value = true
+}
+
 function applyFilters() {
   meta.value.current_page = 1
   load()
@@ -338,6 +364,12 @@ function triggerImport() {
   importFileInput.value?.click()
 }
 
+async function openAddModal() {
+  hydrateSecondaryData()
+  await deferredSecondaryBootstrap.run()
+  addModalVisible.value = true
+}
+
 async function onImportFileChange(event) {
   const file = event.target?.files?.[0]
   if (!file) return
@@ -457,6 +489,7 @@ async function onUpdateCell(rowId, field, value) {
 
 function openViewModal(row) {
   if (row?.id) {
+    hydrateSecondaryData()
     viewModalExtensionId.value = row.id
     viewModalVisible.value = true
   }
@@ -477,6 +510,7 @@ function onViewModalEdit() {
 
 function openEditModal(row) {
   if (row?.id) {
+    hydrateSecondaryData()
     editModalExtensionId.value = row.id
     editModalVisible.value = true
   }
@@ -536,13 +570,13 @@ async function fetchHistoryRows(id) {
 
 onMounted(async () => {
   await loadTablePreference()
-  loadFilters()
-  loadColumns()
-  loadAssignableEmployees()
   loadSummary()
   await load()
+  hydrateSecondaryData()
   const editId = route.query.edit
   if (editId) {
+    advancedFiltersHydration.hydrateNow()
+    await deferredSecondaryBootstrap.run()
     editModalExtensionId.value = Number(editId) || editId
     editModalVisible.value = true
     await nextTick()
@@ -612,7 +646,7 @@ onMounted(async () => {
             v-if="canCreate"
             type="button"
             class="inline-flex items-center rounded bg-green-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-green-700"
-            @click="addModalVisible = true"
+            @click="openAddModal"
           >
             <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -623,7 +657,8 @@ onMounted(async () => {
       </div>
 
       <!-- Summary cards -->
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div ref="summaryHydration.targetRef" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <template v-if="summaryHydration.isHydrated">
         <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <div class="min-w-0">
             <p class="text-sm font-medium text-gray-500 leading-tight">Total Extensions</p>
@@ -668,6 +703,13 @@ onMounted(async () => {
             </svg>
           </div>
         </div>
+        </template>
+        <template v-else>
+          <div v-for="n in 4" :key="`extensions-summary-skeleton-${n}`" class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <div class="h-3 w-24 animate-pulse rounded bg-gray-200" />
+            <div class="mt-2 h-8 w-12 animate-pulse rounded bg-gray-100" />
+          </div>
+        </template>
       </div>
 
       <div
@@ -732,7 +774,7 @@ onMounted(async () => {
           <button
             type="button"
             class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-            @click="advancedVisible = !advancedVisible"
+            @click="openAdvancedFilters"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
             Advanced Filters
@@ -740,7 +782,7 @@ onMounted(async () => {
           <button
             type="button"
             class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-            @click="columnModalVisible = true"
+            @click="openColumnCustomizer"
           >
             Customize Columns
             <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -751,16 +793,27 @@ onMounted(async () => {
       </div>
 
       <!-- Advanced Filters (all filters) -->
-      <FiltersBar
-        :visible="advancedVisible"
-        :filters="filters"
-        :filter-options="filterOptions"
-        :manager-options="managerOptions"
-        :team-leader-options="teamLeaderOptions"
-        :loading="loading"
-        @apply="applyFilters"
-        @reset="resetFilters"
-      />
+      <div ref="advancedFiltersHydration.targetRef">
+        <FiltersBar
+          v-if="advancedFiltersHydration.isHydrated"
+          :visible="advancedVisible"
+          :filters="filters"
+          :filter-options="filterOptions"
+          :manager-options="managerOptions"
+          :team-leader-options="teamLeaderOptions"
+          :loading="loading"
+          @apply="applyFilters"
+          @reset="resetFilters"
+        />
+        <div v-else-if="advancedVisible" class="rounded-lg border border-gray-200 bg-white p-4">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div v-for="n in 6" :key="`extensions-advanced-skeleton-${n}`" class="space-y-2">
+              <div class="h-3 w-20 animate-pulse rounded bg-gray-200" />
+              <div class="h-9 w-full animate-pulse rounded bg-gray-100" />
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div class="overflow-x-auto rounded-xl border-2 border-black bg-white shadow-sm">
         <ExtensionsTable

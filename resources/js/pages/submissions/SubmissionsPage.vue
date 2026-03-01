@@ -3,8 +3,9 @@
  * Progressive rendering: Tabs and card shell render immediately.
  * Tab content is lazy-loaded; each async component shows a skeleton while loading (no Suspense).
  */
-import { ref, onMounted, defineAsyncComponent } from 'vue'
+import { ref, onMounted, defineAsyncComponent, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import Tabs from '@/components/Tabs.vue'
 import SubmissionFormSkeleton from '@/components/skeletons/SubmissionFormSkeleton.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
@@ -24,13 +25,14 @@ const VasRequestWizard = asyncForm(() => import('@/forms/VASRequestForm/VasReque
 const NewSubmissionForm = asyncForm(() => import('@/forms/NewSubmissionForm/NewSubmissionForm.vue'))
 
 const route = useRoute()
+const auth = useAuthStore()
 const activeTab = ref('lead')
 /** Incremented on every tab click so the visible form remounts (clears success message, shows fresh form). */
 const formKey = ref(0)
 /** When true, lead wizard mounts in "new submission" mode and does not load current draft. */
 const leadForceNewForm = ref(false)
 
-const tabs = [
+const allTabs = [
   { key: 'lead', label: 'Lead Submissions' },
   { key: 'field', label: 'Field Submissions' },
   { key: 'support', label: 'Customer Support' },
@@ -38,11 +40,37 @@ const tabs = [
   { key: 'new', label: 'Special Request' },
 ]
 
+const isSuperAdmin = computed(() => auth.user?.roles?.includes('superadmin') ?? false)
+const userPermissions = computed(() => auth.user?.permissions ?? [])
+const canCreateLeadSubmission = computed(() => (
+  isSuperAdmin.value
+  || userPermissions.value.includes('lead-submissions.create')
+  || userPermissions.value.includes('lead.create')
+))
+
+const tabs = computed(() => {
+  return allTabs.filter((tab) => tab.key !== 'lead' || canCreateLeadSubmission.value)
+})
+
+function ensureActiveTabAvailable() {
+  if (!tabs.value.length) {
+    activeTab.value = ''
+    return
+  }
+  if (!tabs.value.some((tab) => tab.key === activeTab.value)) {
+    activeTab.value = tabs.value[0].key
+    formKey.value = Date.now()
+  }
+}
+
 onMounted(() => {
   if (route.query.vas_request_id != null && route.query.vas_request_id !== '') {
     activeTab.value = 'vas'
   }
+  ensureActiveTabAvailable()
 })
+
+watch(tabs, ensureActiveTabAvailable, { deep: true })
 
 function onTabChange(key) {
   activeTab.value = key
@@ -64,11 +92,7 @@ function onLeadNewSubmission() {
         <Breadcrumbs />
       </div>
       <!-- TABS (dark bar like 1st image) -->
-      <Tabs
-        :tabs="tabs"
-        :active="activeTab"
-        @change="onTabChange"
-      />
+      <Tabs :tabs="tabs" :active="activeTab" @change="onTabChange" />
 
       <!-- TAB CONTENT: one async component per tab; each shows skeleton while loading. -->
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 px-6 pb-6 pt-3 sm:px-8 sm:pb-8 sm:pt-4 !mt-0">
@@ -82,6 +106,9 @@ function onLeadNewSubmission() {
         <CustomerSupportForm v-else-if="activeTab === 'support'" :key="`support-${formKey}`" />
         <VasRequestWizard v-else-if="activeTab === 'vas'" :key="`vas-${formKey}`" />
         <NewSubmissionForm v-else-if="activeTab === 'new'" :key="`new-${formKey}`" />
+        <div v-else class="py-10 text-center text-sm text-gray-500">
+          No submission forms available for your role.
+        </div>
       </div>
     </div>
   </div>

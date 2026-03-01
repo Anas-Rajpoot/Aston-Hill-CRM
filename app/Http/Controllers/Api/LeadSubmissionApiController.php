@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Models\UserColumnPreference;
 use App\Rules\AllowedDocumentFile;
 use App\Jobs\BulkAssignLeadJob;
+use App\Policies\LeadSubmissionPolicy;
 use App\Services\LeadSubmissionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -379,9 +380,9 @@ class LeadSubmissionApiController extends Controller
 
         $overdue = $elapsed - $slaMinutes;
         if ($warningMinutes > 0) {
-            return 'Overdue by ' . $this->formatDuration($overdue) . ' (' . $this->formatDuration($elapsed) . ' passed)';
+            return 'Breached by ' . $this->formatDuration($overdue) . ' (' . $this->formatDuration($elapsed) . ' passed)';
         }
-        return 'Overdue by ' . $this->formatDuration($overdue);
+        return 'Breached by ' . $this->formatDuration($overdue);
     }
 
     private function formatDuration(int $minutes): string
@@ -550,17 +551,7 @@ class LeadSubmissionApiController extends Controller
      */
     public function backOfficeOptions(Request $request): JsonResponse
     {
-        $userId = $request->user()->id;
-        $allowed = DB::table('model_has_roles')
-            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
-            ->where('model_has_roles.model_id', $userId)
-            ->where('model_has_roles.model_type', (new User)->getMorphClass())
-            ->whereIn('roles.name', ['superadmin', 'back_office', 'manager', 'team_leader'])
-            ->exists();
-
-        if (! $allowed) {
-            abort(403, 'Unauthorized.');
-        }
+        $this->authorize('assignAny', LeadSubmission::class);
 
         $executives = Cache::remember('lead_back_office_options', 600, function () {
             return DB::table('users')
@@ -570,7 +561,7 @@ class LeadSubmissionApiController extends Controller
                 })
                 ->join('roles', function ($j) {
                     $j->on('model_has_roles.role_id', '=', 'roles.id')
-                      ->where('roles.name', 'back_office');
+                      ->whereIn('roles.name', ['back_office', 'backoffice', 'back_office_executive']);
                 })
                 ->where('users.status', 'approved')
                 ->orderBy('users.name')
@@ -678,17 +669,8 @@ class LeadSubmissionApiController extends Controller
      */
     public function bulkAssign(Request $request): JsonResponse
     {
+        $this->authorize('assignAny', LeadSubmission::class);
         $user = $request->user();
-        $allowed = DB::table('model_has_roles')
-            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
-            ->where('model_has_roles.model_id', $user->id)
-            ->where('model_has_roles.model_type', (new User)->getMorphClass())
-            ->whereIn('roles.name', ['superadmin', 'back_office'])
-            ->exists();
-
-        if (! $allowed) {
-            abort(403, 'Only superadmin or back office can bulk assign.');
-        }
 
         $data = $request->validate([
             'lead_ids' => ['required', 'array', 'min:1'],
@@ -698,6 +680,13 @@ class LeadSubmissionApiController extends Controller
 
         $ids = array_unique(array_map('intval', $data['lead_ids']));
         $executiveId = (int) $data['executive_id'];
+        $executive = User::find($executiveId);
+
+        if (! $executive || ! LeadSubmissionPolicy::isValidAssignee($executive)) {
+            return response()->json([
+                'message' => 'Selected assignee must be a back office user.',
+            ], 422);
+        }
 
         $existingCount = DB::table('lead_submissions')->whereIn('id', $ids)->count();
         if ($existingCount !== count($ids)) {
@@ -744,16 +733,14 @@ class LeadSubmissionApiController extends Controller
      */
     public function updateBackOffice(Request $request, LeadSubmission $lead): JsonResponse
     {
-        $user = $request->user();
-        $allowed = DB::table('model_has_roles')
-            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
-            ->where('model_has_roles.model_id', $user->id)
-            ->where('model_has_roles.model_type', (new User)->getMorphClass())
-            ->whereIn('roles.name', ['superadmin', 'back_office'])
-            ->exists();
+        $isAssignmentOnly = $request->exists('executive_id')
+            && count(array_diff(array_keys($request->all()), ['executive_id', 'back_office_notes'])) === 0;
 
-        if (! $allowed) {
-            abort(403, 'Only superadmin or back office can edit this submission.');
+        if ($request->exists('executive_id')) {
+            $this->authorize('assign', $lead);
+        }
+        if (! $isAssignmentOnly) {
+            $this->authorize('update', $lead);
         }
 
         $data = $request->validate([
@@ -797,6 +784,15 @@ class LeadSubmissionApiController extends Controller
             'manager_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
         ]);
 
+        if (array_key_exists('executive_id', $data) && ! empty($data['executive_id'])) {
+            $executive = User::find((int) $data['executive_id']);
+            if (! $executive || ! LeadSubmissionPolicy::isValidAssignee($executive)) {
+                return response()->json([
+                    'message' => 'Selected assignee must be a back office user.',
+                ], 422);
+            }
+        }
+
         $lead->update($data);
 
         return response()->json([
@@ -811,17 +807,7 @@ class LeadSubmissionApiController extends Controller
      */
     public function deleteDocument(Request $request, LeadSubmission $lead, int $document): JsonResponse
     {
-        $user = $request->user();
-        $allowed = DB::table('model_has_roles')
-            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
-            ->where('model_has_roles.model_id', $user->id)
-            ->where('model_has_roles.model_type', (new User)->getMorphClass())
-            ->whereIn('roles.name', ['superadmin', 'back_office'])
-            ->exists();
-
-        if (! $allowed) {
-            abort(403, 'Only superadmin or back office can remove documents.');
-        }
+        $this->authorize('update', $lead);
 
         $this->leadSubmissionService->deleteDocument($lead, $document);
 
@@ -840,17 +826,7 @@ class LeadSubmissionApiController extends Controller
      */
     public function uploadDocuments(Request $request, LeadSubmission $lead): JsonResponse
     {
-        $user = $request->user();
-        $allowed = DB::table('model_has_roles')
-            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
-            ->where('model_has_roles.model_id', $user->id)
-            ->where('model_has_roles.model_type', (new User)->getMorphClass())
-            ->whereIn('roles.name', ['superadmin', 'back_office'])
-            ->exists();
-
-        if (! $allowed) {
-            abort(403, 'Only superadmin or back office can add documents.');
-        }
+        $this->authorize('update', $lead);
 
         $request->validate([
             'documents' => ['required', 'array', 'min:1'],
@@ -905,7 +881,7 @@ class LeadSubmissionApiController extends Controller
                         })
                         ->join('roles', function ($j) {
                             $j->on('model_has_roles.role_id', '=', 'roles.id')
-                              ->where('roles.name', 'back_office');
+                              ->whereIn('roles.name', ['back_office', 'backoffice', 'back_office_executive']);
                         })
                         ->where('users.status', 'approved')
                         ->orderBy('users.name')

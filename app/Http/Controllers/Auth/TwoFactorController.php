@@ -11,6 +11,11 @@ class TwoFactorController extends Controller
 {
     public function setup(Request $request)
     {
+        if ((bool) config('auth.disable_google_authentication', false)) {
+            return redirect()->intended(route('dashboard'))
+                ->with('success', 'Google authentication is temporarily disabled.');
+        }
+
         $user = $request->user();
 
         // Optional: superadmin doesn't need 2FA setup
@@ -37,6 +42,11 @@ class TwoFactorController extends Controller
 
     public function enable(Request $request)
     {
+        if ((bool) config('auth.disable_google_authentication', false)) {
+            return redirect()->intended(route('dashboard'))
+                ->with('success', 'Google authentication is temporarily disabled.');
+        }
+
         $request->validate([
             'otp' => ['required', 'digits:6'],
         ]);
@@ -73,6 +83,13 @@ class TwoFactorController extends Controller
 
     public function verify(Request $request)
     {
+        if ((bool) config('auth.disable_google_authentication', false)) {
+            $request->session()->put('2fa_passed', true);
+            return $request->expectsJson()
+                ? response()->json(['redirect' => '/'])
+                : redirect()->intended(route('dashboard'));
+        }
+
         $request->validate([
             'otp' => ['required', 'digits:6'],
         ]);

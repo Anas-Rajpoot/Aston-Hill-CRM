@@ -194,6 +194,41 @@ const { draftLoaded, draftSaving, draftSavedAt, clearDraft } = useFormDraft('cli
 
 const createdByLabel = computed(() => auth.user?.name ? `${auth.user.name} (Auto)` : 'Current User (Auto)')
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const ACCOUNT_TRANSFER_GIVEN_TO_OPTIONS = [
+  'ASTON HILL INTERNATIONAL GENERAL TRADING L.L.C',
+  'DTD',
+  'Retail',
+  'TAM',
+  'LE-GOV',
+  'ARKTEL TECHNOLOGIES L.L.C',
+  'BRANDZ MANAGEMENT CONSULTANCY',
+  'BROUD VISSION SIM TRADING LLC',
+  'CAREER HOUSE COMMUNICATIONS LLC',
+  'DARKBLUE TECHNOLOGY L.L.C',
+  'DIGITWISE TRADING',
+  'EMPEROR COM TECHNOLOGIES L.L.C',
+  'FLY LIGHT ELECTRONICS TRADING LLC',
+  'GRID TECHNOLOGY SOLUTIONS',
+  'HADAF AL KHALEEJ MANAGEMENT CONSULTANCY',
+  'INFINITY HUB TECHNOLOGY',
+  'INFO X COMMUNICATIONS L.L.C',
+  'M B M AL SHARQ GENERAL TRADING L.L.C',
+  'NEW HEIGHTS TECHNOLOGIES LLC',
+  'SAWA INTERNATIONAL GENERAL TRADING  LLC',
+  'SHAUN TECHNOLOGIES TRADING LLC',
+  'SMART LINK TELECOMMUNICATIONS TRADING LLC',
+  'S R J ELECTRONIC TRADING LLC',
+  'STALWART MOBILE TRADING LLC',
+  'STONE HOUSE TELECOM',
+  'STRATEGIC TECHNOLOGY SOLUTION',
+  'TALACO L.L.C',
+  'TANSHEET AL MUBASHIR TECHNOLOGY LLC',
+  'TAYA INFORMATION TECHNOLOGY SERVICES LLC',
+  'TELBIZ COMMUNICATION LLC',
+  'VEGA GLOBAL BUSINESS SERVICES FZ LLE',
+  'VISIONTEL TECHNOLOGY',
+  'X SAT FZE',
+]
 const createdDateLabel = computed(() => {
   const d = new Date()
   return `${d.getDate()}-${MONTH_NAMES[d.getMonth()]}-${d.getFullYear()}`
@@ -951,7 +986,10 @@ function closeToast() {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Account Transfer Given To</label>
-              <input v-model="form.company_detail.account_transfer_given_to" type="text" placeholder="Select" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+              <select v-model="form.company_detail.account_transfer_given_to" class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+                <option value="">Select account transfer given to</option>
+                <option v-for="opt in ACCOUNT_TRANSFER_GIVEN_TO_OPTIONS" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Account Transfer Given Date</label>

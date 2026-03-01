@@ -13,6 +13,11 @@ use App\Models\ClientCsr;
 use App\Models\SystemAuditLog;
 use App\Models\User;
 use App\Models\UserColumnPreference;
+use App\Repositories\ClientRepository;
+use App\Repositories\FilterRepository;
+use App\Http\Resources\ClientResource;
+use App\Http\Resources\FilterResource;
+use App\Services\CacheKey;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
@@ -57,13 +62,21 @@ class ClientApiController extends Controller
         $this->middleware(['auth:sanctum']);
     }
 
+    /**
+     * GET /api/clients
+     *
+     * Query params: cursor, per_page, sort, order, columns[], and field/date filters.
+     * Response shape: { success: bool, data: array<ClientRow>, message: string, meta: { per_page, next_cursor, prev_cursor, has_more } }
+     */
     public function index(Request $request): JsonResponse
     {
         $this->authorize('viewAny', Client::class);
+        $this->enableLocalQueryProfile();
 
         $validated = $request->validate([
-            'page' => ['sometimes', 'integer', 'min:1'],
-            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
+            'cursor' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'page' => ['sometimes', 'integer', 'min:1'], // backward-compat only
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:50'],
             'sort' => ['sometimes', 'string', Rule::in(array_merge(self::ALLOWED_COLUMNS, ['manager', 'team_leader', 'sales_agent', 'creator']))],
             'order' => ['sometimes', 'string', Rule::in(['asc', 'desc'])],
             'columns' => ['sometimes', 'array'],
@@ -105,85 +118,38 @@ class ClientApiController extends Controller
         ]);
 
         $user = $request->user();
-        $prefModule = $this->resolvePrefModule($request);
-        $columns = $this->resolveColumns($user, $validated['columns'] ?? null, $prefModule);
-        $perPage = (int) ($validated['per_page'] ?? 15);
-        $page = (int) ($validated['page'] ?? 1);
-        $sort = $validated['sort'] ?? config('modules.clients.default_sort.0', 'submitted_at');
-        $order = $validated['order'] ?? config('modules.clients.default_sort.1', 'desc');
+        $columns = $this->resolveColumns($user, $validated['columns'] ?? null, $this->resolvePrefModule($request));
+        $validated['per_page'] = (int) ($validated['per_page'] ?? 20);
 
-        $baseQuery = Client::query();
-        $this->applyFilters($baseQuery, $validated);
-        $total = Cache::remember(
-            $this->countCacheKey($request, $validated),
-            self::COUNT_CACHE_SECONDS,
-            fn () => (clone $baseQuery)->count()
+        $cacheParams = $validated;
+        $cacheParams['columns'] = $columns;
+        $payload = $this->rememberByTags(
+            CacheKey::make('clients:index', $cacheParams, $user),
+            120,
+            function () use ($validated, $columns) {
+                $paginator = app(ClientRepository::class)->list($validated, $columns);
+                $items = ClientResource::collection(collect($paginator->items()))->resolve();
+
+                return [
+                    'success' => true,
+                    'data' => $items,
+                    'message' => 'Clients fetched successfully.',
+                    'meta' => [
+                        'per_page' => $paginator->perPage(),
+                        'next_cursor' => optional($paginator->nextCursor())->encode(),
+                        'prev_cursor' => optional($paginator->previousCursor())->encode(),
+                        'has_more' => $paginator->hasMorePages(),
+                    ],
+                ];
+            }
         );
 
-        $dataQuery = Client::query();
-        $this->applyFilters($dataQuery, $validated);
-        $this->applySort($dataQuery, $sort, $order);
+        $response = response()->json($payload, 200);
 
-        $selectColumns = $this->buildSelectColumns($columns);
-        $dataQuery->select($selectColumns);
+        $response = $this->withCacheHeaders($response, 'clients:last-modified');
+        $this->logLocalSlowQueries($request->path());
 
-        $eagerLoad = [];
-        if (in_array('creator', $columns, true)) {
-            $eagerLoad['creator'] = fn ($q) => $q->select('id', 'name', 'email');
-        }
-        if (in_array('manager', $columns, true) || in_array('team_leader', $columns, true) || in_array('sales_agent', $columns, true)) {
-            $eagerLoad['manager'] = fn ($q) => $q->select('id', 'name');
-            $eagerLoad['teamLeader'] = fn ($q) => $q->select('id', 'name');
-            $eagerLoad['salesAgent'] = fn ($q) => $q->select('id', 'name');
-        }
-        $companyDetailCols = [
-            'trade_license_issuing_authority', 'company_category', 'trade_license_number', 'trade_license_expiry_date',
-            'establishment_card_number', 'establishment_card_expiry_date', 'account_taken_from', 'account_mapping_date',
-            'account_transfer_given_to', 'account_transfer_given_date', 'account_manager_name',
-            'first_bill', 'second_bill', 'third_bill', 'fourth_bill', 'additional_comment_1', 'additional_comment_2',
-        ];
-        if (count(array_intersect($columns, $companyDetailCols)) > 0) {
-            $eagerLoad['companyDetail'] = fn ($q) => $q->select([
-                'id', 'client_id',
-                'trade_license_issuing_authority', 'company_category', 'trade_license_number', 'trade_license_expiry_date',
-                'establishment_card_number', 'establishment_card_expiry_date', 'account_taken_from', 'account_mapping_date',
-                'account_transfer_given_to', 'account_transfer_given_date', 'account_manager_name',
-                'first_bill', 'second_bill', 'third_bill', 'fourth_bill', 'additional_comment_1', 'additional_comment_2',
-            ]);
-        }
-        if (in_array('full_address', $columns, true)) {
-            $eagerLoad['addresses'] = fn ($q) => $q->select(['id', 'client_id', 'full_address', 'unit', 'building', 'area', 'emirates', 'sort_order'])
-                ->orderBy('sort_order');
-        }
-
-        if (! empty($eagerLoad)) {
-            $dataQuery->with($eagerLoad);
-        }
-
-        $offset = ($page - 1) * $perPage;
-        $pageRows = $dataQuery->skip($offset)->take($perPage)->get();
-        $renewalAlertMap = [];
-        if (in_array('renewal_alert', $columns, true)) {
-            $clientIds = $pageRows->pluck('id')->map(fn ($id) => (int) $id)->filter()->values()->all();
-            $this->syncRenewalAlertsForClientIds($clientIds);
-            $renewalAlertMap = $this->buildRenewalAlertMap($clientIds);
-        }
-
-        $items = $pageRows->map(function ($row) use ($columns, $renewalAlertMap) {
-            return $this->formatRow($row, $columns, $renewalAlertMap);
-        });
-
-        $lastPage = $total > 0 ? (int) ceil($total / $perPage) : 1;
-
-        return response()->json([
-            'data' => $items,
-            'meta' => [
-                'current_page' => $page,
-                'last_page' => $lastPage,
-                'per_page' => $perPage,
-                'total' => $total,
-            ],
-        ]);
+        return $response;
     }
 
     private function resolveColumns($user, ?array $requestColumns, ?string $module = null): array
@@ -666,81 +632,125 @@ class ClientApiController extends Controller
         return $out;
     }
 
-    public function filters(): JsonResponse
+    /**
+     * GET /api/clients/filters
+     *
+     * Response shape: { success: bool, data: FilterBuckets, message: string, meta: {} }
+     */
+    public function filters(Request $request): JsonResponse
     {
         $this->authorize('viewAny', Client::class);
-        $distinctClientValues = static function (string $column) {
-            return Client::query()
-                ->whereNotNull($column)
-                ->where($column, '!=', '')
-                ->distinct()
-                ->orderBy($column)
-                ->pluck($column)
-                ->values();
-        };
+        $this->enableLocalQueryProfile();
+        $filters = app(FilterRepository::class)->forClients($request->query(), $request->user());
+        $resource = (new FilterResource($filters))->resolve();
+        $response = response()->json([
+            'success' => true,
+            'data' => $resource,
+            'message' => 'Filters fetched successfully.',
+            'meta' => [],
+        ], 200);
 
-        $teamOptions = app(FieldSubmissionController::class)->teamOptions(request());
-        $teamData = $teamOptions->getData(true);
-        $managers = $teamData['managers'] ?? [];
-        $teamLeaders = $teamData['team_leaders'] ?? [];
-        $salesAgents = $teamData['sales_agents'] ?? [];
+        $response = $this->withCacheHeaders($response, 'clients:filters:last-modified');
+        $this->logLocalSlowQueries($request->path());
 
-        $accountNumbers = $distinctClientValues('account_number');
-        $submissionTypes = $distinctClientValues('submission_type');
-        $serviceCategories = $distinctClientValues('service_category');
-        $serviceTypes = $distinctClientValues('service_type');
-        $productTypes = $distinctClientValues('product_type');
-        $workOrderStatuses = $distinctClientValues('work_order_status');
-        $paymentConnections = $distinctClientValues('payment_connection');
-        $contractTypes = $distinctClientValues('contract_type');
-        $clawbackChumOptions = $distinctClientValues('clawback_chum');
-        $companyCategories = ClientCompanyDetail::query()
-            ->whereNotNull('company_category')
-            ->where('company_category', '!=', '')
-            ->distinct()
-            ->orderBy('company_category')
-            ->pluck('company_category')
-            ->values();
-        $accountManagerNames = ClientCompanyDetail::query()
-            ->whereNotNull('account_manager_name')
-            ->where('account_manager_name', '!=', '')
-            ->distinct()
-            ->orderBy('account_manager_name')
-            ->pluck('account_manager_name')
-            ->values();
+        return $response;
+    }
 
-        $alertTypes = ClientAlert::query()
-            ->whereNotNull('alert_type')
-            ->where('alert_type', '!=', '')
-            ->distinct()
-            ->orderBy('alert_type')
-            ->pluck('alert_type')
-            ->values()
-            ->all();
+    /**
+     * Optional combined payload endpoint; enabled with AGGREGATE_CF=true.
+     */
+    public function clientsAndFilters(Request $request): JsonResponse
+    {
+        abort_unless((bool) env('AGGREGATE_CF', false), 404);
+        $this->authorize('viewAny', Client::class);
+        $this->enableLocalQueryProfile();
 
-        $alertTypes = array_values(array_unique(array_merge(
-            ['Trade License Expiry', 'Establishment Card Expiry', 'Custom'],
-            $alertTypes
-        )));
-
-        return response()->json([
-            'statuses' => array_map(fn ($s) => ['value' => $s, 'label' => ucfirst(str_replace('_', ' ', $s))], Client::STATUSES),
-            'managers' => $managers,
-            'team_leaders' => $teamLeaders,
-            'sales_agents' => $salesAgents,
-            'account_numbers' => $accountNumbers,
-            'alert_types' => $alertTypes,
-            'submission_types' => $submissionTypes,
-            'service_categories' => $serviceCategories,
-            'service_types' => $serviceTypes,
-            'product_types' => $productTypes,
-            'work_order_statuses' => $workOrderStatuses,
-            'payment_connections' => $paymentConnections,
-            'contract_types' => $contractTypes,
-            'clawback_chum_options' => $clawbackChumOptions,
-            'company_categories' => $companyCategories,
-            'account_manager_names' => $accountManagerNames,
+        $validated = $request->validate([
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:50'],
+            'cursor' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'sort' => ['sometimes', 'string'],
+            'order' => ['sometimes', 'string', Rule::in(['asc', 'desc'])],
+            'columns' => ['sometimes', 'array'],
+            'columns.*' => ['string'],
         ]);
+        $columns = $this->resolveColumns($request->user(), $validated['columns'] ?? null, $this->resolvePrefModule($request));
+        $paginator = app(ClientRepository::class)->list($validated, $columns);
+        $clients = ClientResource::collection(collect($paginator->items()))->resolve();
+        $filters = (new FilterResource(app(FilterRepository::class)->forClients($request->query(), $request->user())))->resolve();
+
+        $response = response()->json([
+            'success' => true,
+            'data' => [
+                'clients' => $clients,
+                'filters' => $filters,
+            ],
+            'message' => 'Clients and filters fetched successfully.',
+            'meta' => [
+                'per_page' => $paginator->perPage(),
+                'next_cursor' => optional($paginator->nextCursor())->encode(),
+                'prev_cursor' => optional($paginator->previousCursor())->encode(),
+                'has_more' => $paginator->hasMorePages(),
+            ],
+        ], 200);
+
+        $this->logLocalSlowQueries($request->path());
+
+        return $response;
+    }
+
+    private function withCacheHeaders(JsonResponse $response, string $cacheKey): JsonResponse
+    {
+        $lastModified = Cache::remember($cacheKey, 60, fn () => DB::table('clients')->max('updated_at'));
+        if ($lastModified) {
+            $response->headers->set('Last-Modified', gmdate('D, d M Y H:i:s', strtotime($lastModified)) . ' GMT');
+        }
+        $response->headers->set('Cache-Control', 'private, max-age=300');
+
+        return $response;
+    }
+
+    /**
+     * @template T
+     * @param  callable():T  $resolver
+     * @return T
+     */
+    private function rememberByTags(string $key, int $seconds, callable $resolver): mixed
+    {
+        $store = Cache::getStore();
+        if (method_exists($store, 'tags')) {
+            return Cache::tags(['clients', 'filters'])->remember($key, $seconds, $resolver);
+        }
+
+        return Cache::remember($key, $seconds, $resolver);
+    }
+
+    private function enableLocalQueryProfile(): void
+    {
+        if (! app()->isLocal()) {
+            return;
+        }
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+    }
+
+    private function logLocalSlowQueries(string $path): void
+    {
+        if (! app()->isLocal()) {
+            return;
+        }
+
+        foreach (DB::getQueryLog() as $entry) {
+            $time = (float) ($entry['time'] ?? 0);
+            if ($time <= 50) {
+                continue;
+            }
+            \Log::warning('Slow query (>50ms)', [
+                'path' => $path,
+                'time_ms' => $time,
+                'sql' => $entry['query'] ?? null,
+            ]);
+        }
     }
 
     public function columns(Request $request): JsonResponse

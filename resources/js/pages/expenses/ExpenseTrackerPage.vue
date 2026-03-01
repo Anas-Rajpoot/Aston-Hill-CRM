@@ -184,6 +184,34 @@ function resetFilters() {
   load()
 }
 
+function clearFiltersOnly() {
+  filters.value = {
+    expense_date_from: '',
+    expense_date_to: '',
+    created_from: '',
+    created_to: '',
+    product_category: '',
+    added_by: '',
+    added_by_user_id: '',
+    amount_min: '',
+    amount_max: '',
+    vat_applicable: 'all',
+    product_description: '',
+    invoice_number: '',
+    status: '',
+  }
+}
+
+function onAddCreated() {
+  // Keep list state deterministic after create (same result as hard refresh).
+  clearFiltersOnly()
+  meta.value.current_page = 1
+  loadError.value = null
+  toast('success', 'Expense created successfully.')
+  loadFilters()
+  load()
+}
+
 function onSort({ sort: s, order: o }) {
   sort.value = s
   order.value = o
@@ -305,6 +333,11 @@ function openEditModal(row) {
     expenseIdForEdit.value = row.id
     editModalVisible.value = true
   }
+}
+
+function onOpenEditFromDetail(row) {
+  closeDetailModal()
+  openEditModal(row)
 }
 
 function closeEditModal() {
@@ -600,7 +633,7 @@ onMounted(() => {
       :added-by-users="filterOptions.added_by_users"
       :current-user-id="auth.user?.id"
       @close="addModalVisible = false"
-      @created="toast('success', 'Expense created successfully.'); load()"
+      @created="onAddCreated"
     />
 
     <EditExpenseModal
@@ -617,6 +650,7 @@ onMounted(() => {
       :visible="detailModalVisible"
       :expense-id="selectedExpenseId"
       @close="closeDetailModal"
+      @open-edit="onOpenEditFromDetail"
     />
 
     <ExpenseEditHistoryModal

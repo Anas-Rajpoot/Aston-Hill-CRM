@@ -117,4 +117,15 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Temporary Google Authenticator (2FA) Disable
+    |--------------------------------------------------------------------------
+    |
+    | Set DISABLE_GOOGLE_AUTHENTICATION=true in .env to bypass 2FA checks
+    | temporarily. Set it back to false to re-enable normal 2FA flow.
+    |
+    */
+    'disable_google_authentication' => env('DISABLE_GOOGLE_AUTHENTICATION', false),
+
 ];

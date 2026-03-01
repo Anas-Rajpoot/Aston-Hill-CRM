@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (! Schema::hasTable('notification_triggers')) {
+            return;
+        }
+
         if (! Schema::hasColumn('notification_triggers', 'module')) {
             Schema::table('notification_triggers', function (Blueprint $table) {
                 $table->string('module', 100)->nullable()->after('name');
@@ -36,6 +40,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (! Schema::hasTable('notification_triggers')) {
+            return;
+        }
+
         if (Schema::hasColumn('notification_triggers', 'module')) {
             Schema::table('notification_triggers', function (Blueprint $table) {
                 $table->dropColumn('module');
