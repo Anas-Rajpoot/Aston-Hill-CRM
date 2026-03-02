@@ -9,8 +9,15 @@ import api from '@/lib/axios'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import { useAuthStore } from '@/stores/auth'
+import { canModuleAction } from '@/lib/accessControl'
 
 const authStore = useAuthStore()
+const canView = computed(() =>
+  canModuleAction(authStore.user, 'reports', 'view', ['reports.view', 'reports.list'])
+)
+const canExport = computed(() =>
+  canModuleAction(authStore.user, 'reports', 'export', ['reports.export', 'reports.export_reports'])
+)
 const TABLE_MODULE = 'sla-performance-reports'
 const perPageOptions = ref([10, 20, 25, 50, 100])
 
@@ -84,6 +91,7 @@ const maxCategoryTotal = computed(() => Math.max(1, ...categories.value.map((c) 
 
 /* ───── Data loading ───── */
 async function loadData() {
+  if (!canView.value) return
   loading.value = true
   try {
     const params = {}
@@ -196,6 +204,7 @@ function escapeCsv(val) {
 }
 
 function exportReport() {
+  if (!canExport.value) return
   exportLoading.value = true
   try {
     const cols = visibleBreachColumns.value
@@ -227,6 +236,10 @@ async function loadTablePreference() {
 
 /* ───── Init ───── */
 onMounted(async () => {
+  if (!canView.value) {
+    loading.value = false
+    return
+  }
   await loadTablePreference()
   loadData()
 })
@@ -245,8 +258,12 @@ onMounted(async () => {
       </div>
     </div>
 
+    <div v-if="!canView" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+      You do not have permission to view reports.
+    </div>
+
     <!-- Filter bar -->
-    <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+    <div v-if="canView" class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
       <div class="flex items-center gap-3">
         <button
           type="button"
@@ -272,6 +289,7 @@ onMounted(async () => {
           Print Report
         </button>
         <button
+          v-if="canExport"
           type="button"
           class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-70"
           :disabled="exportLoading"
@@ -284,7 +302,7 @@ onMounted(async () => {
     </div>
 
     <!-- KPI Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div v-if="canView" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <!-- Total Requests -->
       <div class="rounded-xl bg-white border border-gray-200 p-5 shadow-sm">
         <div class="flex items-center gap-3">
@@ -340,7 +358,7 @@ onMounted(async () => {
     </div>
 
     <!-- Department-wise SLA Performance -->
-    <div class="rounded-xl border-2 border-black bg-white shadow-sm overflow-hidden">
+    <div v-if="canView" class="rounded-xl border-2 border-black bg-white shadow-sm overflow-hidden">
       <div class="px-5 py-4 border-b border-gray-200">
         <h2 class="text-lg font-semibold text-gray-900">Department-wise SLA Performance</h2>
         <p class="text-sm text-gray-500 mt-0.5">Compliance rates by department</p>
@@ -403,7 +421,7 @@ onMounted(async () => {
     </div>
 
     <!-- Category + Priority row -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div v-if="canView" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <!-- SLA Compliance by Category -->
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">SLA Compliance by Category</h3>
@@ -566,7 +584,7 @@ onMounted(async () => {
     </div>
 
     <!-- SLA Compliance Trend -->
-    <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+    <div v-if="canView" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       <h2 class="text-lg font-semibold text-gray-900 mb-1">SLA Compliance Trend</h2>
       <p class="text-sm text-gray-500 mb-4">Monthly compliance rate over time</p>
       <div v-if="loading" class="py-8 text-center text-gray-400 text-sm">Loading…</div>
@@ -584,7 +602,7 @@ onMounted(async () => {
     </div>
 
     <!-- Key Insights & Recommendations -->
-    <div v-if="insights.length" class="rounded-xl border border-gray-200 bg-gray-800 p-5 shadow-sm">
+    <div v-if="canView && insights.length" class="rounded-xl border border-gray-200 bg-gray-800 p-5 shadow-sm">
       <h2 class="text-lg font-semibold text-white mb-4">Key Insights &amp; Recommendations</h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div
@@ -613,6 +631,7 @@ onMounted(async () => {
 
     <!-- Column Customizer Modal for Breaches Table -->
     <ColumnCustomizerModal
+      v-if="canView"
       :visible="columnModalVisible"
       :all-columns="ALL_BREACH_COLUMNS"
       :visible-columns="visibleBreachColumns"

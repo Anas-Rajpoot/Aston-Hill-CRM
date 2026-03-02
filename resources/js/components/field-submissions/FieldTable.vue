@@ -5,6 +5,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { canModuleAction } from '@/lib/accessControl'
 
 const props = defineProps({
   columns: { type: Array, required: true },
@@ -23,12 +24,15 @@ const props = defineProps({
 const emit = defineEmits(['sort', 'updateStatus', 'assignTechnician', 'update:selectedIds', 'updateCell', 'viewHistory'])
 const router = useRouter()
 const auth = useAuthStore()
+const canViewAction = computed(() => canModuleAction(auth.user, 'field', 'view'))
+const canEditAction = computed(() => canModuleAction(auth.user, 'field', 'edit'))
+const canHistoryAction = computed(() => canViewAction.value)
 const perms = computed(() => auth.user?.permissions ?? [])
 const canEdit = computed(() => perms.value.includes('field_head.view') || perms.value.includes('field_head.list'))
 
 /** Who can inline-edit rows: superadmin, field_head, field_agent, back_office. */
 const canInlineEdit = computed(() => {
-  if (canEdit.value) return true
+  if (canEditAction.value || canEdit.value) return true
   const roles = auth.user?.roles ?? []
   if (!Array.isArray(roles)) return false
   const hasRole = (name) => roles.some((r) => (typeof r === 'string' ? r : r?.name) === name)
@@ -63,6 +67,11 @@ function goToView(row) {
 function rowNumber(index) {
   return (props.currentPage - 1) * props.perPage + index + 1
 }
+
+const hasAnyRowAction = computed(() => {
+  if (canViewAction.value || canEditAction.value || canHistoryAction.value) return true
+  return canEditAction.value && (props.data || []).some((row) => canResubmit(row))
+})
 
 const columnLabels = {
   id: 'SR',
@@ -409,14 +418,14 @@ function isEditing(rowId, col) {
             </button>
             <span v-else class="font-bold text-white">{{ label(col) }}</span>
           </th>
-          <th scope="col" class="whitespace-nowrap px-4 py-3 text-right text-sm font-bold text-white">
+          <th v-if="hasAnyRowAction" scope="col" class="whitespace-nowrap px-4 py-3 text-right text-sm font-bold text-white">
             Actions
           </th>
         </tr>
       </thead>
       <tbody class="bg-white">
         <tr v-if="!loading && !data.length" class="border-b border-black bg-white">
-          <td :colspan="columns.length + 2" class="px-4 py-12 text-center text-gray-500">
+          <td :colspan="columns.length + (hasAnyRowAction ? 2 : 1)" class="px-4 py-12 text-center text-gray-500">
             No field submissions found.
           </td>
         </tr>
@@ -605,10 +614,11 @@ function isEditing(rowId, col) {
               <span v-else>{{ truncate(formatValue(row, col)) }}</span>
             </template>
           </td>
-          <td class="whitespace-nowrap px-4 py-3 text-right">
+          <td v-if="hasAnyRowAction" class="whitespace-nowrap px-4 py-3 text-right">
             <div class="flex items-center justify-end gap-2">
               <div class="inline-flex items-center gap-1">
                 <button
+                  v-if="canViewAction"
                   type="button"
                   class="rounded-full p-1.5 text-blue-600 hover:bg-blue-50"
                   title="View"
@@ -620,6 +630,7 @@ function isEditing(rowId, col) {
                   </svg>
                 </button>
                 <button
+                  v-if="canEditAction"
                   type="button"
                   class="rounded-full p-1.5 text-green-600 hover:bg-green-50"
                   title="Edit"
@@ -630,6 +641,7 @@ function isEditing(rowId, col) {
                   </svg>
                 </button>
                 <button
+                  v-if="canHistoryAction"
                   type="button"
                   class="rounded-full p-1.5 text-amber-600 hover:bg-amber-50"
                   title="View History"
@@ -641,7 +653,7 @@ function isEditing(rowId, col) {
                 </button>
               </div>
               <router-link
-                v-if="canResubmit(row)"
+                v-if="canEditAction && canResubmit(row)"
                 :to="`/field-submissions/${row.id}/edit`"
                 class="rounded bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700"
               >

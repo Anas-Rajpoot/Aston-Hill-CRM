@@ -66,12 +66,12 @@ const addCsrf = (config) => {
 api.interceptors.request.use(addCsrf)
 web.interceptors.request.use(addCsrf)
 
-// Intercept X-Password-Action header from EnforcePasswordExpiry middleware.
+// Intercept X-Password-Action header from security middleware.
 // When the server signals a password change is needed, update the auth store and redirect.
 api.interceptors.response.use(
   (res) => {
     const pwAction = res.headers?.['x-password-action']
-    if (pwAction && (pwAction === 'must_change_password' || pwAction === 'password_expired')) {
+    if (pwAction === 'must_change_password') {
       // Lazy import to avoid circular dependency at module load
       import('@/stores/auth').then(({ useAuthStore }) => {
         const auth = useAuthStore()

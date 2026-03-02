@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import api, { invalidateCurrentDraftCache } from '@/services/leadSubmissionsApi'
 import { useFormErrors } from '@/composables/useFormErrors'
 import { formatTeamLabel } from '@/composables/useTeamLabel'
+import { useSessionFormState } from '@/composables/useSessionFormState'
 import { toDdMmYyyy } from '@/lib/dateFormat'
 
 const EMIRATES_OPTIONS = [
@@ -51,6 +52,7 @@ const form = ref({
   sales_agent_id: '',
   remarks: '',
 })
+const { restoreState, clearState } = useSessionFormState('submission.lead.step1', form)
 
 const managers = ref([])
 const teamLeaders = ref([])
@@ -141,6 +143,7 @@ const resetForm = () => {
   draftId.value = null
   draftDate.value = null
   clearErrors()
+  clearState()
 }
 
 // Filter team leaders by manager; clear team_leader and sales_agent when manager changes
@@ -241,6 +244,8 @@ onMounted(async () => {
         populateForm(draft, true)
       }
     }
+    // Restore unsaved typing after browser refresh.
+    restoreState()
   } catch (_) {
     // Silent fail for team options
   } finally {
@@ -298,6 +303,7 @@ const saveDraft = async () => {
       draftId.value = data.id
       draftDate.value = new Date().toISOString()
       invalidateCurrentDraftCache()
+      clearState()
       emit('draft-saved', data.id)
     }
   } catch (e) {
@@ -347,8 +353,6 @@ const validateStep1 = () => {
   const aeResult = validateAeDomain(form.value.ae_domain)
   if (!aeResult.valid) err.ae_domain = [aeResult.message]
   if (!form.value.manager_id) err.manager_id = [`${formatTeamLabel(teamLabels.value.manager || 'manager')} is required.`]
-  if (!form.value.team_leader_id) err.team_leader_id = [`${formatTeamLabel(teamLabels.value.team_leader || 'team_leader')} is required.`]
-  if (!form.value.sales_agent_id) err.sales_agent_id = [`${formatTeamLabel(teamLabels.value.sales_agent || 'sales_agent')} is required.`]
   if (form.value.location_coordinates?.trim()) {
     const coordPattern = /^-?\d{1,3}(\.\d+)?\s*,\s*-?\d{1,3}(\.\d+)?$/
     const coords = form.value.location_coordinates.trim()
@@ -395,6 +399,11 @@ const onMrcInput = (e) => {
   form.value.mrc_aed = v === '' ? '0' : String(parseInt(v, 10) || 0)
   clearFieldError('mrc_aed')
 }
+const onQuantityInput = (e) => {
+  const v = e.target.value.replace(/\D/g, '')
+  form.value.quantity = v === '' ? '' : String(parseInt(v, 10) || 0)
+  clearFieldError('quantity')
+}
 const onGaidInput = (e) => {
   form.value.gaid = e.target.value
   clearFieldError('gaid')
@@ -420,6 +429,7 @@ const submit = async () => {
     const data = response.data
     if (data?.id) {
       invalidateCurrentDraftCache()
+      clearState()
       emit('next', data.id)
     }
   } catch (e) {
@@ -430,6 +440,7 @@ const submit = async () => {
 }
 
 const cancel = () => {
+  clearState()
   router.push('/submissions')
 }
 </script>
@@ -513,17 +524,6 @@ const cancel = () => {
             />
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Product <span class="text-red-500">*</span></label>
-            <input
-              v-model="form.product"
-              type="text"
-              placeholder="Search Product"
-              :class="inputClass('product')"
-              @input="clearFieldError('product')"
-            />
-            <p v-if="getError('product')" class="mt-1 text-sm text-red-600">{{ getError('product') }}</p>
-          </div>
-          <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Contact Number <span class="text-red-500">*</span></label>
             <input
               v-model="form.contact_number_gsm"
@@ -557,40 +557,16 @@ const cancel = () => {
             />
             <p v-if="getError('email')" class="mt-1 text-sm text-red-600">{{ getError('email') }}</p>
           </div>
-        </div>
-        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div class="md:col-span-2 lg:col-span-3">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Complete Address as per Ejari <span class="text-red-500">*</span></label>
-            <textarea
-              v-model="form.address"
-              rows="2"
-              placeholder="Enter complete address"
-              :class="inputClass('address')"
-              @input="clearFieldError('address')"
-            />
-            <p v-if="getError('address')" class="mt-1 text-sm text-red-600">{{ getError('address') }}</p>
-          </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Emirates <span class="text-red-500">*</span></label>
-            <select
-              v-model="form.emirates"
-              :class="inputClass('emirates')"
-            >
-              <option value="">Select Emirates</option>
-              <option v-for="e in EMIRATES_OPTIONS" :key="e" :value="e">{{ e }}</option>
-            </select>
-            <p v-if="getError('emirates')" class="mt-1 text-sm text-red-600">{{ getError('emirates') }}</p>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Location Coordinates</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Product <span class="text-red-500">*</span></label>
             <input
-              v-model="form.location_coordinates"
+              v-model="form.product"
               type="text"
-              placeholder="e.g. 25.2048, 55.2708"
-              :class="inputClass('location_coordinates')"
-              @input="clearFieldError('location_coordinates')"
+              placeholder="Search Product"
+              :class="inputClass('product')"
+              @input="clearFieldError('product')"
             />
-            <p v-if="errors?.location_coordinates" class="mt-1 text-xs text-red-600">{{ errors.location_coordinates[0] }}</p>
+            <p v-if="getError('product')" class="mt-1 text-sm text-red-600">{{ getError('product') }}</p>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Offer</label>
@@ -635,6 +611,41 @@ const cancel = () => {
               @input="onQuantityInput"
             />
             <p v-if="getError('quantity')" class="mt-1 text-sm text-red-600">{{ getError('quantity') }}</p>
+          </div>
+        </div>
+        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div class="md:col-span-2 lg:col-span-3">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Complete Address as per Ejari <span class="text-red-500">*</span></label>
+            <textarea
+              v-model="form.address"
+              rows="2"
+              placeholder="Enter complete address"
+              :class="inputClass('address')"
+              @input="clearFieldError('address')"
+            />
+            <p v-if="getError('address')" class="mt-1 text-sm text-red-600">{{ getError('address') }}</p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Emirates <span class="text-red-500">*</span></label>
+            <select
+              v-model="form.emirates"
+              :class="inputClass('emirates')"
+            >
+              <option value="">Select Emirates</option>
+              <option v-for="e in EMIRATES_OPTIONS" :key="e" :value="e">{{ e }}</option>
+            </select>
+            <p v-if="getError('emirates')" class="mt-1 text-sm text-red-600">{{ getError('emirates') }}</p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Location Coordinates</label>
+            <input
+              v-model="form.location_coordinates"
+              type="text"
+              placeholder="e.g. 25.2048, 55.2708"
+              :class="inputClass('location_coordinates')"
+              @input="clearFieldError('location_coordinates')"
+            />
+            <p v-if="errors?.location_coordinates" class="mt-1 text-xs text-red-600">{{ errors.location_coordinates[0] }}</p>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">.ae Domain</label>
@@ -686,7 +697,7 @@ const cancel = () => {
             <p v-if="getError('manager_id')" class="mt-1 text-sm text-red-600">{{ getError('manager_id') }}</p>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">{{ formatTeamLabel(teamLabels.team_leader || 'team_leader') }} Name <span class="text-red-500">*</span></label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ formatTeamLabel(teamLabels.team_leader || 'team_leader') }} Name</label>
             <select
               v-model="form.team_leader_id"
               :class="inputClass('team_leader_id')"
@@ -698,7 +709,7 @@ const cancel = () => {
             <p v-if="getError('team_leader_id')" class="mt-1 text-sm text-red-600">{{ getError('team_leader_id') }}</p>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">{{ formatTeamLabel(teamLabels.sales_agent || 'sales_agent') }} Name <span class="text-red-500">*</span></label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ formatTeamLabel(teamLabels.sales_agent || 'sales_agent') }} Name</label>
             <select
               v-model="form.sales_agent_id"
               :class="inputClass('sales_agent_id')"

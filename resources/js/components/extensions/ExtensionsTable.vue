@@ -4,6 +4,7 @@
  */
 import { ref, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { canModuleAction } from '@/lib/accessControl'
 
 const auth = useAuthStore()
 
@@ -28,15 +29,30 @@ const inlineEditValue = ref('')
 const inlineEditError = ref('')
 const showPasswordInline = ref(false)
 
-const permissions = computed(() => auth.user?.permissions ?? [])
-const isSuperAdmin = computed(() => {
-  const r = auth.user?.roles ?? []
-  return Array.isArray(r) && r.some((x) => (typeof x === 'string' ? x === 'superadmin' : x?.name === 'superadmin'))
-})
-const canView = computed(() => isSuperAdmin.value || permissions.value.includes('extensions.list'))
-const canEdit = computed(() => isSuperAdmin.value || permissions.value.includes('extensions.edit'))
-const canDelete = computed(() => isSuperAdmin.value || permissions.value.includes('extensions.edit'))
+const canView = computed(() =>
+  canModuleAction(auth.user, 'extensions', 'view', [
+    'extensions.list',
+    'extensions.view',
+    'cisco-extensions.list',
+    'cisco-extensions.view',
+  ])
+)
+const canEdit = computed(() =>
+  canModuleAction(auth.user, 'extensions', 'edit', [
+    'extensions.edit',
+    'extensions.update',
+    'cisco-extensions.edit',
+    'cisco-extensions.update',
+  ])
+)
+const canDelete = computed(() =>
+  canModuleAction(auth.user, 'extensions', 'delete', [
+    'extensions.delete',
+    'cisco-extensions.delete',
+  ])
+)
 const canInlineEdit = computed(() => canEdit.value)
+const hasAnyRowAction = computed(() => canView.value || canEdit.value || canDelete.value)
 
 const EDITABLE_COLUMNS = ['extension', 'landline_number', 'gateway', 'username', 'password', 'status', 'assigned_to_name', 'manager', 'team_leader', 'comment']
 const DROPDOWN_COLUMNS = ['gateway', 'status', 'assigned_to_name', 'manager', 'team_leader']
@@ -204,7 +220,7 @@ function goToEdit(row) {
 }
 
 function goToHistory(row) {
-  if (row?.id) emit('openHistory', row)
+  if (row?.id && canView.value) emit('openHistory', row)
 }
 
 function onDelete(row) {
@@ -251,12 +267,12 @@ function onDelete(row) {
             </button>
             <span v-else class="font-semibold text-gray-900">{{ label(col) }}</span>
           </th>
-          <th scope="col" class="whitespace-nowrap px-4 py-3 text-center text-sm font-semibold text-gray-900">Actions</th>
+          <th v-if="hasAnyRowAction" scope="col" class="whitespace-nowrap px-4 py-3 text-center text-sm font-semibold text-gray-900">Actions</th>
         </tr>
       </thead>
       <tbody class="bg-white">
         <tr v-if="!loading && !data.length" class="border-b border-black">
-          <td :colspan="columns.length + 1" class="px-4 py-12 text-center text-sm text-gray-500">No extensions found.</td>
+          <td :colspan="columns.length + (hasAnyRowAction ? 1 : 0)" class="px-4 py-12 text-center text-sm text-gray-500">No extensions found.</td>
         </tr>
         <tr
           v-for="(row, rowIndex) in data"
@@ -420,7 +436,7 @@ function onDelete(row) {
               {{ formatValue(row, col) }}
             </template>
           </td>
-          <td class="whitespace-nowrap px-4 py-3 text-center">
+          <td v-if="hasAnyRowAction" class="whitespace-nowrap px-4 py-3 text-center">
             <div class="inline-flex items-center justify-center gap-2">
               <button
                 v-if="canView"
@@ -446,6 +462,7 @@ function onDelete(row) {
                 </svg>
               </button>
               <button
+                v-if="canView"
                 type="button"
                 class="rounded-full p-1.5 text-amber-500 hover:bg-amber-50"
                 title="History"

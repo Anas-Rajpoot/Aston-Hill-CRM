@@ -26,7 +26,6 @@ class SecuritySetting extends Model
         'require_uppercase'                => true,
         'require_number'                   => true,
         'require_special'                  => true,
-        'password_expiry_days'             => 90,
     ];
 
     protected $fillable = [
@@ -42,7 +41,6 @@ class SecuritySetting extends Model
         'require_uppercase',
         'require_number',
         'require_special',
-        'password_expiry_days',
         'updated_by',
     ];
 
@@ -59,7 +57,6 @@ class SecuritySetting extends Model
         'require_uppercase'                => 'boolean',
         'require_number'                   => 'boolean',
         'require_special'                  => 'boolean',
-        'password_expiry_days'             => 'integer',
     ];
 
     /* ── Singleton accessor with caching ── */

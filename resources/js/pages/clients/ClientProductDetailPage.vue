@@ -4,14 +4,18 @@ import { useRoute, useRouter } from 'vue-router'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import clientsApi from '@/services/clientsApi'
 import { toDdMonYyyyDash } from '@/lib/dateFormat'
+import { useAuthStore } from '@/stores/auth'
+import { canModuleAction } from '@/lib/accessControl'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 
 const loading = ref(true)
 const product = ref(null)
 
 const productId = computed(() => Number(route.params.id || 0))
+const canEdit = computed(() => canModuleAction(auth.user, 'clients', 'edit', ['all-clients.edit', 'all-clients.update']))
 
 const closeTarget = computed(() => {
   const returnTo = String(route.query.return_to || '').trim()
@@ -64,6 +68,7 @@ function goClose() {
 }
 
 function goEdit() {
+  if (!canEdit.value) return
   const id = productId.value
   if (!id) return
   router.push({
@@ -88,7 +93,7 @@ onMounted(loadProduct)
             <button type="button" class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="goClose">
               Close
             </button>
-            <button type="button" class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700" @click="goEdit">
+            <button v-if="canEdit" type="button" class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700" @click="goEdit">
               Edit Product & Service
             </button>
           </div>

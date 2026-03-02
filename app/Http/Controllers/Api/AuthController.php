@@ -223,7 +223,7 @@ class AuthController extends Controller
 
     /**
      * Check if user must change their password.
-     * Returns null if no action needed, or 'must_change_password' / 'password_expired'.
+     * Returns null if no action needed, or 'must_change_password'.
      */
     private function resolvePasswordAction(User $user): ?string
     {
@@ -235,21 +235,6 @@ class AuthController extends Controller
                 return 'must_change_password';
             }
 
-            // Super admins are exempt from password expiry – they change when they choose to.
-            if ($user->hasRole('superadmin')) {
-                return null;
-            }
-
-            // Password expiry
-            if ($settings->password_expiry_days > 0) {
-                if (! $user->password_changed_at) {
-                    return 'password_expired';
-                }
-                $expiresAt = $user->password_changed_at->addDays($settings->password_expiry_days);
-                if ($expiresAt->isPast()) {
-                    return 'password_expired';
-                }
-            }
         } catch (\Throwable $e) {
             // Silently fail during migrations
         }

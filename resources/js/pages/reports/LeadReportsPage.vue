@@ -12,9 +12,16 @@ import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import { toDdMonYyyyLower } from '@/lib/dateFormat'
 import { useAuthStore } from '@/stores/auth'
+import { canModuleAction } from '@/lib/accessControl'
 
 const route = useRoute()
 const authStore = useAuthStore()
+const canView = computed(() =>
+  canModuleAction(authStore.user, 'reports', 'view', ['reports.view', 'reports.list'])
+)
+const canExport = computed(() =>
+  canModuleAction(authStore.user, 'reports', 'export', ['reports.export', 'reports.export_reports'])
+)
 const TABLE_MODULE = 'lead-reports'
 const perPageOptions = ref([10, 20, 25, 50, 100])
 
@@ -156,6 +163,7 @@ function filterParams() {
 
 /* ───── Data loading ───── */
 async function loadFilterOptions() {
+  if (!canView.value) return
   try {
     const { data } = await api.get('/lead-submissions/filters')
     filterOptions.value.categories = data.categories ?? []
@@ -166,6 +174,7 @@ async function loadFilterOptions() {
 }
 
 async function loadStats() {
+  if (!canView.value) return
   statsLoading.value = true
   try {
     const { data } = await api.get('/reports/lead-stats', { params: filterParams() })
@@ -182,6 +191,7 @@ async function loadStats() {
 }
 
 async function loadTable() {
+  if (!canView.value) return
   tableLoading.value = true
   try {
     const data = await leadSubmissionsApi.index(params.value)
@@ -195,6 +205,7 @@ async function loadTable() {
 }
 
 async function loadColumns() {
+  if (!canView.value) return
   try {
     const data = await leadSubmissionsApi.columns()
     allColumns.value = data.all_columns ?? []
@@ -343,6 +354,7 @@ function escapeCsv(val) {
 }
 
 async function exportExcel() {
+  if (!canExport.value) return
   exportLoading.value = true
   try {
     const exportParams = { ...params.value, page: 1, per_page: 5000 }
@@ -384,6 +396,10 @@ async function loadTablePreference() {
 
 /* ───── Init ───── */
 onMounted(async () => {
+  if (!canView.value) {
+    loading.value = false
+    return
+  }
   loading.value = true
   await Promise.all([loadFilterOptions(), loadColumns(), loadTablePreference()])
   await Promise.all([loadStats(), loadTable()])
@@ -404,6 +420,7 @@ onMounted(async () => {
       </div>
       <div class="flex gap-2">
         <button
+          v-if="canExport"
           type="button"
           class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-70 disabled:cursor-wait"
           :disabled="exportLoading"
@@ -416,8 +433,12 @@ onMounted(async () => {
       </div>
     </div>
 
+    <div v-if="!canView" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+      You do not have permission to view reports.
+    </div>
+
     <!-- KPI cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+    <div v-if="canView" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
       <div class="rounded-xl bg-gray-800 text-white p-5 shadow">
         <div class="flex items-center justify-between">
           <div>
@@ -476,7 +497,7 @@ onMounted(async () => {
     </div>
 
     <!-- Charts row -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div v-if="canView" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- Leads by Status -->
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <h3 class="text-sm font-semibold text-gray-900 mb-4">Leads by Status</h3>
@@ -527,7 +548,7 @@ onMounted(async () => {
     </div>
 
     <!-- Filters Section (below charts) -->
-    <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+    <div v-if="canView" class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
       <div class="flex flex-wrap items-end gap-4">
         <div>
           <label class="block text-xs font-medium text-gray-500 mb-1">Status</label>
@@ -598,7 +619,7 @@ onMounted(async () => {
     </div>
 
     <!-- Table Section -->
-    <div class="rounded-xl border-2 border-black bg-white shadow-sm overflow-hidden">
+    <div v-if="canView" class="rounded-xl border-2 border-black bg-white shadow-sm overflow-hidden">
       <!-- Table header bar -->
       <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b-2 border-black bg-white">
         <h2 class="text-base font-semibold text-gray-900">Lead Submissions Details</h2>

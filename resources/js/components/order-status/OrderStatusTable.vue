@@ -11,6 +11,7 @@ const props = defineProps({
   sort: { type: String, default: 'submitted_at' },
   order: { type: String, default: 'desc' },
   loading: { type: Boolean, default: false },
+  canViewAction: { type: Boolean, default: true },
 })
 
 const emit = defineEmits(['sort'])
@@ -189,12 +190,14 @@ function goToClient(row) {
           >
             <template v-if="col === 'activity'">
               <router-link
+                v-if="canViewAction"
                 :to="`/clients/${row.id}`"
                 class="font-medium text-green-600 hover:text-green-800 hover:underline"
                 @click.stop
               >
                 {{ activityDisplay(row) }}
               </router-link>
+              <span v-else class="text-gray-500">{{ activityDisplay(row) }}</span>
             </template>
             <template v-else-if="col === 'status'">
               <span

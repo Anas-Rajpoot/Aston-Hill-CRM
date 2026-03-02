@@ -11,12 +11,16 @@ use App\Models\LeadSubmission;
 use App\Models\SystemPreference;
 use App\Models\User;
 use App\Models\VasRequestSubmission;
+use App\Services\TeamHierarchyService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
 
 class DashboardController extends Controller
 {
+    private const VERSION_KEY = 'dashboard_stats_version';
+
     /**
      * GET /api/dashboard/stats
      *
@@ -25,11 +29,13 @@ class DashboardController extends Controller
      */
     public function stats(Request $request): JsonResponse
     {
-        $cacheKey = 'dashboard_stats';
+        $user = $request->user();
+        $version = (int) Cache::get(self::VERSION_KEY, 1);
+        $cacheKey = "dashboard_stats:v{$version}:u{$user->id}";
         $cacheTtl = 120; // 2 min
 
-        $data = Cache::remember($cacheKey, $cacheTtl, function () {
-            return $this->buildStats();
+        $data = Cache::remember($cacheKey, $cacheTtl, function () use ($user) {
+            return $this->buildStats($user);
         });
 
         // Compute ETag from data hash
@@ -53,35 +59,57 @@ class DashboardController extends Controller
         ->header('Cache-Control', 'private, max-age=60');
     }
 
-    private function buildStats(): array
+    private function buildStats(User $user): array
     {
         $today = now()->startOfDay();
         $weekAgo = now()->subDays(7);
+        $visibleUserIds = $this->visibleUserIds($user);
+
+        $leadQuery = LeadSubmission::query();
+        $fieldQuery = FieldSubmission::query();
+        $supportQuery = CustomerSupportSubmission::query();
+        $vasQuery = VasRequestSubmission::query();
+        $clientQuery = Client::query();
+
+        $this->scopeByVisibleUsers($leadQuery, $user, ['created_by', 'sales_agent_id', 'team_leader_id', 'manager_id', 'executive_id']);
+        $this->scopeByVisibleUsers($fieldQuery, $user, ['created_by', 'sales_agent_id', 'team_leader_id', 'manager_id', 'field_executive_id']);
+        $this->scopeByVisibleUsers($supportQuery, $user, ['created_by', 'sales_agent_id', 'team_leader_id', 'manager_id', 'csr_id']);
+        $this->scopeByVisibleUsers($vasQuery, $user, ['created_by', 'sales_agent_id', 'team_leader_id', 'manager_id', 'back_office_executive_id']);
+        $this->scopeByVisibleUsers($clientQuery, $user, ['created_by', 'sales_agent_id', 'team_leader_id', 'manager_id', 'account_manager_id']);
 
         return [
             'kpis' => [
-                'total_leads'        => LeadSubmission::count(),
-                'leads_today'        => LeadSubmission::where('created_at', '>=', $today)->count(),
-                'field_submissions'  => FieldSubmission::count(),
-                'field_today'        => FieldSubmission::where('created_at', '>=', $today)->count(),
-                'support_tickets'    => CustomerSupportSubmission::count(),
-                'support_open'       => CustomerSupportSubmission::where('status', 'open')->count(),
-                'vas_requests'       => VasRequestSubmission::count(),
-                'vas_pending'        => VasRequestSubmission::where('status', 'pending')->count(),
-                'total_clients'      => Client::count(),
-                'active_users'       => User::where('updated_at', '>=', $weekAgo)->count(),
+                'total_leads'        => (clone $leadQuery)->count(),
+                'leads_today'        => (clone $leadQuery)->where('created_at', '>=', $today)->count(),
+                'field_submissions'  => (clone $fieldQuery)->count(),
+                'field_today'        => (clone $fieldQuery)->where('created_at', '>=', $today)->count(),
+                'support_tickets'    => (clone $supportQuery)->count(),
+                'support_open'       => (clone $supportQuery)->where('status', 'open')->count(),
+                'vas_requests'       => (clone $vasQuery)->count(),
+                'vas_pending'        => (clone $vasQuery)->where('status', 'pending')->count(),
+                'total_clients'      => (clone $clientQuery)->count(),
+                'active_users'       => $user->hasRole('superadmin')
+                    ? User::where('updated_at', '>=', $weekAgo)->count()
+                    : User::whereIn('id', $visibleUserIds)->where('updated_at', '>=', $weekAgo)->count(),
             ],
-            'recent_activity' => $this->recentActivity(),
+            'recent_activity' => $this->recentActivity($user),
             'generated_at'    => now()->toIso8601String(),
         ];
     }
 
-    private function recentActivity(): array
+    private function recentActivity(User $user): array
     {
         $items = collect();
+        $leadQuery = LeadSubmission::query();
+        $fieldQuery = FieldSubmission::query();
+        $supportQuery = CustomerSupportSubmission::query();
+
+        $this->scopeByVisibleUsers($leadQuery, $user, ['created_by', 'sales_agent_id', 'team_leader_id', 'manager_id', 'executive_id']);
+        $this->scopeByVisibleUsers($fieldQuery, $user, ['created_by', 'sales_agent_id', 'team_leader_id', 'manager_id', 'field_executive_id']);
+        $this->scopeByVisibleUsers($supportQuery, $user, ['created_by', 'sales_agent_id', 'team_leader_id', 'manager_id', 'csr_id']);
 
         // Recent lead submissions
-        LeadSubmission::orderByDesc('created_at')->limit(5)->get(['id', 'company_name', 'account_number', 'status', 'created_at'])->each(function ($r) use ($items) {
+        $leadQuery->orderByDesc('created_at')->limit(5)->get(['id', 'company_name', 'account_number', 'status', 'created_at'])->each(function ($r) use ($items) {
             $items->push([
                 'type'      => 'lead',
                 'label'     => 'Lead ' . ($r->account_number ?? '#' . $r->id),
@@ -92,7 +120,7 @@ class DashboardController extends Controller
         });
 
         // Recent field submissions
-        FieldSubmission::orderByDesc('created_at')->limit(5)->get(['id', 'company_name', 'status', 'created_at'])->each(function ($r) use ($items) {
+        $fieldQuery->orderByDesc('created_at')->limit(5)->get(['id', 'company_name', 'status', 'created_at'])->each(function ($r) use ($items) {
             $items->push([
                 'type'      => 'field',
                 'label'     => 'Field #' . $r->id,
@@ -103,7 +131,7 @@ class DashboardController extends Controller
         });
 
         // Recent support tickets
-        CustomerSupportSubmission::orderByDesc('created_at')->limit(3)->get(['id', 'issue_category', 'status', 'created_at'])->each(function ($r) use ($items) {
+        $supportQuery->orderByDesc('created_at')->limit(3)->get(['id', 'issue_category', 'status', 'created_at'])->each(function ($r) use ($items) {
             $items->push([
                 'type'      => 'support',
                 'label'     => 'Support #' . $r->id,
@@ -117,10 +145,57 @@ class DashboardController extends Controller
     }
 
     /**
+     * Get all user IDs visible to the current user.
+     *
+     * @return int[]
+     */
+    private function visibleUserIds(User $user): array
+    {
+        if ($user->hasRole('superadmin')) {
+            return [];
+        }
+
+        $ids = TeamHierarchyService::getVisibleUserIds($user);
+        if (! in_array((int) $user->id, $ids, true)) {
+            $ids[] = (int) $user->id;
+        }
+
+        return array_values(array_unique(array_map('intval', $ids)));
+    }
+
+    /**
+     * Scope a query to visible users for non-superadmin users.
+     *
+     * @param  array<int,string>  $columns
+     */
+    private function scopeByVisibleUsers(Builder $query, User $user, array $columns): void
+    {
+        if ($user->hasRole('superadmin')) {
+            return;
+        }
+
+        $visibleUserIds = $this->visibleUserIds($user);
+        if (empty($visibleUserIds)) {
+            $query->whereRaw('1 = 0');
+            return;
+        }
+
+        $query->where(function ($q) use ($columns, $visibleUserIds) {
+            foreach ($columns as $index => $column) {
+                if ($index === 0) {
+                    $q->whereIn($column, $visibleUserIds);
+                    continue;
+                }
+                $q->orWhereIn($column, $visibleUserIds);
+            }
+        });
+    }
+
+    /**
      * Called after any mutation to bust the dashboard cache.
      */
     public static function clearCache(): void
     {
-        Cache::forget('dashboard_stats');
+        Cache::put(self::VERSION_KEY, time(), 86400);
     }
 }

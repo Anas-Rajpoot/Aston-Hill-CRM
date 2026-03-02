@@ -6,6 +6,7 @@ import PlaceholderPage from '@/pages/PlaceholderPage.vue'
 import UserShow from '@/pages/users/UserShow.vue'
 import UserEdit from '@/pages/users/UserEdit.vue'
 import { useAuthStore } from '@/stores/auth'
+import { canAccessRoute } from '@/lib/accessControl'
 
 // Lazy-load heavy pages so initial HTML + JS parse stays fast (DOMContentLoaded < 3s).
 const ph = (title) => ({ component: PlaceholderPage, props: { title } })
@@ -160,6 +161,17 @@ router.beforeEach(async (to, from, next) => {
   // (except for API/logout routes)
   if (auth.isAuthenticated && auth.passwordAction && to.path !== '/change-password') {
     return next('/change-password')
+  }
+
+  // Never apply module access-control to auth pages.
+  if (authPath) {
+    return next()
+  }
+
+  // Default-deny module access for non-superadmin users.
+  // Dashboard remains the safe fallback for users with no assigned permissions.
+  if (!canAccessRoute(auth.user, to.path)) {
+    return next('/')
   }
 
   next()

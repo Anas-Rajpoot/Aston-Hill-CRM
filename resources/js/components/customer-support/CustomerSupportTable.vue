@@ -6,6 +6,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { canModuleAction } from '@/lib/accessControl'
 
 const router = useRouter()
 
@@ -36,11 +37,14 @@ const props = defineProps({
 const emit = defineEmits(['sort', 'updateCell', 'viewHistory', 'openAssign', 'update:selectedIds'])
 
 const auth = useAuthStore()
+const canViewAction = computed(() => canModuleAction(auth.user, 'support', 'view'))
+const canEditAction = computed(() => canModuleAction(auth.user, 'support', 'edit'))
+const canHistoryAction = computed(() => canViewAction.value)
 const canInlineEdit = computed(() => {
   const roles = auth.user?.roles ?? []
   if (!Array.isArray(roles)) return false
   const hasRole = (name) => roles.some((r) => (typeof r === 'string' ? r : r?.name) === name)
-  return hasRole('superadmin') || hasRole('back_office') || hasRole('backoffice')
+  return canEditAction.value && (hasRole('superadmin') || hasRole('back_office') || hasRole('backoffice'))
 })
 
 function rowNumber(index) {
@@ -329,6 +333,11 @@ function workflowBadgeClass(val) {
 function isUnassignedCsr(row) {
   return row.csr_id == null && (!row.csr || row.csr === '' || row.csr === '—')
 }
+
+const hasAnyRowAction = computed(() => {
+  if (canViewAction.value || canEditAction.value || canHistoryAction.value) return true
+  return canEditAction.value && (props.data || []).some((row) => canResubmit(row))
+})
 </script>
 
 <template>
@@ -393,14 +402,14 @@ function isUnassignedCsr(row) {
             </button>
             <span v-else class="font-bold text-white">{{ label(col) }}</span>
           </th>
-          <th scope="col" class="whitespace-nowrap px-4 py-3 text-center text-sm font-bold capitalize text-white">
+          <th v-if="hasAnyRowAction" scope="col" class="whitespace-nowrap px-4 py-3 text-center text-sm font-bold capitalize text-white">
             Actions
           </th>
         </tr>
       </thead>
       <tbody class="bg-white">
         <tr v-if="!loading && !data.length" class="border-b border-black bg-white">
-          <td :colspan="columns.length + (canBulkAssign ? 2 : 1)" class="px-4 py-12 text-center text-gray-500">
+          <td :colspan="columns.length + (canBulkAssign ? 1 : 0) + (hasAnyRowAction ? 1 : 0)" class="px-4 py-12 text-center text-gray-500">
             No customer support requests found.
           </td>
         </tr>
@@ -580,10 +589,11 @@ function isUnassignedCsr(row) {
               {{ truncate(formatValue(row, col)) }}
             </template>
           </td>
-          <td class="whitespace-nowrap px-4 py-3">
+          <td v-if="hasAnyRowAction" class="whitespace-nowrap px-4 py-3">
             <div class="flex items-center justify-between gap-3">
               <div class="inline-flex items-center gap-1">
                 <button
+                  v-if="canViewAction"
                   type="button"
                   class="rounded-full p-1.5 text-blue-600 hover:bg-blue-50"
                   title="View"
@@ -595,6 +605,7 @@ function isUnassignedCsr(row) {
                   </svg>
                 </button>
                 <button
+                  v-if="canEditAction"
                   type="button"
                   class="rounded-full p-1.5 text-green-600 hover:bg-green-50"
                   title="Edit"
@@ -605,6 +616,7 @@ function isUnassignedCsr(row) {
                   </svg>
                 </button>
                 <button
+                  v-if="canHistoryAction"
                   type="button"
                   class="rounded-full p-1.5 text-amber-600 hover:bg-amber-50"
                   title="View History"
@@ -616,7 +628,7 @@ function isUnassignedCsr(row) {
                 </button>
               </div>
               <router-link
-                v-if="canResubmit(row)"
+                v-if="canEditAction && canResubmit(row)"
                 :to="`/customer-support/${row.id}/resubmit`"
                 class="rounded bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700"
               >

@@ -17,6 +17,7 @@ import RecordHistoryModal from '@/components/RecordHistoryModal.vue'
 import Toast from '@/components/Toast.vue'
 import { debounce } from '@/composables/useApiRequest'
 import { useFilterCache } from '@/composables/useFilterCache'
+import { canModuleAction } from '@/lib/accessControl'
 
 const router = useRouter()
 const historyModalVisible = ref(false)
@@ -85,6 +86,7 @@ const canBulkAssign = (() => {
   if (isSuperAdmin) return true
   return perms.includes('customer_support_requests.assign_csr')
 })()
+const canExport = () => canModuleAction(auth.user, 'support', 'export')
 
 const filters = ref({
   q: '',
@@ -511,6 +513,7 @@ onMounted(async () => {
             Bulk Assign
           </button>
           <button
+            v-if="canExport()"
             type="button"
             class="inline-flex items-center rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70 disabled:cursor-wait"
             :disabled="loading || exportLoading"

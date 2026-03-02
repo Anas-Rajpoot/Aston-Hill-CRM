@@ -4,7 +4,6 @@
  *
  * Shown when:
  *  - User must change password on first login (must_change_password flag)
- *  - User's password has expired (password_expiry_days exceeded)
  *  - User voluntarily wants to change their password
  *
  * Displays dynamic password policy requirements from SecuritySettings.
@@ -34,7 +33,6 @@ const policy = reactive({
   require_uppercase: true,
   require_number: true,
   require_special: true,
-  expiry_days: 90,
   reason: null,
 })
 
@@ -46,9 +44,6 @@ const allChecksMet = computed(() => strengthMeter.value?.allMet && passwordsMatc
 const reasonMessage = computed(() => {
   if (policy.reason === 'must_change_password') {
     return 'You are required to change your password before continuing. This is your first login.'
-  }
-  if (policy.reason === 'password_expired') {
-    return `Your password has expired (policy: change every ${policy.expiry_days} days). Please set a new password.`
   }
   return null
 })

@@ -3,6 +3,7 @@ import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import api from '@/services/fieldSubmissionsApi'
 import { useFormErrors } from '@/composables/useFormErrors'
 import { formatTeamLabel } from '@/composables/useTeamLabel'
+import { useSessionFormState } from '@/composables/useSessionFormState'
 
 const EMIRATES = [
   'Abu Dhabi',
@@ -28,6 +29,7 @@ const form = ref({
   team_leader_id: '',
   sales_agent_id: '',
 })
+const { restoreState, clearState } = useSessionFormState('submission.field.step1', form)
 
 const managers = ref([])
 const teamLeaders = ref([])
@@ -123,6 +125,7 @@ onMounted(async () => {
     if (data.labels) {
       teamLabels.value = { ...teamLabels.value, ...data.labels }
     }
+    restoreState()
   } catch (e) {
     setErrors(e)
   }
@@ -211,6 +214,7 @@ async function submit() {
       document.documentElement.scrollTop = 0
       document.body.scrollTop = 0
     })
+    clearState()
     Object.assign(form.value, {
       company_name: '',
       contact_number: '',
@@ -233,6 +237,7 @@ async function submit() {
 }
 
 function cancel() {
+  clearState()
   Object.assign(form.value, {
     company_name: '',
     contact_number: '',

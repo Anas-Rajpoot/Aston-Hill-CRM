@@ -39,19 +39,11 @@ class BootstrapController extends Controller
             $prefs    = SystemPreference::singleton();
             $security = SecuritySetting::current();
 
-            // Determine password action (must_change or expired)
-            // Super admins are exempt from password expiry – they change when they choose to.
+            // Determine password action (must_change only)
             $passwordAction = null;
-            $isSuperAdmin = $user->hasRole('superadmin');
             try {
                 if ($security->force_password_reset_on_first_login && $user->must_change_password) {
                     $passwordAction = 'must_change_password';
-                } elseif (! $isSuperAdmin && $security->password_expiry_days > 0) {
-                    if (! $user->password_changed_at) {
-                        $passwordAction = 'password_expired';
-                    } elseif ($user->password_changed_at->addDays($security->password_expiry_days)->isPast()) {
-                        $passwordAction = 'password_expired';
-                    }
                 }
             } catch (\Throwable $e) {
                 // Silently fail

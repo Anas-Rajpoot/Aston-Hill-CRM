@@ -1,7 +1,8 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { canModuleAction } from '@/lib/accessControl'
 
 const MONTHS_3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 function formatDateTime(val) {
@@ -47,12 +48,17 @@ const props = defineProps({
   viewMode: { type: String, default: 'client-tab' }, // client-tab | product-detail
   parentClientId: { type: [Number, String], default: null },
   returnTo: { type: String, default: '' },
+  permissionModule: { type: String, default: 'clients' },
 })
 
 const emit = defineEmits(['sort', 'updateCell', 'viewHistory', 'show-renewal-alerts'])
 
 const router = useRouter()
 const auth = useAuthStore()
+const canViewAction = computed(() => canModuleAction(auth.user, props.permissionModule, 'view'))
+const canEditAction = computed(() => canModuleAction(auth.user, props.permissionModule, 'edit'))
+const canHistoryAction = computed(() => canViewAction.value)
+const hasAnyRowAction = computed(() => canViewAction.value || canHistoryAction.value)
 
 const columnLabels = {
   id: 'ID',
@@ -338,12 +344,14 @@ function getOptionsForColumn(col) {
 }
 
 function openDropdownEdit(row, col) {
+  if (!canEditAction.value) return
   editingCell.value = { rowId: row.id, col }
   inlineEditValue.value = getCellValueForEdit(row, col)
   inlineEditError.value = ''
 }
 
 function openInputEdit(row, col) {
+  if (!canEditAction.value) return
   editingCell.value = { rowId: row.id, col }
   inlineEditValue.value = getCellValueForEdit(row, col)
   inlineEditError.value = ''
@@ -422,6 +430,7 @@ function cancelInlineEdit() {
 }
 
 function onCellInteract(e, row, col) {
+  if (!canEditAction.value) return
   if (isReadOnly(col)) return
   if (isDropdownColumn(col)) {
     e.stopPropagation()
@@ -430,6 +439,7 @@ function onCellInteract(e, row, col) {
 }
 
 function onCellDblClick(e, row, col) {
+  if (!canEditAction.value) return
   if (isReadOnly(col)) return
   if (!isDropdownColumn(col)) {
     e.stopPropagation()
@@ -490,14 +500,14 @@ function onCellDblClick(e, row, col) {
             </button>
             <span v-else class="font-bold text-white">{{ label(col) }}</span>
           </th>
-          <th scope="col" class="whitespace-nowrap px-4 py-3 text-center text-sm font-bold capitalize text-white">
+          <th v-if="hasAnyRowAction" scope="col" class="whitespace-nowrap px-4 py-3 text-center text-sm font-bold capitalize text-white">
             Actions
           </th>
         </tr>
       </thead>
       <tbody class="bg-white">
         <tr v-if="!loading && !data.length" class="border-b border-black bg-white">
-          <td :colspan="columns.length + 2" class="px-4 py-12 text-center text-gray-500">
+          <td :colspan="columns.length + (hasAnyRowAction ? 2 : 1)" class="px-4 py-12 text-center text-gray-500">
             No clients found.
           </td>
         </tr>
@@ -599,15 +609,17 @@ function onCellDblClick(e, row, col) {
               </template>
             </template>
           </td>
-          <td class="whitespace-nowrap border-r border-gray-200 px-4 py-3 text-right text-sm last:border-r-0" @click.stop>
+          <td v-if="hasAnyRowAction" class="whitespace-nowrap border-r border-gray-200 px-4 py-3 text-right text-sm last:border-r-0" @click.stop>
             <div class="inline-flex items-center gap-2">
               <router-link
+                v-if="canViewAction"
                 :to="viewRoute(row)"
                 class="text-green-600 hover:text-green-800 font-medium"
               >
                 View
               </router-link>
               <button
+                v-if="canHistoryAction"
                 type="button"
                 class="rounded-full p-1.5 text-amber-600 hover:bg-amber-50"
                 title="View History"

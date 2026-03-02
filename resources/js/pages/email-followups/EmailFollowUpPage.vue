@@ -2,7 +2,7 @@
 /**
  * Email Follow-Up – add form + listing on same page. Added By auto-filled from logged-in user.
  */
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import emailFollowUpsApi from '@/services/emailFollowUpsApi'
 import FiltersBar from '@/components/email-followups/FiltersBar.vue'
@@ -12,8 +12,33 @@ import EmailFollowUpTable from '@/components/email-followups/EmailFollowUpTable.
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
 import api from '@/lib/axios'
+import { canModuleAction } from '@/lib/accessControl'
 
 const auth = useAuthStore()
+const canView = computed(() =>
+  canModuleAction(auth.user, 'email-follow-up', 'view', [
+    'emails_followup.list',
+    'emails_followup.view',
+  ])
+)
+const canCreate = computed(() =>
+  canModuleAction(auth.user, 'email-follow-up', 'create', [
+    'emails_followup.create',
+    'emails_followup.add',
+  ])
+)
+const canEdit = computed(() =>
+  canModuleAction(auth.user, 'email-follow-up', 'edit', [
+    'emails_followup.edit',
+    'emails_followup.update',
+  ])
+)
+const canExport = computed(() =>
+  canModuleAction(auth.user, 'email-follow-up', 'export', [
+    'emails_followup.export',
+    'emails_followup.export_reports',
+  ])
+)
 const TABLE_MODULE = 'email-followups'
 const perPageOptions = ref([10, 20, 25, 50, 100])
 const addedByName = ref('')
@@ -64,6 +89,11 @@ function buildParams() {
 }
 
 async function load() {
+  if (!canView.value) {
+    submissions.value = []
+    loading.value = false
+    return
+  }
   window.scrollTo(0, 0)
   loading.value = true
   try {
@@ -76,6 +106,7 @@ async function load() {
 }
 
 async function loadFilters() {
+  if (!canView.value) return
   try {
     const data = await emailFollowUpsApi.filters()
     filterOptions.value = {
@@ -88,6 +119,7 @@ async function loadFilters() {
 }
 
 async function loadColumns() {
+  if (!canView.value) return
   try {
     const data = await emailFollowUpsApi.columns()
     allColumns.value = data.all_columns ?? []
@@ -127,6 +159,7 @@ async function onSaveColumns(cols) {
 }
 
 async function onUpdateCell(id, field, value) {
+  if (!canEdit.value) return
   const row = submissions.value.find((r) => r.id === id)
   const prev = row ? { ...row } : null
   if (row) row[field] = value
@@ -171,6 +204,7 @@ function clearForm() {
 }
 
 async function submitForm() {
+  if (!canCreate.value) return
   if (!form.value.email_date) return
   submitLoading.value = true
   try {
@@ -212,6 +246,7 @@ function escapeCsv(val) {
 }
 
 async function onExport() {
+  if (!canExport.value) return
   const params = { ...buildParams(), page: 1, per_page: 500 }
   exportLoading.value = true
   try {
@@ -240,9 +275,13 @@ async function onExport() {
 onMounted(async () => {
   await loadTablePreference()
   addedByName.value = auth.user?.name ?? ''
-  loadFilters()
-  loadColumns()
-  load()
+  if (canView.value) {
+    loadFilters()
+    loadColumns()
+    load()
+  } else {
+    loading.value = false
+  }
 })
 </script>
 
@@ -256,7 +295,7 @@ onMounted(async () => {
       <p class="text-sm text-gray-600">Record outgoing follow-up emails and track communication history.</p>
 
       <!-- Add Email Follow-Up Entry -->
-      <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <div v-if="canCreate" class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
         <h2 class="mb-4 text-sm font-semibold text-gray-900">Add Email Follow-Up Entry</h2>
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div>
@@ -333,9 +372,10 @@ onMounted(async () => {
       </div>
 
       <!-- Listing -->
-      <div class="flex flex-wrap items-center justify-between gap-4">
+      <div v-if="canView" class="flex flex-wrap items-center justify-between gap-4">
         <span class="text-sm text-gray-600">Listing</span>
         <button
+          v-if="canExport"
           type="button"
           class="inline-flex items-center rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70"
           :disabled="loading || exportLoading"
@@ -345,7 +385,12 @@ onMounted(async () => {
         </button>
       </div>
 
+      <div v-if="!canView" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        You do not have permission to view email follow-ups.
+      </div>
+
       <FiltersBar
+        v-if="canView"
         :filters="filters"
         :filter-options="filterOptions"
         :loading="loading"
@@ -372,6 +417,7 @@ onMounted(async () => {
       </FiltersBar>
 
       <AdvancedFilters
+        v-if="canView"
         :visible="advancedVisible"
         :filters="filters"
         :filter-options="filterOptions"
@@ -380,7 +426,7 @@ onMounted(async () => {
         @reset="resetFilters"
       />
 
-      <div class="overflow-hidden rounded-xl border-2 border-black bg-white shadow-sm">
+      <div v-if="canView" class="overflow-hidden rounded-xl border-2 border-black bg-white shadow-sm">
         <EmailFollowUpTable
           :columns="visibleColumns"
           :data="submissions"
@@ -390,6 +436,7 @@ onMounted(async () => {
           :current-page="meta.current_page"
           :per-page="meta.per_page"
           :edit-options="filterOptions"
+          :can-inline-edit="canEdit"
           @sort="onSort"
           @update-cell="onUpdateCell"
         />

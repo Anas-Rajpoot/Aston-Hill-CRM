@@ -45,7 +45,6 @@ const form = reactive({
   require_uppercase: true,
   require_number: true,
   require_special: true,
-  password_expiry_days: 90,
 })
 const original = ref({})
 
@@ -399,7 +398,7 @@ const warningOptions = [
             </div>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 items-start">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 items-start">
             <!-- Minimum Password Length -->
             <div class="flex h-full flex-col">
               <label class="block min-h-[3rem] text-sm font-medium text-gray-700 mb-1.5">Minimum Password Length</label>
@@ -475,21 +474,6 @@ const warningOptions = [
               <p class="text-xs text-gray-400 mt-1.5">At least one special character (!@#$%)</p>
             </div>
 
-            <!-- Password Expiry (Days) -->
-            <div class="flex h-full flex-col">
-              <label class="block min-h-[3rem] text-sm font-medium text-gray-700 mb-1.5">Password Expiry (Days)</label>
-              <input
-                v-model.number="form.password_expiry_days"
-                type="number"
-                min="0"
-                max="3650"
-                :disabled="!canUpdate"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500 transition"
-              />
-              <p class="text-xs text-gray-400 mt-1">Force password change after this period (0 = never expires)</p>
-              <p class="text-xs text-gray-400 mt-0.5 italic">Note: Super admin accounts are exempt from password expiry</p>
-              <p v-if="errors.password_expiry_days" class="mt-1 text-xs text-red-600">{{ errors.password_expiry_days }}</p>
-            </div>
           </div>
         </div>
 

@@ -357,6 +357,22 @@ onMounted(() => {
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.email) }}</div>
                 </div>
                 <div>
+                  <label class="block text-xs font-medium text-gray-500">Product</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.product) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Offer</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.offer) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">MRC (AED)</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ formatMrc(lead.mrc_aed) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Quantity</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.quantity) }}</div>
+                </div>
+                <div>
                   <label class="block text-xs font-medium text-gray-500">Emirates</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.emirate) }}</div>
                 </div>
@@ -388,20 +404,12 @@ onMounted(() => {
               <h2 class="mb-3 text-sm font-semibold text-gray-900">Service Details</h2>
               <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Product</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.product) }}</div>
-                </div>
-                <div>
                   <label class="block text-xs font-medium text-gray-500">Service Category</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ categoryDisplay(lead) }}</div>
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Service Type</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ typeNameDisplay(lead) }}</div>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">Offer</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.offer) }}</div>
                 </div>
               </div>
             </section>
@@ -410,14 +418,6 @@ onMounted(() => {
             <section class="mb-6">
               <h2 class="mb-3 text-sm font-semibold text-gray-900">Commercial</h2>
               <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">MRC (AED)</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ formatMrc(lead.mrc_aed) }}</div>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">Quantity</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.quantity) }}</div>
-                </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500">AE Domain</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.ae_domain) }}</div>

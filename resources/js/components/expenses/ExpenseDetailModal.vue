@@ -8,6 +8,7 @@ import { ref, watch, computed, onBeforeUnmount } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import expensesApi from '@/services/expensesApi'
 import api from '@/lib/axios'
+import { canModuleAction } from '@/lib/accessControl'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -22,12 +23,12 @@ const loading = ref(false)
 const loadError = ref(null)
 const imageBlobUrls = ref({})
 
-const permissions = computed(() => auth.user?.permissions ?? [])
-const isSuperAdmin = computed(() => {
-  const r = auth.user?.roles ?? []
-  return Array.isArray(r) && r.some((x) => (typeof x === 'string' ? x === 'superadmin' : x?.name === 'superadmin'))
-})
-const canEdit = computed(() => isSuperAdmin.value || permissions.value.includes('expense_tracker.edit') || permissions.value.includes('expense_tracker.update'))
+const canEdit = computed(() =>
+  canModuleAction(auth.user, 'expense-tracker', 'edit', [
+    'expense_tracker.edit',
+    'expense_tracker.update',
+  ])
+)
 
 function statusLabel(status) {
   if (status === 'approved') return 'Approved'

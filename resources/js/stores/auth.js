@@ -75,7 +75,7 @@ export const useAuthStore = defineStore('auth', {
       warning_enabled: false,
       warning_minutes_before: 5,
     },
-    passwordAction: null, // 'must_change_password' | 'password_expired' | null
+    passwordAction: null, // 'must_change_password' | null
     loading: false,
     _fetchPromise: null,
     _lastFetchedAt: 0,

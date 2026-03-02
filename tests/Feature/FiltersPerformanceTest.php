@@ -11,7 +11,7 @@ function disableNonEssentialApiMiddlewareForFilterPerfTests(\Tests\TestCase $tes
         \App\Http\Middleware\CheckStatus::class,
         \App\Http\Middleware\BreadcrumbTrail::class,
         \App\Http\Middleware\AuditApiActivity::class,
-        \App\Http\Middleware\EnforcePasswordExpiry::class,
+        \App\Http\Middleware\EnforcePasswordAction::class,
         \App\Http\Middleware\ValidateSessionToken::class,
         \App\Http\Middleware\ApplySecuritySettings::class,
     ]);

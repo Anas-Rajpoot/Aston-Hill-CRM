@@ -7,9 +7,14 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { toDdMmYyyy } from '@/lib/dateFormat'
+import { canModuleAction } from '@/lib/accessControl'
 
 const router = useRouter()
 const auth = useAuthStore()
+const canViewAction = computed(() => canModuleAction(auth.user, 'users', 'view'))
+const canEditAction = computed(() => canModuleAction(auth.user, 'users', 'edit'))
+const canDeleteAction = computed(() => canModuleAction(auth.user, 'users', 'delete'))
+const canHistoryAction = computed(() => canViewAction.value)
 
 const props = defineProps({
   columns: { type: Array, required: true },
@@ -173,13 +178,14 @@ function isSuperAdmin(row) {
 
 /** Only super admin can edit a super admin row (and only their own). */
 function canEditRow(row) {
+  if (!canEditAction.value) return false
   if (!isSuperAdmin(row)) return true
   return auth.user?.id === row.id
 }
 
 /** Can show Activate/Deactivate (not super admin). */
 function canToggleActiveRow(row) {
-  return !isSuperAdmin(row)
+  return canDeleteAction.value && !isSuperAdmin(row)
 }
 
 function onCheckboxCellClick(row) {
@@ -187,6 +193,10 @@ function onCheckboxCellClick(row) {
     emit('showMessage', 'Super admin cannot be selected.')
   }
 }
+
+const hasAnyRowAction = computed(() =>
+  canViewAction.value || canEditAction.value || canDeleteAction.value || canHistoryAction.value
+)
 </script>
 
 <template>
@@ -238,12 +248,12 @@ function onCheckboxCellClick(row) {
             </button>
             <span v-else class="font-bold text-white">{{ label(col) }}</span>
           </th>
-          <th scope="col" class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold uppercase tracking-wider text-white">Actions</th>
+          <th v-if="hasAnyRowAction" scope="col" class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold uppercase tracking-wider text-white">Actions</th>
         </tr>
       </thead>
       <tbody class="bg-white">
         <tr v-if="!loading && !data.length" class="border-b border-black bg-white">
-          <td :colspan="columns.length + 2" class="px-4 py-12 text-center text-gray-500">No employees found.</td>
+          <td :colspan="columns.length + (hasAnyRowAction ? 2 : 1)" class="px-4 py-12 text-center text-gray-500">No employees found.</td>
         </tr>
         <tr
           v-for="(row, rowIndex) in data"
@@ -311,10 +321,11 @@ function onCheckboxCellClick(row) {
               {{ formatValue(row, col) }}
             </template>
           </td>
-          <td class="whitespace-nowrap px-4 py-3 text-left">
+          <td v-if="hasAnyRowAction" class="whitespace-nowrap px-4 py-3 text-left">
             <div class="inline-flex items-center gap-2">
               <!-- View / Edit / History icons always at left; Activate/Deactivate or space to the right -->
               <button
+                v-if="canViewAction"
                 type="button"
                 class="rounded-full p-1.5 text-blue-600 hover:bg-blue-50"
                 title="View"
@@ -337,6 +348,7 @@ function onCheckboxCellClick(row) {
                 </svg>
               </button>
               <button
+                v-if="canHistoryAction"
                 type="button"
                 class="rounded-full p-1.5 text-amber-500 hover:bg-amber-50"
                 title="History / Activity"

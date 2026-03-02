@@ -11,6 +11,8 @@ import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomize
 import DSPTrackerDetailModal from '@/components/dsp-tracker/DSPTrackerDetailModal.vue'
 import dspTrackerApi from '@/services/dspTrackerApi'
 import Toast from '@/components/Toast.vue'
+import { useAuthStore } from '@/stores/auth'
+import { canModuleAction } from '@/lib/accessControl'
 
 const COLUMNS = [
   'activity_number',
@@ -51,6 +53,12 @@ const IMPORT_CSV_COLUMNS = [...COLUMNS, ...OPTIONAL_CSV_COLUMNS]
 const REQUIRED_CSV_COLUMNS = [...COLUMNS]
 
 const loading = ref(false)
+const auth = useAuthStore()
+const canImport = computed(() => canModuleAction(auth.user, 'dsp-tracker', 'import'))
+const canViewAction = computed(() => canModuleAction(auth.user, 'dsp-tracker', 'view'))
+const canEditAction = computed(() => canModuleAction(auth.user, 'dsp-tracker', 'edit'))
+const canDeleteCsv = computed(() => canModuleAction(auth.user, 'dsp-tracker', 'delete', ['dsp-tracker.delete-existing-csv', 'dsp_tracker.delete_existing_csv']))
+const hasAnyRowAction = computed(() => canViewAction.value || canEditAction.value)
 const loadError = ref(null)
 const csvUploadError = ref('')
 const data = ref([])
@@ -229,10 +237,12 @@ function formatCell(row, col) {
 }
 
 function onView(row) {
+  if (!canViewAction.value) return
   selectedRecord.value = row
   detailModalVisible.value = true
 }
 function onEdit(row) {
+  if (!canEditAction.value) return
   // TODO: open edit modal or navigate to edit
 }
 function closeDetailModal() {
@@ -249,6 +259,7 @@ function onHistory(row) {
 }
 
 function triggerImport() {
+  if (!canImport.value) return
   if (lastUploadedBatchId.value) {
     alert('Before uploading, delete the previous record.')
     return
@@ -291,6 +302,7 @@ function csvEscape(val) {
 }
 
 function downloadCsvSample() {
+  if (!canImport.value) return
   const headers = IMPORT_CSV_COLUMNS.map((c) => {
     if (c === 'dsp_om_id') return 'DSP OM ID'
     if (c === 'uploaded_by') return 'Uploaded By'
@@ -416,6 +428,7 @@ function onCsvChange(e) {
 }
 
 async function deleteOldFile() {
+  if (!canDeleteCsv.value) return
   if (!lastUploadedBatchId.value) return
   loading.value = true
   csvUploadError.value = ''
@@ -462,6 +475,7 @@ onMounted(() => load())
             @change="onCsvChange"
           />
           <button
+            v-if="canImport"
             type="button"
             class="inline-flex items-center gap-2 rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
             @click="downloadCsvSample"
@@ -472,6 +486,7 @@ onMounted(() => load())
             Download CSV Sample
           </button>
           <button
+            v-if="canDeleteCsv"
             type="button"
             class="inline-flex items-center rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
             :disabled="!lastUploadedBatchId"
@@ -480,6 +495,7 @@ onMounted(() => load())
             Delete Old File
           </button>
           <button
+            v-if="canImport"
             type="button"
             class="inline-flex items-center gap-2 rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
             @click="triggerImport"
@@ -593,14 +609,14 @@ onMounted(() => load())
                   </svg>
                 </button>
               </th>
-              <th scope="col" class="whitespace-nowrap px-4 py-3 text-center text-sm font-semibold text-gray-800 bg-sky-50">
+              <th v-if="hasAnyRowAction" scope="col" class="whitespace-nowrap px-4 py-3 text-center text-sm font-semibold text-gray-800 bg-sky-50">
                 Action
               </th>
             </tr>
           </thead>
           <tbody class="bg-white">
             <tr v-if="loading" class="border-b border-gray-200">
-              <td :colspan="visibleColumns.length + 1" class="px-4 py-12 text-center text-sm text-gray-500">
+              <td :colspan="visibleColumns.length + (hasAnyRowAction ? 1 : 0)" class="px-4 py-12 text-center text-sm text-gray-500">
                 <span class="inline-flex items-center gap-2">
                   <svg class="h-5 w-5 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
@@ -611,7 +627,7 @@ onMounted(() => load())
               </td>
             </tr>
             <tr v-else-if="!sortedData.length" class="border-b border-gray-200">
-              <td :colspan="visibleColumns.length + 1" class="px-4 py-12 text-center text-sm text-gray-500">No records found.</td>
+              <td :colspan="visibleColumns.length + (hasAnyRowAction ? 1 : 0)" class="px-4 py-12 text-center text-sm text-gray-500">No records found.</td>
             </tr>
             <tr
               v-for="row in sortedData"
@@ -625,9 +641,10 @@ onMounted(() => load())
               >
                 {{ formatCell(row, col) }}
               </td>
-              <td class="whitespace-nowrap px-4 py-3">
+              <td v-if="hasAnyRowAction" class="whitespace-nowrap px-4 py-3">
                 <div class="inline-flex items-center justify-center gap-1">
                   <button
+                    v-if="canViewAction"
                     type="button"
                     class="rounded p-1.5 text-blue-600 hover:bg-blue-50"
                     title="View"
@@ -639,6 +656,7 @@ onMounted(() => load())
                     </svg>
                   </button>
                   <button
+                    v-if="canEditAction"
                     type="button"
                     class="rounded p-1.5 text-green-600 hover:bg-green-50"
                     title="Edit"
@@ -649,6 +667,7 @@ onMounted(() => load())
                     </svg>
                   </button>
                   <button
+                    v-if="canViewAction"
                     type="button"
                     class="rounded p-1.5 text-amber-600 hover:bg-amber-50"
                     title="History"
@@ -680,6 +699,7 @@ onMounted(() => load())
       <DSPTrackerDetailModal
         :visible="detailModalVisible"
         :record="selectedRecord"
+        :can-edit="canEditAction"
         @close="closeDetailModal"
         @edit="onDetailEdit"
       />

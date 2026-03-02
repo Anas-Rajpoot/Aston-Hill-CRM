@@ -398,8 +398,6 @@ function validateFields() {
   const aeResult = validateAeDomain(form.value.ae_domain)
   if (form.value.ae_domain?.trim() && !aeResult.valid) errs.ae_domain = aeResult.message
   if (!form.value.manager_id) errs.manager_id = 'Manager Name is required.'
-  if (!form.value.team_leader_id) errs.team_leader_id = 'Team Leader Name is required.'
-  if (!form.value.sales_agent_id) errs.sales_agent_id = 'Sales Agent Name is required.'
   fieldErrors.value = errs
   return Object.keys(errs).length === 0
 }
@@ -525,14 +523,6 @@ onMounted(() => {
                   <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.authorized_signatory_name) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Product <span class="text-red-500">*</span></label>
-                  <template v-if="canEditBackOffice">
-                    <input v-model="form.product" type="text" class="mt-0.5 w-full rounded border bg-white px-3 py-2 text-sm" :class="fieldErrors.product ? 'border-red-500' : 'border-gray-300'" @input="fieldErrors.product = null" />
-                    <p v-if="fieldErrors.product" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.product }}</p>
-                  </template>
-                  <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.product) }}</div>
-                </div>
-                <div>
                   <label class="block text-xs font-medium text-gray-500">Contact Number <span class="text-red-500">*</span></label>
                   <template v-if="canEditBackOffice">
                     <input v-model="form.contact_number_gsm" type="text" maxlength="12" placeholder="971XXXXXXXXX" class="mt-0.5 w-full rounded border bg-white px-3 py-2 text-sm" :class="fieldErrors.contact_number_gsm ? 'border-red-500' : 'border-gray-300'" @input="onPhoneInput('contact_number_gsm', $event)" />
@@ -552,6 +542,29 @@ onMounted(() => {
                   <label class="block text-xs font-medium text-gray-500">Email ID</label>
                   <input v-if="canEditBackOffice" v-model="form.email" type="email" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm" />
                   <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.email) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Product <span class="text-red-500">*</span></label>
+                  <template v-if="canEditBackOffice">
+                    <input v-model="form.product" type="text" class="mt-0.5 w-full rounded border bg-white px-3 py-2 text-sm" :class="fieldErrors.product ? 'border-red-500' : 'border-gray-300'" @input="fieldErrors.product = null" />
+                    <p v-if="fieldErrors.product" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.product }}</p>
+                  </template>
+                  <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.product) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Offer</label>
+                  <input v-if="canEditBackOffice" v-model="form.offer" type="text" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm" />
+                  <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.offer) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">MRC (AED)</label>
+                  <input v-if="canEditBackOffice" v-model="form.mrc_aed" type="text" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm" />
+                  <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.mrc_aed) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Quantity</label>
+                  <input v-if="canEditBackOffice" v-model="form.quantity" type="text" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm" />
+                  <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.quantity) }}</div>
                 </div>
                 <div v-if="canEditBackOffice">
                   <label class="block text-xs font-medium text-gray-500">Request Type</label>
@@ -576,21 +589,6 @@ onMounted(() => {
                     <p v-if="fieldErrors.location_coordinates" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.location_coordinates }}</p>
                   </template>
                   <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.location_coordinates) }}</div>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">Offer</label>
-                  <input v-if="canEditBackOffice" v-model="form.offer" type="text" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm" />
-                  <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.offer) }}</div>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">MRC (AED)</label>
-                  <input v-if="canEditBackOffice" v-model="form.mrc_aed" type="text" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm" />
-                  <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.mrc_aed) }}</div>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">Quantity</label>
-                  <input v-if="canEditBackOffice" v-model="form.quantity" type="text" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm" />
-                  <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.quantity) }}</div>
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500">.ae Domain</label>
@@ -667,7 +665,7 @@ onMounted(() => {
                   <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.manager_name) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Team Leader Name <span class="text-red-500">*</span></label>
+                  <label class="block text-xs font-medium text-gray-500">Team Leader Name</label>
                   <template v-if="canEditBackOffice">
                     <select v-model="form.team_leader_id" class="mt-0.5 w-full rounded border bg-white px-3 py-2 text-sm" :class="fieldErrors.team_leader_id ? 'border-red-500' : 'border-gray-300'" @change="fieldErrors.team_leader_id = null">
                       <option :value="null">Select Team Leader</option>
@@ -678,7 +676,7 @@ onMounted(() => {
                   <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.team_leader_name) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Sales Agent Name <span class="text-red-500">*</span></label>
+                  <label class="block text-xs font-medium text-gray-500">Sales Agent Name</label>
                   <template v-if="canEditBackOffice">
                     <select v-model="form.sales_agent_id" class="mt-0.5 w-full rounded border bg-white px-3 py-2 text-sm" :class="fieldErrors.sales_agent_id ? 'border-red-500' : 'border-gray-300'" @change="fieldErrors.sales_agent_id = null">
                       <option :value="null">Select Sales Agent</option>

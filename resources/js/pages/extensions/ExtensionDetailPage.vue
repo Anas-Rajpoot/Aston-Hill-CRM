@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/auth'
 import extensionsApi from '@/services/extensionsApi'
 import { toDdMonYyyy } from '@/lib/dateFormat'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import { canModuleAction } from '@/lib/accessControl'
 
 const route = useRoute()
 const router = useRouter()
@@ -16,12 +17,14 @@ const extension = ref(null)
 const loading = ref(true)
 const loadError = ref(null)
 
-const permissions = computed(() => auth.user?.permissions ?? [])
-const isSuperAdmin = computed(() => {
-  const r = auth.user?.roles ?? []
-  return Array.isArray(r) && r.some((x) => (typeof x === 'string' ? x === 'superadmin' : x?.name === 'superadmin'))
-})
-const canEdit = computed(() => isSuperAdmin.value || permissions.value.includes('extensions.edit'))
+const canEdit = computed(() =>
+  canModuleAction(auth.user, 'extensions', 'edit', [
+    'extensions.edit',
+    'extensions.update',
+    'cisco-extensions.edit',
+    'cisco-extensions.update',
+  ])
+)
 
 function statusLabel(status) {
   if (status === 'active') return 'Active'

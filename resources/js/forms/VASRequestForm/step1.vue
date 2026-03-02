@@ -3,6 +3,7 @@ import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import api from '@/services/vasRequestsApi'
 import { useFormErrors } from '@/composables/useFormErrors'
 import { formatTeamLabel } from '@/composables/useTeamLabel'
+import { useSessionFormState } from '@/composables/useSessionFormState'
 
 const props = defineProps({
   vasRequestId: { type: Number, default: null },
@@ -41,6 +42,7 @@ const form = ref({
   team_leader_id: '',
   sales_agent_id: '',
 })
+const { restoreState, clearState } = useSessionFormState('submission.vas.step1', form)
 
 const managers = ref([])
 const teamLeaders = ref([])
@@ -155,6 +157,7 @@ onMounted(async () => {
         })
       } catch (_) {}
     }
+    restoreState()
   } catch (e) {
     setErrors(e)
   } finally {
@@ -219,9 +222,11 @@ async function saveDraft() {
     const payload = buildPayload()
     if (props.vasRequestId) {
       await api.updateStep1(props.vasRequestId, payload)
+      clearState()
       emit('next', props.vasRequestId)
     } else {
       const { data } = await api.storeStep1(payload)
+      clearState()
       emit('next', data.id)
     }
   } catch (e) {
@@ -244,9 +249,11 @@ async function nextStep() {
     const payload = buildPayload()
     if (props.vasRequestId) {
       await api.updateStep1(props.vasRequestId, payload)
+      clearState()
       emit('next', props.vasRequestId)
     } else {
       const { data } = await api.storeStep1(payload)
+      clearState()
       emit('next', data.id)
     }
   } catch (e) {

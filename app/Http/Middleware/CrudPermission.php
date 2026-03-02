@@ -36,29 +36,93 @@ class CrudPermission
             'update'  => 'update',
             'destroy' => 'delete',
             'submit'  => 'create',
+            // Wizard/custom actions used across modules
+            'storeStep1' => 'create',
+            'storeStep2' => 'update',
+            'storeStep3' => 'update',
+            'storeStep4' => 'update',
+            'updateStep1' => 'update',
+            'resubmissionData' => 'read',
+            'resubmit' => 'update',
+            'discardDraft' => 'delete',
+            'filters' => 'read',
+            'columns' => 'read',
+            'saveColumns' => 'update',
+            'bootstrap' => 'read',
+            'teamOptions' => 'create',
+            // Used by lead creation wizard; should follow create permission, not listing permission.
+            'currentDraft' => 'create',
+            'auditLog' => 'read',
+            'audits' => 'read',
+            'backOfficeOptions' => 'read',
+            'bulkAssign' => 'update',
+            'bulkAssignStatus' => 'read',
+            'updateStatus' => 'update',
+            'updateStatusChangedAt' => 'update',
+            'updateBackOffice' => 'update',
+            'uploadDocuments' => 'update',
+            'deleteDocument' => 'delete',
         ];
 
         $permAction = $map[$action] ?? null;
 
-        // If route action is not a standard resource action, just allow by default
-        // (You can change this to "deny by default" if you prefer strict mode)
+        // Fallback for any custom controller methods not explicitly mapped.
         if (!$permAction) {
-            abort(403, 'Unauthorized');
-            // return $next($request);
+            $permAction = match (strtoupper($request->method())) {
+                'GET', 'HEAD', 'OPTIONS' => 'read',
+                'POST' => 'create',
+                'PUT', 'PATCH' => 'update',
+                'DELETE' => 'delete',
+                default => null,
+            };
         }
 
-        $legacy = match ($permAction) {
-            'read' => ["{$module}.list", "{$module}.view"],
-            'create' => ["{$module}.create", "{$module}.add"],
-            'update' => ["{$module}.edit", "{$module}.update"],
-            'delete' => ["{$module}.delete"],
-            default => [],
-        };
+        if (!$permAction) {
+            abort(403, 'Unauthorized');
+        }
 
-        if (! RbacPermission::can($user, $module, $permAction, $legacy)) {
+        $moduleCandidates = $this->moduleCandidates($module);
+        $legacy = [];
+        foreach ($moduleCandidates as $candidate) {
+            $legacy = array_merge($legacy, match ($permAction) {
+                'read' => ["{$candidate}.list", "{$candidate}.view"],
+                'create' => ["{$candidate}.create", "{$candidate}.add"],
+                'update' => ["{$candidate}.edit", "{$candidate}.update"],
+                'delete' => ["{$candidate}.delete"],
+                default => [],
+            });
+        }
+        $legacy = array_values(array_unique($legacy));
+
+        if (! RbacPermission::can($user, $moduleCandidates, $permAction, $legacy)) {
             abort(403, 'Unauthorized');
         }
 
         return $next($request);
+    }
+
+    /**
+     * Build module aliases to support legacy key formats.
+     *
+     * @return array<int,string>
+     */
+    private function moduleCandidates(string $module): array
+    {
+        $normalized = trim($module);
+        $aliases = [
+            $normalized,
+            str_replace('-', '_', $normalized),
+            str_replace('_', '-', $normalized),
+        ];
+
+        // Explicit backwards-compatible aliases for submission modules.
+        if (in_array($normalized, ['lead-submissions', 'lead_submissions'], true)) {
+            $aliases = array_merge($aliases, ['lead', 'lead-submission', 'lead_submission']);
+        }
+        if (in_array($normalized, ['field-submissions', 'field_submissions'], true)) {
+            $aliases = array_merge($aliases, ['field', 'field-submission', 'field_submission']);
+        }
+
+        return array_values(array_unique($aliases));
     }
 }

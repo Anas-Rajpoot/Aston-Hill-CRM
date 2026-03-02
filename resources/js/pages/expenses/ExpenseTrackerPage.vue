@@ -16,18 +16,31 @@ import ExpenseTable from '@/components/expenses/ExpenseTable.vue'
 import ExpenseEditHistoryModal from '@/components/expenses/ExpenseEditHistoryModal.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Toast from '@/components/Toast.vue'
+import { canModuleAction } from '@/lib/accessControl'
 
 const auth = useAuthStore()
 const { perPage, perPageOptions, perPageReady, setPerPage } = useTablePageSize('expenses')
-const permissions = computed(() => auth.user?.permissions ?? [])
-const isSuperAdmin = computed(() => {
-  const r = auth.user?.roles ?? []
-  return Array.isArray(r) && r.some((x) => (typeof x === 'string' ? x === 'superadmin' : x?.name === 'superadmin'))
-})
-const canCreate = computed(() => isSuperAdmin.value || permissions.value.includes('expense_tracker.create'))
-const canExport = computed(() => isSuperAdmin.value || permissions.value.includes('expense_tracker.export_expenses') || permissions.value.includes('expense_tracker.export'))
-const canEdit = computed(() => isSuperAdmin.value || permissions.value.includes('expense_tracker.edit') || permissions.value.includes('expense_tracker.update'))
-const canDelete = computed(() => isSuperAdmin.value || permissions.value.includes('expense_tracker.delete'))
+const canView = computed(() =>
+  canModuleAction(auth.user, 'expense-tracker', 'view', [
+    'expense_tracker.view',
+    'expense_tracker.list',
+  ])
+)
+const canCreate = computed(() => canModuleAction(auth.user, 'expense-tracker', 'create', ['expense_tracker.create']))
+const canExport = computed(() =>
+  canModuleAction(auth.user, 'expense-tracker', 'export', [
+    'expense_tracker.export_expenses',
+    'expense_tracker.export',
+  ])
+)
+const canEdit = computed(() => canModuleAction(auth.user, 'expense-tracker', 'edit', ['expense_tracker.edit', 'expense_tracker.update']))
+const canDelete = computed(() => canModuleAction(auth.user, 'expense-tracker', 'delete', ['expense_tracker.delete']))
+const canHistory = computed(() =>
+  canModuleAction(auth.user, 'expense-tracker', 'view', [
+    'expense_tracker.history',
+    'expense_tracker.view-history',
+  ])
+)
 
 const loading = ref(true)
 const loadError = ref(null)
@@ -277,6 +290,7 @@ function escapeCsv(val) {
 }
 
 async function onExport() {
+  if (!canExport.value) return
   const params = { ...buildParams(), page: 1, per_page: 5000 }
   exportLoading.value = true
   try {
@@ -317,6 +331,7 @@ const COLUMN_HEADERS = {
 }
 
 function openDetailModal(row) {
+  if (!canView.value) return
   if (row?.id) {
     selectedExpenseId.value = row.id
     detailModalVisible.value = true
@@ -329,6 +344,7 @@ function closeDetailModal() {
 }
 
 function openEditModal(row) {
+  if (!canEdit.value) return
   if (row?.id) {
     expenseIdForEdit.value = row.id
     editModalVisible.value = true
@@ -346,6 +362,7 @@ function closeEditModal() {
 }
 
 const openHistoryModal = (row) => {
+  if (!canHistory.value) return
   if (row?.id) {
     historyExpenseId.value = row.id
     historyExpenseRef.value = row.expense_id || ''
@@ -360,6 +377,7 @@ const closeHistoryModal = () => {
 }
 
 function openDeleteConfirm(row) {
+  if (!canDelete.value) return
   expenseToDelete.value = row
 }
 
@@ -368,6 +386,7 @@ function closeDeleteConfirm() {
 }
 
 async function confirmDelete() {
+  if (!canDelete.value) return
   const row = expenseToDelete.value
   if (!row?.id) {
     closeDeleteConfirm()
@@ -388,6 +407,7 @@ async function confirmDelete() {
 }
 
 onMounted(() => {
+  if (!canView.value) return
   loadFilters()
   loadColumns()
   load()
@@ -439,9 +459,12 @@ onMounted(() => {
       <div v-if="loadError" class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
         {{ loadError }}
       </div>
+      <div v-if="!canView" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        You do not have permission to view expense tracker.
+      </div>
 
       <!-- Summary cards (above advanced filters) -->
-      <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div v-if="canView" class="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <div class="flex items-center justify-between">
             <span class="text-sm font-medium text-gray-600">Total Expenses</span>
@@ -489,7 +512,7 @@ onMounted(() => {
       </div>
 
       <!-- Filters: Status, Product Category, Apply/Reset, Advanced Filters, Customize Columns -->
-      <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <div v-if="canView" class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
         <div class="flex flex-wrap items-end gap-4">
           <div class="min-w-[140px] max-w-[180px]">
             <label class="mb-1 block text-xs font-medium text-gray-600">Status</label>
@@ -555,6 +578,7 @@ onMounted(() => {
       </div>
 
       <AdvancedFilters
+        v-if="canView"
         :visible="advancedVisible"
         :filters="filters"
         :filter-options="filterOptions"
@@ -563,7 +587,7 @@ onMounted(() => {
         @reset="resetFilters"
       />
 
-      <div class="overflow-hidden rounded-lg border-2 border-black bg-white shadow-sm">
+      <div v-if="canView" class="overflow-hidden rounded-lg border-2 border-black bg-white shadow-sm">
         <ExpenseTable
           :columns="visibleColumns"
           :data="expenses"
@@ -577,6 +601,8 @@ onMounted(() => {
           :filter-options="filterOptions"
           :can-edit="canEdit"
           :can-delete="canDelete"
+          :can-view="canView"
+          :can-history="canHistory"
           @sort="onSort"
           @view="openDetailModal"
           @open-edit="openEditModal"

@@ -11,6 +11,7 @@ import api from '@/lib/axios'
 import Toast from '@/components/Toast.vue'
 import { useProgressiveHydration } from '@/composables/useProgressiveHydration'
 import { useDeferredQuery } from '@/composables/useDeferredQuery'
+import { canModuleAction } from '@/lib/accessControl'
 
 const FiltersBar = defineAsyncComponent(() => import('@/components/extensions/AdvancedFilters.vue'))
 const ColumnCustomizerModal = defineAsyncComponent(() => import('@/components/lead-submissions/ColumnCustomizerModal.vue'))
@@ -28,7 +29,13 @@ const isSuperAdmin = computed(() => {
   const r = auth.user?.roles ?? []
   return Array.isArray(r) && r.some((x) => (typeof x === 'string' ? x === 'superadmin' : x?.name === 'superadmin'))
 })
-const canCreate = computed(() => isSuperAdmin.value || permissions.value.includes('extensions.create'))
+const canCreate = computed(() => canModuleAction(auth.user, 'extensions', 'create'))
+const canImport = computed(() => canModuleAction(auth.user, 'extensions', 'import'))
+const canExport = computed(() => canModuleAction(auth.user, 'extensions', 'export'))
+const canViewAction = computed(() => canModuleAction(auth.user, 'extensions', 'view'))
+const canEditAction = computed(() => canModuleAction(auth.user, 'extensions', 'edit'))
+const canDeleteAction = computed(() => canModuleAction(auth.user, 'extensions', 'delete'))
+const canSample = computed(() => canImport.value)
 const summaryHydration = useProgressiveHydration({ strategy: 'visible-or-idle', idleTimeout: 900 })
 const advancedFiltersHydration = useProgressiveHydration({ strategy: 'visible-or-idle', idleTimeout: 1200 })
 
@@ -345,6 +352,7 @@ function sampleLabel(col) {
 }
 
 function downloadCsvSample() {
+  if (!canSample.value) return
   const headers = SAMPLE_COLUMNS.map(sampleLabel)
   const sampleRow = [
     '', '1001', '042123456', 'Etisalat', 'user_1001', 'secret123',
@@ -361,16 +369,19 @@ function downloadCsvSample() {
 }
 
 function triggerImport() {
+  if (!canImport.value) return
   importFileInput.value?.click()
 }
 
 async function openAddModal() {
+  if (!canCreate.value) return
   hydrateSecondaryData()
   await deferredSecondaryBootstrap.run()
   addModalVisible.value = true
 }
 
 async function onImportFileChange(event) {
+  if (!canImport.value) return
   const file = event.target?.files?.[0]
   if (!file) return
   importLoading.value = true
@@ -393,6 +404,7 @@ async function onImportFileChange(event) {
 }
 
 async function onExport() {
+  if (!canExport.value) return
   const params = { ...buildParams(), page: 1, per_page: 1000 }
   exportLoading.value = true
   try {
@@ -419,6 +431,7 @@ async function onExport() {
 }
 
 function openDeleteConfirm(row) {
+  if (!canDeleteAction.value) return
   extensionToDelete.value = row
 }
 
@@ -427,6 +440,10 @@ function closeDeleteConfirm() {
 }
 
 async function confirmDelete() {
+  if (!canDeleteAction.value) {
+    closeDeleteConfirm()
+    return
+  }
   const row = extensionToDelete.value
   if (!row?.id) {
     closeDeleteConfirm()
@@ -488,6 +505,7 @@ async function onUpdateCell(rowId, field, value) {
 }
 
 function openViewModal(row) {
+  if (!canViewAction.value) return
   if (row?.id) {
     hydrateSecondaryData()
     viewModalExtensionId.value = row.id
@@ -509,6 +527,7 @@ function onViewModalEdit() {
 }
 
 function openEditModal(row) {
+  if (!canEditAction.value) return
   if (row?.id) {
     hydrateSecondaryData()
     editModalExtensionId.value = row.id
@@ -529,6 +548,7 @@ function onEditUpdated() {
 }
 
 function openHistoryModal(row) {
+  if (!canViewAction.value) return
   historyModalExtension.value = row
 }
 
@@ -595,6 +615,7 @@ onMounted(async () => {
         </div>
         <div class="ml-auto flex items-center gap-1.5 shrink-0">
           <button
+            v-if="canSample"
             type="button"
             class="inline-flex items-center rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
             @click="downloadCsvSample"
@@ -605,7 +626,7 @@ onMounted(async () => {
             Download CSV Sample
           </button>
           <button
-            v-if="canCreate"
+            v-if="canImport"
             type="button"
             class="inline-flex items-center rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             :disabled="loading || importLoading"
@@ -628,6 +649,7 @@ onMounted(async () => {
             @change="onImportFileChange"
           />
           <button
+            v-if="canExport"
             type="button"
             class="inline-flex items-center rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             :disabled="loading || exportLoading"

@@ -164,8 +164,8 @@ class LeadSubmissionController extends Controller
             'ae_domain' => [$draft ? 'nullable' : 'required', 'string', 'max:255', new AeDomainRule()],
             'gaid' => ['nullable', 'string', 'max:255'],
             'manager_id' => [$draft ? 'nullable' : 'required', 'integer', 'exists:users,id'],
-            'team_leader_id' => [$draft ? 'nullable' : 'required', 'integer', 'exists:users,id'],
-            'sales_agent_id' => [$draft ? 'nullable' : 'required', 'integer', 'exists:users,id'],
+            'team_leader_id' => ['nullable', 'integer', 'exists:users,id'],
+            'sales_agent_id' => ['nullable', 'integer', 'exists:users,id'],
             'remarks' => ['nullable', 'string', 'max:1000'],
             'request_type' => ['nullable', 'string', 'max:120'],
         ];
@@ -177,8 +177,6 @@ class LeadSubmissionController extends Controller
             'product.required' => 'Product is required.',
             'ae_domain.required' => 'Enter Domain Name',
             'manager_id.required' => 'Please select a manager.',
-            'team_leader_id.required' => 'Please select a team leader.',
-            'sales_agent_id.required' => 'Please select a sales agent.',
             'email.email' => 'Please enter a valid email address.',
         ];
         $data = $request->validate($rules, $messages);
@@ -292,8 +290,8 @@ class LeadSubmissionController extends Controller
             'ae_domain' => [$draft ? 'nullable' : 'required', 'string', 'max:255', new AeDomainRule()],
             'gaid' => ['nullable', 'string', 'max:255'],
             'manager_id' => [$draft ? 'nullable' : 'required', 'integer', 'exists:users,id'],
-            'team_leader_id' => [$draft ? 'nullable' : 'required', 'integer', 'exists:users,id'],
-            'sales_agent_id' => [$draft ? 'nullable' : 'required', 'integer', 'exists:users,id'],
+            'team_leader_id' => ['nullable', 'integer', 'exists:users,id'],
+            'sales_agent_id' => ['nullable', 'integer', 'exists:users,id'],
             'remarks' => ['nullable', 'string', 'max:1000'],
             'request_type' => ['nullable', 'string', 'max:120'],
         ];
@@ -305,8 +303,6 @@ class LeadSubmissionController extends Controller
             'product.required' => 'Product is required.',
             'ae_domain.required' => 'Enter Domain Name',
             'manager_id.required' => 'Please select a manager.',
-            'team_leader_id.required' => 'Please select a team leader.',
-            'sales_agent_id.required' => 'Please select a sales agent.',
             'email.email' => 'Please enter a valid email address.',
         ];
         $data = $request->validate($rules, $messages);
@@ -987,6 +983,9 @@ if ($request->expectsJson() || $request->ajax()) {
             'remarks' => ['nullable', 'string', 'max:2000'],
             'service_category_id' => ['nullable', 'integer', 'exists:service_categories,id'],
             'service_type_id' => ['nullable', 'integer', 'exists:service_types,id'],
+            'manager_id' => ['nullable', 'integer', 'exists:users,id'],
+            'team_leader_id' => ['nullable', 'integer', 'exists:users,id'],
+            'sales_agent_id' => ['nullable', 'integer', 'exists:users,id'],
             'product' => ['nullable', 'string', 'max:255'],
             'offer' => ['nullable', 'string', 'max:255'],
             'mrc_aed' => ['nullable', 'string', 'max:50'],
@@ -1020,6 +1019,9 @@ if ($request->expectsJson() || $request->ajax()) {
             'ae_domain' => $data['ae_domain'] ?? $leadSubmission->ae_domain,
             'gaid' => $data['gaid'] ?? $leadSubmission->gaid,
             'remarks' => $data['remarks'] ?? $leadSubmission->remarks,
+            'manager_id' => $data['manager_id'] ?? $leadSubmission->manager_id,
+            'team_leader_id' => $data['team_leader_id'] ?? $leadSubmission->team_leader_id,
+            'sales_agent_id' => $data['sales_agent_id'] ?? $leadSubmission->sales_agent_id,
             'payload' => $payload,
             'submission_type' => 'resubmission',
             'updated_by' => $request->user()->id,

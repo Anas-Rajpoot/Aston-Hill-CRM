@@ -288,8 +288,6 @@ function validateFields() {
     if (!aeResult.valid) errs.ae_domain = aeResult.message
   }
   if (!form.value.manager_id) errs.manager_id = 'Manager Name is required.'
-  if (!form.value.team_leader_id) errs.team_leader_id = 'Team Leader Name is required.'
-  if (!form.value.sales_agent_id) errs.sales_agent_id = 'Sales Agent Name is required.'
   fieldErrors.value = errs
   return Object.keys(errs).length === 0
 }
@@ -460,11 +458,6 @@ onMounted(() => {
                 <input v-model="form.authorized_signatory_name" type="text" placeholder="Enter authorized signatory name" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Product <span class="text-red-500">*</span></label>
-                <input v-model="form.product" type="text" placeholder="Enter product" class="w-full rounded-lg border px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="fieldErrors.product ? 'border-red-500' : 'border-gray-300'" @input="fieldErrors.product = null" />
-                <p v-if="fieldErrors.product" class="mt-1 text-sm text-red-600">{{ fieldErrors.product }}</p>
-              </div>
-              <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Contact Number <span class="text-red-500">*</span></label>
                 <input v-model="form.contact_number_gsm" type="text" maxlength="12" placeholder="971XXXXXXXXX" class="w-full rounded-lg border px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="fieldErrors.contact_number_gsm ? 'border-red-500' : 'border-gray-300'" @input="onPhoneInput('contact_number_gsm', $event)" />
                 <p v-if="fieldErrors.contact_number_gsm" class="mt-1 text-sm text-red-600">{{ fieldErrors.contact_number_gsm }}</p>
@@ -478,6 +471,23 @@ onMounted(() => {
                 <label class="block text-sm font-medium text-gray-700 mb-1">Email ID</label>
                 <input v-model="form.email" type="email" placeholder="Enter email" class="w-full rounded-lg border px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="fieldErrors.email ? 'border-red-500' : 'border-gray-300'" @input="fieldErrors.email = null" />
                 <p v-if="fieldErrors.email" class="mt-1 text-sm text-red-600">{{ fieldErrors.email }}</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Product <span class="text-red-500">*</span></label>
+                <input v-model="form.product" type="text" placeholder="Enter product" class="w-full rounded-lg border px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="fieldErrors.product ? 'border-red-500' : 'border-gray-300'" @input="fieldErrors.product = null" />
+                <p v-if="fieldErrors.product" class="mt-1 text-sm text-red-600">{{ fieldErrors.product }}</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Offer</label>
+                <input v-model="form.offer" type="text" placeholder="Enter offer" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+          </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">MRC (AED)</label>
+                <input v-model="form.mrc_aed" type="text" placeholder="Enter MRC" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                <input v-model="form.quantity" type="text" placeholder="Enter quantity" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Complete Address as per Ejari <span class="text-red-500">*</span></label>
@@ -494,18 +504,6 @@ onMounted(() => {
                 <input v-model="form.location_coordinates" type="text" placeholder="e.g. 25.2048, 55.2708" class="w-full rounded-lg border px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="fieldErrors.location_coordinates ? 'border-red-500' : 'border-gray-300'" @input="fieldErrors.location_coordinates = null" />
                 <p v-if="fieldErrors.location_coordinates" class="mt-1 text-sm text-red-600">{{ fieldErrors.location_coordinates }}</p>
             </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Offer</label>
-                <input v-model="form.offer" type="text" placeholder="Enter offer" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
-          </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">MRC (AED)</label>
-                <input v-model="form.mrc_aed" type="text" placeholder="Enter MRC" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
-                <input v-model="form.quantity" type="text" placeholder="Enter quantity" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
-              </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">.ae Domain</label>
                 <input v-model="form.ae_domain" type="text" placeholder="Enter Domain (e.g. example.ae)" class="w-full rounded-lg border px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="fieldErrors.ae_domain ? 'border-red-500' : 'border-gray-300'" @input="fieldErrors.ae_domain = null" />
@@ -533,7 +531,7 @@ onMounted(() => {
                 <p v-if="fieldErrors.manager_id" class="mt-1 text-sm text-red-600">{{ fieldErrors.manager_id }}</p>
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Team Leader Name <span class="text-red-500">*</span></label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Team Leader Name</label>
                 <select v-model="form.team_leader_id" class="w-full rounded-lg border px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="fieldErrors.team_leader_id ? 'border-red-500' : 'border-gray-300'" @change="fieldErrors.team_leader_id = null">
                   <option :value="null">Select Team Leader</option>
                   <option v-for="u in teamLeaders" :key="u.id" :value="Number(u.id)">{{ u.name }}</option>
@@ -541,7 +539,7 @@ onMounted(() => {
                 <p v-if="fieldErrors.team_leader_id" class="mt-1 text-sm text-red-600">{{ fieldErrors.team_leader_id }}</p>
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Sales Agent Name <span class="text-red-500">*</span></label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Sales Agent Name</label>
                 <select v-model="form.sales_agent_id" class="w-full rounded-lg border px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="fieldErrors.sales_agent_id ? 'border-red-500' : 'border-gray-300'" @change="fieldErrors.sales_agent_id = null">
                   <option :value="null">Select Sales Agent</option>
                   <option v-for="u in salesAgents" :key="u.id" :value="Number(u.id)">{{ u.name }}</option>

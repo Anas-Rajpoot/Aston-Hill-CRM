@@ -177,6 +177,36 @@ function onEditSubmission() {
                       {{ formatStatus(lead.status) }}
                     </div>
                   </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500">Email ID</label>
+                    <div class="mt-0.5 rounded border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-800">
+                      {{ displayVal(lead.email) }}
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500">Product</label>
+                    <div class="mt-0.5 rounded border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-800">
+                      {{ displayVal(lead.product) }}
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500">Offer</label>
+                    <div class="mt-0.5 rounded border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-800">
+                      {{ displayVal(lead.offer) }}
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500">MRC (AED)</label>
+                    <div class="mt-0.5 rounded border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-800">
+                      {{ formatMrc(lead.mrc_aed) }}
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500">Quantity</label>
+                    <div class="mt-0.5 rounded border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-800">
+                      {{ displayVal(lead.quantity) }}
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -196,32 +226,13 @@ function onEditSubmission() {
                       {{ typeNameDisplay(lead) }}
                     </div>
                   </div>
-                  <div>
-                    <label class="block text-xs font-medium text-gray-500">Product</label>
-                    <div class="mt-0.5 rounded border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-800">
-                      {{ displayVal(lead.product) }}
-                    </div>
-                  </div>
                 </div>
               </div>
 
               <!-- Commercial -->
               <div class="mb-5">
                 <h3 class="mb-3 text-sm font-semibold text-gray-900">Commercial</h3>
-                <div class="grid grid-cols-2 gap-3">
-                  <div>
-                    <label class="block text-xs font-medium text-gray-500">MRC</label>
-                    <div class="mt-0.5 rounded border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-800">
-                      {{ formatMrc(lead.mrc_aed) }}
-                    </div>
-                  </div>
-                  <div>
-                    <label class="block text-xs font-medium text-gray-500">Quantity</label>
-                    <div class="mt-0.5 rounded border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-800">
-                      {{ displayVal(lead.quantity) }}
-                    </div>
-                  </div>
-                </div>
+                <div class="grid grid-cols-2 gap-3"></div>
               </div>
 
               <!-- Team & Status -->

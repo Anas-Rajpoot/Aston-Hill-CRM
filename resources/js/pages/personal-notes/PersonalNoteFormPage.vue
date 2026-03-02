@@ -5,9 +5,12 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import personalNotesApi from '@/services/personalNotesApi'
+import { useAuthStore } from '@/stores/auth'
+import { canModuleAction } from '@/lib/accessControl'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 
 const title = ref('')
 const body = ref('')
@@ -16,8 +19,19 @@ const saving = ref(false)
 const loadError = ref(null)
 
 const isEdit = computed(() => Boolean(route.params.id))
+const canView = computed(() =>
+  canModuleAction(auth.user, 'personal-notes', 'view', ['personal_notes.list', 'personal_notes.view'])
+)
+const canCreate = computed(() =>
+  canModuleAction(auth.user, 'personal-notes', 'create', ['personal_notes.create', 'personal_notes.add'])
+)
+const canEdit = computed(() =>
+  canModuleAction(auth.user, 'personal-notes', 'edit', ['personal_notes.edit', 'personal_notes.update'])
+)
+const canSave = computed(() => (isEdit.value ? canEdit.value : canCreate.value))
 
 async function loadNote() {
+  if (!canView.value) return
   if (!route.params.id) return
   loading.value = true
   loadError.value = null
@@ -37,6 +51,7 @@ function cancel() {
 }
 
 async function save() {
+  if (!canSave.value) return
   saving.value = true
   try {
     if (isEdit.value) {
@@ -76,6 +91,7 @@ onMounted(() => loadNote())
           Cancel
         </button>
         <button
+          v-if="canSave"
           type="button"
           class="rounded bg-[#0D7377] px-4 py-2 text-sm font-medium text-white shadow hover:bg-[#0a5c5f] disabled:opacity-70"
           :disabled="saving"
@@ -99,6 +115,9 @@ onMounted(() => loadNote())
 
       <!-- Right panel: title + body -->
       <main class="min-w-0 flex-1 overflow-y-auto bg-[#E8E8E8] p-6">
+        <div v-if="!canView" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          You do not have permission to view personal notes.
+        </div>
         <div v-if="loading" class="flex items-center justify-center py-16">
           <svg class="h-8 w-8 animate-spin text-[#0D7377]" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />

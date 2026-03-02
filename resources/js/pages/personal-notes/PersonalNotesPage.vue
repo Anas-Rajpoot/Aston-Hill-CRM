@@ -7,9 +7,25 @@ import { useRoute, useRouter } from 'vue-router'
 import personalNotesApi from '@/services/personalNotesApi'
 import { toDdMonYyyyLower } from '@/lib/dateFormat'
 import Toast from '@/components/Toast.vue'
+import { useAuthStore } from '@/stores/auth'
+import { canModuleAction } from '@/lib/accessControl'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
+
+const canView = computed(() =>
+  canModuleAction(auth.user, 'personal-notes', 'view', ['personal_notes.list', 'personal_notes.view'])
+)
+const canCreate = computed(() =>
+  canModuleAction(auth.user, 'personal-notes', 'create', ['personal_notes.create', 'personal_notes.add'])
+)
+const canEdit = computed(() =>
+  canModuleAction(auth.user, 'personal-notes', 'edit', ['personal_notes.edit', 'personal_notes.update'])
+)
+const canDelete = computed(() =>
+  canModuleAction(auth.user, 'personal-notes', 'delete', ['personal_notes.delete'])
+)
 
 const notes = ref([])
 const currentIndex = ref(0)
@@ -71,6 +87,12 @@ function selectNoteByIndex(index) {
 }
 
 async function loadNotes() {
+  if (!canView.value) {
+    notes.value = []
+    currentIndex.value = 0
+    loading.value = false
+    return
+  }
   loading.value = true
   try {
     const res = await personalNotesApi.index()
@@ -91,15 +113,18 @@ async function loadNotes() {
 }
 
 function addNote() {
+  if (!canCreate.value) return
   router.push('/personal-notes/create')
 }
 
 function editNote() {
+  if (!canEdit.value) return
   const note = currentNote.value
   if (note?.id) router.push(`/personal-notes/${note.id}/edit`)
 }
 
 function openDeleteModal() {
+  if (!canDelete.value) return
   if (currentNote.value?.id) showDeleteModal.value = true
 }
 
@@ -108,6 +133,7 @@ function closeDeleteModal() {
 }
 
 async function confirmDeleteNote() {
+  if (!canDelete.value) return
   const note = currentNote.value
   if (!note?.id) return
   deleting.value = true
@@ -130,7 +156,9 @@ async function confirmDeleteNote() {
   }
 }
 
-onMounted(() => loadNotes())
+onMounted(() => {
+  loadNotes()
+})
 
 watch(
   () => route.params.id,
@@ -156,6 +184,7 @@ watch(
       </div>
       <div class="flex items-center gap-2">
         <button
+          v-if="canCreate"
           type="button"
           class="rounded p-2 text-white hover:bg-white/20"
           aria-label="Add note"
@@ -166,6 +195,7 @@ watch(
           </svg>
         </button>
         <button
+          v-if="canEdit"
           type="button"
           class="rounded p-2 text-white hover:bg-white/20"
           aria-label="Edit note"
@@ -177,6 +207,7 @@ watch(
           </svg>
         </button>
         <button
+          v-if="canDelete"
           type="button"
           class="rounded p-2 text-white hover:bg-white/20"
           aria-label="Delete note"
@@ -209,6 +240,9 @@ watch(
 
       <!-- Note content -->
       <main class="min-w-0 flex-1 overflow-y-auto bg-[#E8E8E8] p-6">
+        <div v-if="!canView" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          You do not have permission to view personal notes.
+        </div>
         <div v-if="loading" class="flex items-center justify-center py-16">
           <svg class="h-8 w-8 animate-spin text-[#0D7377]" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />

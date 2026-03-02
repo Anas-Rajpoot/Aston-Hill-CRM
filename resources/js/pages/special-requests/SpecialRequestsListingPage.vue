@@ -13,6 +13,7 @@ import Toast from '@/components/Toast.vue'
 import RecordHistoryModal from '@/components/RecordHistoryModal.vue'
 import { debounce } from '@/composables/useApiRequest'
 import { useFilterCache } from '@/composables/useFilterCache'
+import { canModuleAction } from '@/lib/accessControl'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -67,6 +68,7 @@ const advancedVisible = ref(false)
 const columnModalVisible = ref(false)
 const exportLoading = ref(false)
 const selectedIds = ref([])
+const canExport = () => canModuleAction(auth.user, 'special', 'export')
 
 const filters = ref({
   q: '',
@@ -318,6 +320,7 @@ onMounted(async () => {
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <button
+            v-if="canExport()"
             type="button"
             class="inline-flex items-center rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70"
             :disabled="loading || exportLoading"

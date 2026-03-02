@@ -3,9 +3,16 @@
  * Reports main page: 4 report cards (Lead, Field Operations, VAS, SLA) with "View Report" links.
  */
 import { useRouter } from 'vue-router'
+import { computed } from 'vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import { useAuthStore } from '@/stores/auth'
+import { canModuleAction } from '@/lib/accessControl'
 
 const router = useRouter()
+const auth = useAuthStore()
+const canView = computed(() =>
+  canModuleAction(auth.user, 'reports', 'view', ['reports.view', 'reports.list'])
+)
 
 const cards = [
   {
@@ -43,6 +50,7 @@ const cards = [
 ]
 
 function viewReport(route) {
+  if (!canView.value) return
   router.push(route)
 }
 </script>
@@ -54,7 +62,11 @@ function viewReport(route) {
       <p class="mt-1 text-sm text-gray-500">Access comprehensive analytics and insights across all CRM modules.</p>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div v-if="!canView" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+      You do not have permission to view reports.
+    </div>
+
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <article
         v-for="card in cards"
         :key="card.id"

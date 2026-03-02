@@ -22,6 +22,7 @@ import Toast from '@/components/Toast.vue'
 import RecordHistoryModal from '@/components/RecordHistoryModal.vue'
 import { debounce } from '@/composables/useApiRequest'
 import { useFilterCache } from '@/composables/useFilterCache'
+import { canModuleAction } from '@/lib/accessControl'
 
 const loading = ref(true)
 const selectedSubmissionIds = ref([])
@@ -337,6 +338,7 @@ const canBulkAssign = (() => {
   if (isSuperAdmin) return true
   return perms.includes('back_office.assign_bo_executive') || perms.includes('vas_requests.process_vas_requests')
 })()
+const canExport = () => canModuleAction(auth.user, 'vas', 'export')
 
 function goToResubmit(row) {
   if (row?.id) router.push(`/vas-requests/${row.id}/resubmit`)
@@ -506,6 +508,7 @@ onMounted(async () => {
             Bulk Assign
           </button>
           <button
+            v-if="canExport()"
             type="button"
             class="inline-flex items-center rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70 disabled:cursor-wait"
             :disabled="loading || exportLoading"

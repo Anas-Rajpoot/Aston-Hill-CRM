@@ -55,7 +55,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->api(append: [
             \App\Http\Middleware\ApplySecuritySettings::class,
             \App\Http\Middleware\ValidateSessionToken::class,
-            \App\Http\Middleware\EnforcePasswordExpiry::class,
+            \App\Http\Middleware\EnforcePasswordAction::class,
             \App\Http\Middleware\AuditApiActivity::class,
         ]);
     })
@@ -125,6 +125,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
             $status = $e instanceof HttpExceptionInterface ? $e->getStatusCode() : 500;
             $message = match ($status) {
+                403 => 'You do not have permission to perform this action.',
                 404 => 'Requested resource was not found.',
                 405 => 'This action is not allowed.',
                 419 => 'Session expired. Please refresh and try again.',

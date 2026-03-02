@@ -28,7 +28,6 @@ return new class extends Migration
             $table->boolean('require_uppercase')->default(true);
             $table->boolean('require_number')->default(true);
             $table->boolean('require_special')->default(true);
-            $table->unsignedInteger('password_expiry_days')->default(90);
 
             $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();

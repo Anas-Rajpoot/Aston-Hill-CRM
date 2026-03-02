@@ -4,6 +4,7 @@
  */
 import { ref, computed, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { canModuleAction } from '@/lib/accessControl'
 
 const auth = useAuthStore()
 
@@ -20,6 +21,8 @@ const props = defineProps({
   filterOptions: { type: Object, default: () => ({}) },
   canEdit: { type: Boolean, default: undefined },
   canDelete: { type: Boolean, default: undefined },
+  canView: { type: Boolean, default: undefined },
+  canHistory: { type: Boolean, default: undefined },
 })
 
 const emit = defineEmits(['sort', 'delete', 'view', 'edit', 'viewHistory', 'openEdit'])
@@ -38,14 +41,21 @@ const orderedColumns = computed(() => {
   })
 })
 
-const permissions = computed(() => auth.user?.permissions ?? [])
-const isSuperAdmin = computed(() => {
-  const r = auth.user?.roles ?? []
-  return Array.isArray(r) && r.some((x) => (typeof x === 'string' ? x === 'superadmin' : x?.name === 'superadmin'))
-})
-const canView = computed(() => isSuperAdmin.value || permissions.value.includes('expense_tracker.view') || permissions.value.includes('expense_tracker.list'))
-const effectiveCanEdit = computed(() => props.canEdit !== undefined ? props.canEdit : (isSuperAdmin.value || permissions.value.includes('expense_tracker.edit') || permissions.value.includes('expense_tracker.update')))
-const effectiveCanDelete = computed(() => props.canDelete !== undefined ? props.canDelete : (isSuperAdmin.value || permissions.value.includes('expense_tracker.delete')))
+const effectiveCanView = computed(() => props.canView !== undefined
+  ? props.canView
+  : canModuleAction(auth.user, 'expense-tracker', 'view', ['expense_tracker.view', 'expense_tracker.list']))
+const effectiveCanEdit = computed(() => props.canEdit !== undefined
+  ? props.canEdit
+  : canModuleAction(auth.user, 'expense-tracker', 'edit', ['expense_tracker.edit', 'expense_tracker.update']))
+const effectiveCanDelete = computed(() => props.canDelete !== undefined
+  ? props.canDelete
+  : canModuleAction(auth.user, 'expense-tracker', 'delete', ['expense_tracker.delete']))
+const effectiveCanHistory = computed(() => props.canHistory !== undefined
+  ? props.canHistory
+  : canModuleAction(auth.user, 'expense-tracker', 'view', ['expense_tracker.history', 'expense_tracker.view-history']))
+const hasAnyRowAction = computed(() =>
+  effectiveCanView.value || effectiveCanEdit.value || effectiveCanDelete.value || effectiveCanHistory.value
+)
 
 const editingCell = ref({ rowId: null, col: null })
 const editValue = ref('')
@@ -151,7 +161,7 @@ function statusLabel(status) {
 }
 
 function goToView(row) {
-  if (row?.id && canView.value) emit('view', row)
+  if (row?.id && effectiveCanView.value) emit('view', row)
 }
 
 function openEditModal(row) {
@@ -159,7 +169,7 @@ function openEditModal(row) {
 }
 
 function goToViewHistory(row) {
-  if (row?.id) emit('viewHistory', row)
+  if (row?.id && effectiveCanHistory.value) emit('viewHistory', row)
 }
 
 function onDelete(row) {
@@ -206,12 +216,12 @@ function onDelete(row) {
             </button>
             <span v-else class="font-semibold text-gray-800">{{ label(col) }}</span>
           </th>
-          <th scope="col" class="whitespace-nowrap px-4 py-3 text-center text-sm font-semibold text-gray-800 bg-sky-50">Actions</th>
+          <th v-if="hasAnyRowAction" scope="col" class="whitespace-nowrap px-4 py-3 text-center text-sm font-semibold text-gray-800 bg-sky-50">Actions</th>
         </tr>
       </thead>
       <tbody class="bg-white">
         <tr v-if="!loading && !data.length" class="border-b border-black">
-          <td :colspan="orderedColumns.length + 1" class="px-4 py-12 text-center text-sm text-gray-500">No expenses found.</td>
+          <td :colspan="orderedColumns.length + (hasAnyRowAction ? 1 : 0)" class="px-4 py-12 text-center text-sm text-gray-500">No expenses found.</td>
         </tr>
         <tr
           v-for="row in data"
@@ -387,10 +397,10 @@ function onDelete(row) {
               <span :title="isEditable(col) ? 'Double-click to edit' : undefined">{{ formatValue(row, col) }}</span>
             </template>
           </td>
-          <td class="whitespace-nowrap px-4 py-3 text-center">
+          <td v-if="hasAnyRowAction" class="whitespace-nowrap px-4 py-3 text-center">
             <div class="inline-flex items-center gap-1">
               <button
-                v-if="canView"
+                v-if="effectiveCanView"
                 type="button"
                 class="rounded p-1.5 text-blue-600 hover:bg-blue-50"
                 title="View"
@@ -413,6 +423,7 @@ function onDelete(row) {
                   </svg>
                 </button>
                 <button
+                  v-if="effectiveCanHistory"
                   type="button"
                   class="rounded p-1.5 text-amber-600 hover:bg-amber-50"
                   title="View History"

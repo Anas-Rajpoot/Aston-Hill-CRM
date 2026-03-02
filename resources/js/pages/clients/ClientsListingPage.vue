@@ -2,7 +2,7 @@
 /**
  * Clients listing – search by company name / account number, filters, sort, customize columns, export.
  */
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import clientsApi from '@/services/clientsApi'
 import ClientsFiltersBar from '@/components/clients/ClientsFiltersBar.vue'
@@ -14,6 +14,7 @@ import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import RecordHistoryModal from '@/components/RecordHistoryModal.vue'
 import api from '@/lib/axios'
 import { useAuthStore } from '@/stores/auth'
+import { canModuleAction } from '@/lib/accessControl'
 
 const historyModalVisible = ref(false)
 const historyRecordId = ref(null)
@@ -36,6 +37,9 @@ async function fetchClientAudits(id) {
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const canCreate = computed(() => canModuleAction(authStore.user, 'clients', 'create'))
+const canExport = computed(() => canModuleAction(authStore.user, 'clients', 'export'))
+const canImport = computed(() => canModuleAction(authStore.user, 'clients', 'import'))
 const loading = ref(true)
 const clients = ref([])
 const TABLE_MODULE = 'clients'
@@ -494,6 +498,7 @@ onMounted(() => {
             @change="onImportFileSelect"
           />
           <button
+            v-if="canImport"
             type="button"
             class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             :disabled="loading || importLoading"
@@ -509,6 +514,7 @@ onMounted(() => {
             {{ importLoading ? 'Importing...' : 'Import CSV' }}
           </button>
           <button
+            v-if="canExport"
             type="button"
             class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             :disabled="loading || exportLoading"
@@ -524,6 +530,7 @@ onMounted(() => {
             {{ exportLoading ? 'Exporting...' : 'Export' }}
           </button>
           <button
+            v-if="canCreate"
             type="button"
             class="inline-flex items-center rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70 disabled:cursor-wait"
             :disabled="loading"
@@ -690,6 +697,7 @@ onMounted(() => {
           :current-page="meta.current_page"
           :per-page="meta.per_page"
           :edit-options="filterOptions"
+          permission-module="clients"
           @sort="onSort"
           @update-cell="onUpdateCell"
           @view-history="openHistoryModal"

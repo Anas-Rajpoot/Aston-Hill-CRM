@@ -12,6 +12,7 @@ import { toDdMonYyyy, fromDdMmYyyy } from '@/lib/dateFormat'
 const props = defineProps({
   visible: { type: Boolean, default: false },
   record: { type: Object, default: null },
+  canEdit: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['close', 'edit'])
@@ -45,6 +46,7 @@ function close() {
 }
 
 function onEdit() {
+  if (!props.canEdit) return
   if (props.record) emit('edit', props.record)
 }
 </script>
@@ -169,6 +171,7 @@ function onEdit() {
               Close
             </button>
             <button
+              v-if="canEdit"
               type="button"
               class="inline-flex items-center gap-2 rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
               @click="onEdit"

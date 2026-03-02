@@ -4,6 +4,7 @@
  */
 import { ref, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { canModuleAction } from '@/lib/accessControl'
 
 const props = defineProps({
   columns: { type: Array, required: true },
@@ -14,12 +15,20 @@ const props = defineProps({
   currentPage: { type: Number, default: 1 },
   perPage: { type: Number, default: 15 },
   editOptions: { type: Object, default: () => ({}) },
+  canInlineEdit: { type: Boolean, default: undefined },
 })
 
 const emit = defineEmits(['sort', 'updateCell'])
 
 const auth = useAuthStore()
 const canInlineEdit = computed(() => {
+  if (props.canInlineEdit !== undefined) return props.canInlineEdit
+  if (
+    canModuleAction(auth.user, 'email-follow-up', 'edit', [
+      'emails_followup.edit',
+      'emails_followup.update',
+    ])
+  ) return true
   const perms = auth.user?.permissions ?? []
   if (perms.includes('emails_followup.edit')) return true
   const roles = auth.user?.roles ?? []

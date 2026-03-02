@@ -2,6 +2,7 @@
 import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import specialRequestsApi from '@/services/specialRequestsApi'
 import { useFormErrors } from '@/composables/useFormErrors'
+import { useSessionFormState } from '@/composables/useSessionFormState'
 
 const form = ref({
   company_name: '',
@@ -14,6 +15,7 @@ const form = ref({
   complete_address: '',
   special_instruction: '',
 })
+const { restoreState, clearState } = useSessionFormState('submission.special-request.step1', form)
 
 const options = ref({
   managers: [],
@@ -94,6 +96,7 @@ onMounted(async () => {
       team_leaders: data.team_leaders ?? [],
       sales_agents: data.sales_agents ?? [],
     }
+    restoreState()
   } catch { /* silent */ }
   finally { loading.value = false }
 })
@@ -144,6 +147,7 @@ async function submit() {
     documentFiles.value.forEach((file) => { if (file) fd.append('documents[]', file) })
     await specialRequestsApi.store(fd)
     successMessage.value = 'Special request submitted successfully.'
+    clearState()
     nextTick(() => { window.scrollTo(0, 0) })
   } catch (e) {
     setErrors(e)
@@ -154,6 +158,7 @@ async function submit() {
 }
 
 function reset() {
+  clearState()
   form.value = {
     company_name: '',
     account_number: '',

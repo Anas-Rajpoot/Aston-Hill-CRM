@@ -9,8 +9,10 @@ import OrderStatusTable from '@/components/order-status/OrderStatusTable.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import api from '@/lib/axios'
 import { useAuthStore } from '@/stores/auth'
+import { canModuleAction } from '@/lib/accessControl'
 
 const auth = useAuthStore()
+const canViewAction = () => canModuleAction(auth.user, 'order-status', 'view')
 const TABLE_MODULE = 'order-status'
 const COLUMN_MODULE = 'order-status-listing'
 const perPageOptions = ref([10, 20, 25, 50, 100])
@@ -340,6 +342,7 @@ onMounted(async () => {
           :sort="sort"
           :order="order"
           :loading="loading"
+          :can-view-action="canViewAction()"
           @sort="onSort"
         />
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">

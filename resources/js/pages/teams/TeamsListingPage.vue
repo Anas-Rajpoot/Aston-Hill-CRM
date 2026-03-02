@@ -12,6 +12,7 @@ import teamsApi from '@/services/teamsApi'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import Toast from '@/components/Toast.vue'
+import { canModuleAction } from '@/lib/accessControl'
 
 const router = useRouter()
 const route = useRoute()
@@ -28,9 +29,12 @@ function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value 
 /* ───── Auth ───── */
 const isSuperAdmin = computed(() => auth.user?.roles?.includes('superadmin') ?? false)
 const perms = computed(() => auth.user?.permissions ?? [])
-const canCreate = computed(() => isSuperAdmin.value || perms.value.includes('teams.create'))
-const canEdit = computed(() => isSuperAdmin.value || perms.value.includes('teams.edit'))
-const canDelete = computed(() => isSuperAdmin.value || perms.value.includes('teams.delete'))
+const canCreate = computed(() => canModuleAction(auth.user, 'teams', 'create'))
+const canEdit = computed(() => canModuleAction(auth.user, 'teams', 'edit'))
+const canDelete = computed(() => canModuleAction(auth.user, 'teams', 'delete'))
+const canViewAction = computed(() => canModuleAction(auth.user, 'teams', 'view'))
+const hasSelectionColumn = computed(() => canDelete.value || canEdit.value)
+const hasAnyRowAction = computed(() => canViewAction.value || canEdit.value || canDelete.value)
 
 /* ───── State ───── */
 const loading = ref(true)
@@ -450,7 +454,7 @@ onMounted(async () => {
         <table class="min-w-full">
           <thead class="bg-gray-50 border-b-2 border-black">
             <tr>
-              <th v-if="canDelete || canEdit" class="w-10 px-3 py-3">
+              <th v-if="hasSelectionColumn" class="w-10 px-3 py-3">
                 <input type="checkbox" v-model="allSelected" class="rounded border-gray-300 text-green-600 focus:ring-green-500" />
               </th>
               <th
@@ -470,21 +474,21 @@ onMounted(async () => {
                   </span>
                 </div>
               </th>
-              <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Actions</th>
+              <th v-if="hasAnyRowAction" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Actions</th>
             </tr>
           </thead>
           <tbody class="bg-white">
             <tr v-if="tableLoading" class="border-b border-black">
-              <td :colspan="activeColumns.length + 2" class="px-4 py-12 text-center">
+              <td :colspan="activeColumns.length + (hasSelectionColumn ? 1 : 0) + (hasAnyRowAction ? 1 : 0)" class="px-4 py-12 text-center">
                 <svg class="mx-auto h-6 w-6 animate-spin text-gray-400 mb-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
                 <p class="text-sm text-gray-400">Loading teams…</p>
               </td>
             </tr>
             <tr v-else-if="!tableData.length" class="border-b border-black">
-              <td :colspan="activeColumns.length + 2" class="px-4 py-12 text-center text-sm text-gray-400">No teams found</td>
+              <td :colspan="activeColumns.length + (hasSelectionColumn ? 1 : 0) + (hasAnyRowAction ? 1 : 0)" class="px-4 py-12 text-center text-sm text-gray-400">No teams found</td>
             </tr>
             <tr v-else v-for="(row, rowIndex) in tableData" :key="row.id" class="border-b border-black hover:bg-gray-50 transition-colors">
-              <td v-if="canDelete || canEdit" class="w-10 px-3 py-2.5">
+              <td v-if="hasSelectionColumn" class="w-10 px-3 py-2.5">
                 <input type="checkbox" :value="row.id" v-model="selectedIds" class="rounded border-gray-300 text-green-600 focus:ring-green-500" />
               </td>
               <td v-for="col in activeColumns" :key="col.key" class="px-4 py-2.5 text-sm whitespace-nowrap">
@@ -533,14 +537,14 @@ onMounted(async () => {
               </td>
 
               <!-- Actions column -->
-              <td class="px-4 py-2.5 text-right relative">
+              <td v-if="hasAnyRowAction" class="px-4 py-2.5 text-right relative">
                 <div class="relative inline-block">
                   <button type="button" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100" @click="actionMenuOpen = actionMenuOpen === row.id ? null : row.id">
                     <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="4" r="2" /><circle cx="10" cy="10" r="2" /><circle cx="10" cy="16" r="2" /></svg>
                   </button>
                   <Transition enter-active-class="transition ease-out duration-100" enter-from-class="opacity-0 scale-95" enter-to-class="opacity-100 scale-100" leave-active-class="transition ease-in duration-75" leave-from-class="opacity-100 scale-100" leave-to-class="opacity-0 scale-95">
                     <div v-if="actionMenuOpen === row.id" class="absolute right-0 top-full mt-1 z-30 w-44 rounded-lg border border-gray-200 bg-white shadow-lg py-1" @mouseleave="actionMenuOpen = null">
-                      <router-link :to="`/teams/${row.id}`" class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                      <router-link v-if="canViewAction" :to="`/teams/${row.id}`" class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
                         <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                         View Details
                       </router-link>

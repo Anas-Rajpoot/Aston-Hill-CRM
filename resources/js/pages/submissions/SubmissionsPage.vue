@@ -42,15 +42,26 @@ const allTabs = [
 
 const isSuperAdmin = computed(() => auth.user?.roles?.includes('superadmin') ?? false)
 const userPermissions = computed(() => auth.user?.permissions ?? [])
-const canCreateLeadSubmission = computed(() => (
-  isSuperAdmin.value
-  || userPermissions.value.includes('lead-submissions.create')
-  || userPermissions.value.includes('lead.create')
-))
 
-const tabs = computed(() => {
-  return allTabs.filter((tab) => tab.key !== 'lead' || canCreateLeadSubmission.value)
-})
+function hasAnyPermission(keys = []) {
+  if (isSuperAdmin.value) return true
+  const perms = new Set((userPermissions.value ?? []).map((p) => String(p)))
+  return keys.some((k) => perms.has(k))
+}
+
+const createPermissionMap = {
+  lead: ['lead-submissions.create', 'lead.create'],
+  field: ['field-submissions.create', 'field.create'],
+  support: ['customer_support_requests.create', 'customer-support-requests.create', 'customer_support.create', 'customer-support.create'],
+  vas: ['vas_requests.create', 'vas-requests.create', 'vas.create'],
+  new: ['special_requests.create', 'special-requests.create', 'special.create'],
+}
+
+const tabs = computed(() => allTabs.filter((tab) => hasAnyPermission(createPermissionMap[tab.key] || [])))
+
+const hiddenTabsLabels = computed(() => allTabs
+  .filter((tab) => !tabs.value.some((allowed) => allowed.key === tab.key))
+  .map((tab) => tab.label))
 
 function ensureActiveTabAvailable() {
   if (!tabs.value.length) {
@@ -80,7 +91,7 @@ function onTabChange(key) {
 function onLeadNewSubmission() {
   leadForceNewForm.value = true
   formKey.value = Date.now()
-  setTimeout(() => { leadForceNewForm.value = false }, 500)
+  window.setTimeout(() => { leadForceNewForm.value = false }, 500)
 }
 </script>
 
@@ -93,6 +104,9 @@ function onLeadNewSubmission() {
       </div>
       <!-- TABS (dark bar like 1st image) -->
       <Tabs :tabs="tabs" :active="activeTab" @change="onTabChange" />
+      <div v-if="hiddenTabsLabels.length" class="mx-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800">
+        You do not have permission for: {{ hiddenTabsLabels.join(', ') }}.
+      </div>
 
       <!-- TAB CONTENT: one async component per tab; each shows skeleton while loading. -->
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 px-6 pb-6 pt-3 sm:px-8 sm:pb-8 sm:pt-4 !mt-0">
@@ -107,7 +121,7 @@ function onLeadNewSubmission() {
         <VasRequestWizard v-else-if="activeTab === 'vas'" :key="`vas-${formKey}`" />
         <NewSubmissionForm v-else-if="activeTab === 'new'" :key="`new-${formKey}`" />
         <div v-else class="py-10 text-center text-sm text-gray-500">
-          No submission forms available for your role.
+          You do not have permission to add submission forms.
         </div>
       </div>
     </div>

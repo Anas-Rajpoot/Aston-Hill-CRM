@@ -16,6 +16,7 @@ import RecordHistoryModal from '@/components/RecordHistoryModal.vue'
 import Toast from '@/components/Toast.vue'
 import TruncatedText from '@/components/TruncatedText.vue'
 import api from '@/lib/axios'
+import { canModuleAction } from '@/lib/accessControl'
 
 const route = useRoute()
 const router = useRouter()
@@ -28,9 +29,7 @@ const initialTab = validTabs.includes(route.query.tab) ? route.query.tab : 'comp
 const activeTab = ref(initialTab)
 
 const canEdit = computed(() => {
-  const perms = auth.user?.permissions ?? []
-  const roles = auth.user?.roles ?? []
-  return roles.includes('superadmin') || perms.includes('clients.edit')
+  return canModuleAction(auth.user, 'clients', 'edit', ['all-clients.edit', 'all-clients.update'])
 })
 
 provide('breadcrumbLabel', computed(() => (client.value?.company_name ?? null)))
@@ -449,6 +448,7 @@ async function resolveAlert(alert) {
 }
 
 function openAlertCellEdit(row, col) {
+  if (!canEdit.value) return
   if (ALERT_READONLY_COLS.includes(col)) return
   alertEditingCell.value = { rowId: row.id, col }
   if (col === 'expiry_date') {
@@ -468,6 +468,7 @@ function isAlertEditing(rowId, col) {
 function cancelAlertEdit() { alertEditingCell.value = null }
 
 async function saveAlertCellEdit() {
+  if (!canEdit.value) return
   if (!alertEditingCell.value) return
   const { rowId, col } = alertEditingCell.value
   let payload = {}

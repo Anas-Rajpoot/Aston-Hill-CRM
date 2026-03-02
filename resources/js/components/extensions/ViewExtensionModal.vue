@@ -6,6 +6,7 @@ import { ref, computed, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import extensionsApi from '@/services/extensionsApi'
 import { toDdMonYyyy } from '@/lib/dateFormat'
+import { canModuleAction } from '@/lib/accessControl'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -22,12 +23,14 @@ const loading = ref(false)
 const loadError = ref(null)
 const showPassword = ref(false)
 
-const permissions = computed(() => auth.user?.permissions ?? [])
-const isSuperAdmin = computed(() => {
-  const r = auth.user?.roles ?? []
-  return Array.isArray(r) && r.some((x) => (typeof x === 'string' ? x === 'superadmin' : x?.name === 'superadmin'))
-})
-const canEdit = computed(() => isSuperAdmin.value || permissions.value.includes('extensions.edit'))
+const canEdit = computed(() =>
+  canModuleAction(auth.user, 'extensions', 'edit', [
+    'extensions.edit',
+    'extensions.update',
+    'cisco-extensions.edit',
+    'cisco-extensions.update',
+  ])
+)
 
 watch(
   () => [props.visible, props.extensionId],

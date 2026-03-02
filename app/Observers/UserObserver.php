@@ -33,17 +33,10 @@ class UserObserver
     public function deleted(User $user): void
     {
         $this->invalidateUserCache($user->id);
-
-        UserAudit::create([
-            'user_id'    => $user->id,
-            'field_name' => '_deleted',
-            'old_value'  => $this->serializeValue($user->email),
-            'new_value'  => null,
-            'changed_at' => now(),
-            'changed_by' => Auth::id(),
-            'ip_address' => request()->ip(),
-            'user_agent' => substr((string) request()->userAgent(), 0, 500),
-        ]);
+        // Do not write to user_audits after delete:
+        // user_audits.user_id has a FK to users(id), so creating an audit row here
+        // causes a FK violation once the parent user row is gone.
+        // Delete activity is already captured via SystemAuditLog in UserController::destroy().
     }
 
     public function updated(User $user): void

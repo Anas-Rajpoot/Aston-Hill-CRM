@@ -16,6 +16,7 @@ import Toast from '@/components/Toast.vue'
 import RecordHistoryModal from '@/components/RecordHistoryModal.vue'
 import { debounce } from '@/composables/useApiRequest'
 import { useFilterCache } from '@/composables/useFilterCache'
+import { canModuleAction } from '@/lib/accessControl'
 
 const auth = useAuthStore()
 let listAbortController = null
@@ -76,6 +77,7 @@ const canBulkAssign = (() => {
   if (isSuperAdmin) return true
   return perms.includes('field_head.assign_field_agent') || perms.includes('field-submissions.assign_field_agent')
 })()
+const canExport = () => canModuleAction(auth.user, 'field', 'export')
 const sort = ref('created_at')
 const order = ref('desc')
 const advancedVisible = ref(false)
@@ -551,6 +553,7 @@ onMounted(async () => {
             Bulk Assign
           </button>
           <button
+            v-if="canExport()"
             type="button"
             class="inline-flex items-center rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70 disabled:cursor-wait"
             :disabled="loading || exportLoading"

@@ -3,6 +3,7 @@ import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import api from '@/services/customerSupportApi'
 import { useFormErrors } from '@/composables/useFormErrors'
 import { formatTeamLabel } from '@/composables/useTeamLabel'
+import { useSessionFormState } from '@/composables/useSessionFormState'
 
 const ISSUE_CATEGORIES = [
   'Internet / Landline Issues',
@@ -27,6 +28,9 @@ const form = ref({
   manager_id: '',
   team_leader_id: '',
   sales_agent_id: '',
+})
+const { restoreState, clearState } = useSessionFormState('submission.customer-support.step1', form, {
+  omitKeys: ['attachment_1', 'attachment_2'],
 })
 
 const managers = ref([])
@@ -123,6 +127,7 @@ onMounted(async () => {
     if (data.labels) {
       teamLabels.value = { ...teamLabels.value, ...data.labels }
     }
+    restoreState()
   } catch (e) {
     setErrors(e)
   } finally {
@@ -216,6 +221,7 @@ async function submit() {
       document.documentElement.scrollTop = 0
       document.body.scrollTop = 0
     })
+    clearState()
     form.value = {
       issue_category: '',
       company_name: '',
@@ -241,6 +247,7 @@ async function submit() {
 }
 
 function cancel() {
+  clearState()
   form.value = {
     issue_category: '',
     company_name: '',

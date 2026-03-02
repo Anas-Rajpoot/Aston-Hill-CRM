@@ -13,16 +13,30 @@ import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import FiltersBar from '@/components/attendance/FiltersBar.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import Toast from '@/components/Toast.vue'
+import { canModuleAction } from '@/lib/accessControl'
 
 const auth = useAuthStore()
-const permissions = computed(() => auth.user?.permissions ?? [])
-const isSuperAdmin = computed(() => {
-  const r = auth.user?.roles ?? []
-  return Array.isArray(r) && r.some((x) => (typeof x === 'string' ? x === 'superadmin' : x?.name === 'superadmin'))
-})
-const canView = computed(() => isSuperAdmin.value || permissions.value.includes('view_attendance_logs'))
-const canForceLogout = computed(() => isSuperAdmin.value || permissions.value.includes('force_logout'))
-const canExport = computed(() => isSuperAdmin.value || permissions.value.includes('export_attendance_data'))
+const canView = computed(() =>
+  canModuleAction(auth.user, 'attendance-log', 'view', [
+    'view_attendance_logs',
+    'attendance-log.view',
+    'attendance_log.view',
+  ])
+)
+const canForceLogout = computed(() =>
+  canModuleAction(auth.user, 'attendance-log', 'edit', [
+    'force_logout',
+    'attendance-log.force-logout',
+    'attendance_log.force_logout',
+  ])
+)
+const canExport = computed(() =>
+  canModuleAction(auth.user, 'attendance-log', 'export', [
+    'export_attendance_data',
+    'attendance-log.export',
+    'attendance_log.export',
+  ])
+)
 
 const ATTENDANCE_COLUMNS = [
   { key: 'sr', label: 'SR' },

@@ -5,6 +5,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { canModuleAction } from '@/lib/accessControl'
 
 const props = defineProps({
   columns: { type: Array, required: true },
@@ -30,12 +31,9 @@ try {
   // Not inside a router (e.g. test env); navigation will be no-op
 }
 const auth = useAuthStore()
-
-function goToSubmission(leadId) {
-  if (router && typeof router.push === 'function') {
-    router.push({ path: '/submissions', query: { lead_id: leadId } })
-  }
-}
+const canViewAction = computed(() => canModuleAction(auth.user, 'lead', 'view'))
+const canEditAction = computed(() => canModuleAction(auth.user, 'lead', 'edit'))
+const canHistoryAction = computed(() => canViewAction.value)
 
 function goToDetail(leadId) {
   if (router && typeof router.push === 'function') {
@@ -43,18 +41,14 @@ function goToDetail(leadId) {
   }
 }
 const canEdit = computed(() => {
-  const roles = auth.user?.roles ?? []
-  const permissions = auth.user?.permissions ?? []
-  const isSuperAdmin = Array.isArray(roles) && roles.some((r) => (typeof r === 'string' ? r : r?.name) === 'superadmin')
-  if (isSuperAdmin) return true
-  return permissions.includes('lead.edit')
+  return canEditAction.value
 })
 
 /** Only superadmin or backoffice can open Edit Submission modal (back office form). */
 const canEditBackOffice = computed(() => {
   const roles = auth.user?.roles ?? []
   if (!Array.isArray(roles)) return false
-  return roles.some((r) => {
+  return canEditAction.value && roles.some((r) => {
     const name = typeof r === 'string' ? r : r?.name
     return name === 'superadmin' || name === 'backoffice' || name === 'back_office'
   })
@@ -396,6 +390,11 @@ function rowNumber(index) {
   return (props.currentPage - 1) * props.perPage + index + 1
 }
 
+const hasAnyRowAction = computed(() => {
+  if (canViewAction.value || canEditBackOffice.value || canHistoryAction.value) return true
+  return canEditAction.value && (props.data || []).some((row) => canResubmit(row))
+})
+
 function sortable(col) {
   return SORTABLE_COLUMNS.includes(col)
 }
@@ -532,14 +531,14 @@ function statusBadgeClass(status) {
             </button>
             <span v-else class="font-semibold text-white">{{ label(col) }}</span>
           </th>
-          <th scope="col" class="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold text-white">
+          <th v-if="hasAnyRowAction" scope="col" class="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold text-white">
             Actions
           </th>
         </tr>
       </thead>
       <tbody class="bg-white">
         <tr v-if="!loading && !data.length" class="border-b border-black bg-white">
-          <td :colspan="effectiveColumns.length + 2" class="px-4 py-12 text-center text-gray-500">
+          <td :colspan="effectiveColumns.length + (hasAnyRowAction ? 2 : 1)" class="px-4 py-12 text-center text-gray-500">
             No leads found.
           </td>
         </tr>
@@ -796,10 +795,11 @@ function statusBadgeClass(status) {
               >{{ truncate(formatValue(row, col), TRUNCATE_LENGTH) }}</span>
             </template>
           </td>
-          <td class="whitespace-nowrap px-4 py-3">
+          <td v-if="hasAnyRowAction" class="whitespace-nowrap px-4 py-3">
             <div class="flex w-full min-w-[140px] items-center justify-between gap-2">
               <div class="inline-flex items-center gap-1 shrink-0">
                 <button
+                  v-if="canViewAction"
                   type="button"
                   class="rounded-full p-1.5 text-blue-600 hover:bg-blue-50"
                   title="View details"
@@ -822,17 +822,7 @@ function statusBadgeClass(status) {
                   </svg>
                 </button>
                 <button
-                  v-else-if="!canEditBackOffice && !canResubmit(row) && row.status !== 'rejected'"
-                  type="button"
-                  class="rounded-full p-1.5 text-green-600 hover:bg-green-50"
-                  title="Edit"
-                  @click="goToSubmission(row.id)"
-                >
-                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
-                </button>
-                <button
+                  v-if="canHistoryAction"
                   type="button"
                   class="rounded-full p-1.5 text-amber-600 hover:bg-amber-50"
                   title="View History"
@@ -845,7 +835,7 @@ function statusBadgeClass(status) {
               </div>
               <div class="inline-flex min-w-[72px] shrink-0 justify-end">
                 <router-link
-                  v-if="canResubmit(row)"
+                  v-if="canEditAction && canResubmit(row)"
                   :to="{ path: `/lead-submissions/${row.id}/resubmit` }"
                   class="rounded bg-blue-800 px-2 py-1 text-xs font-medium text-white hover:bg-blue-900"
                 >

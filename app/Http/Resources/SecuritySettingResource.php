@@ -26,7 +26,6 @@ class SecuritySettingResource extends JsonResource
             'require_uppercase'    => (bool) $this->require_uppercase,
             'require_number'       => (bool) $this->require_number,
             'require_special'      => (bool) $this->require_special,
-            'password_expiry_days' => $this->password_expiry_days,
 
             // Meta
             'updated_at'      => $this->updated_at?->toIso8601String(),

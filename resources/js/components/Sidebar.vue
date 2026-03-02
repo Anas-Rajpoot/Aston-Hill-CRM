@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useSidebar } from '@/composables/useSidebar'
 import SidebarLink from './SidebarLink.vue'
+import { canAccessRoute, isSuperAdmin } from '@/lib/accessControl'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -14,8 +15,6 @@ const logout = async () => {
   await auth.logout()
   router.push('/login')
 }
-
-const userHasRole = (role) => auth.user?.roles?.includes(role) ?? false
 
 const primaryRole = computed(() => {
   const roles = auth.user?.roles ?? []
@@ -45,19 +44,22 @@ const navItems = [
   { to: '/reports', label: 'Reports', abbr: 'Re' },
 ]
 
+const visibleNavItems = computed(() => navItems.filter((item) => canAccessRoute(auth.user, item.to)))
+
 const settingsChildren = computed(() => {
   const items = []
-  if (userHasRole('superadmin')) {
+  if (isSuperAdmin(auth.user)) {
     items.push(
       { to: '/users', label: 'Users', abbr: 'Us' },
       { to: '/teams', label: 'Teams', abbr: 'Te' },
       { to: '/roles', label: 'Roles', abbr: 'Ro' },
       { to: '/permissions', label: 'Permissions', abbr: 'Pe' },
+      { to: '/settings', label: 'Settings', abbr: 'Se' },
     )
   } else {
-    items.push({ to: '/teams', label: 'Teams', abbr: 'Te' })
+    if (canAccessRoute(auth.user, '/users')) items.push({ to: '/users', label: 'Users', abbr: 'Us' })
+    if (canAccessRoute(auth.user, '/teams')) items.push({ to: '/teams', label: 'Teams', abbr: 'Te' })
   }
-  items.push({ to: '/settings', label: 'Settings', abbr: 'Se' })
   return items
 })
 
@@ -103,7 +105,7 @@ const isActive = (to) => {
     <!-- Main nav -->
     <nav class="sidebar-nav flex-1 min-h-0 p-2 space-y-0.5 overflow-y-auto overflow-x-hidden">
       <SidebarLink
-        v-for="item in navItems"
+        v-for="item in visibleNavItems"
         :key="item.to"
         :to="item.to"
         :label="item.label"
@@ -113,7 +115,7 @@ const isActive = (to) => {
         :active="isActive(item.to)"
       />
       <!-- Settings group -->
-      <div class="pt-2">
+      <div v-if="settingsChildren.length" class="pt-2">
         <button
           type="button"
           class="group relative w-full rounded-md text-sm font-medium transition-colors"

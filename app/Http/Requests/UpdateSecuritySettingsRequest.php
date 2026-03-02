@@ -32,7 +32,6 @@ class UpdateSecuritySettingsRequest extends FormRequest
             'require_uppercase' => 'boolean',
             'require_number'    => 'boolean',
             'require_special'   => 'boolean',
-            'password_expiry_days' => 'required|integer|min:0|max:3650',
         ];
     }
 

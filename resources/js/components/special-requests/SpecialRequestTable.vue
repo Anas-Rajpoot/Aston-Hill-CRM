@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { canModuleAction } from '@/lib/accessControl'
 
 const router = useRouter()
 
@@ -28,14 +29,18 @@ const props = defineProps({
 const emit = defineEmits(['sort', 'updateCell', 'update:selectedIds', 'viewHistory'])
 
 const auth = useAuthStore()
+const canViewAction = computed(() => canModuleAction(auth.user, 'special', 'view'))
+const canEditAction = computed(() => canModuleAction(auth.user, 'special', 'edit'))
+const canHistoryAction = computed(() => canViewAction.value)
 const canInlineEdit = computed(() => {
   const roles = auth.user?.roles ?? []
   if (!Array.isArray(roles)) return false
-  return roles.some((r) => {
+  return canEditAction.value && roles.some((r) => {
     const name = typeof r === 'string' ? r : r?.name
     return name === 'superadmin' || name === 'backoffice' || name === 'back_office'
   })
 })
+const hasAnyRowAction = computed(() => canViewAction.value || canEditAction.value || canHistoryAction.value)
 
 const COLUMN_LABELS = {
   id: 'SR',
@@ -195,12 +200,12 @@ function toggleRow(id) {
               </template>
             </span>
           </th>
-          <th class="whitespace-nowrap border-b border-black px-3 py-2.5 text-xs font-semibold uppercase text-white">Actions</th>
+          <th v-if="hasAnyRowAction" class="whitespace-nowrap border-b border-black px-3 py-2.5 text-xs font-semibold uppercase text-white">Actions</th>
         </tr>
       </thead>
       <tbody>
         <tr v-if="loading">
-          <td :colspan="columns.length + 3" class="px-4 py-12 text-center">
+          <td :colspan="columns.length + 2 + (hasAnyRowAction ? 1 : 0)" class="px-4 py-12 text-center">
             <svg class="mx-auto h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -208,7 +213,7 @@ function toggleRow(id) {
           </td>
         </tr>
         <tr v-else-if="!data.length">
-          <td :colspan="columns.length + 3" class="px-4 py-10 text-center text-sm text-gray-500">No special requests found.</td>
+          <td :colspan="columns.length + 2 + (hasAnyRowAction ? 1 : 0)" class="px-4 py-10 text-center text-sm text-gray-500">No special requests found.</td>
         </tr>
         <tr
           v-else
@@ -282,15 +287,15 @@ function toggleRow(id) {
               </span>
             </template>
           </td>
-          <td class="border-b border-gray-200 px-3 py-2">
+          <td v-if="hasAnyRowAction" class="border-b border-gray-200 px-3 py-2">
             <div class="flex items-center gap-1">
-              <button type="button" class="rounded p-1 text-blue-600 hover:bg-blue-50" title="View" @click="goToView(row)">
+              <button v-if="canViewAction" type="button" class="rounded p-1 text-blue-600 hover:bg-blue-50" title="View" @click="goToView(row)">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
               </button>
-              <button type="button" class="rounded p-1 text-green-600 hover:bg-green-50" title="Edit" @click="goToEdit(row)">
+              <button v-if="canEditAction" type="button" class="rounded p-1 text-green-600 hover:bg-green-50" title="Edit" @click="goToEdit(row)">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
               </button>
-              <button type="button" class="rounded p-1 text-purple-600 hover:bg-purple-50" title="History" @click="$emit('viewHistory', row)">
+              <button v-if="canHistoryAction" type="button" class="rounded p-1 text-purple-600 hover:bg-purple-50" title="History" @click="$emit('viewHistory', row)">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               </button>
             </div>

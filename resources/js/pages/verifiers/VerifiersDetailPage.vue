@@ -10,6 +10,7 @@ import api from '@/lib/axios'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Toast from '@/components/Toast.vue'
 import { toDdMonYyyy } from '@/lib/dateFormat'
+import { canModuleAction } from '@/lib/accessControl'
 
 const auth = useAuthStore()
 const list = ref([])
@@ -23,18 +24,20 @@ const successMessage = ref('')
 const errorMessage = ref('')
 
 const canAdd = computed(() => {
-  const roles = auth.user?.roles ?? []
-  const perms = auth.user?.permissions ?? []
-  if (Array.isArray(roles) && roles.includes('superadmin')) return true
-  return Array.isArray(perms) && (perms.includes('verifiers.add') || perms.includes('verifiers.create'))
+  return canModuleAction(auth.user, 'verifiers-detail', 'create', ['verifiers.add', 'verifiers.create'])
 })
 
 const canDelete = computed(() => {
-  const roles = auth.user?.roles ?? []
-  const perms = auth.user?.permissions ?? []
-  if (Array.isArray(roles) && roles.includes('superadmin')) return true
-  return Array.isArray(perms) && perms.includes('verifiers.delete')
+  return canModuleAction(auth.user, 'verifiers-detail', 'delete', ['verifiers.delete'])
 })
+const canEdit = computed(() => {
+  return canModuleAction(auth.user, 'verifiers-detail', 'edit', ['verifiers.edit', 'verifiers.update'])
+})
+const canViewAction = computed(() => canModuleAction(auth.user, 'verifiers-detail', 'view', ['verifiers.list', 'verifiers.view']))
+const canImport = computed(() => canModuleAction(auth.user, 'verifiers-detail', 'import'))
+const canExport = computed(() => canModuleAction(auth.user, 'verifiers-detail', 'export'))
+const canSample = computed(() => canImport.value)
+const hasAnyRowAction = computed(() => canViewAction.value || canDelete.value)
 
 // Inline edit (double-click)
 const editingCell = ref(null) // { id, field }
@@ -43,7 +46,7 @@ const savingCell = ref(false)
 const EDITABLE_FIELDS = ['verifier_name', 'verifier_number', 'remarks']
 
 function canEditCell(row, field) {
-  return canAdd.value && row?.id && EDITABLE_FIELDS.includes(field)
+  return canEdit.value && row?.id && EDITABLE_FIELDS.includes(field)
 }
 
 function startEdit(row, field) {
@@ -204,6 +207,7 @@ const importError = ref('')
 const importSuccess = ref('')
 
 function triggerImport() {
+  if (!canImport.value) return
   importError.value = ''
   importSuccess.value = ''
   csvInputRef.value?.click()
@@ -242,6 +246,7 @@ function csvEscape(val) {
 }
 
 function downloadCsvSample() {
+  if (!canSample.value) return
   const headers = ['no.', 'Verifier Name', 'Verifier Number', 'Remarks']
   const sampleRow = ['1', 'Ahmed Khan', '971501234567', 'Primary verifier']
   const csv = [headers.map(csvEscape).join(','), sampleRow.map(csvEscape).join(',')].join('\r\n')
@@ -255,6 +260,7 @@ function downloadCsvSample() {
 }
 
 async function onCsvFileChange(event) {
+  if (!canImport.value) return
   const file = event.target?.files?.[0]
   event.target.value = ''
   if (!file) return
@@ -297,6 +303,7 @@ async function onCsvFileChange(event) {
 
 // Export CSV (fetch with credentials so session is sent)
 async function exportCsv() {
+  if (!canExport.value) return
   const params = new URLSearchParams()
   if (searchQ.value.trim()) params.set('q', searchQ.value.trim())
   try {
@@ -425,6 +432,7 @@ function formatDateTime(iso) {
 }
 
 function openDetailModal(row) {
+  if (!canViewAction.value) return
   selectedVerifier.value = row
   showDetailModal.value = true
 }
@@ -441,6 +449,7 @@ const editSaving = ref(false)
 const editError = ref('')
 
 function openEditModal(row) {
+  if (!canEdit.value) return
   if (!row) return
   closeDetailModal()
   editForm.value = {
@@ -460,6 +469,7 @@ function closeEditModal(force = false) {
 }
 
 async function submitEdit() {
+  if (!canEdit.value) return
   const id = editForm.value.id
   if (!id) return
   const name = (editForm.value.verifier_name || '').trim()
@@ -526,6 +536,7 @@ onMounted(() => load())
           @change="onCsvFileChange"
         />
         <button
+          v-if="canSample"
           type="button"
           @click="downloadCsvSample"
           class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -536,7 +547,7 @@ onMounted(() => load())
           Download CSV Sample
         </button>
         <button
-          v-if="canAdd"
+          v-if="canImport"
           type="button"
           @click="triggerImport"
           class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -547,6 +558,7 @@ onMounted(() => load())
           Import CSV
         </button>
         <button
+          v-if="canExport"
           type="button"
           @click="exportCsv"
           class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -632,15 +644,15 @@ onMounted(() => load())
               >
                 <span class="inline-flex items-center gap-1">Remarks {{ sortIcon('remarks') }}</span>
               </th>
-              <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 tracking-wider w-24">Actions</th>
+              <th v-if="hasAnyRowAction" scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 tracking-wider w-24">Actions</th>
             </tr>
           </thead>
           <tbody class="bg-white">
             <tr v-if="loading" class="border-b border-black bg-gray-50">
-              <td colspan="5" class="px-4 py-8 text-center text-gray-500">Loading...</td>
+              <td :colspan="4 + (hasAnyRowAction ? 1 : 0)" class="px-4 py-8 text-center text-gray-500">Loading...</td>
             </tr>
             <tr v-else-if="!list.length" class="border-b border-black">
-              <td colspan="5" class="px-4 py-8 text-center text-gray-500">No verifiers found.</td>
+              <td :colspan="4 + (hasAnyRowAction ? 1 : 0)" class="px-4 py-8 text-center text-gray-500">No verifiers found.</td>
             </tr>
             <tr v-for="(row, idx) in list" :key="row.id" class="border-b border-black hover:bg-gray-50">
               <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ fromEntry + idx }}</td>
@@ -707,9 +719,10 @@ onMounted(() => load())
                 </template>
                 <span v-else>{{ row.remarks || '—' }}</span>
               </td>
-              <td class="px-4 py-3 text-right whitespace-nowrap">
+              <td v-if="hasAnyRowAction" class="px-4 py-3 text-right whitespace-nowrap">
                 <div class="flex items-center justify-end gap-1">
                   <button
+                    v-if="canViewAction"
                     type="button"
                     @click="openDetailModal(row)"
                     class="rounded px-2 py-1 text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100"
@@ -724,7 +737,6 @@ onMounted(() => load())
                   >
                     Delete
                   </button>
-                  <span v-if="!canDelete" class="text-gray-400 text-xs">—</span>
                 </div>
               </td>
             </tr>
@@ -930,7 +942,7 @@ onMounted(() => load())
               Close
             </button>
             <button
-              v-if="canAdd"
+              v-if="canEdit"
               type="button"
               class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 transition-colors"
               @click="openEditModal(selectedVerifier)"
