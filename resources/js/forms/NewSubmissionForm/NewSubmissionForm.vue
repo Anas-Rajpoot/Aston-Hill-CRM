@@ -118,8 +118,6 @@ function validateForm() {
   if (!form.value.company_name?.trim()) err.company_name = ['Company name is required.']
   if (!form.value.request_type?.trim()) err.request_type = ['Request type is required.']
   if (!form.value.manager_id) err.manager_id = ['Manager is required.']
-  if (!form.value.team_leader_id) err.team_leader_id = ['Team leader is required.']
-  if (!form.value.sales_agent_id) err.sales_agent_id = ['Sales agent is required.']
   return Object.keys(err).length ? err : null
 }
 
@@ -142,8 +140,8 @@ async function submit() {
     fd.append('complete_address', form.value.complete_address?.trim() || '')
     fd.append('special_instruction', form.value.special_instruction?.trim() || '')
     fd.append('manager_id', form.value.manager_id)
-    fd.append('team_leader_id', form.value.team_leader_id)
-    fd.append('sales_agent_id', form.value.sales_agent_id)
+    if (form.value.team_leader_id) fd.append('team_leader_id', form.value.team_leader_id)
+    if (form.value.sales_agent_id) fd.append('sales_agent_id', form.value.sales_agent_id)
     documentFiles.value.forEach((file) => { if (file) fd.append('documents[]', file) })
     await specialRequestsApi.store(fd)
     successMessage.value = 'Special request submitted successfully.'
@@ -237,7 +235,7 @@ const selectClass = (field) =>
           <p v-if="getError('manager_id')" class="mt-1 text-sm text-red-600">{{ getError('manager_id') }}</p>
         </div>
         <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700">Team Leader <span class="text-red-500">*</span></label>
+          <label class="mb-1 block text-sm font-medium text-gray-700">Team Leader</label>
           <select v-model="form.team_leader_id" :class="selectClass('team_leader_id')" @change="clearFieldError('team_leader_id')">
             <option value="">Select</option>
             <option v-for="t in filteredTeamLeaders" :key="t.id" :value="String(t.id)">{{ t.name }}</option>
@@ -245,7 +243,7 @@ const selectClass = (field) =>
           <p v-if="getError('team_leader_id')" class="mt-1 text-sm text-red-600">{{ getError('team_leader_id') }}</p>
         </div>
         <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700">Sales Agent <span class="text-red-500">*</span></label>
+          <label class="mb-1 block text-sm font-medium text-gray-700">Sales Agent</label>
           <select v-model="form.sales_agent_id" :class="selectClass('sales_agent_id')" @change="clearFieldError('sales_agent_id')">
             <option value="">Select</option>
             <option v-for="s in filteredSalesAgents" :key="s.id" :value="String(s.id)">{{ s.name }}</option>
