@@ -43,7 +43,7 @@ class LeadSubmission extends Model
     public function submit()
     {
         $this->update([
-            'status' => 'submitted',
+            'status' => 'unassigned',
             'submitted_at' => now(),
             'status_changed_at' => now(),
         ]);

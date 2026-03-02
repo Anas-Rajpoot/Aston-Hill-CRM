@@ -31,9 +31,11 @@ use Illuminate\Support\Facades\Route;
 | - Token: Bearer token in Authorization header (e.g. separate frontend deploy)
 */
 
-// ----- Public (cached 1h to reduce DB load) -----
+// ----- Public -----
 Route::get('/countries', function () {
-    return Cache::remember('api_countries', 3600, fn () => Country::where('is_active', true)->orderBy('name')->get(['id', 'name', 'code', 'timezone']));
+    return Country::where('is_active', true)
+        ->orderBy('name')
+        ->get(['id', 'name', 'code', 'timezone']);
 });
 Route::get('/password-policy', [\App\Http\Controllers\Api\ChangePasswordController::class, 'policy']);
 

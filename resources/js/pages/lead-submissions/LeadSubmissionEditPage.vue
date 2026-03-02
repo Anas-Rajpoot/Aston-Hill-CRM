@@ -216,7 +216,7 @@ async function loadLead() {
       team_leader_id: data.team_leader_id != null ? Number(data.team_leader_id) : null,
       manager_id: data.manager_id != null ? Number(data.manager_id) : null,
       executive_id: data.executive_id != null ? Number(data.executive_id) : null,
-      status: data.status ?? '',
+      status: data.status || 'unassigned',
       call_verification: data.call_verification ?? '',
       documents_verification: data.documents_verification ?? '',
       submission_date_from: data.submission_date_from ?? '',
