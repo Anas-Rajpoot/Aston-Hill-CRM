@@ -292,8 +292,6 @@ function validateRequired() {
   if (!(f.contact_number ?? '').toString().trim()) errs.contact_number = ['Contact number is required.']
   if (!(f.issue_description ?? '').toString().trim()) errs.issue_description = ['Issue description is required.']
   if (!f.manager_id || Number(f.manager_id) < 1) errs.manager_id = ['Please select a manager.']
-  if (!f.team_leader_id || Number(f.team_leader_id) < 1) errs.team_leader_id = ['Please select a team leader.']
-  if (!f.sales_agent_id || Number(f.sales_agent_id) < 1) errs.sales_agent_id = ['Please select a sales agent.']
   if (Object.keys(errs).length > 0) {
     setErrors({ response: { data: { errors: errs, message: 'Please correct the errors below.' } } })
     return false
@@ -486,7 +484,7 @@ onMounted(() => {
                 <p v-if="getError('manager_id')" class="mt-1 text-sm text-red-600">{{ getError('manager_id') }}</p>
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700">{{ teamLabels.team_leader }} <span class="text-red-500">*</span></label>
+                <label class="block text-sm font-medium text-gray-700">{{ teamLabels.team_leader }}</label>
                 <select v-model="form.team_leader_id" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
                   <option value="">Select {{ teamLabels.team_leader }}</option>
                   <option v-for="u in filteredTeamLeaders" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
@@ -494,7 +492,7 @@ onMounted(() => {
                 <p v-if="getError('team_leader_id')" class="mt-1 text-sm text-red-600">{{ getError('team_leader_id') }}</p>
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700">{{ teamLabels.sales_agent || 'Sales Agent' }} <span class="text-red-500">*</span></label>
+                <label class="block text-sm font-medium text-gray-700">{{ teamLabels.sales_agent || 'Sales Agent' }}</label>
                 <select v-model="form.sales_agent_id" class="mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="getError('sales_agent_id') ? 'border-red-500' : 'border-gray-300'">
                   <option value="">Select {{ teamLabels.sales_agent || 'Sales Agent' }}</option>
                   <option v-for="u in filteredSalesAgents" :key="u.id" :value="String(u.id)">{{ u.name }}</option>

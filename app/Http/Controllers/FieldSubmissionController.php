@@ -33,8 +33,8 @@ class FieldSubmissionController extends Controller
             'additional_notes' => ['nullable', 'string', 'max:2000'],
             'special_instruction' => ['nullable', 'string', 'max:2000'],
             'manager_id' => ['required', 'exists:users,id'],
-            'team_leader_id' => ['required', 'exists:users,id'],
-            'sales_agent_id' => ['required', 'exists:users,id'],
+            'team_leader_id' => ['nullable', 'exists:users,id'],
+            'sales_agent_id' => ['nullable', 'exists:users,id'],
         ], [
             'company_name.required' => 'Company name is required.',
             'contact_number.required' => 'Contact number is required.',
@@ -43,8 +43,6 @@ class FieldSubmissionController extends Controller
             'emirates.required' => 'Emirates is required.',
             'complete_address.required' => 'Complete address is required.',
             'manager_id.required' => 'Please select a manager.',
-            'team_leader_id.required' => 'Please select a team leader.',
-            'sales_agent_id.required' => 'Please select a sales agent.',
         ]);
 
         $fieldSubmission = $this->fieldSubmissionService->create($data, $request->user()->id);

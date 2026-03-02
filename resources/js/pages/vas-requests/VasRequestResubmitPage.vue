@@ -128,8 +128,6 @@ function validateForm() {
   if (!form.value.company_name?.trim()) err.company_name = ['Company name is required.']
   if (!form.value.description?.trim()) err.description = ['Request description is required.']
   if (!form.value.manager_id) err.manager_id = ['Please select a manager.']
-  if (!form.value.team_leader_id) err.team_leader_id = ['Please select a team leader.']
-  if (!form.value.sales_agent_id) err.sales_agent_id = ['Please select a sales agent.']
   return Object.keys(err).length > 0 ? err : null
 }
 
@@ -324,7 +322,7 @@ onMounted(() => load())
               <p v-if="getError('manager_id')" class="mt-1 text-xs text-red-600">{{ getError('manager_id') }}</p>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700">Team Leader <span class="text-red-500">*</span></label>
+              <label class="block text-sm font-medium text-gray-700">Team Leader</label>
               <select
                 v-model="form.team_leader_id"
                 required
@@ -337,7 +335,7 @@ onMounted(() => load())
               <p v-if="getError('team_leader_id')" class="mt-1 text-xs text-red-600">{{ getError('team_leader_id') }}</p>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700">Sales Agent <span class="text-red-500">*</span></label>
+              <label class="block text-sm font-medium text-gray-700">Sales Agent</label>
               <select
                 v-model="form.sales_agent_id"
                 required

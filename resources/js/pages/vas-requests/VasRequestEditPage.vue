@@ -318,8 +318,6 @@ function validateForm() {
   if (!form.value.company_name?.trim()) err.company_name = ['Company name is required.']
   if (!form.value.description?.trim()) err.description = ['Request description is required.']
   if (!form.value.manager_id) err.manager_id = ['Manager is required.']
-  if (!form.value.team_leader_id) err.team_leader_id = ['Team Leader is required.']
-  if (!form.value.sales_agent_id) err.sales_agent_id = ['Sales Agent is required.']
   if (!form.value.back_office_executive_id) err.back_office_executive_id = ['Executive Name is required.']
   if (!form.value.status?.trim()) err.status = ['Status is required.']
   return Object.keys(err).length ? err : null
@@ -504,7 +502,7 @@ onMounted(() => load())
               <p v-if="getError('manager_id')" class="mt-1 text-sm text-red-600">{{ getError('manager_id') }}</p>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700">Team Leader <span class="text-red-500">*</span></label>
+              <label class="block text-sm font-medium text-gray-700">Team Leader</label>
               <select
                 v-model="form.team_leader_id"
                 :class="selectClass('team_leader_id')"
@@ -516,7 +514,7 @@ onMounted(() => load())
               <p v-if="getError('team_leader_id')" class="mt-1 text-sm text-red-600">{{ getError('team_leader_id') }}</p>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700">Sales Agent <span class="text-red-500">*</span></label>
+              <label class="block text-sm font-medium text-gray-700">Sales Agent</label>
               <select
                 v-model="form.sales_agent_id"
                 :class="selectClass('sales_agent_id')"

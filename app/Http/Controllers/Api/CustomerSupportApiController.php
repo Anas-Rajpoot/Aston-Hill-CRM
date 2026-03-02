@@ -505,8 +505,8 @@ class CustomerSupportApiController extends Controller
             'contact_number' => ['sometimes', 'required', 'string', 'max:50'],
             'issue_description' => ['sometimes', 'required', 'string', 'max:5000'],
             'manager_id' => ['sometimes', 'required', 'integer', 'min:1', 'exists:users,id'],
-            'team_leader_id' => ['sometimes', 'required', 'integer', 'min:1', 'exists:users,id'],
-            'sales_agent_id' => ['sometimes', 'required', 'integer', 'min:1', 'exists:users,id'],
+            'team_leader_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'sales_agent_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'status' => ['sometimes', 'string', Rule::in(CustomerSupportSubmission::STATUSES)],
             'ticket_number' => ['sometimes', 'nullable', 'string', 'max:100'],
             'csr_name' => ['sometimes', 'nullable', 'string', 'max:255'],
@@ -526,10 +526,6 @@ class CustomerSupportApiController extends Controller
             'issue_description.required' => 'Issue description is required.',
             'manager_id.required' => 'Please select a manager.',
             'manager_id.min' => 'Please select a manager.',
-            'team_leader_id.required' => 'Please select a team leader.',
-            'team_leader_id.min' => 'Please select a team leader.',
-            'sales_agent_id.required' => 'Please select a sales agent.',
-            'sales_agent_id.min' => 'Please select a sales agent.',
         ];
 
         $data = $request->validate($rules, $messages);
@@ -544,12 +540,6 @@ class CustomerSupportApiController extends Controller
         if (! empty($data)) {
             if (isset($data['status']) && $data['status'] === 'submitted' && ! $customerSupportSubmission->submitted_at) {
                 $data['submitted_at'] = now();
-            }
-            // Do not set manager_id, team_leader_id, sales_agent_id to null (columns are NOT NULL)
-            foreach (['manager_id', 'team_leader_id', 'sales_agent_id'] as $key) {
-                if (array_key_exists($key, $data) && $data[$key] === null) {
-                    unset($data[$key]);
-                }
             }
             $customerSupportSubmission->update($data);
             // Update history is tracked by CustomerSupportSubmissionObserver -> customer_support_submission_audits
@@ -610,8 +600,8 @@ class CustomerSupportApiController extends Controller
             'contact_number' => ['required', 'string', 'max:50'],
             'issue_description' => ['required', 'string', 'max:5000'],
             'manager_id' => ['required', 'integer', 'exists:users,id'],
-            'team_leader_id' => ['required', 'integer', 'exists:users,id'],
-            'sales_agent_id' => ['required', 'integer', 'exists:users,id'],
+            'team_leader_id' => ['nullable', 'integer', 'exists:users,id'],
+            'sales_agent_id' => ['nullable', 'integer', 'exists:users,id'],
             'ticket_number' => ['nullable', 'string', 'max:100'],
             'csr_name' => ['nullable', 'string', 'max:255'],
             'workflow_status' => ['nullable', 'string'],

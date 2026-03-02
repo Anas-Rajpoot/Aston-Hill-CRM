@@ -86,8 +86,8 @@ class VasRequestController extends Controller
             'request_description' => ['required', 'string', 'max:5000'],
             'additional_notes' => ['nullable', 'string', 'max:2000'],
             'manager_id' => ['required', 'exists:users,id'],
-            'team_leader_id' => ['required', 'exists:users,id'],
-            'sales_agent_id' => ['required', 'exists:users,id'],
+            'team_leader_id' => ['nullable', 'exists:users,id'],
+            'sales_agent_id' => ['nullable', 'exists:users,id'],
         ], [
             'request_type.required' => 'Please select a request type.',
             'request_type.in' => 'Invalid request type.',
@@ -96,8 +96,6 @@ class VasRequestController extends Controller
             'company_name.required' => 'Company name is required.',
             'request_description.required' => 'Request description is required.',
             'manager_id.required' => 'Please select a manager.',
-            'team_leader_id.required' => 'Please select a team leader.',
-            'sales_agent_id.required' => 'Please select a sales agent.',
         ]);
 
         $payload = [
@@ -108,8 +106,8 @@ class VasRequestController extends Controller
             'description' => $data['request_description'],
             'additional_notes' => $data['additional_notes'] ?? null,
             'manager_id' => (int) $data['manager_id'],
-            'team_leader_id' => (int) $data['team_leader_id'],
-            'sales_agent_id' => (int) $data['sales_agent_id'],
+            'team_leader_id' => isset($data['team_leader_id']) ? (int) $data['team_leader_id'] : null,
+            'sales_agent_id' => isset($data['sales_agent_id']) ? (int) $data['sales_agent_id'] : null,
         ];
 
         $submission = $this->vasRequestService->create($payload, $request->user()->id);
@@ -295,8 +293,8 @@ class VasRequestController extends Controller
             'request_description' => ['nullable', 'string', 'max:5000'],
             'additional_notes' => ['nullable', 'string', 'max:2000'],
             'manager_id' => ['required', 'exists:users,id'],
-            'team_leader_id' => ['required', 'exists:users,id'],
-            'sales_agent_id' => ['required', 'exists:users,id'],
+            'team_leader_id' => ['nullable', 'exists:users,id'],
+            'sales_agent_id' => ['nullable', 'exists:users,id'],
             'back_office_executive_id' => ['nullable', 'exists:users,id'],
             'status' => ['nullable', 'string', Rule::in(VasRequestSubmission::STATUSES)],
         ]);
@@ -346,8 +344,8 @@ class VasRequestController extends Controller
             'company_name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
             'manager_id' => ['required', 'exists:users,id'],
-            'team_leader_id' => ['required', 'exists:users,id'],
-            'sales_agent_id' => ['required', 'exists:users,id'],
+            'team_leader_id' => ['nullable', 'exists:users,id'],
+            'sales_agent_id' => ['nullable', 'exists:users,id'],
             'back_office_executive_id' => ['nullable', 'exists:users,id'],
         ]);
 

@@ -204,8 +204,6 @@ function validateForm() {
   if (!form.value.company_name?.trim()) err.company_name = ['Company name is required.']
   if (!form.value.request_description?.trim()) err.request_description = ['Request description is required.']
   if (!form.value.manager_id) err.manager_id = [`${formatTeamLabel(teamLabels.value.manager || 'manager')} is required.`]
-  if (!form.value.team_leader_id) err.team_leader_id = [`${formatTeamLabel(teamLabels.value.team_leader || 'team_leader')} is required.`]
-  if (!form.value.sales_agent_id) err.sales_agent_id = [`${formatTeamLabel(teamLabels.value.sales_agent || 'sales_agent')} is required.`]
   return Object.keys(err).length ? err : null
 }
 
@@ -400,7 +398,7 @@ const selectClass = (field) =>
         </div>
         <div>
           <label class="mb-1 block text-sm font-medium text-gray-700">
-            {{ formatTeamLabel(teamLabels.team_leader || 'team_leader') }} <span class="text-red-500">*</span>
+            {{ formatTeamLabel(teamLabels.team_leader || 'team_leader') }}
           </label>
           <select
             v-model="form.team_leader_id"
@@ -414,7 +412,7 @@ const selectClass = (field) =>
         </div>
         <div>
           <label class="mb-1 block text-sm font-medium text-gray-700">
-            {{ formatTeamLabel(teamLabels.sales_agent || 'sales_agent') }} <span class="text-red-500">*</span>
+            {{ formatTeamLabel(teamLabels.sales_agent || 'sales_agent') }}
           </label>
           <select
             v-model="form.sales_agent_id"
