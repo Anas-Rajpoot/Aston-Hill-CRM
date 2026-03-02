@@ -612,6 +612,23 @@ const cancel = () => {
             />
             <p v-if="getError('quantity')" class="mt-1 text-sm text-red-600">{{ getError('quantity') }}</p>
           </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">.ae Domain</label>
+            <input
+              v-model="form.ae_domain"
+              type="text"
+              placeholder="Enter Domain (e.g. example.ae)"
+              :class="inputClass('ae_domain')"
+              @input="clearFieldError('ae_domain')"
+            />
+            <p v-if="getError('ae_domain')" class="mt-1 text-sm text-red-600">{{ getError('ae_domain') }}</p>
+            <p v-else-if="form.ae_domain?.trim() && aeDomainValidation.valid" class="mt-1 text-sm text-green-600">
+              {{ aeDomainValidation.message }}
+            </p>
+            <p v-else-if="form.ae_domain?.trim() && !aeDomainValidation.valid" class="mt-1 text-sm text-red-600">
+              {{ aeDomainValidation.message }}
+            </p>
+          </div>
         </div>
         <div class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div class="md:col-span-2 lg:col-span-3">
@@ -646,23 +663,6 @@ const cancel = () => {
               @input="clearFieldError('location_coordinates')"
             />
             <p v-if="errors?.location_coordinates" class="mt-1 text-xs text-red-600">{{ errors.location_coordinates[0] }}</p>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">.ae Domain</label>
-            <input
-              v-model="form.ae_domain"
-              type="text"
-              placeholder="Enter Domain (e.g. example.ae)"
-              :class="inputClass('ae_domain')"
-              @input="clearFieldError('ae_domain')"
-            />
-            <p v-if="getError('ae_domain')" class="mt-1 text-sm text-red-600">{{ getError('ae_domain') }}</p>
-            <p v-else-if="form.ae_domain?.trim() && aeDomainValidation.valid" class="mt-1 text-sm text-green-600">
-              {{ aeDomainValidation.message }}
-            </p>
-            <p v-else-if="form.ae_domain?.trim() && !aeDomainValidation.valid" class="mt-1 text-sm text-red-600">
-              {{ aeDomainValidation.message }}
-            </p>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">GAID</label>

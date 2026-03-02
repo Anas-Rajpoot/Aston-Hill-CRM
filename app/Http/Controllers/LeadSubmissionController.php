@@ -895,7 +895,7 @@ if ($request->expectsJson() || $request->ajax()) {
 
         // UPDATE existing row only (avoid INSERT / created_by error)
         $leadSubmission->update([
-            'status' => 'submitted',
+            'status' => 'unassigned',
             'submitted_at' => now(),
             'status_changed_at' => now(),
             'submission_type' => $leadSubmission->submission_type ?? 'new',
