@@ -44,7 +44,7 @@ import { toDdMonYyyyDash } from '@/lib/dateFormat'
 const props = defineProps({
   modelValue: { type: String, default: '' },
   inputClass: { type: String, default: '' },
-  placeholder: { type: String, default: 'dd-Mon-yyyy' },
+  placeholder: { type: String, default: 'DD-MMM-YYYY' },
   disabled: { type: Boolean, default: false },
 })
 

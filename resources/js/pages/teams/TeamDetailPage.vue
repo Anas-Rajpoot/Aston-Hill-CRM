@@ -9,6 +9,7 @@ import { useAuthStore } from '@/stores/auth'
 import teamsApi from '@/services/teamsApi'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Toast from '@/components/Toast.vue'
+import { formatUserDate } from '@/lib/dateFormat'
 
 const route = useRoute()
 const router = useRouter()
@@ -30,8 +31,7 @@ const deleteModal = ref({ visible: false, loading: false })
 
 function statusBadgeClass(s) { return s === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }
 function formatDate(d) {
-  if (!d) return '—'
-  try { return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) } catch { return '—' }
+  return formatUserDate(d, '—')
 }
 function initials(name) {
   if (!name) return '?'

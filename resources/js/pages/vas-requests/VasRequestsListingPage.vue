@@ -16,7 +16,7 @@ import AdvancedFilters from '@/components/vas-requests/AdvancedFilters.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import VasRequestTable from '@/components/vas-requests/VasRequestTable.vue'
 import AssignModal from '@/components/AssignModal.vue'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import DeleteOtpModal from '@/components/DeleteOtpModal.vue'
 import api from '@/lib/axios'
 import Toast from '@/components/Toast.vue'
 import RecordHistoryModal from '@/components/RecordHistoryModal.vue'
@@ -36,6 +36,36 @@ const showToast = ref(false)
 const toastType = ref('success')
 const toastMsg  = ref('')
 function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
+
+const deleteModalVisible = ref(false)
+const deleteLoading = ref(false)
+const deleteTarget = ref(null)
+
+function openDeleteModal(row) {
+  if (!row?.id) return
+  deleteTarget.value = row
+  deleteModalVisible.value = true
+}
+
+function closeDeleteModal() {
+  deleteModalVisible.value = false
+  deleteTarget.value = null
+}
+
+async function confirmDelete() {
+  if (!deleteTarget.value?.id || deleteLoading.value) return
+  deleteLoading.value = true
+  try {
+    await vasRequestsApi.destroy(deleteTarget.value.id)
+    closeDeleteModal()
+    toast('success', 'VAS request deleted successfully.')
+    await load()
+  } catch (e) {
+    toast('error', e?.response?.data?.message || 'Failed to delete VAS request.')
+  } finally {
+    deleteLoading.value = false
+  }
+}
 
 const historyModalVisible = ref(false)
 const historyRecordId = ref(null)
@@ -69,7 +99,7 @@ const meta = ref({ current_page: 1, last_page: 1, per_page: auth.defaultTablePag
 const perPageOptions = ref([10, 20, 25, 50, 100])
 const allColumns = ref([])
 const visibleColumns = ref([
-  'id', 'request_type', 'account_number', 'company_name', 'contact_number', 'description', 'additional_notes',
+  'id', 'created_at', 'request_type', 'account_number', 'contact_number', 'company_name', 'request_description', 'additional_notes',
   'manager', 'team_leader', 'sales_agent', 'executive', 'sla_timer', 'status', 'creator',
 ])
 const sort = ref('id')
@@ -121,12 +151,13 @@ function buildParams() {
 
 const COLUMN_LABELS = {
   id: 'ID',
-  created_at: 'Created',
+  created_at: 'Created At',
   request_type: 'Request Type',
   account_number: 'Account Number',
   company_name: 'Company Name',
   contact_number: 'Contact Number',
-  description: 'Description',
+  request_description: 'Request Description',
+  description: 'Request Description',
   additional_notes: 'Additional Notes',
   manager: 'Manager',
   team_leader: 'Team Leader',
@@ -134,7 +165,7 @@ const COLUMN_LABELS = {
   executive: 'Back Office Executive',
   sla_timer: 'SLA Timer',
   status: 'Status',
-  creator: 'Created By',
+  creator: 'Submitter Name',
 }
 
 function escapeCsv(val) {
@@ -340,10 +371,6 @@ const canBulkAssign = (() => {
 })()
 const canExport = () => canModuleAction(auth.user, 'vas', 'export')
 
-function goToResubmit(row) {
-  if (row?.id) router.push(`/vas-requests/${row.id}/resubmit`)
-}
-
 let _cachedBackOfficeOptions = null
 async function loadBackOfficeOptions() {
   if (_cachedBackOfficeOptions) return _cachedBackOfficeOptions
@@ -489,12 +516,22 @@ onMounted(async () => {
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-white py-6 px-4 sm:px-6">
     <div class="mx-auto max-w-7xl space-y-4">
-      <div class="flex flex-wrap items-center justify-between gap-4">
-        <div class="flex flex-wrap items-baseline gap-2">
-          <h1 class="text-xl font-semibold text-gray-900 leading-tight">VAS Requests</h1>
-          <Breadcrumbs />
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
+      <div
+        v-if="bulkAssignMessage"
+        class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"
+        role="alert"
+      >
+        {{ bulkAssignMessage }}
+      </div>
+
+      <FiltersBar
+        :filters="filters"
+        :filter-options="filterOptions"
+        :loading="loading"
+        @apply="applyFilters"
+        @reset="resetFilters"
+      >
+        <template #before-apply>
           <button
             v-if="canBulkAssign"
             type="button"
@@ -514,33 +551,16 @@ onMounted(async () => {
             :disabled="loading || exportLoading"
             @click="onExport"
           >
-          <svg v-if="exportLoading" class="mr-1.5 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-          </svg>
-          <svg v-else class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          {{ exportLoading ? 'Exporting...' : 'Export' }}
+            <svg v-if="exportLoading" class="mr-1.5 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            <svg v-else class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            {{ exportLoading ? 'Exporting...' : 'Export' }}
           </button>
-        </div>
-      </div>
-
-      <div
-        v-if="bulkAssignMessage"
-        class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"
-        role="alert"
-      >
-        {{ bulkAssignMessage }}
-      </div>
-
-      <FiltersBar
-        :filters="filters"
-        :filter-options="filterOptions"
-        :loading="loading"
-        @apply="applyFilters"
-        @reset="resetFilters"
-      >
+        </template>
         <template #after-reset>
           <button
             type="button"
@@ -595,7 +615,7 @@ onMounted(async () => {
           @update-cell="onUpdateCell"
           @open-assign="openAssignModal"
           @view-history="openHistoryModal"
-          @resubmit="goToResubmit"
+          @delete="openDeleteModal"
         />
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
           <p class="text-sm text-gray-600">
@@ -653,6 +673,15 @@ onMounted(async () => {
       module-name="VAS Requests"
       :fetch-fn="fetchVasAudits"
       @close="closeHistoryModal"
+    />
+
+    <DeleteOtpModal
+      :visible="deleteModalVisible"
+      title="Delete VAS Request"
+      :item-label="deleteTarget?.company_name || `VAS Request #${deleteTarget?.id ?? ''}`"
+      :loading="deleteLoading"
+      @close="closeDeleteModal"
+      @confirm="confirmDelete"
     />
 
     <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />

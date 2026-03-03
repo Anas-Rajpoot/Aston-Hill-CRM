@@ -59,6 +59,14 @@ class FieldSubmissionPolicy
         ]) && $this->view($user, $fieldSubmission);
     }
 
+    public function delete(User $user, FieldSubmission $fieldSubmission): bool
+    {
+        return RbacPermission::can($user, ['field-submissions', 'field_head'], 'delete', [
+            'field-submissions.delete',
+            'field_head.delete',
+        ]) && $this->view($user, $fieldSubmission);
+    }
+
     public function assignAny(User $user): bool
     {
         return self::hasFieldRole($user);

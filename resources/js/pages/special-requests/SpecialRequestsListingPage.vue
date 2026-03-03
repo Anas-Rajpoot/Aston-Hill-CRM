@@ -7,7 +7,7 @@ import FiltersBar from '@/components/vas-requests/FiltersBar.vue'
 import AdvancedFilters from '@/components/vas-requests/AdvancedFilters.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import SpecialRequestTable from '@/components/special-requests/SpecialRequestTable.vue'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import DeleteOtpModal from '@/components/DeleteOtpModal.vue'
 import api from '@/lib/axios'
 import Toast from '@/components/Toast.vue'
 import RecordHistoryModal from '@/components/RecordHistoryModal.vue'
@@ -26,6 +26,36 @@ const showToast = ref(false)
 const toastType = ref('success')
 const toastMsg = ref('')
 function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
+
+const deleteModalVisible = ref(false)
+const deleteLoading = ref(false)
+const deleteTarget = ref(null)
+
+function openDeleteModal(row) {
+  if (!row?.id) return
+  deleteTarget.value = row
+  deleteModalVisible.value = true
+}
+
+function closeDeleteModal() {
+  deleteModalVisible.value = false
+  deleteTarget.value = null
+}
+
+async function confirmDelete() {
+  if (!deleteTarget.value?.id || deleteLoading.value) return
+  deleteLoading.value = true
+  try {
+    await specialRequestsApi.destroy(deleteTarget.value.id)
+    closeDeleteModal()
+    toast('success', 'Special request deleted successfully.')
+    await load()
+  } catch (e) {
+    toast('error', e?.response?.data?.message || 'Failed to delete special request.')
+  } finally {
+    deleteLoading.value = false
+  }
+}
 
 const historyModalVisible = ref(false)
 const historyRecordId = ref(null)
@@ -59,8 +89,8 @@ const meta = ref({ current_page: 1, last_page: 1, per_page: auth.defaultTablePag
 const perPageOptions = ref([10, 20, 25, 50, 100])
 const allColumns = ref([])
 const visibleColumns = ref([
-  'created_at', 'company_name', 'account_number', 'request_type',
-  'complete_address', 'special_instruction', 'manager', 'team_leader', 'sales_agent', 'status', 'creator', 'updated_at',
+  'id', 'created_at', 'company_name', 'account_number', 'request_type', 'status',
+  'manager', 'team_leader', 'sales_agent', 'complete_address', 'special_instruction', 'creator', 'updated_at',
 ])
 const sort = ref('created_at')
 const order = ref('desc')
@@ -110,30 +140,29 @@ function buildParams() {
 }
 
 const COLUMN_LABELS = {
-  id: 'SR',
-  submitted_at: 'Submission Date',
-  created_at: 'Created',
+  id: 'ID',
+  submitted_at: 'Submitted At',
+  created_at: 'Created At',
   company_name: 'Company Name',
   account_number: 'Account Number',
   request_type: 'Request Type',
-  complete_address: 'Address',
+  complete_address: 'Complete Address',
   special_instruction: 'Special Instruction',
   sales_agent: 'Sales Agent',
   team_leader: 'Team Leader',
   manager: 'Manager',
   status: 'Status',
-  creator: 'Created By',
+  creator: 'Submitter Name',
   updated_at: 'Last Updated',
 }
 
 const COLUMN_ORDER = [
-  'created_at', 'company_name', 'account_number', 'request_type',
-  'complete_address', 'special_instruction', 'manager', 'team_leader',
-  'sales_agent', 'status', 'creator', 'updated_at',
+  'id', 'created_at', 'company_name', 'account_number', 'request_type', 'status',
+  'manager', 'team_leader', 'sales_agent', 'complete_address', 'special_instruction', 'creator', 'updated_at',
 ]
 
 function normalizeVisibleColumns(cols) {
-  const set = new Set((cols || []).filter((c) => c !== 'id' && c !== 'submitted_at'))
+  const set = new Set((cols || []).filter((c) => c !== 'submitted_at'))
   const ordered = COLUMN_ORDER.filter((c) => set.has(c))
   const extra = [...set].filter((c) => !COLUMN_ORDER.includes(c))
   return [...ordered, ...extra]
@@ -313,12 +342,8 @@ onMounted(async () => {
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-white py-6 px-4 sm:px-6">
     <div class="mx-auto max-w-7xl space-y-4">
-      <div class="flex flex-wrap items-center justify-between gap-4">
-        <div class="flex flex-wrap items-baseline gap-2">
-          <h1 class="text-xl font-semibold text-gray-900 leading-tight">Special Requests</h1>
-          <Breadcrumbs />
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
+      <FiltersBar :filters="filters" :filter-options="filterOptions" :loading="loading" @apply="applyFilters" @reset="resetFilters">
+        <template #before-apply>
           <button
             v-if="canExport()"
             type="button"
@@ -330,10 +355,7 @@ onMounted(async () => {
             <svg v-else class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
             {{ exportLoading ? 'Exporting...' : 'Export' }}
           </button>
-        </div>
-      </div>
-
-      <FiltersBar :filters="filters" :filter-options="filterOptions" :loading="loading" @apply="applyFilters" @reset="resetFilters">
+        </template>
         <template #after-reset>
           <button type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50" @click="advancedVisible = !advancedVisible">
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
@@ -364,6 +386,7 @@ onMounted(async () => {
           @sort="onSort"
           @update-cell="onUpdateCell"
           @view-history="openHistoryModal"
+          @delete="openDeleteModal"
         />
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
           <p class="text-sm text-gray-600">
@@ -390,6 +413,14 @@ onMounted(async () => {
 
     <ColumnCustomizerModal :visible="columnModalVisible" :all-columns="allColumns" :visible-columns="visibleColumns" @update:visible="columnModalVisible = $event" @save="onSaveColumns" />
     <RecordHistoryModal :visible="historyModalVisible" :record-id="historyRecordId" :record-label="historyRecordLabel" module-name="Special Requests" :fetch-fn="fetchAudits" @close="closeHistoryModal" />
+    <DeleteOtpModal
+      :visible="deleteModalVisible"
+      title="Delete Special Request"
+      :item-label="deleteTarget?.company_name || `Special Request #${deleteTarget?.id ?? ''}`"
+      :loading="deleteLoading"
+      @close="closeDeleteModal"
+      @confirm="confirmDelete"
+    />
     <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />
   </div>
 </template>

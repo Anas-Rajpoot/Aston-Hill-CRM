@@ -6,6 +6,7 @@
  * only the individual sub-fields that actually changed.
  */
 import { ref, watch, computed } from 'vue'
+import { formatSystemDateTime } from '@/lib/dateFormat'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -101,11 +102,7 @@ const COMMON_LABELS = {
 }
 
 function formatDateTime(iso) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  const pad = (n) => String(n).padStart(2, '0')
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  return `${pad(d.getDate())}-${months[d.getMonth()]}-${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  return formatSystemDateTime(iso, '—')
 }
 
 function prettyField(name, backendLabel) {

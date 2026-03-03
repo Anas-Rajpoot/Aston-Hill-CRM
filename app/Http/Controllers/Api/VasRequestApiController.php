@@ -18,6 +18,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Throwable;
@@ -29,7 +30,7 @@ class VasRequestApiController extends Controller
 
     private const ALLOWED_COLUMNS = [
         'id', 'created_at', 'created_by', 'updated_at', 'approved_at', 'rejected_at',
-        'request_type', 'account_number', 'contact_number', 'company_name', 'description', 'additional_notes',
+        'request_type', 'account_number', 'contact_number', 'company_name', 'request_description', 'description', 'additional_notes',
         'manager_id', 'team_leader_id', 'sales_agent_id', 'back_office_executive_id',
         'status', 'sla_timer',
     ];
@@ -238,7 +239,7 @@ class VasRequestApiController extends Controller
         }
 
         if ($cardFilter === 'pending') {
-            $query->whereIn('status', ['draft', 'submitted_under_process']);
+            $query->whereIn('status', ['draft', 'submitted_under_process', 'unassigned']);
         } elseif ($cardFilter === 'completed_today') {
             $todayStart = now()->startOfDay()->toDateTimeString();
             $todayEnd = now()->endOfDay()->toDateTimeString();
@@ -281,6 +282,7 @@ class VasRequestApiController extends Controller
             'contact_number' => "{$t}.contact_number",
             'company_name' => "{$t}.company_name",
             'description' => "{$t}.description",
+            'request_description' => "{$t}.description",
             'additional_notes' => "{$t}.additional_notes",
             'manager_id' => "{$t}.manager_id",
             'manager' => "{$t}.manager_id",
@@ -350,6 +352,10 @@ class VasRequestApiController extends Controller
             }
             if (in_array($col, ['created_at', 'approved_at', 'rejected_at', 'updated_at'], true)) {
                 $out[$col] = $row->$col ? $row->$col->format('d-M-Y H:i') : null;
+                continue;
+            }
+            if ($col === 'request_description') {
+                $out['request_description'] = $row->description ?? null;
                 continue;
             }
             $out[$col] = $row->$col ?? null;
@@ -528,6 +534,22 @@ class VasRequestApiController extends Controller
             'message' => 'Updated.',
             'row' => $row,
         ]);
+    }
+
+    public function destroy(Request $request, VasRequestSubmission $vasRequest): JsonResponse
+    {
+        $this->authorize('delete', $vasRequest);
+
+        $requestId = (int) $vasRequest->id;
+        $vasRequest->delete();
+
+        Storage::disk('public')->deleteDirectory("vas-requests/{$requestId}");
+
+        SystemAuditLog::record('vas_request.deleted', [
+            'vas_request_id' => $requestId,
+        ], null, $request->user()->id, 'vas_request', $requestId);
+
+        return response()->json(['message' => 'VAS request deleted.']);
     }
 
     /**

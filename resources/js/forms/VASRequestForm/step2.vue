@@ -272,7 +272,7 @@ async function goNext() {
 </script>
 
 <template>
-  <div class="space-y-8">
+  <div class="space-y-6">
     <div
       v-if="generalMessage || Object.keys(errors).length"
       class="rounded-lg border border-red-200 bg-red-50 p-4"
@@ -403,20 +403,26 @@ async function goNext() {
         </div>
       </div>
 
-      <!-- Actions: left = Back + Step 2, right = Save as Draft, Cancel, Next -->
+      <!-- Actions: left = Back + Cancel, right = Save as Draft + Next -->
       <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 pt-6">
         <div class="flex items-center gap-3">
           <button
             type="button"
             @click="emit('back')"
-            class="inline-flex items-center gap-2 rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-teal-600"
+            class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-green-700"
           >
             <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
             </svg>
             Back
           </button>
-          <span class="rounded-lg bg-[#121d2c] px-4 py-2.5 text-sm font-medium text-white shadow-sm">Step 2</span>
+          <button
+            type="button"
+            @click="emit('back')"
+            class="rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-green-700"
+          >
+            Cancel
+          </button>
         </div>
         <div class="flex flex-wrap items-center gap-3">
           <button
@@ -429,12 +435,6 @@ async function goNext() {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
             </svg>
             Save as Draft
-          </button>
-          <button
-            type="button"
-            class="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-teal-600"
-          >
-            Cancel
           </button>
           <button
             type="button"

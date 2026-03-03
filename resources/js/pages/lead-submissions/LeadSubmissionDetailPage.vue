@@ -8,7 +8,7 @@ import leadSubmissionsApi from '@/services/leadSubmissionsApi'
 import { useAuthStore } from '@/stores/auth'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import TruncatedText from '@/components/TruncatedText.vue'
-import { toDdMmYyyy } from '@/lib/dateFormat'
+import { formatUserDate, formatSystemDateTime } from '@/lib/dateFormat'
 
 const route = useRoute()
 const router = useRouter()
@@ -46,13 +46,7 @@ function displayVal(val) {
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 function formatDate(d) {
-  if (!d) return '—'
-  const date = new Date(d)
-  if (Number.isNaN(date.getTime())) return '—'
-  const day = String(date.getDate()).padStart(2, '0')
-  const mon = MONTH_NAMES[date.getMonth()]
-  const year = date.getFullYear()
-  return `${day}-${mon}-${year}`
+  return formatUserDate(d, '—')
 }
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?)?/
@@ -60,15 +54,7 @@ function formatAuditSingleValue(val) {
   if (val == null || val === '') return null
   const s = String(val)
   if (DATE_PATTERN.test(s)) {
-    const date = new Date(s)
-    if (!Number.isNaN(date.getTime())) {
-      const day = String(date.getDate()).padStart(2, '0')
-      const mon = MONTH_NAMES[date.getMonth()]
-      const year = date.getFullYear()
-      const h = String(date.getHours()).padStart(2, '0')
-      const m = String(date.getMinutes()).padStart(2, '0')
-      return `${day}-${mon}-${year} ${h}:${m}`
-    }
+    return formatSystemDateTime(s, s)
   }
   return s
 }
@@ -165,12 +151,7 @@ function formatAuditValue(val) {
 }
 
 function formatDateTime(d) {
-  if (!d) return '—'
-  const date = new Date(d)
-  if (Number.isNaN(date.getTime())) return '—'
-  const dateStr = date.toISOString().slice(0, 10)
-  const timeStr = date.toTimeString().slice(0, 5)
-  return `${toDdMmYyyy(dateStr) || ''} ${timeStr}`.trim() || '—'
+  return formatSystemDateTime(d, '—')
 }
 
 function submissionDateDisplay(l) {
@@ -331,21 +312,30 @@ onMounted(() => {
             <!-- Primary Information -->
             <section class="mb-6">
               <h2 class="mb-3 text-sm font-semibold text-gray-900">Primary Information</h2>
-              <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-4">
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">ID</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.id) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Request Type</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.submission_type) }}</div>
+                </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Account Number</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.account_number) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Company Name as per Trade License</label>
+                  <label class="block text-xs font-medium text-gray-500">Company Name as per Trade License <span class="text-red-500">*</span></label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.company_name) }}</div>
                 </div>
+
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Authorized Signatory Name</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.authorized_signatory_name) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Contact Number</label>
+                  <label class="block text-xs font-medium text-gray-500">Contact Number <span class="text-red-500">*</span></label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.contact_number_gsm) }}</div>
                 </div>
                 <div>
@@ -356,13 +346,27 @@ onMounted(() => {
                   <label class="block text-xs font-medium text-gray-500">Email ID</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.email) }}</div>
                 </div>
+
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Product</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.product) }}</div>
+                  <label class="block text-xs font-medium text-gray-500">.ae Domain</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.ae_domain) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Offer</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.offer) }}</div>
+                  <label class="block text-xs font-medium text-gray-500">GAID</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.gaid) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Service Category</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ categoryDisplay(lead) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Service Type</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ typeNameDisplay(lead) }}</div>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Product <span class="text-red-500">*</span></label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.product) }}</div>
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500">MRC (AED)</label>
@@ -373,95 +377,58 @@ onMounted(() => {
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.quantity) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Emirates</label>
+                  <label class="block text-xs font-medium text-gray-500">Offer</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.offer) }}</div>
+                </div>
+
+                <div class="sm:col-span-2">
+                  <label class="block text-xs font-medium text-gray-500">Complete Address as per Ejari <span class="text-red-500">*</span></label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 whitespace-pre-wrap">{{ displayVal(lead.address) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Emirates <span class="text-red-500">*</span></label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.emirate) }}</div>
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Location Coordinates</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.location_coordinates) }}</div>
                 </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">Status</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ formatStatus(lead.status) }}</div>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">Submission Date</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ submissionDateDisplay(lead) }}</div>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">Request Type</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.submission_type) }}</div>
-                </div>
-                <div class="sm:col-span-2">
-                  <label class="block text-xs font-medium text-gray-500">Complete Address as per Ejari</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.address) }}</div>
-                </div>
               </div>
             </section>
 
-            <!-- Service Details -->
+            <!-- Team Information -->
             <section class="mb-6">
-              <h2 class="mb-3 text-sm font-semibold text-gray-900">Service Details</h2>
-              <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <h2 class="mb-3 text-sm font-semibold text-gray-900">Team Information</h2>
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-4">
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Service Category</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ categoryDisplay(lead) }}</div>
+                  <label class="block text-xs font-medium text-gray-500">Submitter Name</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.creator_name) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Service Type</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ typeNameDisplay(lead) }}</div>
-                </div>
-              </div>
-            </section>
-
-            <!-- Commercial -->
-            <section class="mb-6">
-              <h2 class="mb-3 text-sm font-semibold text-gray-900">Commercial</h2>
-              <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">AE Domain</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.ae_domain) }}</div>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">GAID</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.gaid) }}</div>
-                </div>
-                <div class="sm:col-span-2">
-                  <label class="block text-xs font-medium text-gray-500">Remarks</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.remarks) }}</div>
-                </div>
-              </div>
-            </section>
-
-            <!-- Team & Status -->
-            <section class="mb-6">
-              <h2 class="mb-3 text-sm font-semibold text-gray-900">Team & Status</h2>
-              <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">Sales Agent</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.sales_agent_name) }}</div>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">Team Leader</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.team_leader_name) }}</div>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">Manager</label>
+                  <label class="block text-xs font-medium text-gray-500">Manager Name</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.manager_name) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Created By</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.creator_name) }}</div>
+                  <label class="block text-xs font-medium text-gray-500">Team Leader Name</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.team_leader_name) }}</div>
                 </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Sales Agent Name</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.sales_agent_name) }}</div>
+                </div>
+              </div>
+              <div class="mt-3">
+                <label class="block text-xs font-medium text-gray-500">Comment / Remarks</label>
+                <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 whitespace-pre-wrap">{{ displayVal(lead.remarks) }}</div>
               </div>
             </section>
 
             <!-- Back Office / Edit form fields -->
             <section class="mb-6">
-              <h2 class="mb-3 text-sm font-semibold text-gray-900">Back Office Details</h2>
+              <h2 class="mb-3 text-sm font-semibold text-gray-900">Back Office Working Section</h2>
               <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Back Office</label>
+                  <label class="block text-xs font-medium text-gray-500">Back Office Executive</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.executive_name) }}</div>
                 </div>
                 <div>
@@ -582,7 +549,7 @@ onMounted(() => {
                   </div>
                   <button
                     type="button"
-                    class="shrink-0 rounded p-1.5 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                    class="shrink-0 rounded p-1.5 text-green-700 hover:bg-green-50 hover:text-green-800"
                     title="Download"
                     @click="downloadDoc(doc)"
                   >

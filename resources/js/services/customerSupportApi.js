@@ -4,9 +4,21 @@ let _csrOptionsCache = null
 let _csrOptionsCacheAt = 0
 const CSR_OPTIONS_TTL_MS = 5 * 60 * 1000
 
+let _teamOptionsCache = null
+let _teamOptionsCacheAt = 0
+const TEAM_OPTIONS_TTL_MS = 2 * 60 * 1000
+
 export default {
-  getTeamOptions() {
-    return api.get('/customer-support/team-options')
+  getTeamOptions(forceRefresh = false) {
+    if (!forceRefresh && _teamOptionsCache && Date.now() - _teamOptionsCacheAt < TEAM_OPTIONS_TTL_MS) {
+      return Promise.resolve(_teamOptionsCache)
+    }
+    const req = api.get('/customer-support/team-options')
+    req.then((res) => {
+      _teamOptionsCache = res
+      _teamOptionsCacheAt = Date.now()
+    })
+    return req
   },
 
   async index(params = {}, options = {}) {
@@ -102,6 +114,11 @@ export default {
     const { data } = await api.patch(`/customer-support/${submissionId}/assign-csr`, {
       csr_id: csrId,
     })
+    return data
+  },
+
+  async destroy(submissionId) {
+    const { data } = await api.delete(`/customer-support/${submissionId}`)
     return data
   },
 

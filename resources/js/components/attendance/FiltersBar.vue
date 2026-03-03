@@ -3,6 +3,8 @@
  * Attendance Log filters bar – Employee, Role only; Apply, Reset; slot for Advanced Filters + Customize Columns.
  * From, To, Status are in Advanced Filters (see AttendanceLogPage).
  */
+import HorizontalScrollToolbar from '@/components/common/HorizontalScrollToolbar.vue'
+
 defineProps({
   filters: { type: Object, required: true },
   filterOptions: {
@@ -16,7 +18,8 @@ const emit = defineEmits(['apply', 'reset'])
 </script>
 
 <template>
-  <div class="flex items-end gap-2 overflow-x-auto rounded-lg border border-gray-200 bg-white px-3 py-3">
+  <div class="rounded-lg border border-gray-200 bg-white px-2 py-2">
+    <HorizontalScrollToolbar>
     <div class="shrink-0">
       <label class="block text-xs font-medium text-gray-600">Employee</label>
       <select
@@ -28,7 +31,7 @@ const emit = defineEmits(['apply', 'reset'])
         <option v-for="u in filterOptions.users" :key="u.id" :value="u.id">{{ u.name }}</option>
       </select>
     </div>
-    <div class="shrink-0">
+    <div class="shrink-0 ml-2">
       <label class="block text-xs font-medium text-gray-600">Role</label>
       <select
         v-model="filters.role"
@@ -61,5 +64,6 @@ const emit = defineEmits(['apply', 'reset'])
       </button>
       <slot name="after-reset" />
     </div>
+    </HorizontalScrollToolbar>
   </div>
 </template>

@@ -4,9 +4,21 @@ let _fieldAgentOptionsCache = null
 let _fieldAgentOptionsCacheAt = 0
 const FIELD_AGENT_OPTIONS_TTL_MS = 5 * 60 * 1000
 
+let _teamOptionsCache = null
+let _teamOptionsCacheAt = 0
+const TEAM_OPTIONS_TTL_MS = 2 * 60 * 1000
+
 export default {
-  getTeamOptions() {
-    return api.get('/field-submissions/team-options')
+  getTeamOptions(forceRefresh = false) {
+    if (!forceRefresh && _teamOptionsCache && Date.now() - _teamOptionsCacheAt < TEAM_OPTIONS_TTL_MS) {
+      return Promise.resolve(_teamOptionsCache)
+    }
+    const req = api.get('/field-submissions/team-options')
+    req.then((res) => {
+      _teamOptionsCache = res
+      _teamOptionsCacheAt = Date.now()
+    })
+    return req
   },
   store(data, submit = true) {
     return api.post('/field-submissions', { ...data, submit })
@@ -38,6 +50,11 @@ export default {
   /** Partial update for listing inline edits. Payload: e.g. { company_name: 'x' }, { manager_id: 5 }. */
   async updateSubmissionFields(fieldSubmissionId, payload) {
     const { data } = await api.patch(`/field-submissions/${fieldSubmissionId}`, payload)
+    return data
+  },
+  
+  async destroy(id) {
+    const { data } = await api.delete(`/field-submissions/${id}`)
     return data
   },
 

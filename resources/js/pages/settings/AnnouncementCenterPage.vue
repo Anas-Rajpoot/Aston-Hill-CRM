@@ -13,6 +13,7 @@ import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Toast from '@/components/Toast.vue'
 import SkeletonBox from '@/components/skeletons/SkeletonBox.vue'
 import AnnouncementFormModal from '@/components/announcements/AnnouncementFormModal.vue'
+import { formatUserDate } from '@/lib/dateFormat'
 
 const router = useRouter()
 
@@ -250,8 +251,7 @@ function onSaved() {
 
 // ═══ Helpers ══════════════════════════════════════════════
 function fmtDate(iso) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+  return formatUserDate(iso, '—')
 }
 function statusBadge(s) {
   const map = {

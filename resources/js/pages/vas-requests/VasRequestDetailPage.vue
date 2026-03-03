@@ -8,6 +8,7 @@ import vasRequestsApi from '@/services/vasRequestsApi'
 import { useAuthStore } from '@/stores/auth'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import TruncatedText from '@/components/TruncatedText.vue'
+import { formatUserDate, formatSystemDateTime } from '@/lib/dateFormat'
 
 const route = useRoute()
 const router = useRouter()
@@ -48,25 +49,11 @@ function displayVal(val) {
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 function formatDate(d) {
-  if (!d) return '—'
-  const date = new Date(d)
-  if (Number.isNaN(date.getTime())) return '—'
-  const day = String(date.getDate()).padStart(2, '0')
-  const mon = MONTH_NAMES[date.getMonth()]
-  const year = date.getFullYear()
-  return `${day}-${mon}-${year}`
+  return formatUserDate(d, '—')
 }
 
 function formatDateTime(d) {
-  if (!d) return '—'
-  const date = new Date(d)
-  if (Number.isNaN(date.getTime())) return '—'
-  const day = String(date.getDate()).padStart(2, '0')
-  const mon = MONTH_NAMES[date.getMonth()]
-  const year = date.getFullYear()
-  const h = String(date.getHours()).padStart(2, '0')
-  const m = String(date.getMinutes()).padStart(2, '0')
-  return `${day}-${mon}-${year} ${h}:${m}`
+  return formatSystemDateTime(d, '—')
 }
 
 function formatStatus(status) {
@@ -132,15 +119,7 @@ function formatAuditSingleValue(val) {
   if (val == null || val === '') return null
   const s = String(val)
   if (DATE_PATTERN.test(s)) {
-    const date = new Date(s)
-    if (!Number.isNaN(date.getTime())) {
-      const day = String(date.getDate()).padStart(2, '0')
-      const mon = MONTH_NAMES[date.getMonth()]
-      const year = date.getFullYear()
-      const h = String(date.getHours()).padStart(2, '0')
-      const m = String(date.getMinutes()).padStart(2, '0')
-      return `${day}-${mon}-${year} ${h}:${m}`
-    }
+    return formatSystemDateTime(s, s)
   }
   return s
 }
@@ -186,6 +165,7 @@ const FIELD_LABELS = {
   account_number: 'Account Number',
   contact_number: 'Contact Number',
   request_type: 'Request Type',
+  request_description: 'Request Description',
   description: 'Description',
   additional_notes: 'Additional Notes',
   status: 'Status',
@@ -277,16 +257,16 @@ onMounted(() => {
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.request_type) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Company Name as per Trade License</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.company_name) }}</div>
-                </div>
-                <div>
                   <label class="block text-xs font-medium text-gray-500">Account Number</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.account_number) }}</div>
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Contact Number</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.contact_number) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Company Name as per Trade License</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.company_name) }}</div>
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Status</label>
@@ -300,7 +280,7 @@ onMounted(() => {
               <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Request Description</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 whitespace-pre-wrap">{{ displayVal(request.description) }}</div>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 whitespace-pre-wrap">{{ displayVal(request.request_description) }}</div>
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Additional Notes</label>
@@ -332,18 +312,29 @@ onMounted(() => {
               </div>
             </section>
 
-            <!-- Additional Information -->
             <section class="mb-6">
-              <h2 class="mb-3 text-sm font-semibold text-gray-900">Additional Information</h2>
+              <h2 class="mb-3 text-sm font-semibold text-gray-900">Back Office Working Section</h2>
               <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Created By</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.creator_name) }}</div>
+                  <label class="block text-xs font-medium text-gray-500">Back Office Executive</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.back_office_executive_name) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Creator Role</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ formatStatus(request.creator_role) }}</div>
+                  <label class="block text-xs font-medium text-gray-500">Submission Date</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ formatDate(request.submitted_at || request.created_at) }}</div>
                 </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Activity</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 whitespace-pre-wrap">{{ displayVal(request.activity) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Completion Date</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ formatDate(request.completion_date || request.approved_at) }}</div>
+                </div>
+              </div>
+              <div class="mt-3">
+                <label class="block text-xs font-medium text-gray-500">Remarks</label>
+                <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 whitespace-pre-wrap">{{ displayVal(request.remarks) }}</div>
               </div>
             </section>
 

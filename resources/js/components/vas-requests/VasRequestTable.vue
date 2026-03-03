@@ -29,12 +29,13 @@ const props = defineProps({
   selectedIds: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['sort', 'updateCell', 'openAssign', 'update:selectedIds', 'viewHistory', 'resubmit'])
+const emit = defineEmits(['sort', 'updateCell', 'openAssign', 'update:selectedIds', 'viewHistory', 'delete'])
 
 const auth = useAuthStore()
 const canViewAction = computed(() => canModuleAction(auth.user, 'vas', 'view'))
 const canEditAction = computed(() => canModuleAction(auth.user, 'vas', 'edit'))
 const canHistoryAction = computed(() => canViewAction.value)
+const canDeleteAction = computed(() => canModuleAction(auth.user, 'vas', 'delete'))
 const canInlineEdit = computed(() => {
   if (canEditAction.value) return true
   const roles = auth.user?.roles ?? []
@@ -57,13 +58,14 @@ function rowNumber(index) {
 }
 
 const columnLabels = {
-  id: 'SR',
-  created_at: 'Created',
+  id: 'ID',
+  created_at: 'Created At',
   updated_at: 'Last Updated',
   request_type: 'Request Type',
   account_number: 'Account Number',
   company_name: 'Company Name',
-  description: 'Description',
+  description: 'Request Description',
+  request_description: 'Request Description',
   additional_notes: 'Additional Notes',
   contact_number: 'Contact Number',
   manager: 'Manager',
@@ -74,7 +76,7 @@ const columnLabels = {
   status: 'Status',
   approved_at: 'Completion Date',
   rejected_at: 'Rejected Date',
-  creator: 'Created By',
+  creator: 'Submitter Name',
 }
 
 const SORTABLE_COLUMNS = [
@@ -265,7 +267,7 @@ function isEditing(rowId, col) {
   return editingCell.value && editingCell.value.rowId === rowId && editingCell.value.col === col
 }
 
-const hasAnyRowAction = computed(() => canViewAction.value || canEditAction.value || canHistoryAction.value)
+const hasAnyRowAction = computed(() => canViewAction.value || canEditAction.value || canHistoryAction.value || canDeleteAction.value)
 
 const STATUS_BADGES = {
   draft: 'bg-gray-100 text-gray-700',
@@ -516,14 +518,12 @@ function formatStatus(status) {
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </button>
+                <button v-if="canDeleteAction" type="button" class="rounded-full p-1.5 text-red-600 hover:bg-red-50" title="Delete" @click="$emit('delete', row)">
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+                  </svg>
+                </button>
               </div>
-              <router-link
-                v-if="canEditAction && row.status !== 'approved'"
-                :to="`/vas-requests/${row.id}/resubmit`"
-                class="rounded bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700"
-              >
-                Resubmit
-              </router-link>
             </div>
           </td>
         </tr>

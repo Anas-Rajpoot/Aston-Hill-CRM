@@ -4,6 +4,7 @@ import api from '@/services/customerSupportApi'
 import { useFormErrors } from '@/composables/useFormErrors'
 import { formatTeamLabel } from '@/composables/useTeamLabel'
 import { useSessionFormState } from '@/composables/useSessionFormState'
+import { useAuthStore } from '@/stores/auth'
 
 const ISSUE_CATEGORIES = [
   'Internet / Landline Issues',
@@ -22,6 +23,7 @@ const form = ref({
   company_name: '',
   account_number: '',
   contact_number: '',
+  alternate_contact_number: '',
   issue_description: '',
   attachment_1: null,
   attachment_2: null,
@@ -38,33 +40,119 @@ const teamLeaders = ref([])
 const salesAgents = ref([])
 const settingFromChild = ref(false)
 const settingFromSalesAgent = ref(false)
+const auth = useAuthStore()
 const teamLabels = ref({
   manager: 'Manager Name',
   team_leader: 'Team Leader Name',
   sales_agent: 'Sales Agent Name',
 })
+const teamSectionCollapsed = ref(false)
 const loading = ref(true)
 const submitting = ref(false)
+const savingDraft = ref(false)
 const successMessage = ref('')
 const fileInput1 = ref(null)
 const fileInput2 = ref(null)
 const errorSummaryRef = ref(null)
 /** Public URL for submit icon (in public/images/) – use bound :src so Vite does not try to import */
 const submitRequestIconUrl = '/images/submit-request-icon.png'
+const currentSubmitterName = computed(() => auth.user?.name || '-')
 
 const { errors, generalMessage, setErrors, clearErrors, clearFieldError, getError } = useFormErrors()
+
+const pickFirstValue = (obj, keys) => {
+  for (const key of keys) {
+    const value = obj?.[key]
+    if (value != null && value !== '') return String(value)
+  }
+  return ''
+}
+
+const resolveTeamLeaderManagerId = (teamLeader) => {
+  const direct = pickFirstValue(teamLeader, ['manager_id', 'managerId'])
+  if (direct) return direct
+  const reportsTo = pickFirstValue(teamLeader, ['reports_to', 'reportsTo'])
+  if (reportsTo && managers.value.some((m) => String(m.id) === reportsTo)) return reportsTo
+  return ''
+}
 
 const filteredTeamLeaders = computed(() => {
   const mid = form.value.manager_id
   if (!mid) return teamLeaders.value
-  return teamLeaders.value.filter((t) => String(t.manager_id) === String(mid))
+  return teamLeaders.value.filter((t) => resolveTeamLeaderManagerId(t) === String(mid))
 })
 
 const filteredSalesAgents = computed(() => {
   const tlId = form.value.team_leader_id
-  if (!tlId) return salesAgents.value
-  return salesAgents.value.filter((sa) => String(sa.team_leader_id) === String(tlId))
+  const managerId = form.value.manager_id
+  const teamLeaderIdsUnderManager = new Set(
+    teamLeaders.value
+      .filter((t) => managerId && resolveTeamLeaderManagerId(t) === String(managerId))
+      .map((t) => String(t.id))
+  )
+
+  const resolveSalesAgentTeamLeaderId = (salesAgent) => {
+    const direct = pickFirstValue(salesAgent, ['team_leader_id', 'teamLeaderId'])
+    const reportsTo = pickFirstValue(salesAgent, ['reports_to', 'reportsTo'])
+    if (direct) return direct
+    if (reportsTo) {
+      const asTeamLeader = teamLeaders.value.some((t) => String(t.id) === String(reportsTo))
+      if (asTeamLeader) return String(reportsTo)
+    }
+    return ''
+  }
+
+  const resolveSalesAgentManagerId = (salesAgent) => {
+    const direct = pickFirstValue(salesAgent, ['manager_id', 'managerId'])
+    const reportsTo = pickFirstValue(salesAgent, ['reports_to', 'reportsTo'])
+    if (direct) return direct
+    if (reportsTo) {
+      const asManager = managers.value.some((m) => String(m.id) === String(reportsTo))
+      if (asManager) return String(reportsTo)
+    }
+    const teamLeaderIdFromAgent = resolveSalesAgentTeamLeaderId(salesAgent)
+    if (teamLeaderIdFromAgent) {
+      const teamLeader = teamLeaders.value.find((t) => String(t.id) === String(teamLeaderIdFromAgent))
+      const managerIdFromLeader = resolveTeamLeaderManagerId(teamLeader)
+      if (managerIdFromLeader) return managerIdFromLeader
+    }
+    return ''
+  }
+
+  if (tlId) {
+    return salesAgents.value.filter((salesAgent) => resolveSalesAgentTeamLeaderId(salesAgent) === String(tlId))
+  }
+  if (managerId) {
+    return salesAgents.value.filter((salesAgent) => {
+      const resolvedManagerId = resolveSalesAgentManagerId(salesAgent)
+      const resolvedTeamLeaderId = resolveSalesAgentTeamLeaderId(salesAgent)
+      return resolvedManagerId === String(managerId) || teamLeaderIdsUnderManager.has(resolvedTeamLeaderId)
+    })
+  }
+  return salesAgents.value
 })
+
+const deriveSalesHierarchy = (salesAgent) => {
+  let teamLeaderId = pickFirstValue(salesAgent, ['team_leader_id', 'teamLeaderId'])
+  let managerId = pickFirstValue(salesAgent, ['manager_id', 'managerId'])
+  const reportsTo = pickFirstValue(salesAgent, ['reports_to', 'reportsTo'])
+
+  if (!teamLeaderId && reportsTo && teamLeaders.value.some((u) => String(u.id) === reportsTo)) {
+    teamLeaderId = reportsTo
+  }
+  if (!managerId && reportsTo && managers.value.some((u) => String(u.id) === reportsTo)) {
+    managerId = reportsTo
+  }
+  if (!managerId && teamLeaderId) {
+    const teamLeader = teamLeaders.value.find((u) => String(u.id) === String(teamLeaderId))
+    managerId = resolveTeamLeaderManagerId(teamLeader)
+  }
+  if (!teamLeaderId && managerId) {
+    const leaders = teamLeaders.value.filter((u) => resolveTeamLeaderManagerId(u) === String(managerId))
+    if (leaders.length === 1) teamLeaderId = String(leaders[0].id)
+  }
+  return { teamLeaderId, managerId }
+}
 
 watch(
   () => form.value.manager_id,
@@ -83,14 +171,15 @@ watch(
   (id) => {
     if (id) {
       const tl = teamLeaders.value.find((u) => String(u.id) === String(id))
-      if (tl?.manager_id != null) {
+      const managerId = resolveTeamLeaderManagerId(tl)
+      if (managerId) {
         settingFromChild.value = true
-        form.value.manager_id = String(tl.manager_id)
+        form.value.manager_id = String(managerId)
         nextTick(() => { settingFromChild.value = false })
       }
       if (!settingFromSalesAgent.value) form.value.sales_agent_id = ''
-    } else {
-      form.value.manager_id = ''
+    } else if (!settingFromSalesAgent.value) {
+      form.value.sales_agent_id = ''
     }
   }
 )
@@ -101,18 +190,16 @@ watch(
     if (id) {
       const sa = salesAgents.value.find((u) => String(u.id) === String(id))
       if (sa) {
+        const resolved = deriveSalesHierarchy(sa)
         settingFromSalesAgent.value = true
         settingFromChild.value = true
-        if (sa.team_leader_id != null) form.value.team_leader_id = String(sa.team_leader_id)
-        if (sa.manager_id != null) form.value.manager_id = String(sa.manager_id)
+        if (resolved.teamLeaderId) form.value.team_leader_id = resolved.teamLeaderId
+        if (resolved.managerId) form.value.manager_id = resolved.managerId
         nextTick(() => {
           settingFromSalesAgent.value = false
           settingFromChild.value = false
         })
       }
-    } else {
-      form.value.team_leader_id = ''
-      form.value.manager_id = ''
     }
   }
 )
@@ -120,7 +207,8 @@ watch(
 onMounted(async () => {
   loading.value = true
   try {
-    const { data } = await api.getTeamOptions()
+    await auth.fetchUser()
+    const { data } = await api.getTeamOptions(true)
     managers.value = data.managers || []
     teamLeaders.value = data.team_leaders || []
     salesAgents.value = data.sales_agents || []
@@ -145,6 +233,7 @@ function buildPayload() {
     company_name: f.company_name?.trim() ?? '',
     account_number: f.account_number?.trim() ?? '',
     contact_number: f.contact_number?.trim() ?? '',
+    alternate_contact_number: f.alternate_contact_number?.trim() ?? '',
     issue_description: f.issue_description?.trim() ?? '',
     attachment_1: f.attachment_1 instanceof File ? f.attachment_1 : null,
     attachment_2: f.attachment_2 instanceof File ? f.attachment_2 : null,
@@ -211,7 +300,7 @@ async function submit() {
       return
     }
     await api.store(payload, true)
-    successMessage.value = 'Request submitted successfully.'
+    successMessage.value = 'Your customer support request has been submitted successfully. Back Office will review and process.'
     nextTick(() => {
       window.scrollTo(0, 0)
       document.documentElement.scrollTop = 0
@@ -223,6 +312,7 @@ async function submit() {
       company_name: '',
       account_number: '',
       contact_number: '',
+      alternate_contact_number: '',
       issue_description: '',
       attachment_1: null,
       attachment_2: null,
@@ -242,6 +332,29 @@ async function submit() {
   }
 }
 
+async function saveDraft() {
+  clearErrors()
+  const frontendErrors = validateForm()
+  if (frontendErrors) {
+    errors.value = frontendErrors
+    generalMessage.value = 'Please correct the errors below.'
+    nextTick(() => errorSummaryRef.value?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }))
+    return
+  }
+  savingDraft.value = true
+  try {
+    const payload = buildPayload()
+    await api.store(payload, false)
+  } catch (e) {
+    setErrors(e)
+    nextTick(() => {
+      errorSummaryRef.value?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+    })
+  } finally {
+    savingDraft.value = false
+  }
+}
+
 function cancel() {
   clearState()
   form.value = {
@@ -249,6 +362,7 @@ function cancel() {
     company_name: '',
     account_number: '',
     contact_number: '',
+    alternate_contact_number: '',
     issue_description: '',
     attachment_1: null,
     attachment_2: null,
@@ -299,7 +413,7 @@ const selectClass = (field) =>
       <svg class="mx-auto mb-3 h-12 w-12 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
-      <h3 class="text-lg font-semibold text-green-800">Request Submitted</h3>
+      <h3 class="text-lg font-semibold text-green-800">Customer support submission completed</h3>
       <p class="mt-1 text-sm text-green-600">{{ successMessage }}</p>
       <p class="mt-3 text-sm text-gray-600">Click the button below to start a new customer support request.</p>
       <button
@@ -311,7 +425,7 @@ const selectClass = (field) =>
       </button>
     </div>
 
-    <form v-if="!successMessage" @submit.prevent="submit" class="space-y-8">
+    <form v-if="!successMessage" @submit.prevent="submit" class="space-y-6">
       <div
         ref="errorSummaryRef"
         v-if="generalMessage || Object.keys(errors).length"
@@ -328,33 +442,7 @@ const selectClass = (field) =>
         <h3 class="text-base font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">
           Primary Information
         </h3>
-        <div>
-          <label class="mb-2 block text-sm font-medium text-gray-700">
-            Issue Category <span class="text-red-500">*</span>
-          </label>
-          <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3">
-            <label
-              v-for="cat in ISSUE_CATEGORIES"
-              :key="cat"
-              class="flex cursor-pointer items-center rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-700 transition hover:border-green-400 hover:bg-gray-50 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 has-[:checked]:ring-1 has-[:checked]:ring-green-500"
-              :class="{ 'border-red-500': getError('issue_category') }"
-            >
-              <input
-                v-model="form.issue_category"
-                type="radio"
-                :value="cat"
-                class="h-4 w-4 border-gray-300 text-green-600 focus:ring-green-500"
-                @change="clearFieldError('issue_category')"
-              />
-              <span class="ml-2">{{ cat }}</span>
-            </label>
-          </div>
-          <p v-if="getError('issue_category')" class="mt-1 text-sm text-red-600">
-            {{ getError('issue_category') }}
-          </p>
-        </div>
-
-        <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <div>
             <label class="mb-1 block text-sm font-medium text-gray-700">
               Company Name <span class="text-red-500">*</span>
@@ -395,156 +483,207 @@ const selectClass = (field) =>
             />
             <p v-if="getError('contact_number')" class="mt-1 text-sm text-red-600">{{ getError('contact_number') }}</p>
           </div>
+          <div>
+            <label class="mb-1 block text-sm font-medium text-gray-700">
+              Alternate Contact Number
+            </label>
+            <input
+              v-model="form.alternate_contact_number"
+              type="text"
+              maxlength="12"
+              placeholder="971XXXXXXXXX"
+              :class="inputClass('alternate_contact_number')"
+              @input="onPhoneInput('alternate_contact_number', $event)"
+            />
+            <p v-if="getError('alternate_contact_number')" class="mt-1 text-sm text-red-600">{{ getError('alternate_contact_number') }}</p>
+          </div>
         </div>
 
-        <!-- Issue Description (wider) + Attachments (narrower, smaller) -->
-        <div class="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_280px] xl:grid-cols-[1fr_260px] lg:items-start">
-          <div class="min-w-0">
-            <label class="mb-1 block text-sm font-semibold text-gray-900">
-              Issue Description <span class="text-red-500">*</span>
+        <div class="mt-4">
+          <label class="mb-2 block text-sm font-medium text-gray-700">
+            Issue Category <span class="text-red-500">*</span>
+          </label>
+          <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3">
+            <label
+              v-for="cat in ISSUE_CATEGORIES"
+              :key="cat"
+              class="flex cursor-pointer items-center rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-700 transition hover:border-green-400 hover:bg-gray-50 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 has-[:checked]:ring-1 has-[:checked]:ring-green-500"
+              :class="{ 'border-red-500': getError('issue_category') }"
+            >
+              <input
+                v-model="form.issue_category"
+                type="radio"
+                :value="cat"
+                class="h-4 w-4 border-gray-300 text-green-600 focus:ring-green-500"
+                @change="clearFieldError('issue_category')"
+              />
+              <span class="ml-2">{{ cat }}</span>
             </label>
-            <textarea
-              v-model="form.issue_description"
-              rows="5"
-              placeholder="Provide detailed description of the issue..."
-              :class="inputClass('issue_description')"
-              @input="clearFieldError('issue_description')"
-            />
-            <p v-if="getError('issue_description')" class="mt-1 text-sm text-red-600">
-              {{ getError('issue_description') }}
-            </p>
           </div>
-          <div class="flex max-w-full flex-col gap-2">
-            <label class="block text-sm font-semibold text-gray-900">Attachments</label>
-            <div class="flex flex-col gap-2">
-              <!-- Attachment 1 -->
-              <div class="flex min-w-0 items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm">
-                <div class="shrink-0 text-gray-500">
-                  <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <div class="min-w-0 flex-1">
-                  <p class="truncate text-xs font-medium text-gray-900">Attachment 1</p>
-                  <p v-if="form.attachment_1" class="truncate text-xs text-gray-500">{{ form.attachment_1.name }}</p>
-                </div>
-                <label class="shrink-0 cursor-pointer">
-                  <input
-                    ref="fileInput1"
-                    type="file"
-                    class="hidden"
-                    @change="onFileChange(1, $event)"
-                  />
-                  <span class="inline-flex items-center gap-1 rounded-lg bg-green-600 px-2 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-green-700">
-                    <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+          <p v-if="getError('issue_category')" class="mt-1 text-sm text-red-600">
+            {{ getError('issue_category') }}
+          </p>
+        </div>
+
+      </div>
+
+      <!-- Team & Remarks -->
+      <div>
+        <button
+          type="button"
+          class="w-full flex items-center justify-between text-left text-base font-semibold text-gray-900 border-b border-gray-200 pb-2"
+          :aria-expanded="(!teamSectionCollapsed).toString()"
+          @click.prevent="teamSectionCollapsed = !teamSectionCollapsed"
+        >
+          <span>Team & Remarks</span>
+          <div class="flex items-center gap-2 text-sm text-gray-500">
+            <span>{{ teamSectionCollapsed ? 'Show' : 'Minimize' }}</span>
+            <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': teamSectionCollapsed }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </button>
+
+        <div v-show="!teamSectionCollapsed" class="mt-4 space-y-4">
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Submitter Name</label>
+            <input :value="currentSubmitterName" type="text" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-gray-100 text-gray-700" readonly />
+            </div>
+            <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ formatTeamLabel(teamLabels.manager || 'manager') }} Name <span class="text-red-500">*</span></label>
+            <select v-model="form.manager_id" :class="inputClass('manager_id')" @change="clearFieldError('manager_id')">
+              <option value="">Select {{ formatTeamLabel(teamLabels.manager || 'manager') }}</option>
+              <option v-for="u in managers" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
+            </select>
+            <p v-if="getError('manager_id')" class="mt-1 text-sm text-red-600">{{ getError('manager_id') }}</p>
+            </div>
+            <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ formatTeamLabel(teamLabels.team_leader || 'team_leader') }} Name</label>
+            <select v-model="form.team_leader_id" :class="inputClass('team_leader_id')" @change="clearFieldError('team_leader_id')">
+              <option value="">Select {{ formatTeamLabel(teamLabels.team_leader || 'team_leader') }}</option>
+              <option v-for="u in filteredTeamLeaders" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
+            </select>
+            <p v-if="getError('team_leader_id')" class="mt-1 text-sm text-red-600">{{ getError('team_leader_id') }}</p>
+            </div>
+            <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ formatTeamLabel(teamLabels.sales_agent || 'sales_agent') }} Name</label>
+            <select v-model="form.sales_agent_id" :class="inputClass('sales_agent_id')" @change="clearFieldError('sales_agent_id')">
+              <option value="">Select {{ formatTeamLabel(teamLabels.sales_agent || 'sales_agent') }}</option>
+              <option v-for="u in filteredSalesAgents" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
+            </select>
+            <p v-if="getError('sales_agent_id')" class="mt-1 text-sm text-red-600">{{ getError('sales_agent_id') }}</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_260px] lg:items-stretch">
+            <div class="min-w-0">
+              <label class="mb-1 block text-sm font-semibold text-gray-900">
+                Issue Description <span class="text-red-500">*</span>
+              </label>
+              <textarea
+                v-model="form.issue_description"
+                rows="3"
+                placeholder="Provide detailed description of the issue..."
+                :class="`${inputClass('issue_description')} h-24 resize-none`"
+                @input="clearFieldError('issue_description')"
+              />
+              <p v-if="getError('issue_description')" class="mt-1 text-sm text-red-600">
+                {{ getError('issue_description') }}
+              </p>
+            </div>
+            <div class="flex max-w-full flex-col gap-2">
+              <label class="block text-sm font-semibold text-gray-900">Attachments</label>
+              <div class="h-24 flex flex-col justify-between gap-2">
+                <div class="flex min-w-0 items-center gap-2 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 shadow-sm">
+                  <div class="shrink-0 text-gray-500">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    Upload
-                  </span>
-                </label>
-              </div>
-              <!-- Attachment 2 -->
-              <div class="flex min-w-0 items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm">
-                <div class="shrink-0 text-gray-500">
-                  <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-xs font-medium text-gray-900">Attachment 1</p>
+                    <p v-if="form.attachment_1" class="truncate text-xs text-gray-500">{{ form.attachment_1.name }}</p>
+                  </div>
+                  <label class="shrink-0 cursor-pointer">
+                    <input
+                      ref="fileInput1"
+                      type="file"
+                      class="hidden"
+                      @change="onFileChange(1, $event)"
+                    />
+                    <span class="inline-flex items-center gap-1 rounded-lg bg-green-600 px-2 py-1 text-xs font-medium text-white shadow-sm hover:bg-green-700">
+                      <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      </svg>
+                      Upload
+                    </span>
+                  </label>
                 </div>
-                <div class="min-w-0 flex-1">
-                  <p class="truncate text-xs font-medium text-gray-900">Attachment 2</p>
-                  <p v-if="form.attachment_2" class="truncate text-xs text-gray-500">{{ form.attachment_2.name }}</p>
-                </div>
-                <label class="shrink-0 cursor-pointer">
-                  <input
-                    ref="fileInput2"
-                    type="file"
-                    class="hidden"
-                    @change="onFileChange(2, $event)"
-                  />
-                  <span class="inline-flex items-center gap-1 rounded-lg bg-green-600 px-2 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-green-700">
-                    <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                <div class="flex min-w-0 items-center gap-2 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 shadow-sm">
+                  <div class="shrink-0 text-gray-500">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    Upload
-                  </span>
-                </label>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-xs font-medium text-gray-900">Attachment 2</p>
+                    <p v-if="form.attachment_2" class="truncate text-xs text-gray-500">{{ form.attachment_2.name }}</p>
+                  </div>
+                  <label class="shrink-0 cursor-pointer">
+                    <input
+                      ref="fileInput2"
+                      type="file"
+                      class="hidden"
+                      @change="onFileChange(2, $event)"
+                    />
+                    <span class="inline-flex items-center gap-1 rounded-lg bg-green-600 px-2 py-1 text-xs font-medium text-white shadow-sm hover:bg-green-700">
+                      <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      </svg>
+                      Upload
+                    </span>
+                  </label>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Team Information -->
-      <div>
-        <h3 class="border-b border-gray-200 pb-2 text-base font-semibold text-gray-800">
-          Team Information
-        </h3>
-        <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">
-              {{ formatTeamLabel(teamLabels.manager || 'manager') || 'Manager' }} Name <span class="text-red-500">*</span>
-            </label>
-            <select
-              v-model="form.manager_id"
-              :class="selectClass('manager_id')"
-              @change="clearFieldError('manager_id')"
-            >
-              <option value="">Select {{ formatTeamLabel(teamLabels.manager || 'manager') || 'Manager' }}</option>
-              <option v-for="u in managers" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
-            </select>
-            <p v-if="getError('manager_id')" class="mt-1 text-sm text-red-600">{{ getError('manager_id') }}</p>
-          </div>
-          <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">
-              {{ formatTeamLabel(teamLabels.team_leader || 'team_leader') }} Name
-            </label>
-            <select
-              v-model="form.team_leader_id"
-              :class="selectClass('team_leader_id')"
-              @change="clearFieldError('team_leader_id')"
-            >
-              <option value="">Select {{ formatTeamLabel(teamLabels.team_leader || 'team_leader') }}</option>
-              <option v-for="u in filteredTeamLeaders" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
-            </select>
-            <p v-if="getError('team_leader_id')" class="mt-1 text-sm text-red-600">{{ getError('team_leader_id') }}</p>
-          </div>
-          <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">
-              {{ formatTeamLabel(teamLabels.sales_agent || 'sales_agent') }} Name
-            </label>
-            <select
-              v-model="form.sales_agent_id"
-              :class="selectClass('sales_agent_id')"
-              @change="clearFieldError('sales_agent_id')"
-            >
-              <option value="">Select {{ formatTeamLabel(teamLabels.sales_agent || 'sales_agent') }}</option>
-              <option v-for="u in filteredSalesAgents" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
-            </select>
-            <p v-if="getError('sales_agent_id')" class="mt-1 text-sm text-red-600">{{ getError('sales_agent_id') }}</p>
-          </div>
+      <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-6">
+        <div class="flex items-center gap-3">
+          <button
+            type="button"
+            @click="cancel"
+            class="rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-green-700"
+          >
+            Cancel
+          </button>
         </div>
-      </div>
-
-      <div class="flex justify-end gap-3 border-t border-gray-100 pt-6">
-        <button
-          type="button"
-          @click="cancel"
-          class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          :disabled="submitting"
-          class="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-black shadow-sm disabled:opacity-50 bg-green-600 hover:bg-green-700"
-        >
-          <img
-            :src="submitRequestIconUrl"
-            alt=""
-            class="h-4 w-4 shrink-0 object-contain"
-          />
-          <span class="text-black">{{ submitting ? 'Submitting...' : 'Submit Request' }}</span>
-        </button>
+        <div class="flex items-center gap-3">
+          <button
+            type="button"
+            :disabled="savingDraft"
+            @click="saveDraft"
+            class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-gray-100 px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-200 disabled:opacity-50"
+          >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+            </svg>
+            {{ savingDraft ? 'Saving...' : 'Save as Draft' }}
+          </button>
+          <button
+            type="submit"
+            :disabled="submitting"
+            class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-green-700 disabled:opacity-50"
+          >
+            <span class="text-white">{{ submitting ? 'Submitting...' : 'Submit' }}</span>
+            <svg v-if="!submitting" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M13 6l6 6-6 6" />
+            </svg>
+          </button>
+        </div>
       </div>
     </form>
     </template>

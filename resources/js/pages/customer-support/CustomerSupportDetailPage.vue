@@ -8,7 +8,7 @@ import customerSupportApi from '@/services/customerSupportApi'
 import api from '@/lib/axios'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import TruncatedText from '@/components/TruncatedText.vue'
-import { toDdMmYyyy } from '@/lib/dateFormat'
+import { formatUserDate, formatSystemDateTime } from '@/lib/dateFormat'
 
 const route = useRoute()
 const router = useRouter()
@@ -36,42 +36,20 @@ function displayVal(val) {
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 function formatDate(d) {
-  if (!d) return '—'
-  const date = new Date(d)
-  if (Number.isNaN(date.getTime())) return '—'
-  const day = String(date.getDate()).padStart(2, '0')
-  const mon = MONTH_NAMES[date.getMonth()]
-  const year = date.getFullYear()
-  return `${day}-${mon}-${year}`
+  return formatUserDate(d, '—')
 }
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?)?/
 
 function formatDateTime(d) {
-  if (!d) return '—'
-  const date = new Date(d)
-  if (Number.isNaN(date.getTime())) return '—'
-  const day = String(date.getDate()).padStart(2, '0')
-  const mon = MONTH_NAMES[date.getMonth()]
-  const year = date.getFullYear()
-  const h = String(date.getHours()).padStart(2, '0')
-  const m = String(date.getMinutes()).padStart(2, '0')
-  return `${day}-${mon}-${year} ${h}:${m}`
+  return formatSystemDateTime(d, '—')
 }
 
 function formatAuditSingleValue(val) {
   if (val == null || val === '') return null
   const s = String(val)
   if (DATE_PATTERN.test(s)) {
-    const date = new Date(s)
-    if (!Number.isNaN(date.getTime())) {
-      const day = String(date.getDate()).padStart(2, '0')
-      const mon = MONTH_NAMES[date.getMonth()]
-      const year = date.getFullYear()
-      const hh = String(date.getHours()).padStart(2, '0')
-      const mm = String(date.getMinutes()).padStart(2, '0')
-      return `${day}-${mon}-${year} ${hh}:${mm}`
-    }
+    return formatSystemDateTime(s, s)
   }
   return s
 }
@@ -117,6 +95,7 @@ function formatAuditValue(val) {
 
 function formatStatus(status) {
   if (status == null || status === '') return '—'
+  if (String(status).toLowerCase() === 'unassigned') return 'UnAssigned'
   const s = String(status).replace(/_/g, ' ')
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
@@ -126,6 +105,7 @@ const FIELD_LABELS = {
   company_name: 'Company Name',
   account_number: 'Account Number',
   contact_number: 'Contact Number',
+  alternate_contact_number: 'Alternate Contact Number',
   issue_description: 'Issue Description',
   status: 'Status',
   manager_id: 'Manager',
@@ -271,14 +251,6 @@ onMounted(() => {
               <h2 class="mb-3 text-sm font-semibold text-gray-900">Primary Information</h2>
               <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">AH Ticket ID</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.ticket_number) }}</div>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">Issue Category</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.issue_category) }}</div>
-                </div>
-                <div>
                   <label class="block text-xs font-medium text-gray-500">Company Name</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.company_name) }}</div>
                 </div>
@@ -291,39 +263,35 @@ onMounted(() => {
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.contact_number) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Submission Date</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ formatDateTime(submission.submitted_at ?? submission.created_at) }}</div>
+                  <label class="block text-xs font-medium text-gray-500">Alternate Contact Number</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.alternate_contact_number) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Created By</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.creator_name) }}</div>
-                </div>
-                <div class="sm:col-span-4">
-                  <label class="block text-xs font-medium text-gray-500">Issue Description</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 whitespace-pre-wrap">{{ displayVal(submission.issue_description) }}</div>
+                  <label class="block text-xs font-medium text-gray-500">Issue Category</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.issue_category) }}</div>
                 </div>
               </div>
             </section>
 
-            <!-- Team Assignment -->
+            <!-- Team Information -->
             <section class="mb-6">
-              <h2 class="mb-3 text-sm font-semibold text-gray-900">Team Assignment</h2>
+              <h2 class="mb-3 text-sm font-semibold text-gray-900">Team Information</h2>
               <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Manager</label>
+                  <label class="block text-xs font-medium text-gray-500">Submitter Name</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.creator_name) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Manager Name</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.manager_name) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Team Leader</label>
+                  <label class="block text-xs font-medium text-gray-500">Team Leader Name</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.team_leader_name) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Sales Agent</label>
+                  <label class="block text-xs font-medium text-gray-500">Sales Agent Name</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.sales_agent_name) }}</div>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">CSR Name</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.csr_user_name ?? submission.csr_user?.name ?? submission.csr_name) }}</div>
                 </div>
                 <div v-if="submission.account_csr_names?.length" class="sm:col-span-2">
                   <label class="block text-xs font-medium text-gray-500">Account CSRs</label>
@@ -338,17 +306,32 @@ onMounted(() => {
               </div>
             </section>
 
-            <!-- Additional Information -->
+            <!-- Issue Details -->
             <section class="mb-6">
-              <h2 class="mb-3 text-sm font-semibold text-gray-900">Additional Information</h2>
+              <h2 class="mb-3 text-sm font-semibold text-gray-900">Issue Details</h2>
+              <div class="grid grid-cols-1 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Issue Description</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 whitespace-pre-wrap">{{ displayVal(submission.issue_description) }}</div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Additional Information (CSR) -->
+            <section class="mb-6">
+              <h2 class="mb-3 text-sm font-semibold text-gray-900">Additional Information (CSR)</h2>
               <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Ticket Number</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.ticket_number) }}</div>
+                </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Status</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ formatStatus(submission.status) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Completion Date</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ formatDate(submission.completion_date) }}</div>
+                  <label class="block text-xs font-medium text-gray-500">CSR Name</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.csr_user_name ?? submission.csr_user?.name ?? submission.csr_name) }}</div>
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Trouble Ticket</label>
@@ -359,8 +342,8 @@ onMounted(() => {
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.activity) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Pending With</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.pending) }}</div>
+                  <label class="block text-xs font-medium text-gray-500">Completion Date</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ formatDate(submission.completion_date) }}</div>
                 </div>
               </div>
               <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">

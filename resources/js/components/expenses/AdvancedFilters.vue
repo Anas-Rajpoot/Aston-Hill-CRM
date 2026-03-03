@@ -35,19 +35,19 @@ const emit = defineEmits(['apply', 'reset'])
       <div class="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Expense Date From</label>
-          <DateInputDdMmYyyy v-model="filters.expense_date_from" placeholder="dd-Mon-yyyy" :disabled="loading" />
+          <DateInputDdMmYyyy v-model="filters.expense_date_from" placeholder="DD-MMM-YYYY" :disabled="loading" />
         </div>
         <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Expense Date To</label>
-          <DateInputDdMmYyyy v-model="filters.expense_date_to" placeholder="dd-Mon-yyyy" :disabled="loading" />
+          <DateInputDdMmYyyy v-model="filters.expense_date_to" placeholder="DD-MMM-YYYY" :disabled="loading" />
         </div>
         <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Created Date From</label>
-          <DateInputDdMmYyyy v-model="filters.created_from" placeholder="dd-Mon-yyyy" :disabled="loading" />
+          <DateInputDdMmYyyy v-model="filters.created_from" placeholder="DD-MMM-YYYY" :disabled="loading" />
         </div>
         <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Created Date To</label>
-          <DateInputDdMmYyyy v-model="filters.created_to" placeholder="dd-Mon-yyyy" :disabled="loading" />
+          <DateInputDdMmYyyy v-model="filters.created_to" placeholder="DD-MMM-YYYY" :disabled="loading" />
         </div>
         <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Added By</label>

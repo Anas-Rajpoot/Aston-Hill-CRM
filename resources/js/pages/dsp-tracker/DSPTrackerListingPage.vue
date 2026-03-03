@@ -71,6 +71,7 @@ const columnModalVisible = ref(false)
 const detailModalVisible = ref(false)
 const selectedRecord = ref(null)
 const visibleColumns = ref([...COLUMNS])
+const compactColumns = ['activity_number', 'company_name']
 
 const showToast = ref(false)
 const toastType = ref('success')
@@ -191,6 +192,14 @@ const sortedData = computed(() => {
 
 const allColumnsForModal = computed(() =>
   COLUMNS.map((key) => ({ key, label: COLUMN_LABELS[key] }))
+)
+
+const hasPrimarySearch = computed(() =>
+  Boolean(filters.value.activity_number?.trim() || filters.value.company_name?.trim())
+)
+
+const displayedColumns = computed(() =>
+  hasPrimarySearch.value ? [...COLUMNS] : compactColumns
 )
 
 function applyFilters() {
@@ -539,6 +548,16 @@ onMounted(() => load())
               :disabled="loading"
             />
           </div>
+          <div class="min-w-[140px] max-w-[200px]">
+            <label class="mb-1 block text-xs font-medium text-gray-600">Activity</label>
+            <input
+              v-model="filters.activity_number"
+              type="text"
+              placeholder="Search activity..."
+              class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              :disabled="loading"
+            />
+          </div>
           <div class="flex gap-2">
             <button
               type="button"
@@ -593,7 +612,7 @@ onMounted(() => load())
           <thead>
             <tr class="border-b-2 border-black bg-sky-50">
               <th
-                v-for="col in visibleColumns"
+                v-for="col in displayedColumns"
                 :key="col"
                 scope="col"
                 class="whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-gray-800"
@@ -616,7 +635,7 @@ onMounted(() => load())
           </thead>
           <tbody class="bg-white">
             <tr v-if="loading" class="border-b border-gray-200">
-              <td :colspan="visibleColumns.length + (hasAnyRowAction ? 1 : 0)" class="px-4 py-12 text-center text-sm text-gray-500">
+              <td :colspan="displayedColumns.length + (hasAnyRowAction ? 1 : 0)" class="px-4 py-12 text-center text-sm text-gray-500">
                 <span class="inline-flex items-center gap-2">
                   <svg class="h-5 w-5 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
@@ -627,7 +646,7 @@ onMounted(() => load())
               </td>
             </tr>
             <tr v-else-if="!sortedData.length" class="border-b border-gray-200">
-              <td :colspan="visibleColumns.length + (hasAnyRowAction ? 1 : 0)" class="px-4 py-12 text-center text-sm text-gray-500">No records found.</td>
+              <td :colspan="displayedColumns.length + (hasAnyRowAction ? 1 : 0)" class="px-4 py-12 text-center text-sm text-gray-500">No records found.</td>
             </tr>
             <tr
               v-for="row in sortedData"
@@ -635,7 +654,7 @@ onMounted(() => load())
               class="border-b border-gray-200 bg-white hover:bg-gray-50/50"
             >
               <td
-                v-for="col in visibleColumns"
+                v-for="col in displayedColumns"
                 :key="col"
                 class="whitespace-nowrap px-4 py-3 text-sm text-gray-900"
               >
@@ -653,28 +672,6 @@ onMounted(() => load())
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                  </button>
-                  <button
-                    v-if="canEditAction"
-                    type="button"
-                    class="rounded p-1.5 text-green-600 hover:bg-green-50"
-                    title="Edit"
-                    @click="onEdit(row)"
-                  >
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                    </svg>
-                  </button>
-                  <button
-                    v-if="canViewAction"
-                    type="button"
-                    class="rounded p-1.5 text-amber-600 hover:bg-amber-50"
-                    title="History"
-                    @click="onHistory(row)"
-                  >
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </button>
                 </div>

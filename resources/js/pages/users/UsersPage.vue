@@ -11,7 +11,7 @@ import api from '@/lib/axios'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import Toast from '@/components/Toast.vue'
-import { toDdMmYyyy, toDdMonYyyy, toDdMonYyyyDash } from '@/lib/dateFormat'
+import { formatUserDate, formatSystemDateTime } from '@/lib/dateFormat'
 import TruncatedText from '@/components/TruncatedText.vue'
 import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
 import { useProgressiveHydration } from '@/composables/useProgressiveHydration'
@@ -190,39 +190,14 @@ const statusBadgeClass = (status) => {
   return 'bg-gray-100 text-gray-700 border-gray-200'
 }
 const formatDate = (d) => {
-  if (!d) return '-'
-  const str = typeof d === 'string' ? d.trim().slice(0, 10) : ''
-  return str ? (toDdMmYyyy(str) || '-') : '-'
+  return formatUserDate(d, '-')
 }
 const formatDateTime = (d) => {
-  if (!d) return '-'
-  const raw = typeof d === 'string' ? d.trim() : ''
-
-  // Prefer parsing from the original string to avoid timezone/date shifts.
-  if (raw) {
-    const ymd = raw.match(/(\d{4}-\d{2}-\d{2})/)?.[1] || ''
-    const time = raw.match(/\b(\d{2}:\d{2})(?::\d{2})?\b/)?.[1] || ''
-    const datePart = ymd ? toDdMonYyyyDash(ymd) : ''
-    if (datePart && time) return `${datePart} ${time}`
-    if (datePart) return datePart
-  }
-
-  const date = new Date(d)
-  if (Number.isNaN(date.getTime())) return '-'
-  const ymd = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-  const datePart = toDdMonYyyyDash(ymd)
-  const timePart = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
-  return `${datePart || '-'} ${timePart}`.trim()
+  return formatSystemDateTime(d, '-')
 }
 /** Format for detail modal: "15 Jan 2024, 14:30" */
 const formatDetailDateTime = (iso) => {
-  if (!iso || typeof iso !== 'string') return '—'
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return '—'
-  const ymd = iso.trim().slice(0, 10)
-  const datePart = toDdMonYyyy(ymd)
-  const timePart = date.toTimeString().slice(0, 5)
-  return datePart ? `${datePart}, ${timePart}` : '—'
+  return formatSystemDateTime(iso, '—')
 }
 const userIdDisplay = (id) => (id ? `USR${String(id).padStart(3, '0')}` : '—')
 const getInitials = (name) => {
@@ -1099,11 +1074,11 @@ watch(editUserRolesDropdownOpen, (open) => {
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-600 mb-1">Created From</label>
-            <DateInputDdMmYyyy v-model="filters.created_from" placeholder="dd-Mon-yyyy" />
+            <DateInputDdMmYyyy v-model="filters.created_from" placeholder="DD-MMM-YYYY" />
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-600 mb-1">Created To</label>
-            <DateInputDdMmYyyy v-model="filters.created_to" placeholder="dd-Mon-yyyy" />
+            <DateInputDdMmYyyy v-model="filters.created_to" placeholder="DD-MMM-YYYY" />
           </div>
         </div>
         <div class="mt-3 flex gap-2">

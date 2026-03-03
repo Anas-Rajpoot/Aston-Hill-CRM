@@ -9,6 +9,7 @@ import fieldSubmissionsApi from '@/services/fieldSubmissionsApi'
 import api from '@/lib/axios'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import TruncatedText from '@/components/TruncatedText.vue'
+import { formatSystemDateTime } from '@/lib/dateFormat'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -22,16 +23,7 @@ const perPageOptions = [10, 20, 25, 50, 100]
 const isSuperAdmin = () => (auth.user?.roles ?? []).includes('superadmin')
 
 function formatDateTime(iso) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return iso
-  return d.toLocaleString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatSystemDateTime(iso, iso || '—')
 }
 
 function fieldLabel(name, row) {
@@ -75,15 +67,7 @@ function formatAuditSingleValue(val) {
   if (val == null || val === '') return null
   const s = String(val)
   if (DATE_PATTERN.test(s)) {
-    const date = new Date(s)
-    if (!Number.isNaN(date.getTime())) {
-      const day = String(date.getDate()).padStart(2, '0')
-      const mon = MONTH_NAMES[date.getMonth()]
-      const year = date.getFullYear()
-      const h = String(date.getHours()).padStart(2, '0')
-      const m = String(date.getMinutes()).padStart(2, '0')
-      return `${day}-${mon}-${year} ${h}:${m}`
-    }
+    return formatSystemDateTime(s, s)
   }
   return s
 }

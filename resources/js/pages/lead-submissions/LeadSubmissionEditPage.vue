@@ -8,6 +8,7 @@ import leadSubmissionsApi from '@/services/leadSubmissionsApi'
 import { useAuthStore } from '@/stores/auth'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import { useFormDraft } from '@/composables/useFormDraft'
+import { formatSystemDateTime } from '@/lib/dateFormat'
 
 const route = useRoute()
 const router = useRouter()
@@ -16,6 +17,10 @@ const auth = useAuthStore()
 const loading = ref(true)
 const saving = ref(false)
 const lead = ref(null)
+const primarySectionCollapsed = ref(false)
+const teamSectionCollapsed = ref(false)
+const backOfficeSectionCollapsed = ref(false)
+const documentsSectionCollapsed = ref(false)
 const options = ref({
   executives: [],
   call_verification_options: [],
@@ -71,14 +76,32 @@ const form = ref({
 const { draftSaving, draftSavedAt, clearDraft } = useFormDraft('lead-submission', route.params.id || 'new', form)
 
 const STATUS_OPTIONS = [
-  { value: '', label: 'Select' },
+  { value: 'unassigned', label: 'UnAssigned' },
   { value: 'submitted', label: 'Submitted' },
   { value: 'rejected', label: 'Rejected' },
+  { value: 'pending_from_sales', label: 'Pending with Sales' },
+  { value: 'pending_for_finance', label: 'Pending with Finance' },
   { value: 'pending_for_ata', label: 'Pending for ATA' },
-  { value: 'pending_for_finance', label: 'Pending for Finance' },
-  { value: 'pending_from_sales', label: 'Pending from Sales' },
-  { value: 'unassigned', label: 'UnAssigned' },
 ]
+
+const EMIRATES_OPTIONS = [
+  'Abu Dhabi',
+  'Dubai',
+  'Sharjah',
+  'Ajman',
+  'Umm Al Quwain',
+  'Ras Al Khaimah',
+  'Fujairah',
+]
+
+const BASE_REQUEST_TYPE_OPTIONS = ['New Submission', 'Resubmission']
+const requestTypeOptions = computed(() => {
+  const current = String(form.value.submission_type ?? '').trim()
+  if (current && !BASE_REQUEST_TYPE_OPTIONS.includes(current)) {
+    return [current, ...BASE_REQUEST_TYPE_OPTIONS]
+  }
+  return BASE_REQUEST_TYPE_OPTIONS
+})
 
 const leadId = computed(() => {
   const id = route.params.id
@@ -120,15 +143,7 @@ function openDatePicker(refName) {
 }
 
 function formatDateTime(d) {
-  if (!d) return '—'
-  const date = new Date(d)
-  if (Number.isNaN(date.getTime())) return '—'
-  const day = String(date.getDate()).padStart(2, '0')
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  const month = months[date.getMonth()]
-  const h = String(date.getHours()).padStart(2, '0')
-  const m = String(date.getMinutes()).padStart(2, '0')
-  return `${day}-${month}-${date.getFullYear()} ${h}:${m}`
+  return formatSystemDateTime(d, '—')
 }
 
 function formatFileSize(bytes) {
@@ -477,7 +492,6 @@ onMounted(() => {
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
       </div>
-
       <div v-else-if="!lead" class="rounded-lg border border-gray-200 bg-white p-8 text-center text-gray-500">
         Unable to load submission. You may not have permission to view it.
       </div>
@@ -498,11 +512,35 @@ onMounted(() => {
 
             <!-- Section 1: Lead Submission Details (editable when canEditBackOffice) -->
             <section class="mb-6">
-              <h2 class="mb-3 text-sm font-semibold text-gray-900">Primary Information</h2>
-              <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <button
+                type="button"
+                class="mb-3 flex w-full items-center justify-between border-b border-gray-200 pb-2 text-left text-base font-semibold text-gray-900"
+                :aria-expanded="(!primarySectionCollapsed).toString()"
+                @click.prevent="primarySectionCollapsed = !primarySectionCollapsed"
+              >
+                <span>Primary Information</span>
+                <div class="flex items-center gap-2 text-sm font-medium text-gray-500">
+                  <span>{{ primarySectionCollapsed ? 'Show' : 'Minimize' }}</span>
+                  <svg class="h-4 w-4 transition-transform" :class="{ 'rotate-180': primarySectionCollapsed }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </button>
+              <div v-show="!primarySectionCollapsed" class="grid grid-cols-1 gap-3 sm:grid-cols-4">
                 <div>
                   <label class="block text-xs font-medium text-gray-500">ID</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.id) }}</div>
+                </div>
+                <div v-if="canEditBackOffice">
+                  <label class="block text-xs font-medium text-gray-500">Request Type</label>
+                  <select v-model="form.submission_type" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm">
+                    <option value="">Select Request Type</option>
+                    <option v-for="opt in requestTypeOptions" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
+                </div>
+                <div v-else>
+                  <label class="block text-xs font-medium text-gray-500">Request Type</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.submission_type) }}</div>
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Account Number</label>
@@ -544,53 +582,6 @@ onMounted(() => {
                   <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.email) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Product <span class="text-red-500">*</span></label>
-                  <template v-if="canEditBackOffice">
-                    <input v-model="form.product" type="text" class="mt-0.5 w-full rounded border bg-white px-3 py-2 text-sm" :class="fieldErrors.product ? 'border-red-500' : 'border-gray-300'" @input="fieldErrors.product = null" />
-                    <p v-if="fieldErrors.product" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.product }}</p>
-                  </template>
-                  <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.product) }}</div>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">Offer</label>
-                  <input v-if="canEditBackOffice" v-model="form.offer" type="text" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm" />
-                  <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.offer) }}</div>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">MRC (AED)</label>
-                  <input v-if="canEditBackOffice" v-model="form.mrc_aed" type="text" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm" />
-                  <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.mrc_aed) }}</div>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">Quantity</label>
-                  <input v-if="canEditBackOffice" v-model="form.quantity" type="text" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm" />
-                  <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.quantity) }}</div>
-                </div>
-                <div v-if="canEditBackOffice">
-                  <label class="block text-xs font-medium text-gray-500">Request Type</label>
-                  <input v-model="form.submission_type" type="text" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm" placeholder="Request type" />
-                </div>
-                <div v-else>
-                  <label class="block text-xs font-medium text-gray-500">Request Type</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.submission_type) }}</div>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">Emirates <span class="text-red-500">*</span></label>
-                  <template v-if="canEditBackOffice">
-                    <input v-model="form.emirate" type="text" class="mt-0.5 w-full rounded border bg-white px-3 py-2 text-sm" :class="fieldErrors.emirate ? 'border-red-500' : 'border-gray-300'" @input="fieldErrors.emirate = null" />
-                    <p v-if="fieldErrors.emirate" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.emirate }}</p>
-                  </template>
-                  <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.emirate) }}</div>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">Location Coordinates</label>
-                  <template v-if="canEditBackOffice">
-                    <input v-model="form.location_coordinates" type="text" placeholder="e.g. 25.2048, 55.2708" class="mt-0.5 w-full rounded border bg-white px-3 py-2 text-sm" :class="fieldErrors.location_coordinates ? 'border-red-500' : 'border-gray-300'" @input="fieldErrors.location_coordinates = null" />
-                    <p v-if="fieldErrors.location_coordinates" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.location_coordinates }}</p>
-                  </template>
-                  <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.location_coordinates) }}</div>
-                </div>
-                <div>
                   <label class="block text-xs font-medium text-gray-500">.ae Domain</label>
                   <template v-if="canEditBackOffice">
                     <input v-model="form.ae_domain" type="text" placeholder="Enter Domain (e.g. example.ae)" class="mt-0.5 w-full rounded border bg-white px-3 py-2 text-sm" :class="fieldErrors.ae_domain ? 'border-red-500' : 'border-gray-300'" @input="fieldErrors.ae_domain = null" />
@@ -622,37 +613,79 @@ onMounted(() => {
                   <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ typeNameDisplay(lead) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Created By</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.creator_name) }}</div>
+                  <label class="block text-xs font-medium text-gray-500">Product <span class="text-red-500">*</span></label>
+                  <template v-if="canEditBackOffice">
+                    <input v-model="form.product" type="text" class="mt-0.5 w-full rounded border bg-white px-3 py-2 text-sm" :class="fieldErrors.product ? 'border-red-500' : 'border-gray-300'" @input="fieldErrors.product = null" />
+                    <p v-if="fieldErrors.product" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.product }}</p>
+                  </template>
+                  <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.product) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Created At</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ formatDateTime(lead.created_at) }}</div>
+                  <label class="block text-xs font-medium text-gray-500">MRC (AED)</label>
+                  <input v-if="canEditBackOffice" v-model="form.mrc_aed" type="text" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm" />
+                  <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.mrc_aed) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Submission Date</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ formatDateTime(lead.submitted_at ?? lead.created_at) }}</div>
+                  <label class="block text-xs font-medium text-gray-500">Quantity</label>
+                  <input v-if="canEditBackOffice" v-model="form.quantity" type="text" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm" />
+                  <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.quantity) }}</div>
                 </div>
-              </div>
-              <div class="mt-3">
-                <label class="block text-xs font-medium text-gray-500">Complete Address as per Ejari <span class="text-red-500">*</span></label>
-                <template v-if="canEditBackOffice">
-                  <textarea v-model="form.address" rows="3" class="mt-0.5 w-full rounded border bg-white px-3 py-2 text-sm" :class="fieldErrors.address ? 'border-red-500' : 'border-gray-300'" @input="fieldErrors.address = null"></textarea>
-                  <p v-if="fieldErrors.address" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.address }}</p>
-                </template>
-                <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 whitespace-pre-wrap">{{ displayVal(lead.address) }}</div>
-              </div>
-              <div class="mt-3">
-                <label class="block text-xs font-medium text-gray-500">Remarks</label>
-                <textarea v-if="canEditBackOffice" v-model="form.remarks" rows="3" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm"></textarea>
-                <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 whitespace-pre-wrap">{{ displayVal(lead.remarks) }}</div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Offer</label>
+                  <input v-if="canEditBackOffice" v-model="form.offer" type="text" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm" />
+                  <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.offer) }}</div>
+                </div>
+                <div class="sm:col-span-2">
+                  <label class="block text-xs font-medium text-gray-500">Complete Address as per Ejari <span class="text-red-500">*</span></label>
+                  <template v-if="canEditBackOffice">
+                    <input v-model="form.address" type="text" class="mt-0.5 w-full rounded border bg-white px-3 py-2 text-sm" :class="fieldErrors.address ? 'border-red-500' : 'border-gray-300'" @input="fieldErrors.address = null" />
+                    <p v-if="fieldErrors.address" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.address }}</p>
+                  </template>
+                  <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 whitespace-pre-wrap">{{ displayVal(lead.address) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Emirates <span class="text-red-500">*</span></label>
+                  <template v-if="canEditBackOffice">
+                    <select v-model="form.emirate" class="mt-0.5 w-full rounded border bg-white px-3 py-2 text-sm" :class="fieldErrors.emirate ? 'border-red-500' : 'border-gray-300'" @change="fieldErrors.emirate = null">
+                      <option value="">Select Emirates</option>
+                      <option v-for="emirate in EMIRATES_OPTIONS" :key="emirate" :value="emirate">{{ emirate }}</option>
+                    </select>
+                    <p v-if="fieldErrors.emirate" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.emirate }}</p>
+                  </template>
+                  <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.emirate) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Location Coordinates</label>
+                  <template v-if="canEditBackOffice">
+                    <input v-model="form.location_coordinates" type="text" placeholder="e.g. 25.2048, 55.2708" class="mt-0.5 w-full rounded border bg-white px-3 py-2 text-sm" :class="fieldErrors.location_coordinates ? 'border-red-500' : 'border-gray-300'" @input="fieldErrors.location_coordinates = null" />
+                    <p v-if="fieldErrors.location_coordinates" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.location_coordinates }}</p>
+                  </template>
+                  <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.location_coordinates) }}</div>
+                </div>
               </div>
             </section>
 
             <!-- Team Information -->
             <section class="mb-6">
-              <h2 class="text-base font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Team Information</h2>
-              <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <button
+                type="button"
+                class="mb-4 flex w-full items-center justify-between border-b border-gray-200 pb-2 text-left text-base font-semibold text-gray-900"
+                :aria-expanded="(!teamSectionCollapsed).toString()"
+                @click.prevent="teamSectionCollapsed = !teamSectionCollapsed"
+              >
+                <span>Team Information</span>
+                <div class="flex items-center gap-2 text-sm font-medium text-gray-500">
+                  <span>{{ teamSectionCollapsed ? 'Show' : 'Minimize' }}</span>
+                  <svg class="h-4 w-4 transition-transform" :class="{ 'rotate-180': teamSectionCollapsed }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </button>
+              <div v-show="!teamSectionCollapsed" class="grid grid-cols-1 gap-3 sm:grid-cols-4">
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Submitter Name</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.creator_name) }}</div>
+                </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Manager Name <span class="text-red-500">*</span></label>
                   <template v-if="canEditBackOffice">
@@ -687,23 +720,37 @@ onMounted(() => {
                   <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.sales_agent_name) }}</div>
                 </div>
               </div>
+              <div v-show="!teamSectionCollapsed" class="mt-3 grid grid-cols-1 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Comment / Remarks</label>
+                  <textarea v-if="canEditBackOffice" v-model="form.remarks" rows="2" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm" placeholder="Enter any additional comments or remarks"></textarea>
+                  <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 whitespace-pre-wrap">{{ displayVal(lead.remarks) }}</div>
+                </div>
+              </div>
             </section>
 
             <!-- Section 2: Back Office (editable) -->
             <section v-if="canEditBackOffice" class="mb-6">
-              <h2 class="mb-3 text-sm font-semibold text-gray-900">Back Office Details (Editable)</h2>
-              <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <button
+                type="button"
+                class="mb-3 flex w-full items-center justify-between border-b border-gray-200 pb-2 text-left text-base font-semibold text-gray-900"
+                :aria-expanded="(!backOfficeSectionCollapsed).toString()"
+                @click.prevent="backOfficeSectionCollapsed = !backOfficeSectionCollapsed"
+              >
+                <span>Back Office Working Section</span>
+                <div class="flex items-center gap-2 text-sm font-medium text-gray-500">
+                  <span>{{ backOfficeSectionCollapsed ? 'Show' : 'Minimize' }}</span>
+                  <svg class="h-4 w-4 transition-transform" :class="{ 'rotate-180': backOfficeSectionCollapsed }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </button>
+              <div v-show="!backOfficeSectionCollapsed" class="grid grid-cols-1 gap-3 sm:grid-cols-4">
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Executive Name</label>
+                  <label class="block text-xs font-medium text-gray-500">Back Office Executive</label>
                   <select v-model="form.executive_id" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm">
                     <option :value="null">Select</option>
                     <option v-for="e in options.executives" :key="e.id" :value="e.id">{{ e.name }}</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">Status</label>
-                  <select v-model="form.status" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm">
-                    <option v-for="s in STATUS_OPTIONS" :key="s.value" :value="s.value">{{ s.label }}</option>
                   </select>
                 </div>
                 <div>
@@ -721,6 +768,12 @@ onMounted(() => {
                   </select>
                 </div>
                 <div>
+                  <label class="block text-xs font-medium text-gray-500">Status</label>
+                  <select v-model="form.status" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm">
+                    <option v-for="s in STATUS_OPTIONS" :key="s.value" :value="s.value">{{ s.label }}</option>
+                  </select>
+                </div>
+                <div>
                   <label class="block text-xs font-medium text-gray-500">Submission Date</label>
                   <div class="relative mt-0.5 cursor-pointer" @click="openDatePicker('submission_date_from')">
                     <input type="text" readonly :value="formatDateDisplay(form.submission_date_from)" placeholder="DD-MMM-YYYY" class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm cursor-pointer" />
@@ -729,7 +782,7 @@ onMounted(() => {
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Activity</label>
-                  <input v-model="form.activity" type="text" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm" placeholder="Describe Activity" />
+                  <input v-model="form.activity" type="text" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm" placeholder="Enter Activity" />
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Account Number</label>
@@ -737,7 +790,7 @@ onMounted(() => {
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Work Order</label>
-                  <input v-model="form.work_order" type="text" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm" />
+                  <input v-model="form.work_order" type="text" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm" placeholder="Enter Work Order" />
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500">DU Status</label>
@@ -754,24 +807,41 @@ onMounted(() => {
                   </div>
                 </div>
               </div>
-              <div class="mt-3">
+              <div v-show="!backOfficeSectionCollapsed" class="mt-3">
                 <label class="block text-xs font-medium text-gray-500">Back Office Notes</label>
-                <textarea v-model="form.back_office_notes" rows="3" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm" placeholder="Add verification notes..."></textarea>
+                <textarea v-model="form.back_office_notes" rows="2" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm" placeholder="Add verification notes..."></textarea>
               </div>
-              <div class="mt-3">
-                <label class="block text-xs font-medium text-gray-500">DU Remarks</label>
-                <textarea v-model="form.du_remarks" rows="2" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm" placeholder="Add verification notes..."></textarea>
-              </div>
-              <div class="mt-3">
-                <label class="block text-xs font-medium text-gray-500">Additional Note</label>
-                <textarea v-model="form.additional_note" rows="3" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm" placeholder="Add any remarks..."></textarea>
+              <div v-show="!backOfficeSectionCollapsed" class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">DU Remarks</label>
+                  <textarea v-model="form.du_remarks" rows="2" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm" placeholder="Add remarks here..."></textarea>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Additional Note</label>
+                  <textarea v-model="form.additional_note" rows="2" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm" placeholder="Add remarks here..."></textarea>
+                </div>
               </div>
             </section>
 
             <!-- Section 3: Documents -->
             <section>
-              <div class="mb-3 flex items-center justify-between">
-                <h2 class="text-sm font-semibold text-gray-900">Documents</h2>
+              <div class="mb-3">
+                <button
+                  type="button"
+                  class="flex w-full items-center justify-between border-b border-gray-200 pb-2 text-left text-base font-semibold text-gray-900"
+                  :aria-expanded="(!documentsSectionCollapsed).toString()"
+                  @click.prevent="documentsSectionCollapsed = !documentsSectionCollapsed"
+                >
+                  <span>Documents</span>
+                  <div class="flex items-center gap-2 text-sm font-medium text-gray-500">
+                    <span>{{ documentsSectionCollapsed ? 'Show' : 'Minimize' }}</span>
+                    <svg class="h-4 w-4 transition-transform" :class="{ 'rotate-180': documentsSectionCollapsed }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </button>
+              </div>
+              <div v-show="!documentsSectionCollapsed" class="mb-3 flex items-center justify-end">
                 <button
                   type="button"
                   class="rounded border border-gray-300 bg-gray-100 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-200 disabled:opacity-50"
@@ -781,7 +851,7 @@ onMounted(() => {
                   {{ bulkDownloading ? 'Preparing...' : 'Bulk Download' }}
                 </button>
               </div>
-              <div v-if="lead.documents && lead.documents.length" class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div v-show="!documentsSectionCollapsed && lead.documents && lead.documents.length" class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div
                   v-for="doc in lead.documents"
                   :key="doc.id"
@@ -818,9 +888,9 @@ onMounted(() => {
                   </div>
                 </div>
               </div>
-              <div v-else class="rounded-lg border border-gray-200 bg-gray-50 py-8 text-center text-sm text-gray-500">No documents uploaded.</div>
+              <div v-show="!documentsSectionCollapsed && !(lead.documents && lead.documents.length)" class="rounded-lg border border-gray-200 bg-gray-50 py-8 text-center text-sm text-gray-500">No documents uploaded.</div>
               <!-- Add Document cards: one or more slots; user can add more -->
-              <div v-if="canEditBackOffice" class="mt-4 border-t border-gray-200 pt-4">
+              <div v-show="!documentsSectionCollapsed && canEditBackOffice" class="mt-4 border-t border-gray-200 pt-4">
                 <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <h3 class="text-base font-semibold text-gray-900">Add Document</h3>
                   <button
@@ -852,7 +922,7 @@ onMounted(() => {
                       </div>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
-                      <label class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-sky-400 bg-white text-sky-600 text-sm font-medium cursor-pointer hover:bg-sky-50 shrink-0 disabled:opacity-50" :class="{ 'opacity-50 pointer-events-none': uploadingDocs }">
+                      <label class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-green-500 bg-white text-green-700 text-sm font-medium cursor-pointer hover:bg-green-50 shrink-0 disabled:opacity-50" :class="{ 'opacity-50 pointer-events-none': uploadingDocs }">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                         </svg>

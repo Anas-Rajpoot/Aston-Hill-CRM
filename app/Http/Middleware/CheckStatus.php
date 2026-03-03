@@ -26,7 +26,10 @@ class CheckStatus
         if ($request->bearerToken() && method_exists($user, 'currentAccessToken')) {
             $user->currentAccessToken()?->delete();
         }
-        Auth::logout();
+        $webGuard = Auth::guard('web');
+        if (method_exists($webGuard, 'logout')) {
+            $webGuard->logout();
+        }
 
         if ($request->expectsJson() || $request->bearerToken()) {
             return response()->json([

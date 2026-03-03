@@ -17,6 +17,10 @@ class VasRequestResource extends JsonResource
             'submitted_at' => $this->submitted_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
+            'manager_id' => $this->manager_id,
+            'team_leader_id' => $this->team_leader_id,
+            'sales_agent_id' => $this->sales_agent_id,
+            'back_office_executive_id' => $this->back_office_executive_id,
         ];
 
         if ($this->relationLoaded('creator')) {
@@ -39,6 +43,13 @@ class VasRequestResource extends JsonResource
             if (isset($this->attributes[$field]) || array_key_exists($field, $this->attributes ?? [])) {
                 $data[$field] = $this->{$field};
             }
+        }
+
+        if (! isset($data['request_description'])) {
+            $data['request_description'] = $this->request_description ?? $this->description;
+        }
+        if (! isset($data['description'])) {
+            $data['description'] = $this->description ?? $this->request_description;
         }
 
         return $data;

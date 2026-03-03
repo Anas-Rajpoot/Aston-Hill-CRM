@@ -70,6 +70,14 @@ class VasRequestPolicy
         ]) && $this->view($user, $vas);
     }
 
+    public function delete(User $user, VasRequestSubmission $vas): bool
+    {
+        return RbacPermission::can($user, ['vas', 'vas_requests'], 'delete', [
+            'vas.delete',
+            'vas_requests.delete',
+        ]) && $this->view($user, $vas);
+    }
+
     public function submit(User $user, VasRequestSubmission $vas): bool
     {
         return $vas->status === 'draft'

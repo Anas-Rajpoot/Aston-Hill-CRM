@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Role;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class RoleInheritanceService
 {
@@ -17,6 +18,10 @@ class RoleInheritanceService
     public function resolveAncestorRoleIds(int $roleId): array
     {
         return Cache::remember(self::CACHE_PREFIX . $roleId, self::CACHE_TTL, function () use ($roleId) {
+            if (! $this->hasRoleInheritanceTable()) {
+                return [$roleId];
+            }
+
             $visited = [];
             $stack = [$roleId];
 
@@ -46,6 +51,10 @@ class RoleInheritanceService
 
     public function addEdge(Role $parent, Role $child): void
     {
+        if (! $this->hasRoleInheritanceTable()) {
+            return;
+        }
+
         if ($parent->id === $child->id) {
             abort(422, 'A role cannot inherit from itself.');
         }
@@ -68,6 +77,10 @@ class RoleInheritanceService
 
     public function removeEdge(Role $parent, Role $child): void
     {
+        if (! $this->hasRoleInheritanceTable()) {
+            return;
+        }
+
         DB::table('role_inheritance')
             ->where('parent_role_id', (int) $parent->id)
             ->where('child_role_id', (int) $child->id)
@@ -81,6 +94,15 @@ class RoleInheritanceService
         $roleIds = Role::query()->pluck('id')->all();
         foreach ($roleIds as $id) {
             Cache::forget(self::CACHE_PREFIX . (int) $id);
+        }
+    }
+
+    private function hasRoleInheritanceTable(): bool
+    {
+        try {
+            return Schema::hasTable('role_inheritance');
+        } catch (\Throwable $e) {
+            return false;
         }
     }
 }

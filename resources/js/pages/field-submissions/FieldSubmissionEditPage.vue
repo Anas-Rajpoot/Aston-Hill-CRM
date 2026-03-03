@@ -2,13 +2,14 @@
 /**
  * Field Head Edit – full page form matching the design (Primary Info, Team Member, Field Executive, Photographic Proof, Remarks).
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useFormDraft } from '@/composables/useFormDraft'
 import fieldSubmissionsApi from '@/services/fieldSubmissionsApi'
 import { useAuthStore } from '@/stores/auth'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Toast from '@/components/Toast.vue'
+import { formatSystemDateTime } from '@/lib/dateFormat'
 
 const route = useRoute()
 const router = useRouter()
@@ -36,7 +37,9 @@ const emiratesList = computed(() => {
 })
 
 const form = ref({
+  account_number: '',
   company_name: '',
+  authorized_signatory_name: '',
   product: '',
   contact_number: '',
   alternate_number: '',
@@ -59,13 +62,26 @@ const { draftSaving, draftSavedAt, clearDraft } = useFormDraft('field-submission
 const newFiles = ref([])
 const fileInput = ref(null)
 const meetingDateRef = ref(null)
+const settingFromChild = ref(false)
+const settingFromSalesAgent = ref(false)
+const initialFormLoad = ref(false)
 
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 function formatDateDisplay(val) {
   if (!val) return ''
-  const [y, m, d] = val.split('-')
-  if (!y || !m || !d) return ''
-  return `${d}-${MONTHS[parseInt(m, 10) - 1]}-${y}`
+  return formatSystemDateTime(val, '')
+}
+
+function toDateTimeLocal(val) {
+  if (!val) return ''
+  const d = new Date(val)
+  if (Number.isNaN(d.getTime())) return ''
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mi = String(d.getMinutes()).padStart(2, '0')
+  const ss = String(d.getSeconds()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}`
 }
 function openDatePicker(r) {
   const el = r?.$el ?? r
@@ -81,17 +97,99 @@ const id = computed(() => {
 
 const canEdit = computed(() => (auth.user?.permissions ?? []).includes('field_head.view'))
 
+const pickFirstValue = (obj, keys) => {
+  for (const key of keys) {
+    const value = obj?.[key]
+    if (value != null && value !== '') return String(value)
+  }
+  return ''
+}
+
+const resolveTeamLeaderManagerId = (teamLeader) => {
+  const direct = pickFirstValue(teamLeader, ['manager_id', 'managerId'])
+  if (direct) return direct
+  const reportsTo = pickFirstValue(teamLeader, ['reports_to', 'reportsTo'])
+  if (reportsTo && (teamOptions.value.managers ?? []).some((m) => String(m.id) === reportsTo)) return reportsTo
+  return ''
+}
+
 const filteredTeamLeaders = computed(() => {
   const mid = form.value.manager_id
   if (!mid) return teamOptions.value.team_leaders ?? []
-  return (teamOptions.value.team_leaders ?? []).filter((t) => String(t.manager_id) === String(mid))
+  return (teamOptions.value.team_leaders ?? []).filter((t) => resolveTeamLeaderManagerId(t) === String(mid))
 })
 
 const filteredSalesAgents = computed(() => {
   const tlId = form.value.team_leader_id
-  if (!tlId) return teamOptions.value.sales_agents ?? []
-  return (teamOptions.value.sales_agents ?? []).filter((s) => String(s.team_leader_id) === String(tlId))
+  const managerId = form.value.manager_id
+  const teamLeaderIdsUnderManager = new Set(
+    (teamOptions.value.team_leaders ?? [])
+      .filter((t) => managerId && resolveTeamLeaderManagerId(t) === String(managerId))
+      .map((t) => String(t.id))
+  )
+
+  const resolveSalesAgentTeamLeaderId = (salesAgent) => {
+    const direct = pickFirstValue(salesAgent, ['team_leader_id', 'teamLeaderId'])
+    const reportsTo = pickFirstValue(salesAgent, ['reports_to', 'reportsTo'])
+    if (direct) return direct
+    if (reportsTo) {
+      const asTeamLeader = (teamOptions.value.team_leaders ?? []).some((t) => String(t.id) === String(reportsTo))
+      if (asTeamLeader) return String(reportsTo)
+    }
+    return ''
+  }
+
+  const resolveSalesAgentManagerId = (salesAgent) => {
+    const direct = pickFirstValue(salesAgent, ['manager_id', 'managerId'])
+    const reportsTo = pickFirstValue(salesAgent, ['reports_to', 'reportsTo'])
+    if (direct) return direct
+    if (reportsTo) {
+      const asManager = (teamOptions.value.managers ?? []).some((m) => String(m.id) === String(reportsTo))
+      if (asManager) return String(reportsTo)
+    }
+    const teamLeaderIdFromAgent = resolveSalesAgentTeamLeaderId(salesAgent)
+    if (teamLeaderIdFromAgent) {
+      const teamLeader = (teamOptions.value.team_leaders ?? []).find((t) => String(t.id) === String(teamLeaderIdFromAgent))
+      const managerIdFromLeader = resolveTeamLeaderManagerId(teamLeader)
+      if (managerIdFromLeader) return managerIdFromLeader
+    }
+    return ''
+  }
+
+  if (tlId) {
+    return (teamOptions.value.sales_agents ?? []).filter((salesAgent) => resolveSalesAgentTeamLeaderId(salesAgent) === String(tlId))
+  }
+  if (managerId) {
+    return (teamOptions.value.sales_agents ?? []).filter((salesAgent) => {
+      const resolvedManagerId = resolveSalesAgentManagerId(salesAgent)
+      const resolvedTeamLeaderId = resolveSalesAgentTeamLeaderId(salesAgent)
+      return resolvedManagerId === String(managerId) || teamLeaderIdsUnderManager.has(resolvedTeamLeaderId)
+    })
+  }
+  return teamOptions.value.sales_agents ?? []
 })
+
+const deriveSalesHierarchy = (salesAgent) => {
+  let teamLeaderId = pickFirstValue(salesAgent, ['team_leader_id', 'teamLeaderId'])
+  let managerId = pickFirstValue(salesAgent, ['manager_id', 'managerId'])
+  const reportsTo = pickFirstValue(salesAgent, ['reports_to', 'reportsTo'])
+
+  if (!teamLeaderId && reportsTo && (teamOptions.value.team_leaders ?? []).some((u) => String(u.id) === reportsTo)) {
+    teamLeaderId = reportsTo
+  }
+  if (!managerId && reportsTo && (teamOptions.value.managers ?? []).some((u) => String(u.id) === reportsTo)) {
+    managerId = reportsTo
+  }
+  if (!managerId && teamLeaderId) {
+    const teamLeader = (teamOptions.value.team_leaders ?? []).find((u) => String(u.id) === String(teamLeaderId))
+    managerId = resolveTeamLeaderManagerId(teamLeader)
+  }
+  if (!teamLeaderId && managerId) {
+    const leaders = (teamOptions.value.team_leaders ?? []).filter((u) => resolveTeamLeaderManagerId(u) === String(managerId))
+    if (leaders.length === 1) teamLeaderId = String(leaders[0].id)
+  }
+  return { teamLeaderId, managerId }
+}
 
 const existingDocuments = computed(() => submission.value?.documents ?? [])
 
@@ -99,6 +197,7 @@ async function load() {
   if (!id.value) return
   loading.value = true
   submission.value = null
+  initialFormLoad.value = true
   try {
     const [subRes, teamRes, optionsRes] = await Promise.all([
       fieldSubmissionsApi.getSubmission(id.value),
@@ -118,7 +217,9 @@ async function load() {
       field_statuses: optionsRes.field_statuses ?? [],
     }
     form.value = {
+      account_number: data.account_number ?? '',
       company_name: data.company_name ?? '',
+      authorized_signatory_name: data.authorized_signatory_name ?? '',
       product: data.product ?? '',
       contact_number: data.contact_number ?? '',
       alternate_number: data.alternate_number ?? '',
@@ -132,17 +233,73 @@ async function load() {
       manager_id: data.manager_id ?? null,
       field_executive_id: data.field_executive_id ?? null,
       field_status: data.field_status ?? '',
-      meeting_date: data.meeting_date ? data.meeting_date.slice(0, 10) : '',
+      meeting_date: data.meeting_date ? toDateTimeLocal(data.meeting_date) : '',
       remarks_by_field_agent: data.remarks_by_field_agent ?? '',
     }
     newFiles.value = []
   } catch {
     submission.value = null
   } finally {
+    nextTick(() => {
+      initialFormLoad.value = false
+    })
     loading.value = false
     window.scrollTo(0, 0)
   }
 }
+
+watch(
+  () => form.value.manager_id,
+  () => {
+    if (initialFormLoad.value) return
+    if (settingFromChild.value) {
+      nextTick(() => { settingFromChild.value = false })
+      return
+    }
+    form.value.team_leader_id = null
+    form.value.sales_agent_id = null
+  }
+)
+
+watch(
+  () => form.value.team_leader_id,
+  (id) => {
+    if (initialFormLoad.value) return
+    if (id) {
+      const tl = (teamOptions.value.team_leaders ?? []).find((u) => String(u.id) === String(id))
+      const managerId = resolveTeamLeaderManagerId(tl)
+      if (managerId) {
+        settingFromChild.value = true
+        form.value.manager_id = Number(managerId)
+        nextTick(() => { settingFromChild.value = false })
+      }
+      if (!settingFromSalesAgent.value) form.value.sales_agent_id = null
+    } else if (!settingFromSalesAgent.value) {
+      form.value.sales_agent_id = null
+    }
+  }
+)
+
+watch(
+  () => form.value.sales_agent_id,
+  (id) => {
+    if (initialFormLoad.value) return
+    if (id) {
+      const salesAgent = (teamOptions.value.sales_agents ?? []).find((u) => String(u.id) === String(id))
+      if (salesAgent) {
+        const resolved = deriveSalesHierarchy(salesAgent)
+        settingFromSalesAgent.value = true
+        settingFromChild.value = true
+        if (resolved.teamLeaderId) form.value.team_leader_id = Number(resolved.teamLeaderId)
+        if (resolved.managerId) form.value.manager_id = Number(resolved.managerId)
+        nextTick(() => {
+          settingFromSalesAgent.value = false
+          settingFromChild.value = false
+        })
+      }
+    }
+  }
+)
 
 function goBack() {
   router.push('/field-submissions')
@@ -241,7 +398,9 @@ async function submitForm() {
   serverErrors.value = {}
   try {
     const payload = {
+      account_number: form.value.account_number || null,
       company_name: form.value.company_name || null,
+      authorized_signatory_name: form.value.authorized_signatory_name || null,
       product: form.value.product || null,
       contact_number: form.value.contact_number || null,
       alternate_number: form.value.alternate_number || null,
@@ -319,6 +478,15 @@ onMounted(() => {
         <h2 class="mb-4 text-sm font-semibold text-gray-900">Primary Information</h2>
         <div class="grid gap-4 sm:grid-cols-3">
             <div>
+              <label class="block text-sm font-medium text-gray-700">Account Number</label>
+              <input
+                v-model="form.account_number"
+                type="text"
+                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.account_number ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+              />
+              <p v-if="serverErrors.account_number" class="mt-1 text-xs text-red-600">{{ serverErrors.account_number[0] }}</p>
+            </div>
+            <div>
               <label class="block text-sm font-medium text-gray-700">Company Name <span class="text-red-500">*</span></label>
               <input
                 v-model="form.company_name"
@@ -337,6 +505,15 @@ onMounted(() => {
                 :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.product ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
               />
               <p v-if="serverErrors.product" class="mt-1 text-xs text-red-600">{{ serverErrors.product[0] }}</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Authorized Signatory Name</label>
+              <input
+                v-model="form.authorized_signatory_name"
+                type="text"
+                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.authorized_signatory_name ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+              />
+              <p v-if="serverErrors.authorized_signatory_name" class="mt-1 text-xs text-red-600">{{ serverErrors.authorized_signatory_name[0] }}</p>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Contact Number <span class="text-red-500">*</span></label>
@@ -367,6 +544,18 @@ onMounted(() => {
               <p v-if="fieldErrors.alternate_number" class="mt-1 text-xs text-red-600">{{ fieldErrors.alternate_number }}</p>
               <p v-else-if="serverErrors.alternate_number" class="mt-1 text-xs text-red-600">{{ serverErrors.alternate_number[0] }}</p>
             </div>
+        </div>
+        <div class="mt-4 grid gap-4 sm:grid-cols-4">
+            <div class="sm:col-span-2">
+              <label class="block text-sm font-medium text-gray-700">Complete Address <span class="text-red-500">*</span></label>
+              <input
+                v-model="form.complete_address"
+                type="text"
+                required
+                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.complete_address ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+              />
+              <p v-if="serverErrors.complete_address" class="mt-1 text-xs text-red-600">{{ serverErrors.complete_address[0] }}</p>
+            </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Emirates <span class="text-red-500">*</span></label>
               <select
@@ -391,16 +580,6 @@ onMounted(() => {
               <p v-if="fieldErrors.location_coordinates" class="mt-1 text-xs text-red-600">{{ fieldErrors.location_coordinates }}</p>
             </div>
         </div>
-        <div class="mt-4">
-            <label class="block text-sm font-medium text-gray-700">Complete Address <span class="text-red-500">*</span></label>
-            <input
-              v-model="form.complete_address"
-              type="text"
-              required
-              :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.complete_address ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
-            />
-            <p v-if="serverErrors.complete_address" class="mt-1 text-xs text-red-600">{{ serverErrors.complete_address[0] }}</p>
-        </div>
         <div class="mt-4 grid gap-4 sm:grid-cols-2">
             <div>
               <label class="block text-sm font-medium text-gray-700">Additional Notes</label>
@@ -424,28 +603,15 @@ onMounted(() => {
 
         <!-- Section 2: Team Member -->
         <h2 class="mb-4 mt-8 text-sm font-semibold text-gray-900">Team Member</h2>
-        <div class="grid gap-4 sm:grid-cols-3">
+        <div class="grid gap-4 sm:grid-cols-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700">Sales Agent Name</label>
-            <select
-              v-model="form.sales_agent_id"
-              :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.sales_agent_id ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
-            >
-              <option :value="null">Select</option>
-              <option v-for="u in filteredSalesAgents" :key="u.id" :value="u.id">{{ u.name }}</option>
-            </select>
-            <p v-if="serverErrors.sales_agent_id" class="mt-1 text-xs text-red-600">{{ serverErrors.sales_agent_id[0] }}</p>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700">Team Leader Name</label>
-            <select
-              v-model="form.team_leader_id"
-              :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.team_leader_id ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
-            >
-              <option :value="null">Select</option>
-              <option v-for="u in filteredTeamLeaders" :key="u.id" :value="u.id">{{ u.name }}</option>
-            </select>
-            <p v-if="serverErrors.team_leader_id" class="mt-1 text-xs text-red-600">{{ serverErrors.team_leader_id[0] }}</p>
+            <label class="block text-sm font-medium text-gray-700">Submitter Name</label>
+            <input
+              :value="submission?.creator_name || '—'"
+              type="text"
+              readonly
+              class="mt-1 block w-full cursor-not-allowed rounded border border-gray-200 bg-gray-50 px-3 py-2 text-gray-600 shadow-sm"
+            />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700">Manager Name <span class="text-red-500">*</span></label>
@@ -459,8 +625,31 @@ onMounted(() => {
             </select>
             <p v-if="serverErrors.manager_id" class="mt-1 text-xs text-red-600">{{ serverErrors.manager_id[0] }}</p>
           </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Team Leader Name</label>
+            <select
+              v-model="form.team_leader_id"
+              :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.team_leader_id ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+            >
+              <option :value="null">Select</option>
+              <option v-for="u in filteredTeamLeaders" :key="u.id" :value="u.id">{{ u.name }}</option>
+            </select>
+            <p v-if="serverErrors.team_leader_id" class="mt-1 text-xs text-red-600">{{ serverErrors.team_leader_id[0] }}</p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Sales Agent Name</label>
+            <select
+              v-model="form.sales_agent_id"
+              :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.sales_agent_id ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+            >
+              <option :value="null">Select</option>
+              <option v-for="u in filteredSalesAgents" :key="u.id" :value="u.id">{{ u.name }}</option>
+            </select>
+            <p v-if="serverErrors.sales_agent_id" class="mt-1 text-xs text-red-600">{{ serverErrors.sales_agent_id[0] }}</p>
+          </div>
         </div>
-        <div class="mt-4 grid gap-4 sm:grid-cols-3">
+        <h2 class="mb-4 mt-8 text-sm font-semibold text-gray-900">Field Team Working Section</h2>
+        <div class="grid gap-4 sm:grid-cols-3">
           <div>
             <label class="block text-sm font-medium text-gray-700">Field Executive Name <span class="text-red-500">*</span></label>
             <select
@@ -477,7 +666,7 @@ onMounted(() => {
               v-model="form.field_status"
               class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
             >
-              <option value="">Select</option>
+              <option value="">UnAssigned</option>
               <option v-for="s in editOptions.field_statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
             </select>
           </div>
@@ -488,11 +677,11 @@ onMounted(() => {
                 type="text"
                 readonly
                 :value="formatDateDisplay(form.meeting_date)"
-                placeholder="DD-MMM-YYYY"
+                placeholder="DD-MMM-YYYY HH:mm:ss"
                 class="block w-full cursor-pointer rounded border border-gray-300 bg-white px-3 py-2 pr-9 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
               />
               <svg class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-              <input ref="meetingDateRef" v-model="form.meeting_date" type="date" class="sr-only" tabindex="-1" />
+              <input ref="meetingDateRef" v-model="form.meeting_date" type="datetime-local" step="1" class="sr-only" tabindex="-1" />
             </div>
           </div>
         </div>
@@ -510,7 +699,7 @@ onMounted(() => {
               <span class="min-w-0 flex-1 text-sm text-gray-600">Upload Required Document</span>
               <button
                 type="button"
-                class="flex-shrink-0 rounded bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-100"
+                class="flex-shrink-0 rounded bg-green-50 px-3 py-1.5 text-sm font-medium text-green-700 hover:bg-green-100"
                 @click.stop="triggerFileSelect"
               >
                 <span class="inline-flex items-center gap-1">
@@ -525,7 +714,7 @@ onMounted(() => {
               <template v-for="doc in existingDocuments" :key="doc.id">
                 <div class="flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-2 py-1 text-xs">
                   <span class="max-w-[140px] truncate">{{ docDisplayName(doc) }}</span>
-                  <button type="button" class="text-blue-600 hover:underline" @click="downloadDoc(doc)">Download</button>
+                  <button type="button" class="text-green-700 hover:underline" @click="downloadDoc(doc)">Download</button>
                 </div>
               </template>
               <template v-for="(f, idx) in newFiles" :key="'new-' + idx">

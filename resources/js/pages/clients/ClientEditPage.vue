@@ -17,9 +17,53 @@ const fieldErrors = ref({})
 const generalError = ref('')
 const successMessage = ref('')
 const csrOptions = ref([])
+const selectedBillFields = ref(['first_bill'])
+const billsBulkValue = ref('')
 
-const COMPANY_CATEGORY_OPTIONS = ['LLC', 'FZCO', 'FZE', 'Branch', 'Other']
-const TRADE_LICENSE_AUTHORITIES = ['DED', 'JAFZA', 'DMCC', 'Other']
+const COMPANY_CATEGORY_OPTIONS = [
+  'Real Estate',
+  'Education',
+  'Healthcare / Medical Services',
+  'Retail / Wholesale',
+  'Food & Beverage',
+  'Tourism & Hospitality',
+  'Professional Services',
+  'Industrial / Manufacturing',
+  'Technology / IT Services',
+  'Logistics / Transport / Shipping',
+  'Media & Creative',
+  'Financial Services',
+  'Agriculture / Farming / Fisheries',
+  'Environmental / Sustainability Services',
+  'Non-Profit / Charity / NGO',
+  'Other',
+]
+const TRADE_LICENSE_AUTHORITIES = [
+  'DET - Dubai Department of Economy and Tourism',
+  'ADDED - Abu Dhabi Department of Economic Development',
+  'SEDD - Sharjah Economic Development Department',
+  'Ajman DED - Ajman Department of Economic Development',
+  'RAK DED - Ras Al Khaimah Department of Economic Development',
+  'Fujairah Municipality - Fujairah Municipality',
+  'UAQ Municipality - Umm Al Quwain Municipality',
+  'JAFZA - Jebel Ali Free Zone Authority',
+  'DAFZA - Dubai Airport Free Zone Authority',
+  'DMCC - Dubai Multi Commodities Centre',
+  'DIFC - Dubai International Financial Centre',
+  'ADGM - Abu Dhabi Global Market',
+  'SPC - Sharjah Publishing City Free Zone',
+  'SHAMS - Sharjah Media City',
+  'AFZA - Ajman Free Zone Authority',
+  'RAKEZ - Ras Al Khaimah Economic Zone',
+  'ADAFZ - Abu Dhabi Airports Free Zone',
+  'MOE - Ministry of Economy',
+  'TDRA - Telecommunications and Digital Government Regulatory Authority',
+  'MOI - Ministry of Interior',
+  'MOJ - Ministry of Justice',
+  'DHA - Dubai Health Authority',
+  'DoH - Department of Health – Abu Dhabi',
+  'FTA - Federal Tax Authority',
+]
 const BILL_OPTIONS = ['paid', 'unpaid']
 const ACCOUNT_MANAGER_OPTIONS = [
   'Imran Siddiqui',
@@ -62,7 +106,15 @@ const ACCOUNT_TRANSFER_GIVEN_TO_OPTIONS = [
   'VEGA GLOBAL BUSINESS SERVICES FZ LLE',
   'VISIONTEL TECHNOLOGY',
   'X SAT FZE',
+  'Other',
 ]
+const accountTakenFromOptions = computed(() => {
+  const current = String(form.value.account_taken_from || '').trim()
+  if (!current) return ACCOUNT_TRANSFER_GIVEN_TO_OPTIONS
+  return ACCOUNT_TRANSFER_GIVEN_TO_OPTIONS.includes(current)
+    ? ACCOUNT_TRANSFER_GIVEN_TO_OPTIONS
+    : [current, ...ACCOUNT_TRANSFER_GIVEN_TO_OPTIONS]
+})
 const accountTransferGivenToOptions = computed(() => {
   const current = String(form.value.account_transfer_given_to || '').trim()
   if (!current) return ACCOUNT_TRANSFER_GIVEN_TO_OPTIONS
@@ -154,6 +206,16 @@ function selectClass(field) {
     : 'mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500'
 }
 
+function applyBillsBulkAction() {
+  const fields = selectedBillFields.value
+  const value = billsBulkValue.value
+  if (!Array.isArray(fields) || fields.length === 0) return
+  fields.forEach((field) => {
+    form.value[field] = value
+    delete fieldErrors.value[field]
+  })
+}
+
 function validateForm() {
   const f = form.value
   const errs = {}
@@ -161,10 +223,6 @@ function validateForm() {
   if (!f.account_number?.trim()) errs.account_number = 'Account Number is required.'
   if (!f.company_category?.trim()) errs.company_category = 'Company Category is required.'
   if (!f.trade_license_number?.trim()) errs.trade_license_number = 'Trade License Number is required.'
-  if (!f.first_bill?.trim()) errs.first_bill = 'First Bill is required.'
-  if (!f.second_bill?.trim()) errs.second_bill = 'Second Bill is required.'
-  if (!f.third_bill?.trim()) errs.third_bill = 'Third Bill is required.'
-  if (!f.fourth_bill?.trim()) errs.fourth_bill = 'Fourth Bill is required.'
   if (!f.account_manager_name?.trim()) errs.account_manager_name = 'Account Manager Name is required.'
   if (!f.csr_name_1?.trim()) errs.csr_name_1 = 'CSR Name is required.'
   fieldErrors.value = errs
@@ -334,7 +392,10 @@ onMounted(() => load())
               <!-- Row 3 -->
               <div>
                 <label class="text-xs font-medium text-gray-500">Account Taken From</label>
-                <input v-model="form.account_taken_from" type="text" placeholder="Enter value" :class="inputClass('account_taken_from')" />
+                <select v-model="form.account_taken_from" :class="selectClass('account_taken_from')">
+                  <option value="">Select account taken from</option>
+                  <option v-for="opt in accountTakenFromOptions" :key="opt" :value="opt">{{ opt }}</option>
+                </select>
               </div>
               <div>
                 <label class="text-xs font-medium text-gray-500">Account Mapping Date</label>
@@ -346,10 +407,6 @@ onMounted(() => load())
                   <option value="">Select account transfer given to</option>
                   <option v-for="opt in accountTransferGivenToOptions" :key="opt" :value="opt">{{ opt }}</option>
                 </select>
-              </div>
-              <div>
-                <label class="text-xs font-medium text-gray-500">Account Transfer Given Date</label>
-                <DateInputDdMmYyyy v-model="form.account_transfer_given_date" />
               </div>
             </div>
 
@@ -378,7 +435,7 @@ onMounted(() => load())
             <h2 class="mb-4 mt-8 border-b border-gray-200 pb-2 text-base font-semibold text-gray-900">Billing</h2>
             <div class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
               <div>
-                <label class="text-xs font-medium text-gray-500">First Bill <span class="text-red-500">*</span></label>
+                <label class="text-xs font-medium text-gray-500">First Bill</label>
                 <select v-model="form.first_bill" :class="selectClass('first_bill')" @change="fieldErrors.first_bill = ''">
                   <option value="">Paid / Unpaid</option>
                   <option v-for="b in BILL_OPTIONS" :key="b" :value="b">{{ b }}</option>
@@ -386,7 +443,7 @@ onMounted(() => load())
                 <p v-if="fieldErrors.first_bill" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.first_bill }}</p>
               </div>
               <div>
-                <label class="text-xs font-medium text-gray-500">Second Bill <span class="text-red-500">*</span></label>
+                <label class="text-xs font-medium text-gray-500">Second Bill</label>
                 <select v-model="form.second_bill" :class="selectClass('second_bill')" @change="fieldErrors.second_bill = ''">
                   <option value="">Paid / Unpaid</option>
                   <option v-for="b in BILL_OPTIONS" :key="b" :value="b">{{ b }}</option>
@@ -394,7 +451,7 @@ onMounted(() => load())
                 <p v-if="fieldErrors.second_bill" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.second_bill }}</p>
               </div>
               <div>
-                <label class="text-xs font-medium text-gray-500">Third Bill <span class="text-red-500">*</span></label>
+                <label class="text-xs font-medium text-gray-500">Third Bill</label>
                 <select v-model="form.third_bill" :class="selectClass('third_bill')" @change="fieldErrors.third_bill = ''">
                   <option value="">Paid / Unpaid</option>
                   <option v-for="b in BILL_OPTIONS" :key="b" :value="b">{{ b }}</option>
@@ -402,12 +459,40 @@ onMounted(() => load())
                 <p v-if="fieldErrors.third_bill" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.third_bill }}</p>
               </div>
               <div>
-                <label class="text-xs font-medium text-gray-500">Fourth Bill <span class="text-red-500">*</span></label>
+                <label class="text-xs font-medium text-gray-500">Fourth Bill</label>
                 <select v-model="form.fourth_bill" :class="selectClass('fourth_bill')" @change="fieldErrors.fourth_bill = ''">
                   <option value="">Paid / Unpaid</option>
                   <option v-for="b in BILL_OPTIONS" :key="b" :value="b">{{ b }}</option>
                 </select>
                 <p v-if="fieldErrors.fourth_bill" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.fourth_bill }}</p>
+              </div>
+              <div class="sm:col-span-2 lg:col-span-4">
+                <label class="text-xs font-medium text-gray-500">Bulk Action (Select One or More Bills)</label>
+                <div class="mt-1 flex flex-wrap items-end gap-2">
+                  <div class="flex min-h-[42px] flex-wrap items-center gap-3 rounded border border-gray-300 bg-white px-3 py-2">
+                    <label class="inline-flex items-center gap-1.5 text-sm text-gray-700">
+                      <input v-model="selectedBillFields" type="checkbox" value="first_bill" class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500" />
+                      First Bill
+                    </label>
+                    <label class="inline-flex items-center gap-1.5 text-sm text-gray-700">
+                      <input v-model="selectedBillFields" type="checkbox" value="second_bill" class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500" />
+                      Second Bill
+                    </label>
+                    <label class="inline-flex items-center gap-1.5 text-sm text-gray-700">
+                      <input v-model="selectedBillFields" type="checkbox" value="third_bill" class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500" />
+                      Third Bill
+                    </label>
+                    <label class="inline-flex items-center gap-1.5 text-sm text-gray-700">
+                      <input v-model="selectedBillFields" type="checkbox" value="fourth_bill" class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500" />
+                      Fourth Bill
+                    </label>
+                  </div>
+                  <select v-model="billsBulkValue" class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 sm:w-auto sm:min-w-[180px]">
+                    <option value="">Select</option>
+                    <option v-for="b in BILL_OPTIONS" :key="`bulk-${b}`" :value="b">{{ b }}</option>
+                  </select>
+                  <button type="button" class="rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700" @click="applyBillsBulkAction">Apply</button>
+                </div>
               </div>
             </div>
 

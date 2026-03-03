@@ -94,6 +94,8 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
         ->whereNumber('fieldSubmission');
     Route::patch('/field-submissions/{fieldSubmission}', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'patch'])
         ->whereNumber('fieldSubmission');
+    Route::delete('/field-submissions/{fieldSubmission}', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'destroy'])
+        ->whereNumber('fieldSubmission');
     Route::patch('/field-submissions/{fieldSubmission}/status', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'updateStatus'])
         ->whereNumber('fieldSubmission');
     Route::patch('/field-submissions/{fieldSubmission}/assign-field-technician', [\App\Http\Controllers\Api\FieldSubmissionApiController::class, 'assignFieldTechnician'])
@@ -111,6 +113,7 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::get('/special-requests/{specialRequest}', [\App\Http\Controllers\Api\SpecialRequestApiController::class, 'show'])->whereNumber('specialRequest');
     Route::put('/special-requests/{specialRequest}', [\App\Http\Controllers\Api\SpecialRequestApiController::class, 'update'])->whereNumber('specialRequest');
     Route::patch('/special-requests/{specialRequest}', [\App\Http\Controllers\Api\SpecialRequestApiController::class, 'patch'])->whereNumber('specialRequest');
+    Route::delete('/special-requests/{specialRequest}', [\App\Http\Controllers\Api\SpecialRequestApiController::class, 'destroy'])->whereNumber('specialRequest');
     Route::get('/special-requests/{specialRequest}/audits', [\App\Http\Controllers\Api\SpecialRequestApiController::class, 'audits'])->whereNumber('specialRequest');
     Route::post('/special-requests/{specialRequest}/documents', [\App\Http\Controllers\Api\SpecialRequestApiController::class, 'uploadDocuments'])->whereNumber('specialRequest');
     Route::delete('/special-requests/{specialRequest}/documents/{document}', [\App\Http\Controllers\Api\SpecialRequestApiController::class, 'deleteDocument'])->whereNumber('specialRequest');
@@ -141,6 +144,8 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::patch('/customer-support/{customerSupportSubmission}/assign-csr', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'assignCsr'])
         ->whereNumber('customerSupportSubmission');
     Route::patch('/customer-support/{customerSupportSubmission}', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'patch'])
+        ->whereNumber('customerSupportSubmission');
+    Route::delete('/customer-support/{customerSupportSubmission}', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'destroy'])
         ->whereNumber('customerSupportSubmission');
 
     // Clients
@@ -185,9 +190,9 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::delete('/vas-requests/{vasRequest}/documents/{document}', [VasRequestController::class, 'deleteDocument'])->whereNumber('vasRequest')->whereNumber('document');
     Route::put('/vas-requests/{vasRequest}', [VasRequestController::class, 'update'])->whereNumber('vasRequest');
     Route::patch('/vas-requests/{vasRequest}', [\App\Http\Controllers\Api\VasRequestApiController::class, 'patch'])->whereNumber('vasRequest');
+    Route::delete('/vas-requests/{vasRequest}', [\App\Http\Controllers\Api\VasRequestApiController::class, 'destroy'])->whereNumber('vasRequest');
     Route::post('/vas-requests/{vasRequest}/step-2', [VasRequestController::class, 'storeStep2']);
     Route::post('/vas-requests/{vasRequest}/submit', [VasRequestController::class, 'submit']);
-    Route::post('/vas-requests/{vasRequest}/resubmit', [VasRequestController::class, 'resubmit'])->whereNumber('vasRequest');
 
     // Lead submissions (specific routes before {lead})
     Route::get('/lead-submissions/team-options', [FieldSubmissionController::class, 'teamOptions']);
@@ -204,6 +209,8 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::patch('/lead-submissions/{lead}/status-changed-at', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'updateStatusChangedAt'])
         ->whereNumber('lead');
     Route::put('/lead-submissions/{lead}/back-office', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'updateBackOffice'])
+        ->whereNumber('lead');
+    Route::delete('/lead-submissions/{lead}', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'destroy'])
         ->whereNumber('lead');
     Route::get('/lead-submissions/{lead}/audits', [\App\Http\Controllers\Api\LeadSubmissionApiController::class, 'audits'])->whereNumber('lead');
     Route::get('/lead-submissions/{lead}/documents/bulk-download', [LeadSubmissionController::class, 'bulkDownloadDocuments'])

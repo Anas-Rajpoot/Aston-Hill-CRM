@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
@@ -60,9 +60,16 @@ const dropdowns = ref({
   service_categories: [],
   service_types: [],
   product_types: [],
+  product_types_by_category: {},
   work_order_statuses: [],
   contract_types: [],
   clawback_chum_options: [],
+})
+const productTypeOptions = computed(() => {
+  const category = form.value.service_category || ''
+  const mapped = dropdowns.value.product_types_by_category?.[category]
+  if (!mapped) return dropdowns.value.product_types
+  return ensureValueOption(mapped, form.value.product_type)
 })
 
 const filteredTeamLeaders = computed(() => {
@@ -158,6 +165,7 @@ async function loadInitial() {
       service_categories: ensureValueOption(filters.service_categories, currentServiceCategory),
       service_types: ensureValueOption(filters.service_types, currentServiceType),
       product_types: ensureValueOption(filters.product_types, currentProductType),
+      product_types_by_category: filters.product_types_by_category ?? {},
       work_order_statuses: ensureValueOption(filters.work_order_statuses, currentWorkOrderStatus),
       contract_types: ensureValueOption(filters.contract_types, currentContractType),
       clawback_chum_options: ensureValueOption(filters.clawback_chum_options, currentClawbackChum),
@@ -200,6 +208,15 @@ async function loadInitial() {
 function goClose() {
   router.push(closeTarget.value)
 }
+
+watch(
+  () => form.value.service_category,
+  () => {
+    if (!productTypeOptions.value.includes(form.value.product_type)) {
+      form.value.product_type = ''
+    }
+  }
+)
 
 async function save() {
   if (!validateForm()) {
@@ -345,7 +362,7 @@ onMounted(loadInitial)
               <label class="block text-sm font-medium text-gray-700">Product Type</label>
               <select v-model="form.product_type" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
                 <option value="">Select</option>
-                <option v-for="v in dropdowns.product_types" :key="v" :value="v">{{ v }}</option>
+                <option v-for="v in productTypeOptions" :key="v" :value="v">{{ v }}</option>
               </select>
             </div>
             <div>
@@ -371,7 +388,7 @@ onMounted(loadInitial)
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Migration Numbers</label>
-              <input v-model="form.migration_numbers" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <input v-model="form.migration_numbers" type="text" placeholder="Enter Migration / FNP Number" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
             </div>
 
             <div>
@@ -402,7 +419,7 @@ onMounted(loadInitial)
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Activation Date <span class="text-red-600">*</span></label>
-              <DateInputDdMmYyyy v-model="form.activation_date" :input-class="fieldErrors.activation_date ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''" />
+              <DateInputDdMmYyyy v-model="form.activation_date" placeholder="DD-MMM-YYYY" :input-class="fieldErrors.activation_date ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''" />
               <p v-if="fieldErrors.activation_date" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.activation_date }}</p>
             </div>
 
@@ -415,19 +432,20 @@ onMounted(loadInitial)
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Contract End Date</label>
-              <DateInputDdMmYyyy v-model="form.contract_end_date" />
+              <DateInputDdMmYyyy v-model="form.contract_end_date" placeholder="DD-MMM-YYYY" />
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Clawback / Chum <span class="text-red-600">*</span></label>
               <select v-model="form.clawback_chum" :class="selectClass('clawback_chum')">
                 <option value="">Select</option>
-                <option v-for="v in dropdowns.clawback_chum_options" :key="v" :value="v">{{ v }}</option>
+                <option value="Clawback">Clawback</option>
+                <option value="Churn">Churn</option>
               </select>
               <p v-if="fieldErrors.clawback_chum" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.clawback_chum }}</p>
             </div>
             <div class="lg:col-span-2">
               <label class="block text-sm font-medium text-gray-700">Remarks <span class="text-red-600">*</span></label>
-              <input v-model="form.remarks" type="text" :class="inputClass('remarks')">
+              <input v-model="form.remarks" type="text" placeholder="Enter remarks if clawback / Churn...... " :class="inputClass('remarks')">
               <p v-if="fieldErrors.remarks" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.remarks }}</p>
             </div>
           </div>

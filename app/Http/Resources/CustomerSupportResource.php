@@ -17,6 +17,9 @@ class CustomerSupportResource extends JsonResource
             'submitted_at' => $this->submitted_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
+            'manager_id' => $this->manager_id,
+            'team_leader_id' => $this->team_leader_id,
+            'sales_agent_id' => $this->sales_agent_id,
         ];
 
         if ($this->relationLoaded('creator')) {
@@ -32,7 +35,7 @@ class CustomerSupportResource extends JsonResource
             $data['manager'] = $this->manager ? ['id' => $this->manager->id, 'name' => $this->manager->name] : null;
         }
 
-        foreach (['contact_number', 'issue_description'] as $field) {
+        foreach (['contact_number', 'alternate_contact_number', 'issue_description', 'attachments'] as $field) {
             if (isset($this->attributes[$field]) || array_key_exists($field, $this->attributes ?? [])) {
                 $data[$field] = $this->{$field};
             }

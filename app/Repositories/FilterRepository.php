@@ -9,6 +9,12 @@ use Illuminate\Support\Facades\DB;
 
 class FilterRepository
 {
+    private const PRODUCT_TYPES_BY_CATEGORY = [
+        'Fixed' => ['Business Ultimate', 'Business Essential', 'Business Complete', 'Business Line', 'Business Trunk Line', 'ISDN 30', 'SIP Trunk', 'Fax Line', 'Fixed Other'],
+        'FMS' => ['Business Starter', 'Business Starter Pro', 'Business Starter Ultra 12M', 'Business Starter Ultra 24M', 'FMS Other'],
+        'GSM' => ['Simplified', 'Q1', 'BIP', 'Abu Dhabi Offer', 'SPR'],
+    ];
+
     /**
      * Return filters for clients listing.
      *
@@ -96,6 +102,12 @@ class FilterRepository
                 ->values()
                 ->all();
 
+            $productTypes = collect(self::PRODUCT_TYPES_BY_CATEGORY)
+                ->flatten()
+                ->unique()
+                ->values()
+                ->all();
+
             return [
                 'statuses' => $statuses,
                 'managers' => $managers,
@@ -106,7 +118,8 @@ class FilterRepository
                 'submission_types' => $distinctStrings($rows, 'submission_type'),
                 'service_categories' => $distinctStrings($rows, 'service_category'),
                 'service_types' => $distinctStrings($rows, 'service_type'),
-                'product_types' => $distinctStrings($rows, 'product_type'),
+                'product_types' => $productTypes,
+                'product_types_by_category' => self::PRODUCT_TYPES_BY_CATEGORY,
                 'work_order_statuses' => $distinctStrings($rows, 'work_order_status'),
                 'payment_connections' => $distinctStrings($rows, 'payment_connection'),
                 'contract_types' => $distinctStrings($rows, 'contract_type'),

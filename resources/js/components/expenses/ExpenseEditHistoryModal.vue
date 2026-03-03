@@ -5,6 +5,7 @@
  */
 import { ref, watch, computed } from 'vue'
 import expensesApi from '@/services/expensesApi'
+import { formatSystemDateTime } from '@/lib/dateFormat'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -99,15 +100,7 @@ function getChangesFromAudit(a) {
 }
 
 function formatDateTime(iso) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  const pad = (n) => String(n).padStart(2, '0')
-  const day = pad(d.getDate())
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  const mon = months[d.getMonth()]
-  const year = d.getFullYear()
-  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-  return `${day}-${mon}-${year} ${time}`
+  return formatSystemDateTime(iso, '—')
 }
 
 const auditLog = ref([])

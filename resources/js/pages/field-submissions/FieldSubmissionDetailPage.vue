@@ -8,6 +8,7 @@ import fieldSubmissionsApi from '@/services/fieldSubmissionsApi'
 import { useAuthStore } from '@/stores/auth'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import TruncatedText from '@/components/TruncatedText.vue'
+import { formatUserDate, formatSystemDateTime } from '@/lib/dateFormat'
 
 const route = useRoute()
 const router = useRouter()
@@ -38,25 +39,11 @@ function displayVal(val) {
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 function formatDate(d) {
-  if (!d) return '—'
-  const date = new Date(d)
-  if (Number.isNaN(date.getTime())) return '—'
-  const day = String(date.getDate()).padStart(2, '0')
-  const mon = MONTH_NAMES[date.getMonth()]
-  const year = date.getFullYear()
-  return `${day}-${mon}-${year}`
+  return formatUserDate(d, '—')
 }
 
 function formatDateTime(d) {
-  if (!d) return '—'
-  const date = new Date(d)
-  if (Number.isNaN(date.getTime())) return '—'
-  const day = String(date.getDate()).padStart(2, '0')
-  const mon = MONTH_NAMES[date.getMonth()]
-  const year = date.getFullYear()
-  const h = String(date.getHours()).padStart(2, '0')
-  const m = String(date.getMinutes()).padStart(2, '0')
-  return `${day}-${mon}-${year} ${h}:${m}`
+  return formatSystemDateTime(d, '—')
 }
 
 function formatStatus(status) {
@@ -146,7 +133,9 @@ function docDisplayName(doc) {
 }
 
 const FIELD_LABELS = {
+  account_number: 'Account Number',
   company_name: 'Company Name',
+  authorized_signatory_name: 'Authorized Signatory Name',
   contact_number: 'Contact Number',
   product: 'Product',
   alternate_number: 'Alternate Contact Number',
@@ -328,20 +317,34 @@ onMounted(() => load())
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ submissionId(submission) }}</div>
                 </div>
                 <div>
+                  <label class="block text-xs font-medium text-gray-500">Account Number</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.account_number) }}</div>
+                </div>
+                <div>
                   <label class="block text-xs font-medium text-gray-500">Company Name</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.company_name) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Product</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.product) }}</div>
+                  <label class="block text-xs font-medium text-gray-500">Authorized Signatory Name</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.authorized_signatory_name) }}</div>
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Contact Number</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.contact_number) }}</div>
                 </div>
                 <div>
+                  <label class="block text-xs font-medium text-gray-500">Product</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.product) }}</div>
+                </div>
+                <div>
                   <label class="block text-xs font-medium text-gray-500">Alternate Contact Number</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.alternate_number) }}</div>
+                </div>
+              </div>
+              <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-4">
+                <div class="sm:col-span-2">
+                  <label class="block text-xs font-medium text-gray-500">Complete Address</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.complete_address) }}</div>
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Emirates</label>
@@ -350,10 +353,6 @@ onMounted(() => load())
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Location Coordinates</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.location_coordinates) }}</div>
-                </div>
-                <div class="sm:col-span-2">
-                  <label class="block text-xs font-medium text-gray-500">Complete Address</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.complete_address) }}</div>
                 </div>
               </div>
               <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -371,7 +370,7 @@ onMounted(() => load())
             <!-- Team Information -->
             <section class="mb-6">
               <h2 class="mb-3 text-sm font-semibold text-gray-900">Team Information</h2>
-              <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-4">
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Manager</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.manager_name) }}</div>
@@ -384,8 +383,17 @@ onMounted(() => load())
                   <label class="block text-xs font-medium text-gray-500">Sales Agent</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.sales_agent_name) }}</div>
                 </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Created By</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.creator_name) }}</div>
+                </div>
               </div>
-              <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            </section>
+
+            <!-- Field Team Working Section -->
+            <section class="mb-6">
+              <h2 class="mb-3 text-sm font-semibold text-gray-900">Field Team Working Section</h2>
+              <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Field Agent</label>
                   <div
@@ -395,17 +403,6 @@ onMounted(() => load())
                     {{ fieldAgentDisplay(submission) }}
                   </div>
                 </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">Created By</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.creator_name) }}</div>
-                </div>
-              </div>
-            </section>
-
-            <!-- Status & Timeline -->
-            <section class="mb-6">
-              <h2 class="mb-3 text-sm font-semibold text-gray-900">Status & Timeline</h2>
-              <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Field Status</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
@@ -423,32 +420,9 @@ onMounted(() => load())
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ submission.meeting_date ? formatDateTime(submission.meeting_date) : '—' }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">SLA Timer</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm" :class="slaTimerClass(slaTimerText, slaStatusText)">
-                    {{ slaTimerText ?? '—' }}
-                  </div>
+                  <label class="block text-xs font-medium text-gray-500">Remarks by Field Agent</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 whitespace-pre-wrap">{{ displayVal(submission.remarks_by_field_agent) }}</div>
                 </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">SLA Status</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
-                    <span
-                      v-if="slaStatusText"
-                      :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', statusBadgeClass(slaStatusText)]"
-                    >
-                      {{ slaStatusText }}
-                    </span>
-                    <span v-else class="text-gray-500">—</span>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <!-- Notes & Remarks -->
-            <section class="mb-6">
-              <h2 class="mb-3 text-sm font-semibold text-gray-900">Notes & Remarks</h2>
-              <div>
-                <label class="block text-xs font-medium text-gray-500">Remarks by Field Agent</label>
-                <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 whitespace-pre-wrap">{{ displayVal(submission.remarks_by_field_agent) }}</div>
               </div>
             </section>
 
@@ -509,7 +483,7 @@ onMounted(() => load())
                   </div>
                   <button
                     type="button"
-                    class="shrink-0 rounded p-1.5 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                    class="shrink-0 rounded p-1.5 text-green-700 hover:bg-green-50 hover:text-green-800"
                     title="Download"
                     @click="downloadDoc(doc)"
                   >

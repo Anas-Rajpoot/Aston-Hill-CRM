@@ -20,7 +20,7 @@ function createUserWithRole(string $roleName, array $permissions = []): User
     $user = User::factory()->create([
         'name' => "Test {$roleName}",
         'email' => "{$roleName}_perm_" . uniqid() . '@test.com',
-        'status' => 'active',
+        'status' => 'approved',
         'password' => bcrypt('Password1!'),
     ]);
 

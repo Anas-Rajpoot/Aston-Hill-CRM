@@ -19,6 +19,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -31,6 +33,9 @@ class LeadSubmissionApiController extends Controller
     use \App\Traits\ResolvesAuditDisplayValues;
     private const MODULE = 'lead_submissions';
 
+    /** @var array<int, string>|null */
+    private ?array $tableColumns = null;
+
     /** Whitelist of allowed columns for SELECT (prevents SQL injection / unauthorized exposure). */
     private const ALLOWED_COLUMNS = [
         'id', 'company_name', 'account_number', 'authorized_signatory_name', 'email', 'contact_number_gsm',
@@ -38,6 +43,7 @@ class LeadSubmissionApiController extends Controller
         'service_category_id', 'service_type_id', 'status', 'status_changed_at',
         'submitted_at', 'updated_at', 'created_by', 'product', 'offer', 'mrc_aed', 'quantity',
         'ae_domain', 'gaid', 'remarks', 'submission_type',
+        'previous_activity', 'resubmission_reason',
         'call_verification', 'pending_from_sales', 'documents_verification', 'submission_date_from',
         'back_office_notes', 'activity', 'back_office_account', 'work_order', 'du_status', 'completion_date',
         'du_remarks', 'additional_note',
@@ -65,7 +71,7 @@ class LeadSubmissionApiController extends Controller
             'sort' => ['sometimes', 'string', Rule::in(array_merge(self::ALLOWED_COLUMNS, ['creator', 'type', 'category', 'sales_agent', 'team_leader', 'manager', 'executive', 'submission_type', 'sla_timer']))],
             'order' => ['sometimes', 'string', Rule::in(['asc', 'desc'])],
             'columns' => ['sometimes', 'array'],
-            'columns.*' => ['string', Rule::in(array_merge(self::ALLOWED_COLUMNS, ['creator', 'type', 'category', 'sales_agent', 'team_leader', 'manager', 'executive', 'submission_type', 'sla_timer']))],
+            'columns.*' => ['string'],
             'submission_type' => ['sometimes', 'nullable', 'string', Rule::in(['new', 'resubmission'])],
             'service_type_id' => ['sometimes', 'nullable', 'integer', 'exists:service_types,id'],
             'status' => ['sometimes', 'nullable', 'string', Rule::in(LeadSubmission::STATUSES)],
@@ -264,7 +270,12 @@ class LeadSubmissionApiController extends Controller
         } elseif ($sort === 'sla_timer') {
             $query->orderBy('lead_submissions.submitted_at', $order);
         } else {
-            $query->orderBy('lead_submissions.' . $sort, $order);
+            if (in_array($sort, $this->getExistingTableColumns(), true)) {
+                $query->orderBy('lead_submissions.' . $sort, $order);
+            } else {
+                $fallback = in_array('submitted_at', $this->getExistingTableColumns(), true) ? 'submitted_at' : 'created_at';
+                $query->orderBy('lead_submissions.' . $fallback, $order);
+            }
         }
     }
 
@@ -299,8 +310,31 @@ class LeadSubmissionApiController extends Controller
             }
         }
         $base = array_unique($base);
+        $existing = $this->getExistingTableColumns();
+        $base = array_values(array_filter($base, fn ($c) => in_array($c, $existing, true)));
 
         return array_map(fn ($c) => 'lead_submissions.' . $c, $base);
+    }
+
+    /**
+     * Returns existing DB columns for lead_submissions table (cached per request).
+     * Protects listing queries from schema drift on local SQLite environments.
+     *
+     * @return array<int, string>
+     */
+    private function getExistingTableColumns(): array
+    {
+        if ($this->tableColumns !== null) {
+            return $this->tableColumns;
+        }
+
+        try {
+            $this->tableColumns = Schema::getColumnListing('lead_submissions');
+        } catch (\Throwable $e) {
+            $this->tableColumns = self::ALLOWED_COLUMNS;
+        }
+
+        return $this->tableColumns;
     }
 
     private function formatLeadRow(LeadSubmission $lead, array $columns): array
@@ -436,7 +470,7 @@ class LeadSubmissionApiController extends Controller
                     ['value' => 'rejected', 'label' => 'Rejected'],
                     ['value' => 'pending_for_ata', 'label' => 'Pending for ATA'],
                     ['value' => 'pending_for_finance', 'label' => 'Pending for Finance'],
-                    ['value' => 'pending_from_sales', 'label' => 'pending for sales'],
+                    ['value' => 'pending_from_sales', 'label' => 'Pending from Sales'],
                     ['value' => 'unassigned', 'label' => 'Unassigned'],
                 ],
                 'products' => $products,
@@ -468,6 +502,16 @@ class LeadSubmissionApiController extends Controller
             ->first();
 
         $visible = $pref?->visible_columns ?? config('modules.lead_submissions.default_columns', []);
+        $allowedColumns = array_merge(self::ALLOWED_COLUMNS, ['creator', 'type', 'category', 'sales_agent', 'team_leader', 'manager', 'executive', 'submission_type', 'sla_timer']);
+        $visible = array_values(array_intersect((array) $visible, $allowedColumns));
+        if (empty($visible)) {
+            $visible = array_values(array_intersect((array) config('modules.lead_submissions.default_columns', []), $allowedColumns));
+        }
+        if ($pref && $pref->visible_columns !== $visible) {
+            $pref->visible_columns = $visible;
+            $pref->save();
+            Cache::forget("col_pref_{$request->user()->id}_" . self::MODULE);
+        }
 
         return response()->json([
             'all_columns' => $allColumns,
@@ -799,6 +843,22 @@ class LeadSubmissionApiController extends Controller
             'id' => $lead->id,
             'message' => 'Submission updated.',
         ]);
+    }
+
+    public function destroy(Request $request, LeadSubmission $lead): JsonResponse
+    {
+        $this->authorize('delete', $lead);
+
+        $leadId = (int) $lead->id;
+        $lead->delete();
+
+        Storage::disk('public')->deleteDirectory("lead-submissions/{$leadId}");
+
+        SystemAuditLog::record('lead_submission.deleted', [
+            'lead_submission_id' => $leadId,
+        ], null, $request->user()->id, 'lead_submission', $leadId);
+
+        return response()->json(['message' => 'Lead submission deleted.']);
     }
 
     /**

@@ -20,10 +20,15 @@ export function invalidateCurrentDraftCache() {
   currentDraftCacheAt = 0
 }
 
+export function invalidateTeamOptionsCache() {
+  teamOptionsCache = null
+  teamOptionsCacheAt = 0
+}
+
 const leadSubmissionsApi = {
   // ─── Wizard (step1–4) ─────────────────────────────────────────────────────
-  getTeamOptions() {
-    if (teamOptionsCache && Date.now() - teamOptionsCacheAt < TEAM_OPTIONS_TTL_MS) {
+  getTeamOptions(forceRefresh = false) {
+    if (!forceRefresh && teamOptionsCache && Date.now() - teamOptionsCacheAt < TEAM_OPTIONS_TTL_MS) {
       return Promise.resolve(teamOptionsCache)
     }
     const p = api.get('/field-submissions/team-options')
@@ -161,6 +166,11 @@ const leadSubmissionsApi = {
   async updateBackOffice(leadId, data) {
     const { data: res } = await api.put(`/lead-submissions/${leadId}/back-office`, data)
     return res
+  },
+
+  async destroy(leadId) {
+    const { data } = await api.delete(`/lead-submissions/${leadId}`)
+    return data
   },
 
   /** Bulk assign: dispatches queue job, returns tracking_id for progress polling. */

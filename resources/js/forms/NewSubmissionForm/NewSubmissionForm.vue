@@ -25,11 +25,13 @@ const options = ref({
 
 const REQUEST_TYPE_OPTIONS = [
   { value: '', label: 'Select' },
-  { value: 'General', label: 'General' },
-  { value: 'Support', label: 'Support' },
-  { value: 'Relocation', label: 'Relocation' },
-  { value: 'Renewal', label: 'Renewal' },
-  { value: 'Other', label: 'Other' },
+  { value: 'Special Landline Number', label: 'Special Landline Number' },
+  { value: 'Special Mobile Number', label: 'Special Mobile Number' },
+  { value: 'Sequential Number', label: 'Sequential Number' },
+  { value: 'Renewal Offer Approval', label: 'Renewal Offer Approval' },
+  { value: 'Hard Cap Approval', label: 'Hard Cap Approval' },
+  { value: 'Marketing Approval', label: 'Marketing Approval' },
+  { value: 'Other Request', label: 'Other Request' },
 ]
 
 const STATUS_OPTIONS = [
@@ -40,11 +42,13 @@ const STATUS_OPTIONS = [
 
 const documentFiles = ref([null])
 const submitting = ref(false)
+const savingDraft = ref(false)
 const successMessage = ref('')
 const loading = ref(true)
 const settingFromChild = ref(false)
 const settingFromSalesAgent = ref(false)
 const errorSummaryRef = ref(null)
+const submitRequestIconUrl = '/images/submit-request-icon.png'
 
 const { errors, generalMessage, setErrors, clearErrors, clearFieldError, getError } = useFormErrors()
 
@@ -144,7 +148,7 @@ async function submit() {
     if (form.value.sales_agent_id) fd.append('sales_agent_id', form.value.sales_agent_id)
     documentFiles.value.forEach((file) => { if (file) fd.append('documents[]', file) })
     await specialRequestsApi.store(fd)
-    successMessage.value = 'Special request submitted successfully.'
+    successMessage.value = 'Your special request has been submitted successfully. Back Office will review and process.'
     clearState()
     nextTick(() => { window.scrollTo(0, 0) })
   } catch (e) {
@@ -152,6 +156,37 @@ async function submit() {
     nextTick(() => errorSummaryRef.value?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }))
   } finally {
     submitting.value = false
+  }
+}
+
+async function saveDraft() {
+  clearErrors()
+  const frontendErrors = validateForm()
+  if (frontendErrors) {
+    errors.value = frontendErrors
+    generalMessage.value = 'Please correct the errors below.'
+    nextTick(() => errorSummaryRef.value?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }))
+    return
+  }
+  savingDraft.value = true
+  try {
+    const fd = new FormData()
+    fd.append('company_name', form.value.company_name.trim())
+    fd.append('account_number', form.value.account_number?.trim() || '')
+    fd.append('request_type', form.value.request_type.trim())
+    fd.append('status', 'draft')
+    fd.append('complete_address', form.value.complete_address?.trim() || '')
+    fd.append('special_instruction', form.value.special_instruction?.trim() || '')
+    fd.append('manager_id', form.value.manager_id)
+    if (form.value.team_leader_id) fd.append('team_leader_id', form.value.team_leader_id)
+    if (form.value.sales_agent_id) fd.append('sales_agent_id', form.value.sales_agent_id)
+    documentFiles.value.forEach((file) => { if (file) fd.append('documents[]', file) })
+    await specialRequestsApi.store(fd)
+  } catch (e) {
+    setErrors(e)
+    nextTick(() => errorSummaryRef.value?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }))
+  } finally {
+    savingDraft.value = false
   }
 }
 
@@ -189,7 +224,8 @@ const selectClass = (field) =>
     <!-- Success message -->
     <div v-if="successMessage" class="rounded-lg border border-green-200 bg-green-50 p-6 text-center">
       <svg class="mx-auto mb-3 h-12 w-12 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-      <p class="text-lg font-semibold text-green-800">{{ successMessage }}</p>
+      <h3 class="text-lg font-semibold text-green-800">Special request submission completed</h3>
+      <p class="mt-1 text-sm text-green-600">{{ successMessage }}</p>
       <p class="mt-3 text-sm text-gray-600">Click the button below to start a new special request.</p>
       <button type="button" @click="startNewSubmission" class="mt-4 inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-green-700">New Special Request</button>
     </div>
@@ -339,23 +375,41 @@ const selectClass = (field) =>
         </div>
       </div>
 
-      <div class="mt-6 flex flex-wrap justify-end gap-3 border-t border-gray-200 pt-4">
+      <div class="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 pt-4">
+        <div class="flex items-center gap-3">
+          <button
+            type="button"
+            class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+            @click="reset"
+          >
+            Cancel
+          </button>
+        </div>
+        <div class="flex items-center gap-3">
+          <button
+            type="button"
+            :disabled="savingDraft"
+            class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-70"
+            @click="saveDraft"
+          >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+            </svg>
+            {{ savingDraft ? 'Saving...' : 'Save as Draft' }}
+          </button>
         <button
           type="button"
           :disabled="submitting"
-          class="inline-flex items-center rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-70"
+          class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-70"
           @click="submit"
         >
           <span v-if="submitting" class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-          {{ submitting ? 'Saving…' : 'Save' }}
+          <span>{{ submitting ? 'Submitting...' : 'Submit' }}</span>
+          <svg v-if="!submitting" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
         </button>
-        <button
-          type="button"
-          class="inline-flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-          @click="reset"
-        >
-          Reset
-        </button>
+        </div>
       </div>
     </div><!-- end v-else -->
   </div>

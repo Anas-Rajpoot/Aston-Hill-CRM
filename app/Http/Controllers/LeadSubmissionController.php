@@ -22,6 +22,13 @@ use App\Rules\AllowedDocumentFile;
 
 class LeadSubmissionController extends Controller
 {
+    private const CANONICAL_SERVICE_TYPES_BY_CATEGORY = [
+        'fixed' => ['New Submission', 'Relocation', 'Update WO', 'Contract Renewal', 'Migration', 'Other'],
+        'fms' => ['New Submission', 'Relocation', 'Update WO', 'Contract Renewal', 'Migration', 'Other'],
+        'gsm' => ['New Sim Card', 'C2B Migration', 'B2B Migration', 'MNP', 'MNMI / EC Renewal', 'AS Update', 'MPR', 'Sim Replacement', 'Multi Sim'],
+        'other' => ['Office 365', 'Domain Activation', 'Number Swapping', 'Device Request', 'Other Request'],
+    ];
+
     public function __construct(private LeadSubmissionService $leadSubmissionService)
     {
         // Your CrudPermission middleware (module: leads)
@@ -718,13 +725,38 @@ if ($request->expectsJson() || $request->ajax()) {
             'service_category_id' => ['required', 'exists:service_categories,id'],
         ]);
 
+        $category = ServiceCategory::query()
+            ->where('id', (int) $request->service_category_id)
+            ->first(['id', 'name']);
+
         $types = ServiceType::where('service_category_id', $request->service_category_id)
             ->where('is_active', true)
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get(['id', 'name', 'slug']);
 
-        return response()->json($types);
+        $categoryKey = strtolower(trim((string) ($category?->slug ?? $category?->name ?? '')));
+        $canonicalNames = self::CANONICAL_SERVICE_TYPES_BY_CATEGORY[$categoryKey] ?? null;
+        if (! is_array($canonicalNames)) {
+            return response()->json($types);
+        }
+        $ordered = collect();
+        foreach ($canonicalNames as $index => $typeName) {
+            $slug = str($typeName)->slug()->toString() . '-' . ($category?->slug ?? 'service');
+            $type = ServiceType::updateOrCreate(
+                ['slug' => $slug],
+                [
+                    'service_category_id' => (int) $request->service_category_id,
+                    'name' => $typeName,
+                    'sort_order' => $index + 1,
+                    'is_active' => true,
+                    'schema' => ['fields' => [], 'documents' => []],
+                ]
+            );
+            $ordered->push($type->only(['id', 'name', 'slug']));
+        }
+
+        return response()->json($ordered->values()->all());
     }
 
     /** @deprecated use serviceTypes */
@@ -954,7 +986,8 @@ if ($request->expectsJson() || $request->ajax()) {
     }
 
     /**
-     * POST resubmit: update rejected lead with form data + documents, then set status to submitted.
+     * POST resubmit: create a new lead entry from the source lead + form data,
+     * then optionally submit it. Original lead remains unchanged.
      * Only super admin or creator.
      */
     public function resubmit(Request $request, $lead)
@@ -978,8 +1011,8 @@ if ($request->expectsJson() || $request->ajax()) {
             'address' => ['nullable', 'string', 'max:500'],
             'emirate' => ['nullable', 'string', 'max:100'],
             'location_coordinates' => ['nullable', 'string', 'max:100'],
-            'previous_activity' => ['nullable', 'string', 'max:2000'],
-            'resubmission_reason' => ['nullable', 'string', 'max:2000'],
+            'previous_activity' => [$isDraft ? 'nullable' : 'required', 'string', 'max:2000'],
+            'resubmission_reason' => [$isDraft ? 'nullable' : 'required', 'string', 'max:2000'],
             'remarks' => ['nullable', 'string', 'max:2000'],
             'service_category_id' => ['nullable', 'integer', 'exists:service_categories,id'],
             'service_type_id' => ['nullable', 'integer', 'exists:service_types,id'],
@@ -999,10 +1032,12 @@ if ($request->expectsJson() || $request->ajax()) {
         $payload = array_merge($leadSubmission->payload ?? [], [
             'resubmission_reason' => $data['resubmission_reason'] ?? null,
             'previous_activity' => $data['previous_activity'] ?? null,
-            'is_resubmission' => true, // mark so Request Type shows "Resubmission" on detail page
+            'is_resubmission' => true,
+            'resubmission_of_id' => $leadSubmission->id,
         ]);
 
-        $update = [
+        $create = [
+            'created_by' => $request->user()->id,
             'account_number' => $data['account_number'] ?? $leadSubmission->account_number,
             'company_name' => $data['company_name'] ?? $leadSubmission->company_name,
             'authorized_signatory_name' => $data['authorized_signatory_name'] ?? $leadSubmission->authorized_signatory_name,
@@ -1025,19 +1060,46 @@ if ($request->expectsJson() || $request->ajax()) {
             'payload' => $payload,
             'submission_type' => 'resubmission',
             'updated_by' => $request->user()->id,
+            'step' => 4,
+            'status' => $isDraft ? 'draft' : 'unassigned',
+            'submitted_at' => $isDraft ? null : now(),
+            'status_changed_at' => now(),
+            'rejected_at' => null,
+            'rejected_by' => null,
+            'approved_at' => null,
+            'approved_by' => null,
         ];
 
         if (!empty($data['service_category_id'])) {
-            $update['service_category_id'] = $data['service_category_id'];
+            $create['service_category_id'] = $data['service_category_id'];
         }
         if (!empty($data['service_type_id'])) {
-            $update['service_type_id'] = $data['service_type_id'];
+            $create['service_type_id'] = $data['service_type_id'];
         }
 
-        $leadSubmission->update($update);
+        $newLeadSubmission = DB::transaction(function () use ($leadSubmission, $create) {
+            $newLeadSubmission = LeadSubmission::create($create);
+
+            foreach ($leadSubmission->documents as $doc) {
+                $newLeadSubmission->documents()->create([
+                    'service_type_id' => $doc->service_type_id,
+                    'doc_key' => $doc->doc_key,
+                    'label' => $doc->label,
+                    'file_path' => $doc->file_path,
+                    'file_name' => $doc->file_name,
+                    'mime' => $doc->mime,
+                    'size' => $doc->size,
+                ]);
+            }
+
+            return $newLeadSubmission;
+        });
 
         // Document uploads (resubmission doc keys)
-        $docKeys = ['trade_license', 'establishment_card', 'owner_emirates_id', 'vat_certificate'];
+        $docKeys = array_values(array_filter(array_map(
+            fn ($doc) => $doc['key'] ?? null,
+            LeadSubmissionSchema::defaultDocuments()
+        )));
         $fileRules = [];
         foreach ($docKeys as $key) {
             $fileRules["documents.{$key}"] = ['nullable', 'array'];
@@ -1049,7 +1111,7 @@ if ($request->expectsJson() || $request->ajax()) {
             'documents.*.*' => 'Each file must be PDF, DOC, DOCX, or EML.',
             'documents.*.*.max' => 'Each file must not exceed 3MB.',
         ]);
-        $this->leadSubmissionService->saveResubmissionDocuments($request, $leadSubmission, $docKeys);
+        $this->leadSubmissionService->saveResubmissionDocuments($request, $newLeadSubmission, $docKeys);
 
         // Handle additional documents (append, don't replace)
         $additionalFiles = $request->file('documents.additional');
@@ -1059,8 +1121,8 @@ if ($request->expectsJson() || $request->ajax()) {
             foreach ($additionalFiles as $i => $file) {
                 if ($file && $file->isValid()) {
                     $docKey = 'additional_' . $ts . '_' . $i;
-                    $path = $file->store("leads/{$leadSubmission->id}", 'public');
-                    $leadSubmission->documents()->create([
+                    $path = $file->store("leads/{$newLeadSubmission->id}", 'public');
+                    $newLeadSubmission->documents()->create([
                         'doc_key' => $docKey,
                         'original_name' => $file->getClientOriginalName(),
                         'file_path' => $path,
@@ -1073,24 +1135,15 @@ if ($request->expectsJson() || $request->ajax()) {
 
         if (!$isDraft) {
             // Require Trade License on submit (must exist after saving uploads)
-            if (!$leadSubmission->documents()->where('doc_key', 'trade_license')->exists()) {
+            if (!$newLeadSubmission->documents()->where('doc_key', 'trade_license')->exists()) {
                 return response()->json(['message' => 'Trade License is required.'], 422);
             }
-            // Submit: clear rejected state, set submitted, mark as resubmission
-            $leadSubmission->update([
-                'status' => 'submitted',
-                'submitted_at' => now(),
-                'status_changed_at' => now(),
-                'submission_type' => 'resubmission',
-                'rejected_at' => null,
-                'rejected_by' => null,
-            ]);
         }
 
         return response()->json([
-            'id' => $leadSubmission->id,
+            'id' => $newLeadSubmission->id,
             'message' => $isDraft ? 'Resubmission draft saved.' : 'Lead resubmitted successfully.',
-            'status' => $leadSubmission->fresh()->status,
+            'status' => $newLeadSubmission->fresh()->status,
         ], $isDraft ? 200 : 200);
     }
 

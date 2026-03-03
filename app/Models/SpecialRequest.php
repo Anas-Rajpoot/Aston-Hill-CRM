@@ -23,11 +23,13 @@ class SpecialRequest extends Model
     const STATUSES = ['draft', 'submitted', 'approved', 'rejected'];
 
     const REQUEST_TYPES = [
-        'General',
-        'Support',
-        'Relocation',
-        'Renewal',
-        'Other',
+        'Special Landline Number',
+        'Special Mobile Number',
+        'Sequential Number',
+        'Renewal Offer Approval',
+        'Hard Cap Approval',
+        'Marketing Approval',
+        'Other Request',
     ];
 
     protected $casts = [
