@@ -20,7 +20,7 @@ class SpecialRequest extends Model
         'submitted_at',
     ];
 
-    const STATUSES = ['draft', 'submitted', 'approved', 'rejected'];
+    const STATUSES = ['unassigned', 'approved', 'rejected'];
 
     const REQUEST_TYPES = [
         'Special Landline Number',
@@ -40,7 +40,7 @@ class SpecialRequest extends Model
     public function submit(): void
     {
         $this->update([
-            'status' => 'submitted',
+            'status' => 'unassigned',
             'submitted_at' => now(),
         ]);
     }

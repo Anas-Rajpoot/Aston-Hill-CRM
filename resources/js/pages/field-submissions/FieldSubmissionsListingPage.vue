@@ -24,13 +24,13 @@ let listAbortController = null
 const { loadBootstrap: loadCachedBootstrap, invalidate: invalidateFilterCache } = useFilterCache('field-submissions')
 const loading = ref(true)
 const filterOptions = ref({
-  statuses: [],
   products: [],
   emirates: [],
   managers: [],
   teamLeaders: [],
   salesAgents: [],
   field_executives: [],
+  field_statuses: [],
 })
 const submissions = ref([])
 const TABLE_MODULE = 'field-submissions'
@@ -39,7 +39,7 @@ const perPageOptions = ref([10, 20, 25, 50, 100])
 const allColumns = ref([])
 const visibleColumns = ref([
   'id', 'created_at', 'account_number', 'company_name', 'authorized_signatory_name', 'contact_number', 'product', 'alternate_number', 'emirates', 'location_coordinates', 'complete_address',
-  'manager', 'team_leader', 'sales_agent', 'additional_notes', 'special_instruction', 'field_agent', 'field_status', 'target_date', 'remarks_by_field_agent', 'sla_timer', 'sla_status', 'status', 'last_updated', 'creator',
+  'manager', 'team_leader', 'sales_agent', 'additional_notes', 'special_instruction', 'field_agent', 'field_status', 'target_date', 'remarks_by_field_agent', 'sla_timer', 'sla_status', 'last_updated', 'creator',
 ])
 const assignModalVisible = ref(false)
 const assignRow = ref(null)
@@ -120,7 +120,7 @@ const filters = ref({
   company_name: '',
   product: '',
   emirates: '',
-  status: '',
+  field_status: '',
   from: '',
   to: '',
   submitted_from: '',
@@ -129,6 +129,56 @@ const filters = ref({
   team_leader_id: null,
   manager_id: null,
 })
+
+function toReadableLabel(value) {
+  const s = String(value ?? '').trim()
+  if (!s) return ''
+  if (s.includes('_') || s.includes('-')) {
+    return s
+      .replace(/[_-]+/g, ' ')
+      .replace(/\b\w/g, (char) => char.toUpperCase())
+  }
+  return s
+}
+
+function normalizeStatuses(items) {
+  if (!Array.isArray(items)) return []
+  return items
+    .map((item) => {
+      if (item && typeof item === 'object') {
+        const value = item.value ?? item.key ?? item.id ?? ''
+        const label = item.label ?? toReadableLabel(value)
+        return value ? { value: String(value), label: String(label) } : null
+      }
+      const value = String(item ?? '').trim()
+      if (!value) return null
+      return { value, label: toReadableLabel(value) }
+    })
+    .filter(Boolean)
+}
+
+function normalizeSimpleValues(items) {
+  if (!Array.isArray(items)) return []
+  const seen = new Set()
+  const out = []
+  for (const item of items) {
+    let value = ''
+    if (item && typeof item === 'object') {
+      value = String(item.value ?? item.label ?? item.name ?? '').trim()
+    } else {
+      value = String(item ?? '').trim()
+    }
+    if (!value || seen.has(value)) continue
+    seen.add(value)
+    out.push(value)
+  }
+  return out
+}
+
+function removeLegacyStatusColumn(columns) {
+  if (!Array.isArray(columns)) return []
+  return columns.filter((col) => col !== 'status')
+}
 
 function buildParams() {
   const f = filters.value
@@ -143,7 +193,7 @@ function buildParams() {
   if (f.company_name) p.company_name = f.company_name
   if (f.product) p.product = f.product
   if (f.emirates) p.emirates = f.emirates
-  if (f.status) p.status = f.status
+  if (f.field_status) p.field_status = f.field_status
   if (f.from) p.from = f.from
   if (f.to) p.to = f.to
   if (f.submitted_from) p.submitted_from = f.submitted_from
@@ -172,7 +222,6 @@ const COLUMN_LABELS = {
   team_leader: 'Team Leader',
   manager: 'Manager',
   field_agent: 'Field Agent',
-  status: 'Status',
   field_status: 'Field Status',
   target_date: 'Meeting Date',
   remarks_by_field_agent: 'Field Agent Remarks',
@@ -257,14 +306,13 @@ async function loadFilters() {
     const team = teamRes?.data ?? teamRes ?? {}
     const editOpt = editOptionsRes?.data ?? editOptionsRes ?? {}
     filterOptions.value = {
-      statuses: data.statuses ?? [],
-      products: data.products ?? [],
-      emirates: data.emirates ?? [],
+      products: normalizeSimpleValues(data.products),
+      emirates: normalizeSimpleValues(data.emirates),
       managers: team.managers ?? [],
       teamLeaders: team.team_leaders ?? [],
       salesAgents: team.sales_agents ?? [],
       field_executives: team.field_executives ?? [],
-      field_statuses: editOpt.field_statuses ?? [],
+      field_statuses: normalizeStatuses(data.field_statuses ?? editOpt.field_statuses),
     }
   } catch {
     //
@@ -275,7 +323,7 @@ async function loadColumns() {
   try {
     const data = await fieldSubmissionsApi.columns()
     allColumns.value = data.all_columns ?? []
-    visibleColumns.value = data.visible_columns ?? visibleColumns.value
+    visibleColumns.value = removeLegacyStatusColumn(data.visible_columns ?? visibleColumns.value)
   } catch {
     //
   }
@@ -292,7 +340,7 @@ function resetFilters() {
     company_name: '',
     product: '',
     emirates: '',
-    status: '',
+    field_status: '',
     from: '',
     to: '',
     submitted_from: '',
@@ -314,8 +362,9 @@ function onSort({ sort: s, order: o }) {
 
 async function onSaveColumns(cols) {
   try {
-    await fieldSubmissionsApi.saveColumns(cols)
-    visibleColumns.value = cols
+    const cleanedCols = removeLegacyStatusColumn(cols)
+    await fieldSubmissionsApi.saveColumns(cleanedCols)
+    visibleColumns.value = cleanedCols
     meta.value.current_page = 1
     load()
   } catch {
@@ -536,19 +585,18 @@ onMounted(async () => {
     const fd = bootstrapResult.filters ?? {}
     const team = bootstrapResult.team_options ?? {}
     filterOptions.value = {
-      statuses: fd.statuses ?? [],
-      products: fd.products ?? [],
-      emirates: fd.emirates ?? [],
+      products: normalizeSimpleValues(fd.products),
+      emirates: normalizeSimpleValues(fd.emirates),
       managers: team.managers ?? [],
       teamLeaders: team.team_leaders ?? [],
       salesAgents: team.sales_agents ?? [],
       field_executives: team.field_executives ?? [],
-      field_statuses: bootstrapResult.field_statuses ?? [],
+      field_statuses: normalizeStatuses(fd.field_statuses ?? bootstrapResult.field_statuses),
     }
     const cd = bootstrapResult.columns ?? {}
     if (cd.all_columns) allColumns.value = cd.all_columns
     const requestedCols = [...visibleColumns.value]
-    if (cd.visible_columns) visibleColumns.value = cd.visible_columns ?? visibleColumns.value
+    if (cd.visible_columns) visibleColumns.value = removeLegacyStatusColumn(cd.visible_columns ?? visibleColumns.value)
     const pd = bootstrapResult.page ?? {}
     submissions.value = pd.data ?? []
     meta.value = pd.meta ?? meta.value

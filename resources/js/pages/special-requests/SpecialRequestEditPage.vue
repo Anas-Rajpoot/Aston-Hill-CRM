@@ -31,7 +31,16 @@ const REQUEST_TYPES = [
   'Marketing Approval',
   'Other Request',
 ]
-const STATUSES = ['draft', 'submitted', 'approved', 'rejected']
+const STATUS_OPTIONS = [
+  { value: 'approved', label: 'Approved' },
+  { value: 'rejected', label: 'Rejected' },
+]
+
+function normalizeStatus(status) {
+  const value = String(status || '').toLowerCase()
+  if (value === 'draft' || value === 'submitted' || value === '') return 'unassigned'
+  return value
+}
 
 const { errors, generalMessage, setErrors, clearErrors, clearFieldError, getError } = useFormErrors()
 
@@ -198,7 +207,7 @@ async function loadData() {
       company_name: reqData.company_name || '',
       account_number: reqData.account_number || '',
       request_type: reqData.request_type || '',
-      status: reqData.status || '',
+      status: normalizeStatus(reqData.status),
       complete_address: reqData.complete_address || '',
       special_instruction: reqData.special_instruction || '',
       manager_id: reqData.manager_id != null ? String(reqData.manager_id) : '',
@@ -407,8 +416,8 @@ onMounted(() => loadData())
               <div>
                   <label class="block text-xs font-medium text-gray-500">Status</label>
                   <select v-model="form.status" :class="`${selectClass('status')} mt-0.5`">
-                  <option value="">Select</option>
-                  <option v-for="s in STATUSES" :key="s" :value="s">{{ s.charAt(0).toUpperCase() + s.slice(1) }}</option>
+                  <option value="unassigned" disabled>UnAssigned</option>
+                  <option v-for="s in STATUS_OPTIONS" :key="s.value" :value="s.value">{{ s.label }}</option>
                 </select>
               </div>
             </div>

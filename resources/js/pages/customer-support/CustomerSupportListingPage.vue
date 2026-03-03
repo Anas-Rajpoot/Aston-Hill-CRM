@@ -58,7 +58,7 @@ const allColumns = ref([])
 const visibleColumns = ref([
   'id', 'submitted_at', 'ticket_number', 'account_number', 'company_name', 'issue_category',
   'contact_number', 'alternate_contact_number', 'issue_description', 'attachments', 'creator', 'csr', 'sla_timer', 'status', 'workflow_status',
-  'pending', 'completion_date', 'updated_at',
+  'completion_date', 'updated_at',
   'trouble_ticket', 'activity', 'resolution_remarks', 'internal_remarks',
   'manager', 'team_leader', 'sales_agent',
 ])
@@ -183,7 +183,6 @@ const COLUMN_LABELS = {
   created_at: 'Created At',
   trouble_ticket: 'Trouble Ticket',
   activity: 'Activity',
-  pending: 'Pending With',
   resolution_remarks: 'Resolution Remarks',
   internal_remarks: 'Internal Remarks',
 }
@@ -271,11 +270,15 @@ async function loadFilters() {
   }
 }
 
+function removeLegacyPendingColumn(cols) {
+  return cols.filter(c => c !== 'pending')
+}
+
 async function loadColumns() {
   try {
     const data = await customerSupportApi.columns()
-    allColumns.value = data.all_columns ?? []
-    visibleColumns.value = data.visible_columns ?? visibleColumns.value
+    allColumns.value = removeLegacyPendingColumn(data.all_columns ?? [])
+    visibleColumns.value = removeLegacyPendingColumn(data.visible_columns ?? visibleColumns.value)
   } catch {
     //
   }
@@ -315,8 +318,9 @@ function onSort({ sort: s, order: o }) {
 
 async function onSaveColumns(cols) {
   try {
-    await customerSupportApi.saveColumns(cols)
-    visibleColumns.value = cols
+    const cleaned = removeLegacyPendingColumn(cols)
+    await customerSupportApi.saveColumns(cleaned)
+    visibleColumns.value = cleaned
     meta.value.current_page = 1
     load()
   } catch {
@@ -505,9 +509,9 @@ onMounted(async () => {
       csrs: csr.csrs ?? [],
     }
     const cd = bootstrapResult.columns ?? {}
-    if (cd.all_columns) allColumns.value = cd.all_columns
+    if (cd.all_columns) allColumns.value = removeLegacyPendingColumn(cd.all_columns)
     const requestedCols = [...visibleColumns.value]
-    if (cd.visible_columns) visibleColumns.value = cd.visible_columns ?? visibleColumns.value
+    if (cd.visible_columns) visibleColumns.value = removeLegacyPendingColumn(cd.visible_columns ?? visibleColumns.value)
     const pd = bootstrapResult.page ?? {}
     submissions.value = pd.data ?? []
     meta.value = pd.meta ?? meta.value
@@ -526,8 +530,8 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-white">
-    <div class="w-full space-y-4">
+  <div class="min-h-[calc(100vh-4rem)] bg-white py-3 px-4">
+    <div class="w-full space-y-3">
       <div
         v-if="bulkAssignMessage"
         class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"
@@ -551,6 +555,9 @@ onMounted(async () => {
             title="Bulk Assign"
             @click="openBulkAssign"
           >
+            <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
             Bulk Assign
           </button>
           <button

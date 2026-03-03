@@ -44,13 +44,16 @@ const initialFormLoad = ref(false)
 
 const VAS_STATUSES = [
   { value: 'submitted_under_process', label: 'Submitted Under Process' },
+  { value: 'completed', label: 'Completed' },
   { value: 'rejected', label: 'Rejected' },
-  { value: 'pending_with_csr', label: 'Pending with CSR' },
-  { value: 'pending_with_du', label: 'Pending with DU' },
-  { value: 'pending_with_sales', label: 'Pending with Sales' },
-  { value: 'pending_for_approval', label: 'Pending for Approval' },
-  { value: 'unassigned', label: 'UnAssigned' },
 ]
+
+function normalizeStatus(status) {
+  const value = String(status || '').toLowerCase()
+  if (!value || value === 'draft' || value === 'pending_with_csr' || value === 'pending_with_du' || value === 'pending_with_sales' || value === 'pending_for_approval') return 'unassigned'
+  if (value === 'approved') return 'completed'
+  return value
+}
 
 const form = ref({
   request_type: '',
@@ -201,7 +204,7 @@ async function load() {
       company_name: data.company_name ?? '',
       description: data.description ?? '',
       additional_notes: data.additional_notes ?? '',
-      status: data.status ?? 'unassigned',
+      status: normalizeStatus(data.status),
       manager_id: data.manager_id != null ? data.manager_id : null,
       team_leader_id: data.team_leader_id != null ? data.team_leader_id : null,
       sales_agent_id: data.sales_agent_id != null ? data.sales_agent_id : null,
@@ -726,7 +729,7 @@ onMounted(() => load())
                 :class="selectClass('status')"
                 @change="clearFieldError('status')"
               >
-                <option value="" disabled>Select Status</option>
+                <option value="unassigned" disabled>UnAssigned</option>
                 <option v-for="s in VAS_STATUSES" :key="s.value" :value="s.value">{{ s.label }}</option>
               </select>
               <p v-if="getError('status')" class="mt-1 text-sm text-red-600">{{ getError('status') }}</p>

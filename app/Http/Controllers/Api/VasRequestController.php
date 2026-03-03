@@ -67,7 +67,7 @@ class VasRequestController extends Controller
         }
 
         $vas->update([
-            'status' => 'approved',
+            'status' => 'completed',
         ]);
 
         return response()->json(['message' => 'VAS request approved successfully']);

@@ -96,7 +96,6 @@ const columnLabels = {
   created_at: 'Created At',
   trouble_ticket: 'Trouble Ticket',
   activity: 'Activity',
-  pending: 'Pending With',
   resolution_remarks: 'Resolution Remarks',
   internal_remarks: 'Internal Remarks',
 }
@@ -105,7 +104,7 @@ const SORTABLE_COLUMNS = [
   'id', 'submitted_at', 'ticket_number', 'account_number', 'company_name', 'issue_category',
   'contact_number', 'csr', 'manager', 'team_leader', 'sales_agent',
   'status', 'workflow_status', 'completion_date', 'updated_at', 'created_at',
-  'trouble_ticket', 'pending',
+  'trouble_ticket',
 ]
 
 function label(col) {
@@ -146,7 +145,7 @@ const TRUNCATE_COLUMNS = [
   'issue_category', 'company_name', 'account_number', 'contact_number', 'issue_description',
   'manager', 'team_leader', 'sales_agent', 'creator', 'csr', 'status',
   'submitted_at', 'created_at', 'updated_at', 'completion_date',
-  'trouble_ticket', 'activity', 'pending', 'resolution_remarks', 'internal_remarks',
+  'trouble_ticket', 'activity', 'resolution_remarks', 'internal_remarks',
   'workflow_status', 'ticket_number',
 ]
 function shouldTruncate(col) {
@@ -246,10 +245,6 @@ function saveInlineEdit() {
   }
   if (col === 'activity' && value && value.length > 255) {
     inlineEditError.value = 'Activity must not exceed 255 characters.'
-    return
-  }
-  if (col === 'pending' && value && value.length > 255) {
-    inlineEditError.value = 'Pending must not exceed 255 characters.'
     return
   }
   const REQUIRED_DROPDOWNS = { manager: 'Manager', team_leader: 'Team Leader', sales_agent: 'Sales Agent' }

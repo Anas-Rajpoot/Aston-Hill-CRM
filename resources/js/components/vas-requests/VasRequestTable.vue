@@ -272,12 +272,9 @@ const hasAnyRowAction = computed(() => canViewAction.value || canEditAction.valu
 const STATUS_BADGES = {
   draft: 'bg-gray-100 text-gray-700',
   submitted_under_process: 'bg-blue-100 text-blue-700',
+  completed: 'bg-green-100 text-green-700',
   approved: 'bg-green-100 text-green-700',
   rejected: 'bg-red-100 text-red-700',
-  pending_with_csr: 'bg-orange-100 text-orange-700',
-  pending_with_du: 'bg-purple-100 text-purple-700',
-  pending_with_sales: 'bg-cyan-100 text-cyan-700',
-  pending_for_approval: 'bg-amber-100 text-amber-700',
   unassigned: 'bg-rose-100 text-rose-700',
 }
 function statusBadgeClass(status) {
@@ -285,6 +282,8 @@ function statusBadgeClass(status) {
 }
 function formatStatus(status) {
   if (!status) return '—'
+  if (status === 'approved') return 'Completed'
+  if (['draft', 'pending_with_csr', 'pending_with_du', 'pending_with_sales', 'pending_for_approval'].includes(status)) return 'UnAssigned'
   return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 </script>
@@ -443,13 +442,10 @@ function formatStatus(status) {
                   @keydown.enter="saveInlineEdit"
                   @keydown.esc="cancelInlineEdit"
                 >
+                  <option value="unassigned" disabled>UnAssigned</option>
                   <option value="submitted_under_process">Submitted Under Process</option>
+                  <option value="completed">Completed</option>
                   <option value="rejected">Rejected</option>
-                  <option value="pending_with_csr">Pending with CSR</option>
-                  <option value="pending_with_du">Pending with DU</option>
-                  <option value="pending_with_sales">Pending with Sales</option>
-                  <option value="pending_for_approval">Pending for Approval</option>
-                  <option value="unassigned">UnAssigned</option>
                 </select>
                 <div class="flex gap-1">
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>

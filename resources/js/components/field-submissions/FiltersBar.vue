@@ -4,11 +4,37 @@
  */
 import HorizontalScrollToolbar from '@/components/common/HorizontalScrollToolbar.vue'
 
+function toReadableLabel(value) {
+  const s = String(value ?? '').trim()
+  if (!s) return ''
+  if (s.includes('_') || s.includes('-')) {
+    return s
+      .replace(/[_-]+/g, ' ')
+      .replace(/\b\w/g, (char) => char.toUpperCase())
+  }
+  return s
+}
+
+function optionValue(option) {
+  if (option && typeof option === 'object') {
+    return option.value ?? option.id ?? option.key ?? option.label ?? ''
+  }
+  return option ?? ''
+}
+
+function optionLabel(option) {
+  if (option && typeof option === 'object') {
+    const value = option.value ?? option.id ?? option.key ?? ''
+    return option.label ?? option.name ?? toReadableLabel(value)
+  }
+  return toReadableLabel(option)
+}
+
 defineProps({
   filters: { type: Object, required: true },
   filterOptions: {
     type: Object,
-    default: () => ({ statuses: [], products: [], emirates: [] }),
+    default: () => ({ field_statuses: [], products: [], emirates: [] }),
   },
   loading: { type: Boolean, default: false },
 })
@@ -19,15 +45,16 @@ const emit = defineEmits(['apply', 'reset'])
 <template>
   <div class="rounded-lg border border-gray-200 bg-white px-2 py-2">
     <HorizontalScrollToolbar>
-    <label class="sr-only">Status</label>
+    <label class="sr-only">Field Status</label>
     <select
-      v-model="filters.status"
+      v-model="filters.field_status"
       class="w-[150px] shrink-0 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
       :disabled="loading"
     >
-      <option value="">Status</option>
-      <option v-for="s in filterOptions.statuses" :key="s.value" :value="s.value">
-        {{ s.label }}
+      <option value="">Field Status</option>
+      <option value="unassigned">Unassigned</option>
+      <option v-for="s in filterOptions.field_statuses" :key="String(optionValue(s))" :value="optionValue(s)">
+        {{ optionLabel(s) }}
       </option>
     </select>
 
@@ -38,7 +65,7 @@ const emit = defineEmits(['apply', 'reset'])
       :disabled="loading"
     >
       <option value="">Product</option>
-      <option v-for="p in filterOptions.products" :key="p" :value="p">{{ p }}</option>
+      <option v-for="p in filterOptions.products" :key="String(optionValue(p))" :value="optionValue(p)">{{ optionLabel(p) }}</option>
     </select>
 
     <label class="sr-only">Emirates</label>
@@ -48,7 +75,7 @@ const emit = defineEmits(['apply', 'reset'])
       :disabled="loading"
     >
       <option value="">Emirates</option>
-      <option v-for="e in filterOptions.emirates" :key="e" :value="e">{{ e }}</option>
+      <option v-for="e in filterOptions.emirates" :key="String(optionValue(e))" :value="optionValue(e)">{{ optionLabel(e) }}</option>
     </select>
 
     <div class="ml-auto flex shrink-0 items-center gap-2">

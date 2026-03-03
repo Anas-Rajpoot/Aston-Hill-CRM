@@ -172,7 +172,13 @@ class VasRequestApiController extends Controller
     private function applyFilters($query, array $validated): void
     {
         if (! empty($validated['status'])) {
-            $query->where('status', $validated['status']);
+            if ($validated['status'] === 'unassigned') {
+                $query->whereIn('status', ['unassigned', 'draft', 'pending_with_csr', 'pending_with_du', 'pending_with_sales', 'pending_for_approval']);
+            } elseif ($validated['status'] === 'completed') {
+                $query->whereIn('status', ['completed', 'approved']);
+            } else {
+                $query->where('status', $validated['status']);
+            }
         }
         if (! empty($validated['from'])) {
             $query->where('created_at', '>=', $validated['from'] . ' 00:00:00');
@@ -239,11 +245,11 @@ class VasRequestApiController extends Controller
         }
 
         if ($cardFilter === 'pending') {
-            $query->whereIn('status', ['draft', 'submitted_under_process', 'unassigned']);
+            $query->whereIn('status', ['draft', 'submitted_under_process', 'unassigned', 'pending_with_csr', 'pending_with_du', 'pending_with_sales', 'pending_for_approval']);
         } elseif ($cardFilter === 'completed_today') {
             $todayStart = now()->startOfDay()->toDateTimeString();
             $todayEnd = now()->endOfDay()->toDateTimeString();
-            $query->where('status', 'approved')->whereBetween('updated_at', [$todayStart, $todayEnd]);
+            $query->whereIn('status', ['completed', 'approved'])->whereBetween('updated_at', [$todayStart, $todayEnd]);
         }
     }
 
@@ -358,6 +364,16 @@ class VasRequestApiController extends Controller
                 $out['request_description'] = $row->description ?? null;
                 continue;
             }
+            if ($col === 'status') {
+                $status = (string) ($row->status ?? '');
+                if (in_array($status, ['draft', 'pending_with_csr', 'pending_with_du', 'pending_with_sales', 'pending_for_approval'], true)) {
+                    $status = 'unassigned';
+                } elseif ($status === 'approved') {
+                    $status = 'completed';
+                }
+                $out['status'] = $status;
+                continue;
+            }
             $out[$col] = $row->$col ?? null;
         }
         return $out;
@@ -425,7 +441,7 @@ class VasRequestApiController extends Controller
 
             return [
                 'request_types' => array_values($types),
-                'statuses' => array_map(fn ($s) => ['value' => $s, 'label' => ucwords(str_replace('_', ' ', $s))], VasRequestSubmission::STATUSES),
+                'statuses' => array_map(fn ($s) => ['value' => $s, 'label' => $s === 'unassigned' ? 'UnAssigned' : ucwords(str_replace('_', ' ', $s))], VasRequestSubmission::STATUSES),
                 'managers' => $managers,
                 'team_leaders' => $teamLeaders,
                 'sales_agents' => $salesAgents,
