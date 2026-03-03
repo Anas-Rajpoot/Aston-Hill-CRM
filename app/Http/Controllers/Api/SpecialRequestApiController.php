@@ -133,7 +133,13 @@ class SpecialRequestApiController extends Controller
 
     private function applyFilters($query, array $v): void
     {
-        if (! empty($v['status'])) $query->where('status', $v['status']);
+        if (! empty($v['status'])) {
+            if ($v['status'] === 'unassigned') {
+                $query->whereIn('status', ['unassigned', 'draft', 'submitted']);
+            } else {
+                $query->where('status', $v['status']);
+            }
+        }
         if (! empty($v['request_type'])) $query->where('request_type', $v['request_type']);
         if (! empty($v['from'])) $query->where('created_at', '>=', $v['from'] . ' 00:00:00');
         if (! empty($v['to'])) $query->where('created_at', '<=', $v['to'] . ' 23:59:59');
@@ -190,6 +196,11 @@ class SpecialRequestApiController extends Controller
     {
         $out = [];
         foreach ($columns as $col) {
+            if ($col === 'status') {
+                $status = (string) ($row->status ?? '');
+                $out['status'] = in_array($status, ['draft', 'submitted'], true) ? 'unassigned' : $status;
+                continue;
+            }
             if ($col === 'creator') {
                 $out['creator'] = $row->relationLoaded('creator')
                     ? ['id' => $row->creator?->id, 'name' => $row->creator?->name ?? '-']
@@ -236,7 +247,7 @@ class SpecialRequestApiController extends Controller
         $specialRequest = SpecialRequest::create([
             ...$data,
             'created_by' => $request->user()->id,
-            'status' => $data['status'] ?? 'submitted',
+            'status' => $data['status'] ?? 'unassigned',
             'submitted_at' => now(),
         ]);
 
@@ -441,7 +452,7 @@ class SpecialRequestApiController extends Controller
         $this->authorize('viewAny', SpecialRequest::class);
 
         return response()->json([
-            'statuses' => array_map(fn ($s) => ['value' => $s, 'label' => ucfirst($s)], SpecialRequest::STATUSES),
+            'statuses' => array_map(fn ($s) => ['value' => $s, 'label' => $s === 'unassigned' ? 'UnAssigned' : ucfirst($s)], SpecialRequest::STATUSES),
             'request_types' => array_map(fn ($t) => ['value' => $t, 'label' => $t], SpecialRequest::REQUEST_TYPES),
         ]);
     }

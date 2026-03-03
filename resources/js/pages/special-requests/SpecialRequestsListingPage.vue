@@ -3,8 +3,8 @@ import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import specialRequestsApi from '@/services/specialRequestsApi'
-import FiltersBar from '@/components/vas-requests/FiltersBar.vue'
-import AdvancedFilters from '@/components/vas-requests/AdvancedFilters.vue'
+import FiltersBar from '@/components/special-requests/FiltersBar.vue'
+import AdvancedFilters from '@/components/special-requests/AdvancedFilters.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import SpecialRequestTable from '@/components/special-requests/SpecialRequestTable.vue'
 import DeleteOtpModal from '@/components/DeleteOtpModal.vue'
@@ -340,8 +340,8 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-white py-6 px-4 sm:px-6">
-    <div class="mx-auto max-w-7xl space-y-4">
+  <div class="min-h-[calc(100vh-4rem)] bg-white py-3 px-4">
+    <div class="w-full space-y-3">
       <FiltersBar :filters="filters" :filter-options="filterOptions" :loading="loading" @apply="applyFilters" @reset="resetFilters">
         <template #before-apply>
           <button

@@ -47,7 +47,7 @@ const emit = defineEmits(['apply', 'reset'])
       <slot name="before-apply" />
       <button
         type="button"
-        class="inline-flex shrink-0 items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+        class="inline-flex shrink-0 items-center rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 disabled:opacity-50"
         :disabled="loading"
         @click="$emit('apply')"
       >
@@ -58,7 +58,7 @@ const emit = defineEmits(['apply', 'reset'])
       </button>
       <button
         type="button"
-        class="shrink-0 rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        class="shrink-0 rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
         :disabled="loading"
         @click="$emit('reset')"
       >

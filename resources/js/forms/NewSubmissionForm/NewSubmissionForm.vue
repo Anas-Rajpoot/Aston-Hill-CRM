@@ -8,7 +8,7 @@ const form = ref({
   company_name: '',
   account_number: '',
   request_type: '',
-  status: '',
+  status: 'unassigned',
   manager_id: '',
   team_leader_id: '',
   sales_agent_id: '',
@@ -35,9 +35,7 @@ const REQUEST_TYPE_OPTIONS = [
 ]
 
 const STATUS_OPTIONS = [
-  { value: '', label: 'Select' },
-  { value: 'approved', label: 'Approved' },
-  { value: 'rejected', label: 'Rejected' },
+  { value: 'unassigned', label: 'UnAssigned' },
 ]
 
 const documentFiles = ref([null])
@@ -140,7 +138,7 @@ async function submit() {
     fd.append('company_name', form.value.company_name.trim())
     fd.append('account_number', form.value.account_number?.trim() || '')
     fd.append('request_type', form.value.request_type.trim())
-    if (form.value.status) fd.append('status', form.value.status)
+    fd.append('status', 'unassigned')
     fd.append('complete_address', form.value.complete_address?.trim() || '')
     fd.append('special_instruction', form.value.special_instruction?.trim() || '')
     fd.append('manager_id', form.value.manager_id)
@@ -174,7 +172,7 @@ async function saveDraft() {
     fd.append('company_name', form.value.company_name.trim())
     fd.append('account_number', form.value.account_number?.trim() || '')
     fd.append('request_type', form.value.request_type.trim())
-    fd.append('status', 'draft')
+    fd.append('status', 'unassigned')
     fd.append('complete_address', form.value.complete_address?.trim() || '')
     fd.append('special_instruction', form.value.special_instruction?.trim() || '')
     fd.append('manager_id', form.value.manager_id)
@@ -196,7 +194,7 @@ function reset() {
     company_name: '',
     account_number: '',
     request_type: '',
-    status: '',
+    status: 'unassigned',
     manager_id: '',
     team_leader_id: '',
     sales_agent_id: '',

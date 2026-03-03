@@ -36,13 +36,10 @@ class VasRequestSubmission extends Model
     ];
 
     const STATUSES = [
-        'submitted_under_process',
-        'rejected',
-        'pending_with_csr',
-        'pending_with_du',
-        'pending_with_sales',
-        'pending_for_approval',
         'unassigned',
+        'submitted_under_process',
+        'completed',
+        'rejected',
     ];
 
     protected $casts = [

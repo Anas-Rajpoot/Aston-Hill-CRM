@@ -68,6 +68,7 @@ class FieldSubmissionApiController extends Controller
             'columns' => ['sometimes', 'array'],
             'columns.*' => ['string', Rule::in(array_merge(self::ALLOWED_COLUMNS, self::COMPUTED_COLUMNS, ['creator', 'sales_agent', 'team_leader', 'manager', 'field_agent']))],
             'status' => ['sometimes', 'nullable', 'string', Rule::in(FieldSubmission::STATUSES)],
+            'field_status' => ['sometimes', 'nullable', 'string', 'max:150'],
             'q' => ['sometimes', 'nullable', 'string', 'max:200'],
             'company_name' => ['sometimes', 'nullable', 'string', 'max:200'],
             'product' => ['sometimes', 'nullable', 'string', 'max:150'],
@@ -167,6 +168,15 @@ class FieldSubmissionApiController extends Controller
                 $query->whereNull('field_executive_id');
             } else {
                 $query->where('status', $validated['status']);
+            }
+        }
+        if (!empty($validated['field_status'])) {
+            if ($validated['field_status'] === 'unassigned') {
+                $query->where(function ($w) {
+                    $w->whereNull('field_status')->orWhere('field_status', '');
+                });
+            } else {
+                $query->where('field_status', $validated['field_status']);
             }
         }
         if (!empty($validated['from'])) {
@@ -448,6 +458,7 @@ class FieldSubmissionApiController extends Controller
                     ['value' => 'submitted', 'label' => 'Submitted'],
                     ['value' => 'unassigned', 'label' => 'UnAssigned'],
                 ],
+                'field_statuses' => array_map(fn ($status) => ['value' => $status, 'label' => $status], FieldSubmission::FIELD_STATUSES),
                 'products' => array_values($products),
                 'emirates' => array_values($emirates),
             ];

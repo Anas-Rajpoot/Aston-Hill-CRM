@@ -266,9 +266,18 @@ const STATUS_OPTIONS = [
   { value: 'rejected', label: 'Rejected' },
   { value: 'pending_for_ata', label: 'Pending for ATA' },
   { value: 'pending_for_finance', label: 'Pending for Finance' },
-  { value: 'pending_from_sales', label: 'pending for sales' },
+  { value: 'pending_from_sales', label: 'Pending from Sales' },
   { value: 'unassigned', label: 'Unassigned' },
 ]
+
+function statusLabel(status) {
+  if (!status) return '—'
+  const found = STATUS_OPTIONS.find((opt) => opt.value === status)
+  if (found) return found.label
+  return String(status)
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+}
 
 function isEditing(rowId, col) {
   return editingCell.value && editingCell.value.rowId === rowId && editingCell.value.col === col
@@ -639,7 +648,7 @@ function statusBadgeClass(status) {
 <span
                 :class="['inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap cursor-pointer hover:ring-2 hover:ring-green-400', statusBadgeClass(row.status)]"
               >
-                {{ row.status ? row.status.charAt(0).toUpperCase() + row.status.slice(1) : '—' }}
+                {{ statusLabel(row.status) }}
               </span>
             </button>
             </template>
@@ -647,7 +656,7 @@ function statusBadgeClass(status) {
               <span
                 :class="['inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap', statusBadgeClass(row.status)]"
               >
-                {{ row.status ? row.status.charAt(0).toUpperCase() + row.status.slice(1) : '—' }}
+                {{ statusLabel(row.status) }}
               </span>
             </template>
             <template v-else-if="col === 'status_changed_at' && canEdit && isEditing(row.id, 'status_changed_at')">

@@ -514,8 +514,8 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-white py-6 px-4 sm:px-6">
-    <div class="mx-auto max-w-7xl space-y-4">
+  <div class="min-h-[calc(100vh-4rem)] bg-white py-3 px-4">
+    <div class="w-full space-y-3">
       <div
         v-if="bulkAssignMessage"
         class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"

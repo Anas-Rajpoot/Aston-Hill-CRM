@@ -130,7 +130,14 @@ function cancelEdit() {
 
 function getOptionsForColumn(col) {
   const opt = props.editOptions || {}
-  if (col === 'status') return [{ value: '', label: 'Select' }, ...(opt.statuses || [])]
+  if (col === 'status') {
+    const actionStatuses = (opt.statuses || []).filter((s) => ['approved', 'rejected'].includes(String(s?.value || '').toLowerCase()))
+    const current = String(editingValue.value || '').toLowerCase()
+    const currentOption = current && !['approved', 'rejected'].includes(current)
+      ? [{ value: current, label: current === 'unassigned' ? 'UnAssigned' : (current.charAt(0).toUpperCase() + current.slice(1)) }]
+      : []
+    return [...currentOption, ...actionStatuses]
+  }
   if (col === 'request_type') return [{ value: '', label: 'Select' }, ...(opt.request_types || [])]
   if (col === 'manager') return [{ value: '', label: 'Select' }, ...(opt.managers || []).map((m) => ({ value: m.id, label: m.name }))]
   if (col === 'team_leader') return [{ value: '', label: 'Select' }, ...(opt.team_leaders || []).map((t) => ({ value: t.id, label: t.name }))]

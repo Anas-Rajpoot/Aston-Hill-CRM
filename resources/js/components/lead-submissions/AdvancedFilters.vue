@@ -46,6 +46,21 @@ const props = defineProps({
 
 const emit = defineEmits(['apply', 'reset'])
 
+const uniqueTypeOptions = computed(() => {
+  const list = Array.isArray(props.filterOptions?.types) ? props.filterOptions.types : []
+  const seen = new Set()
+  const out = []
+  for (const item of list) {
+    const name = String(item?.name ?? '').trim()
+    if (!name) continue
+    const key = name.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(item)
+  }
+  return out
+})
+
 const activeCount = computed(() => {
   const f = props.filters
   let n = 0
@@ -132,7 +147,7 @@ const activeCount = computed(() => {
             :disabled="loading"
           >
             <option :value="null">All Types</option>
-            <option v-for="t in filterOptions.types" :key="t.id" :value="t.id">{{ t.name }}</option>
+            <option v-for="t in uniqueTypeOptions" :key="t.id" :value="t.id">{{ t.name }}</option>
           </select>
         </div>
         <div>
