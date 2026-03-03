@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import { web } from '@/lib/axios'
+import { ensureCsrfCookie, web } from '@/lib/axios'
 
 const email = ref('')
 const error = ref(null)
@@ -12,7 +12,7 @@ const submit = async () => {
   success.value = null
   loading.value = true
   try {
-    await web.get('/sanctum/csrf-cookie')
+    await ensureCsrfCookie()
     await web.post('/forgot-password', { email: email.value })
     success.value = 'Password reset link has been sent to your email.'
   } catch (e) {

@@ -32,7 +32,7 @@ class LeadSubmissionRepository implements LeadSubmissionRepositoryInterface
     public function submit(LeadSubmission $leadSubmission): LeadSubmission
     {
         $leadSubmission->update([
-            'status' => 'unassigned',
+            'status' => 'submitted',
             'submitted_at' => now(),
             'status_changed_at' => now(),
             'submission_type' => 'new',

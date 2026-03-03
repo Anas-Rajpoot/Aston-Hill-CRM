@@ -1,7 +1,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { web } from '@/lib/axios'
+import { ensureCsrfCookie, web } from '@/lib/axios'
 import api from '@/lib/axios'
 import PasswordStrengthMeter from '@/components/PasswordStrengthMeter.vue'
 
@@ -36,7 +36,7 @@ const submit = async () => {
   error.value = null
   loading.value = true
   try {
-    await web.get('/sanctum/csrf-cookie')
+    await ensureCsrfCookie()
     await web.post('/reset-password', {
       token: token.value,
       email: form.value.email,

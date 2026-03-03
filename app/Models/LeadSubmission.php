@@ -21,7 +21,7 @@ class LeadSubmission extends Model
         'back_office_notes','activity','back_office_account','work_order','du_status','completion_date','du_remarks','additional_note',
     ];
 
-    const STATUSES = ['draft','submitted','approved','rejected','pending_for_ata','pending_for_finance','pending_from_sales','unassigned'];
+    const STATUSES = ['draft', 'submitted', 'approved', 'rejected'];
 
     protected $casts = [
         'payload' => 'array',
@@ -43,7 +43,7 @@ class LeadSubmission extends Model
     public function submit()
     {
         $this->update([
-            'status' => 'unassigned',
+            'status' => 'submitted',
             'submitted_at' => now(),
             'status_changed_at' => now(),
         ]);

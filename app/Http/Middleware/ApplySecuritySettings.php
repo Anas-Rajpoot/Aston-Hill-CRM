@@ -16,6 +16,12 @@ class ApplySecuritySettings
 {
     public function handle(Request $request, Closure $next)
     {
+        // Keep pre-auth/bootstrap routes fast and DB-independent.
+        // If DB is slow/unavailable, these routes must still respond immediately.
+        if ($this->shouldBypass($request)) {
+            return $next($request);
+        }
+
         try {
             $settings = SecuritySetting::current();
 
@@ -60,5 +66,22 @@ class ApplySecuritySettings
         }
 
         return $next($request);
+    }
+
+    private function shouldBypass(Request $request): bool
+    {
+        if ($request->is('sanctum/csrf-cookie')) {
+            return true;
+        }
+
+        if ($request->is('favicon.ico') || $request->is('up')) {
+            return true;
+        }
+
+        if ($request->is('login') || $request->is('register') || $request->is('forgot-password') || $request->is('reset-password/*')) {
+            return true;
+        }
+
+        return false;
     }
 }

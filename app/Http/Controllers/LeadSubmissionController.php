@@ -927,7 +927,7 @@ if ($request->expectsJson() || $request->ajax()) {
 
         // UPDATE existing row only (avoid INSERT / created_by error)
         $leadSubmission->update([
-            'status' => 'unassigned',
+            'status' => 'submitted',
             'submitted_at' => now(),
             'status_changed_at' => now(),
             'submission_type' => $leadSubmission->submission_type ?? 'new',
@@ -1061,7 +1061,7 @@ if ($request->expectsJson() || $request->ajax()) {
             'submission_type' => 'resubmission',
             'updated_by' => $request->user()->id,
             'step' => 4,
-            'status' => $isDraft ? 'draft' : 'unassigned',
+            'status' => $isDraft ? 'draft' : 'submitted',
             'submitted_at' => $isDraft ? null : now(),
             'status_changed_at' => now(),
             'rejected_at' => null,

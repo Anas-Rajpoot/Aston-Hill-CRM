@@ -4,7 +4,10 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "dev": "vite",
+        "serve": "php artisan serve --host=127.0.0.1 --port=8000",
+        "dev:all": "concurrently --kill-others-on-fail -n \"laravel,vite\" -c \"green,cyan\" \"npm:serve\" \"npm:dev\"",
+        "dev:reset": "kill-port 8000 5173 && npm run dev:all"
     },
     "devDependencies": {
         "@tailwindcss/forms": "^0.5.2",
@@ -14,6 +17,7 @@
         "autoprefixer": "^10.4.2",
         "axios": "^1.11.0",
         "concurrently": "^9.0.1",
+        "kill-port": "^2.0.1",
         "laravel-vite-plugin": "^2.0.0",
         "postcss": "^8.4.31",
         "tailwindcss": "^3.1.0",

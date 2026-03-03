@@ -1,7 +1,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { api, web } from '@/lib/axios'
+import { api, ensureCsrfCookie, web } from '@/lib/axios'
 import PasswordStrengthMeter from '@/components/PasswordStrengthMeter.vue'
 
 const router = useRouter()
@@ -90,7 +90,7 @@ const submit = async () => {
 
   loading.value = true
   try {
-    await web.get('/sanctum/csrf-cookie')
+    await ensureCsrfCookie()
     await web.post('/register', form.value)
     router.push('/login')
   } catch (e) {

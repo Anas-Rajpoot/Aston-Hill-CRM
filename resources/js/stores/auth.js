@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { api, web } from '@/lib/axios'
+import { api, ensureCsrfCookie } from '@/lib/axios'
 
 const BOOTSTRAP_CACHE_KEY = 'auth_bootstrap'
 const BOOTSTRAP_CACHE_TTL_MS = 4 * 60 * 1000 // 4 min – under server 5 min
@@ -107,7 +107,7 @@ export const useAuthStore = defineStore('auth', {
         const hasToken = getStorage().getItem('api_token') || sessionStorage.getItem('api_token') || localStorage.getItem('api_token')
         const hasCsrfFromPage = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
         if (!hasToken && !hasCsrfFromPage) {
-          await web.get('/sanctum/csrf-cookie')
+          await ensureCsrfCookie()
         }
 
         const cached = getBootstrapFromStorage()
@@ -168,7 +168,7 @@ export const useAuthStore = defineStore('auth', {
       this.loading = true
       try {
         if (!options.token) {
-          await web.get('/sanctum/csrf-cookie')
+          await ensureCsrfCookie()
         }
         const headers = options.token ? { 'X-Request-Token': 'true' } : {}
         const { data } = await api.post('/auth/login', credentials, { headers })

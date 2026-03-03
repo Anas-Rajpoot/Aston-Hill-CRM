@@ -31,6 +31,9 @@ function getErrorMessage(err) {
 export const api = axios.create({
   baseURL: '/api',
   withCredentials: true,
+  xsrfCookieName: 'XSRF-TOKEN',
+  xsrfHeaderName: 'X-XSRF-TOKEN',
+  timeout: 15000,
   headers: {
     'Accept': 'application/json',
     'X-Requested-With': 'XMLHttpRequest',
@@ -51,11 +54,34 @@ api.interceptors.request.use((config) => {
 export const web = axios.create({
   baseURL: '',
   withCredentials: true,
+  xsrfCookieName: 'XSRF-TOKEN',
+  xsrfHeaderName: 'X-XSRF-TOKEN',
+  timeout: 15000,
   headers: {
     'Accept': 'application/json',
     'X-Requested-With': 'XMLHttpRequest',
   },
 })
+
+let csrfCookiePromise = null
+
+export async function ensureCsrfCookie() {
+  // If cookie already exists, do not call endpoint again.
+  const existing = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=/)
+  if (existing) return
+
+  if (csrfCookiePromise) {
+    await csrfCookiePromise
+    return
+  }
+
+  csrfCookiePromise = web.get('/sanctum/csrf-cookie')
+  try {
+    await csrfCookiePromise
+  } finally {
+    csrfCookiePromise = null
+  }
+}
 
 // Add CSRF token to all requests (web and api) for Laravel
 const addCsrf = (config) => {
