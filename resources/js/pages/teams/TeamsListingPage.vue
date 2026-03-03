@@ -13,6 +13,7 @@ import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import Toast from '@/components/Toast.vue'
 import { canModuleAction } from '@/lib/accessControl'
+import { formatUserDate } from '@/lib/dateFormat'
 
 const router = useRouter()
 const route = useRoute()
@@ -269,10 +270,7 @@ function statusBadgeClass(status) {
 }
 
 function formatDate(d) {
-  if (!d) return '—'
-  try {
-    return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-  } catch { return '—' }
+  return formatUserDate(d, '—')
 }
 
 function cellValue(row, key) {

@@ -18,6 +18,7 @@ const serviceTypes = ref([])
 const selectedCategoryId = ref(props.initialCategoryId != null ? String(props.initialCategoryId) : '')
 const selectedTypeId = ref(props.initialTypeId != null ? String(props.initialTypeId) : '')
 const loading = ref(true)
+const loadingServiceTypes = ref(false)
 const saving = ref(false)
 const savingDraft = ref(false)
 
@@ -93,11 +94,14 @@ watch(selectedTypeId, (newId) => {
 
 const fetchServiceTypes = async (categoryId) => {
   if (!categoryId) return
+  loadingServiceTypes.value = true
   try {
     const { data } = await api.getServiceTypesByCategory(categoryId)
     serviceTypes.value = data || []
   } catch (_) {
     serviceTypes.value = []
+  } finally {
+    loadingServiceTypes.value = false
   }
 }
 
@@ -163,7 +167,7 @@ const cancel = () => router.push('/submissions')
     </svg>
   </div>
 
-  <div v-else class="space-y-8">
+  <div v-else class="space-y-6">
     <!-- Validation errors summary -->
     <div v-if="generalMessage || Object.keys(errors).length" class="rounded-lg bg-red-50 border border-red-200 p-4">
       <p class="text-sm font-medium text-red-800">{{ generalMessage }}</p>
@@ -230,7 +234,7 @@ const cancel = () => router.push('/submissions')
           <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
         </svg>
         <p class="text-sm font-medium text-green-800">
-          {{ selectedCategory?.name }} category selected. {{ serviceTypes.length ? 'Select Service Type.' : 'Loading types...' }}
+          {{ selectedCategory?.name }} category selected. {{ loadingServiceTypes ? 'Loading types...' : (serviceTypes.length ? 'Select Service Type.' : 'No service types available.') }}
         </p>
       </div>
     </div>
@@ -258,16 +262,18 @@ const cancel = () => router.push('/submissions')
         </label>
       </div>
 
+      <p v-if="!loadingServiceTypes && selectedCategoryId && !serviceTypes.length" class="mt-2 text-sm text-amber-700">No service types found for the selected category.</p>
+
       <p v-if="getError('service_type_id') || getError('service_category_id')" class="mt-2 text-sm text-red-600">{{ getError('service_type_id') || getError('service_category_id') }}</p>
     </div>
 
-    <!-- Actions: left group (Back, Cancel, Step 2), right group (Save as Draft, Next) -->
+    <!-- Actions: left group (Back, Cancel), right group (Save as Draft, Next) -->
     <div class="flex flex-wrap items-center justify-between gap-3 pt-6 border-t border-gray-200">
       <div class="flex items-center gap-3">
         <button
           type="button"
           @click="goBack"
-          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-gray-100 text-gray-700 text-sm font-medium hover:bg-gray-200"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium bg-green-600 hover:bg-green-700"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -281,7 +287,6 @@ const cancel = () => router.push('/submissions')
         >
           Cancel
         </button>
-        <span class="px-4 py-2 rounded-lg bg-gray-800 text-white text-sm font-medium">Step 2</span>
       </div>
       <div class="flex items-center gap-3">
         <button

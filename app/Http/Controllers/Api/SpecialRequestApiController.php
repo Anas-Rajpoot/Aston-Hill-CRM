@@ -7,6 +7,7 @@ use App\Http\Controllers\FieldSubmissionController;
 use App\Models\SpecialRequest;
 use App\Models\SpecialRequestAudit;
 use App\Models\SpecialRequestDocument;
+use App\Models\SystemAuditLog;
 use App\Rules\AllowedDocumentFile;
 use App\Models\User;
 use App\Models\UserColumnPreference;
@@ -218,19 +219,18 @@ class SpecialRequestApiController extends Controller
         $data = $request->validate([
             'company_name' => ['required', 'string', 'max:255'],
             'account_number' => ['nullable', 'string', 'max:100'],
-            'request_type' => ['required', 'string', 'max:100'],
+            'request_type' => ['required', 'string', Rule::in(SpecialRequest::REQUEST_TYPES)],
             'status' => ['nullable', 'string', Rule::in(SpecialRequest::STATUSES)],
             'complete_address' => ['nullable', 'string', 'max:2000'],
             'special_instruction' => ['nullable', 'string', 'max:2000'],
             'manager_id' => ['required', 'exists:users,id'],
-            'team_leader_id' => ['required', 'exists:users,id'],
-            'sales_agent_id' => ['required', 'exists:users,id'],
+            'team_leader_id' => ['nullable', 'exists:users,id'],
+            'sales_agent_id' => ['nullable', 'exists:users,id'],
         ], [
             'company_name.required' => 'Company name is required.',
             'request_type.required' => 'Request type is required.',
+            'request_type.in' => 'Invalid request type.',
             'manager_id.required' => 'Please select a manager.',
-            'team_leader_id.required' => 'Please select a team leader.',
-            'sales_agent_id.required' => 'Please select a sales agent.',
         ]);
 
         $specialRequest = SpecialRequest::create([
@@ -309,6 +309,22 @@ class SpecialRequestApiController extends Controller
         ]);
     }
 
+    public function destroy(Request $request, SpecialRequest $specialRequest): JsonResponse
+    {
+        $this->authorize('delete', $specialRequest);
+
+        $requestId = (int) $specialRequest->id;
+        $specialRequest->delete();
+
+        Storage::disk('public')->deleteDirectory("special-requests/{$requestId}");
+
+        SystemAuditLog::record('special_request.deleted', [
+            'special_request_id' => $requestId,
+        ], null, $request->user()->id, 'special_request', $requestId);
+
+        return response()->json(['message' => 'Special request deleted.']);
+    }
+
     public function uploadDocuments(Request $request, SpecialRequest $specialRequest): JsonResponse
     {
         $this->authorize('update', $specialRequest);
@@ -369,13 +385,13 @@ class SpecialRequestApiController extends Controller
         $data = $request->validate([
             'company_name' => ['sometimes', 'required', 'string', 'max:255'],
             'account_number' => ['nullable', 'string', 'max:100'],
-            'request_type' => ['sometimes', 'required', 'string', 'max:100'],
+            'request_type' => ['sometimes', 'required', 'string', Rule::in(SpecialRequest::REQUEST_TYPES)],
             'status' => ['sometimes', 'string', Rule::in(SpecialRequest::STATUSES)],
             'complete_address' => ['nullable', 'string', 'max:2000'],
             'special_instruction' => ['nullable', 'string', 'max:2000'],
             'manager_id' => ['sometimes', 'required', 'exists:users,id'],
-            'team_leader_id' => ['sometimes', 'required', 'exists:users,id'],
-            'sales_agent_id' => ['sometimes', 'required', 'exists:users,id'],
+            'team_leader_id' => ['sometimes', 'nullable', 'exists:users,id'],
+            'sales_agent_id' => ['sometimes', 'nullable', 'exists:users,id'],
         ]);
 
         $specialRequest->update($data);
@@ -393,7 +409,7 @@ class SpecialRequestApiController extends Controller
         $data = $request->validate([
             'company_name' => ['sometimes', 'string', 'max:255'],
             'account_number' => ['sometimes', 'nullable', 'string', 'max:100'],
-            'request_type' => ['sometimes', 'string', 'max:100'],
+            'request_type' => ['sometimes', 'string', Rule::in(SpecialRequest::REQUEST_TYPES)],
             'status' => ['sometimes', 'string', Rule::in(SpecialRequest::STATUSES)],
             'complete_address' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'special_instruction' => ['sometimes', 'nullable', 'string', 'max:2000'],

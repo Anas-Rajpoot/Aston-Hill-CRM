@@ -16,7 +16,7 @@ const router = useRouter()
 const loading = ref(true)
 const saving = ref(false)
 const submission = ref(null)
-const editOptions = ref({ issue_categories: [], statuses: [], workflow_statuses: [], pending_options: [] })
+const editOptions = ref({ issue_categories: [], statuses: [], workflow_statuses: [] })
 const teamOptions = ref({ managers: [], team_leaders: [], sales_agents: [], labels: {} })
 const csrUsers = ref([])
 const accountCsrIds = ref([])
@@ -76,6 +76,7 @@ const form = ref({
   company_name: '',
   account_number: '',
   contact_number: '',
+  alternate_contact_number: '',
   issue_description: '',
   manager_id: '',
   team_leader_id: '',
@@ -87,7 +88,6 @@ const form = ref({
   completion_date: '',
   trouble_ticket: '',
   activity: '',
-  pending: '',
   resolution_remarks: '',
   internal_remarks: '',
 })
@@ -105,17 +105,99 @@ const teamLabels = computed(() => ({
   sales_agent: formatTeamLabel(teamOptions.value.labels?.sales_agent ?? 'sales_agent'),
 }))
 
+const pickFirstValue = (obj, keys) => {
+  for (const key of keys) {
+    const value = obj?.[key]
+    if (value != null && value !== '') return String(value)
+  }
+  return ''
+}
+
+const resolveTeamLeaderManagerId = (teamLeader) => {
+  const direct = pickFirstValue(teamLeader, ['manager_id', 'managerId'])
+  if (direct) return direct
+  const reportsTo = pickFirstValue(teamLeader, ['reports_to', 'reportsTo'])
+  if (reportsTo && (teamOptions.value.managers ?? []).some((m) => String(m.id) === reportsTo)) return reportsTo
+  return ''
+}
+
 const filteredTeamLeaders = computed(() => {
   const mid = form.value.manager_id
   if (!mid) return teamOptions.value.team_leaders ?? []
-  return (teamOptions.value.team_leaders ?? []).filter((t) => String(t.manager_id) === String(mid))
+  return (teamOptions.value.team_leaders ?? []).filter((t) => resolveTeamLeaderManagerId(t) === String(mid))
 })
 
 const filteredSalesAgents = computed(() => {
   const tlId = form.value.team_leader_id
-  if (!tlId) return teamOptions.value.sales_agents ?? []
-  return (teamOptions.value.sales_agents ?? []).filter((s) => String(s.team_leader_id) === String(tlId))
+  const managerId = form.value.manager_id
+  const teamLeaderIdsUnderManager = new Set(
+    (teamOptions.value.team_leaders ?? [])
+      .filter((t) => managerId && resolveTeamLeaderManagerId(t) === String(managerId))
+      .map((t) => String(t.id))
+  )
+
+  const resolveSalesAgentTeamLeaderId = (salesAgent) => {
+    const direct = pickFirstValue(salesAgent, ['team_leader_id', 'teamLeaderId'])
+    const reportsTo = pickFirstValue(salesAgent, ['reports_to', 'reportsTo'])
+    if (direct) return direct
+    if (reportsTo) {
+      const asTeamLeader = (teamOptions.value.team_leaders ?? []).some((t) => String(t.id) === String(reportsTo))
+      if (asTeamLeader) return String(reportsTo)
+    }
+    return ''
+  }
+
+  const resolveSalesAgentManagerId = (salesAgent) => {
+    const direct = pickFirstValue(salesAgent, ['manager_id', 'managerId'])
+    const reportsTo = pickFirstValue(salesAgent, ['reports_to', 'reportsTo'])
+    if (direct) return direct
+    if (reportsTo) {
+      const asManager = (teamOptions.value.managers ?? []).some((m) => String(m.id) === String(reportsTo))
+      if (asManager) return String(reportsTo)
+    }
+    const teamLeaderIdFromAgent = resolveSalesAgentTeamLeaderId(salesAgent)
+    if (teamLeaderIdFromAgent) {
+      const teamLeader = (teamOptions.value.team_leaders ?? []).find((t) => String(t.id) === String(teamLeaderIdFromAgent))
+      const managerIdFromLeader = resolveTeamLeaderManagerId(teamLeader)
+      if (managerIdFromLeader) return managerIdFromLeader
+    }
+    return ''
+  }
+
+  if (tlId) {
+    return (teamOptions.value.sales_agents ?? []).filter((salesAgent) => resolveSalesAgentTeamLeaderId(salesAgent) === String(tlId))
+  }
+  if (managerId) {
+    return (teamOptions.value.sales_agents ?? []).filter((salesAgent) => {
+      const resolvedManagerId = resolveSalesAgentManagerId(salesAgent)
+      const resolvedTeamLeaderId = resolveSalesAgentTeamLeaderId(salesAgent)
+      return resolvedManagerId === String(managerId) || teamLeaderIdsUnderManager.has(resolvedTeamLeaderId)
+    })
+  }
+  return teamOptions.value.sales_agents ?? []
 })
+
+const deriveSalesHierarchy = (salesAgent) => {
+  let teamLeaderId = pickFirstValue(salesAgent, ['team_leader_id', 'teamLeaderId'])
+  let managerId = pickFirstValue(salesAgent, ['manager_id', 'managerId'])
+  const reportsTo = pickFirstValue(salesAgent, ['reports_to', 'reportsTo'])
+
+  if (!teamLeaderId && reportsTo && (teamOptions.value.team_leaders ?? []).some((u) => String(u.id) === reportsTo)) {
+    teamLeaderId = reportsTo
+  }
+  if (!managerId && reportsTo && (teamOptions.value.managers ?? []).some((u) => String(u.id) === reportsTo)) {
+    managerId = reportsTo
+  }
+  if (!managerId && teamLeaderId) {
+    const teamLeader = (teamOptions.value.team_leaders ?? []).find((u) => String(u.id) === String(teamLeaderId))
+    managerId = resolveTeamLeaderManagerId(teamLeader)
+  }
+  if (!teamLeaderId && managerId) {
+    const leaders = (teamOptions.value.team_leaders ?? []).filter((u) => resolveTeamLeaderManagerId(u) === String(managerId))
+    if (leaders.length === 1) teamLeaderId = String(leaders[0].id)
+  }
+  return { teamLeaderId, managerId }
+}
 
 function displayVal(val) {
   return val != null && val !== '' ? String(val) : '—'
@@ -164,7 +246,6 @@ async function load() {
       issue_categories: optionsData.issue_categories ?? [],
       statuses: optionsData.statuses ?? [],
       workflow_statuses: optionsData.workflow_statuses ?? [],
-      pending_options: optionsData.pending_options ?? [],
     }
     teamOptions.value = {
       managers: teamData.managers ?? [],
@@ -180,6 +261,7 @@ async function load() {
       company_name: subData.company_name ?? '',
       account_number: subData.account_number ?? '',
       contact_number: subData.contact_number ?? '',
+      alternate_contact_number: subData.alternate_contact_number ?? '',
       issue_description: subData.issue_description ?? '',
       manager_id: managerId != null ? String(managerId) : '',
       team_leader_id: teamLeaderId != null ? String(teamLeaderId) : '',
@@ -191,7 +273,6 @@ async function load() {
       completion_date: subData.completion_date ? String(subData.completion_date).slice(0, 10) : '',
       trouble_ticket: subData.trouble_ticket ?? '',
       activity: subData.activity ?? '',
-      pending: subData.pending ?? '',
       resolution_remarks: subData.resolution_remarks ?? '',
       internal_remarks: subData.internal_remarks ?? '',
     }
@@ -232,14 +313,15 @@ watch(
     if (initialFormLoad.value) return
     if (tid) {
       const tl = (teamOptions.value.team_leaders ?? []).find((u) => String(u.id) === String(tid))
-      if (tl?.manager_id != null) {
+      const managerId = resolveTeamLeaderManagerId(tl)
+      if (managerId) {
         settingFromChild.value = true
-        form.value.manager_id = String(tl.manager_id)
+        form.value.manager_id = String(managerId)
         nextTick(() => { settingFromChild.value = false })
       }
       if (!settingFromSalesAgent.value) form.value.sales_agent_id = ''
-    } else {
-      form.value.manager_id = ''
+    } else if (!settingFromSalesAgent.value) {
+      form.value.sales_agent_id = ''
     }
   }
 )
@@ -251,10 +333,11 @@ watch(
     if (sid) {
       const sa = (teamOptions.value.sales_agents ?? []).find((u) => String(u.id) === String(sid))
       if (sa) {
+        const resolved = deriveSalesHierarchy(sa)
         settingFromSalesAgent.value = true
         settingFromChild.value = true
-        if (sa.team_leader_id != null) form.value.team_leader_id = String(sa.team_leader_id)
-        if (sa.manager_id != null) form.value.manager_id = String(sa.manager_id)
+        if (resolved.teamLeaderId) form.value.team_leader_id = resolved.teamLeaderId
+        if (resolved.managerId) form.value.manager_id = resolved.managerId
         nextTick(() => {
           settingFromSalesAgent.value = false
           settingFromChild.value = false
@@ -262,7 +345,6 @@ watch(
       }
     } else {
       form.value.team_leader_id = ''
-      form.value.manager_id = ''
     }
   }
 )
@@ -306,6 +388,7 @@ function buildPayload(submitAction = false) {
     company_name: f.company_name || null,
     account_number: f.account_number || null,
     contact_number: f.contact_number || null,
+    alternate_contact_number: f.alternate_contact_number || null,
     issue_description: f.issue_description || null,
     manager_id: f.manager_id ? Number(f.manager_id) : null,
     team_leader_id: f.team_leader_id ? Number(f.team_leader_id) : null,
@@ -317,7 +400,6 @@ function buildPayload(submitAction = false) {
     completion_date: f.completion_date || null,
     trouble_ticket: f.trouble_ticket || null,
     activity: f.activity || null,
-    pending: f.pending || null,
     resolution_remarks: f.resolution_remarks || null,
     internal_remarks: f.internal_remarks || null,
   }
@@ -428,6 +510,26 @@ onMounted(() => {
           <section class="mb-8">
             <h2 class="mb-3 border-b border-gray-200 pb-2 text-base font-semibold text-gray-900">Primary Information</h2>
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div>
+                <label class="block text-sm font-medium text-gray-700">Company Name <span class="text-red-500">*</span></label>
+                <input v-model="form.company_name" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="{ 'border-red-500': getError('company_name') }" />
+                <p v-if="getError('company_name')" class="mt-1 text-sm text-red-600">{{ getError('company_name') }}</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700">Account Number</label>
+                <input v-model="form.account_number" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="{ 'border-red-500': getError('account_number') }" />
+                <p v-if="getError('account_number')" class="mt-1 text-sm text-red-600">{{ getError('account_number') }}</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700">Contact Number <span class="text-red-500">*</span></label>
+                <input v-model="form.contact_number" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="{ 'border-red-500': getError('contact_number') }" />
+                <p v-if="getError('contact_number')" class="mt-1 text-sm text-red-600">{{ getError('contact_number') }}</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700">Alternate Contact Number</label>
+                <input v-model="form.alternate_contact_number" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="{ 'border-red-500': getError('alternate_contact_number') }" />
+                <p v-if="getError('alternate_contact_number')" class="mt-1 text-sm text-red-600">{{ getError('alternate_contact_number') }}</p>
+              </div>
               <div class="sm:col-span-3">
                 <label class="block text-sm font-medium text-gray-700">Issue Category <span class="text-red-500">*</span></label>
                 <div class="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -453,28 +555,22 @@ onMounted(() => {
                 </div>
                 <p v-if="getError('issue_category')" class="mt-1 text-sm text-red-600">{{ getError('issue_category') }}</p>
               </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700">Company Name <span class="text-red-500">*</span></label>
-                <input v-model="form.company_name" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="{ 'border-red-500': getError('company_name') }" />
-                <p v-if="getError('company_name')" class="mt-1 text-sm text-red-600">{{ getError('company_name') }}</p>
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700">Account Number</label>
-                <input v-model="form.account_number" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="{ 'border-red-500': getError('account_number') }" />
-                <p v-if="getError('account_number')" class="mt-1 text-sm text-red-600">{{ getError('account_number') }}</p>
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700">Contact Number <span class="text-red-500">*</span></label>
-                <input v-model="form.contact_number" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="{ 'border-red-500': getError('contact_number') }" />
-                <p v-if="getError('contact_number')" class="mt-1 text-sm text-red-600">{{ getError('contact_number') }}</p>
-              </div>
             </div>
           </section>
 
-          <!-- Team Assignment -->
+          <!-- Team Information -->
           <section class="mb-8">
-            <h2 class="mb-3 border-b border-gray-200 pb-2 text-base font-semibold text-gray-900">Team Assignment</h2>
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <h2 class="mb-3 border-b border-gray-200 pb-2 text-base font-semibold text-gray-900">Team Information</h2>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700">Submitter Name</label>
+                <input
+                  :value="submission?.creator_name || '—'"
+                  type="text"
+                  readonly
+                  class="mt-1 block w-full cursor-not-allowed rounded border border-gray-200 bg-gray-50 px-3 py-2 text-gray-600 shadow-sm"
+                />
+              </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">{{ teamLabels.manager || 'Manager' }} <span class="text-red-500">*</span></label>
                 <select v-model="form.manager_id" class="mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="getError('manager_id') ? 'border-red-500' : 'border-gray-300'">
@@ -512,11 +608,77 @@ onMounted(() => {
             </div>
           </section>
 
+          <!-- Additional CSR fields -->
+          <section class="mb-8">
+            <h2 class="mb-3 border-b border-gray-200 pb-2 text-base font-semibold text-gray-900">Additional Information (CSR)</h2>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div>
+                <label class="block text-sm font-medium text-gray-700">Ticket Number</label>
+                <input :value="form.ticket_number" type="text" readonly class="mt-1 block w-full cursor-not-allowed rounded border border-gray-200 bg-gray-50 px-3 py-2 text-gray-600 shadow-sm" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700">Status</label>
+                <select v-model="form.status" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+                  <option value="">Select Status</option>
+                  <option v-for="opt in editOptions.statuses" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700">CSR Name</label>
+                <select v-model="form.csr_id" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+                  <option value="">Select CSR</option>
+                  <optgroup v-if="accountCsrs.length" label="Assigned to this Account">
+                    <option v-for="csr in accountCsrs" :key="'acc-'+csr.id" :value="String(csr.id)">{{ csr.name }}</option>
+                  </optgroup>
+                  <optgroup v-if="otherCsrs.length" :label="accountCsrs.length ? 'Other CSRs' : 'All CSRs'">
+                    <option v-for="csr in otherCsrs" :key="'oth-'+csr.id" :value="String(csr.id)">{{ csr.name }}</option>
+                  </optgroup>
+                  <template v-if="!accountCsrs.length && !otherCsrs.length">
+                    <option v-for="csr in csrUsers" :key="csr.id" :value="String(csr.id)">{{ csr.name }}</option>
+                  </template>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700">Trouble Ticket</label>
+                <input v-model="form.trouble_ticket" type="text" placeholder="Enter the Ticket" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700">Activity</label>
+                <input v-model="form.activity" type="text" placeholder="Enter Activity" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700">Completion Date</label>
+                <div class="relative mt-1" @click="openDatePicker(completionDateRef)">
+                  <input
+                    type="text"
+                    readonly
+                    :value="formatDateDisplay(form.completion_date)"
+                    placeholder="DD-MMM-YYYY"
+                    class="block w-full cursor-pointer rounded border border-gray-300 bg-white px-3 py-2 pr-9 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  />
+                  <svg class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                  <input ref="completionDateRef" v-model="form.completion_date" type="date" class="sr-only" tabindex="-1" />
+                </div>
+              </div>
+              <div class="sm:col-span-2 lg:col-span-3">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700">Resolution Remarks</label>
+                    <textarea v-model="form.resolution_remarks" rows="3" placeholder="Provide detailed description of the issue..." class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700">Internal Remarks</label>
+                    <textarea v-model="form.internal_remarks" rows="3" placeholder="Provide detailed description of the issue..." class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <!-- Attachments -->
           <section class="mb-8">
             <h2 class="mb-2 text-base font-semibold text-gray-900">Attachments</h2>
             <div class="border-b border-gray-200 pb-3" />
-            <!-- Uploaded documents (cards in a row) -->
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div
                 v-for="(att, idx) in submission.attachments"
@@ -539,7 +701,6 @@ onMounted(() => {
                 </button>
               </div>
             </div>
-            <!-- + Add Another Document – on the next line after uploaded documents -->
             <div class="mt-6 block border-t border-gray-100 pt-4">
               <input ref="fileInput" type="file" multiple accept="image/*,.pdf,.doc,.docx,.csv" class="hidden" @change="onFileChange" />
               <button
@@ -554,95 +715,6 @@ onMounted(() => {
                 <div v-for="(f, idx) in newFiles" :key="'new-' + idx" class="flex items-center gap-2 rounded border border-green-200 bg-green-50 px-2 py-1 text-xs">
                   <span class="max-w-[160px] truncate">{{ f.name }}</span>
                   <button type="button" class="text-red-600 hover:underline" @click="removeNewFile(idx)">Remove</button>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <!-- Submitter Information (read-only) -->
-          <section class="mb-8">
-            <h2 class="mb-3 border-b border-gray-200 pb-2 text-base font-semibold text-gray-900">Submitter Information</h2>
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label class="block text-sm font-medium text-gray-500">Submitter Name</label>
-                <div class="mt-1 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.creator_name) }}</div>
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-500">Submitter Role</label>
-                <div class="mt-1 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.creator_role) }}</div>
-              </div>
-            </div>
-          </section>
-
-          <!-- Additional CSR fields -->
-          <section class="mb-8">
-            <h2 class="mb-3 border-b border-gray-200 pb-2 text-base font-semibold text-gray-900">Additional Information (CSR)</h2>
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <div>
-                <label class="block text-sm font-medium text-gray-700">Status</label>
-                <select v-model="form.status" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
-                  <option value="">Select Status</option>
-                  <option v-for="opt in editOptions.statuses" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700">Ticket Number</label>
-                <input :value="form.ticket_number" type="text" readonly class="mt-1 block w-full cursor-not-allowed rounded border border-gray-200 bg-gray-50 px-3 py-2 text-gray-600 shadow-sm" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700">CSR Name</label>
-                <select v-model="form.csr_id" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
-                  <option value="">Select CSR</option>
-                  <optgroup v-if="accountCsrs.length" label="Assigned to this Account">
-                    <option v-for="csr in accountCsrs" :key="'acc-'+csr.id" :value="String(csr.id)">{{ csr.name }}</option>
-                  </optgroup>
-                  <optgroup v-if="otherCsrs.length" :label="accountCsrs.length ? 'Other CSRs' : 'All CSRs'">
-                    <option v-for="csr in otherCsrs" :key="'oth-'+csr.id" :value="String(csr.id)">{{ csr.name }}</option>
-                  </optgroup>
-                  <template v-if="!accountCsrs.length && !otherCsrs.length">
-                    <option v-for="csr in csrUsers" :key="csr.id" :value="String(csr.id)">{{ csr.name }}</option>
-                  </template>
-                </select>
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700">Completion Date</label>
-                <div class="relative mt-1" @click="openDatePicker(completionDateRef)">
-                  <input
-                    type="text"
-                    readonly
-                    :value="formatDateDisplay(form.completion_date)"
-                    placeholder="DD-MMM-YYYY"
-                    class="block w-full cursor-pointer rounded border border-gray-300 bg-white px-3 py-2 pr-9 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-                  />
-                  <svg class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                  <input ref="completionDateRef" v-model="form.completion_date" type="date" class="sr-only" tabindex="-1" />
-                </div>
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700">Trouble Ticket</label>
-                <input v-model="form.trouble_ticket" type="text" placeholder="Enter the Ticket" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700">Activity</label>
-                <input v-model="form.activity" type="text" placeholder="Enter Activity" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
-              </div>
-              <div class="sm:col-span-2 lg:col-span-3">
-                <label class="block text-sm font-medium text-gray-700">Pending</label>
-                <select v-model="form.pending" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
-                  <option value="">Select Pending</option>
-                  <option v-for="opt in editOptions.pending_options" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-                </select>
-              </div>
-              <div class="sm:col-span-2 lg:col-span-3">
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700">Resolution Remarks</label>
-                    <textarea v-model="form.resolution_remarks" rows="3" placeholder="Provide detailed description of the issue..." class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
-                  </div>
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700">Internal Remarks</label>
-                    <textarea v-model="form.internal_remarks" rows="3" placeholder="Provide detailed description of the issue..." class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
-                  </div>
                 </div>
               </div>
             </div>

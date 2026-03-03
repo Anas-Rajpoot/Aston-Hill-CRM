@@ -34,12 +34,13 @@ const props = defineProps({
   selectedIds: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['sort', 'updateCell', 'viewHistory', 'openAssign', 'update:selectedIds'])
+const emit = defineEmits(['sort', 'updateCell', 'viewHistory', 'openAssign', 'update:selectedIds', 'delete'])
 
 const auth = useAuthStore()
 const canViewAction = computed(() => canModuleAction(auth.user, 'support', 'view'))
 const canEditAction = computed(() => canModuleAction(auth.user, 'support', 'edit'))
 const canHistoryAction = computed(() => canViewAction.value)
+const canDeleteAction = computed(() => canModuleAction(auth.user, 'support', 'delete'))
 const canInlineEdit = computed(() => {
   const roles = auth.user?.roles ?? []
   if (!Array.isArray(roles)) return false
@@ -72,15 +73,17 @@ function toggleRow(id) {
 }
 
 const columnLabels = {
-  id: 'SR',
-  submitted_at: 'Created',
-  ticket_number: 'AH Ticket ID',
+  id: 'ID',
+  submitted_at: 'Submitted At',
+  ticket_number: 'Ticket Number',
   account_number: 'Account Number',
   company_name: 'Company Name',
   issue_category: 'Issue Category',
   contact_number: 'Contact Number',
+  alternate_contact_number: 'Alternate Contact Number',
   issue_description: 'Issue Description',
-  creator: 'Submitted By',
+  attachments: 'Attachments',
+  creator: 'Submitter Name',
   csr: 'CSR Name',
   sla_timer: 'SLA Timer',
   manager: 'Manager',
@@ -90,7 +93,7 @@ const columnLabels = {
   workflow_status: 'SLA Status',
   completion_date: 'Completion Date',
   updated_at: 'Last Updated',
-  created_at: 'Created',
+  created_at: 'Created At',
   trouble_ticket: 'Trouble Ticket',
   activity: 'Activity',
   pending: 'Pending With',
@@ -209,6 +212,11 @@ function saveInlineEdit() {
   if (!editingCell.value) return
   const { rowId, col } = editingCell.value
   let value = inlineEditValue.value
+  if (col === 'status' && String(value).toLowerCase() === 'unassigned') {
+    editingCell.value = null
+    inlineEditError.value = ''
+    return
+  }
   if (col === 'contact_number') {
     const err = validatePhone(value)
     if (err) {
@@ -290,6 +298,7 @@ function isEditing(rowId, col) {
 }
 
 const STATUS_BADGES = {
+  unassigned: 'bg-amber-100 text-amber-700',
   draft: 'bg-gray-100 text-gray-700',
   submitted: 'bg-blue-100 text-blue-700',
   approved: 'bg-green-100 text-green-700',
@@ -304,13 +313,10 @@ function statusBadgeClass(status) {
   return STATUS_BADGES[status] ?? 'bg-gray-100 text-gray-700'
 }
 
-function canResubmit(row) {
-  if (row.status === 'approved') return false
-  const roles = auth.user?.roles ?? []
-  const isSuperAdmin = Array.isArray(roles) && roles.some((r) => (typeof r === 'string' ? r : r?.name) === 'superadmin')
-  if (isSuperAdmin) return true
-  const creatorId = row.creator_id ?? row.created_by
-  return creatorId != null && Number(creatorId) === Number(auth.user?.id)
+function statusLabel(status) {
+  if (!status) return '—'
+  if (String(status).toLowerCase() === 'unassigned') return 'UnAssigned'
+  return String(status).charAt(0).toUpperCase() + String(status).slice(1)
 }
 
 const WORKFLOW_BADGES = {
@@ -335,8 +341,8 @@ function isUnassignedCsr(row) {
 }
 
 const hasAnyRowAction = computed(() => {
-  if (canViewAction.value || canEditAction.value || canHistoryAction.value) return true
-  return canEditAction.value && (props.data || []).some((row) => canResubmit(row))
+  if (canViewAction.value || canEditAction.value || canHistoryAction.value || canDeleteAction.value) return true
+  return false
 })
 </script>
 
@@ -562,14 +568,14 @@ const hasAnyRowAction = computed(() => {
                 :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium cursor-pointer hover:ring-2 hover:ring-green-400', statusBadgeClass(row.status)]"
                 @dblclick="openDropdownEdit(row, 'status')"
               >
-                {{ row.status ? row.status.charAt(0).toUpperCase() + row.status.slice(1) : '—' }}
+                {{ statusLabel(row.status) }}
               </span>
             </template>
             <template v-else-if="col === 'status'">
               <span
                 :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', statusBadgeClass(row.status)]"
               >
-                {{ row.status ? row.status.charAt(0).toUpperCase() + row.status.slice(1) : '—' }}
+                {{ statusLabel(row.status) }}
               </span>
             </template>
             <template v-else-if="canInlineEdit && isDropdownColumn(col)">
@@ -626,14 +632,18 @@ const hasAnyRowAction = computed(() => {
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </button>
+                <button
+                  v-if="canDeleteAction"
+                  type="button"
+                  class="rounded-full p-1.5 text-red-600 hover:bg-red-50"
+                  title="Delete"
+                  @click="$emit('delete', row)"
+                >
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+                  </svg>
+                </button>
               </div>
-              <router-link
-                v-if="canEditAction && canResubmit(row)"
-                :to="`/customer-support/${row.id}/resubmit`"
-                class="rounded bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700"
-              >
-                Resubmit
-              </router-link>
             </div>
           </td>
         </tr>

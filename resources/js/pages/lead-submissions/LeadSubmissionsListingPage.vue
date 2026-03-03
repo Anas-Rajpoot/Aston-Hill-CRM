@@ -11,7 +11,7 @@ import AdvancedFilters from '@/components/lead-submissions/AdvancedFilters.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import AssignBackOfficeModal from '@/components/lead-submissions/AssignBackOfficeModal.vue'
 import LeadTable from '@/components/lead-submissions/LeadTable.vue'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import DeleteOtpModal from '@/components/DeleteOtpModal.vue'
 import api from '@/lib/axios'
 import Toast from '@/components/Toast.vue'
 import RecordHistoryModal from '@/components/RecordHistoryModal.vue'
@@ -41,7 +41,7 @@ const TABLE_MODULE = 'lead-submissions'
 const meta = ref({ current_page: 1, last_page: 1, per_page: auth.defaultTablePageSize || 25, total: 0 })
 const perPageOptions = ref([10, 20, 25, 50, 100])
 const allColumns = ref([])
-const visibleColumns = ref(['id', 'submitted_at', 'submission_type', 'account_number', 'company_name', 'category', 'type', 'product', 'mrc_aed', 'quantity', 'manager', 'team_leader', 'sales_agent', 'status', 'executive', 'sla_timer', 'status_changed_at', 'creator', 'email', 'contact_number_gsm'])
+const visibleColumns = ref(['id', 'submitted_at', 'submission_type', 'account_number', 'company_name', 'authorized_signatory_name', 'email', 'contact_number_gsm', 'alternate_contact_number', 'address', 'emirate', 'location_coordinates', 'category', 'type', 'product', 'offer', 'mrc_aed', 'quantity', 'ae_domain', 'gaid', 'previous_activity', 'resubmission_reason', 'remarks', 'manager', 'team_leader', 'sales_agent', 'status', 'executive', 'sla_timer', 'status_changed_at', 'creator'])
 const sort = ref('submitted_at')
 const order = ref('desc')
 const advancedVisible = ref(false)
@@ -59,6 +59,36 @@ const showToast = ref(false)
 const toastType = ref('success')
 const toastMsg  = ref('')
 function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
+
+const deleteModalVisible = ref(false)
+const deleteLoading = ref(false)
+const deleteTarget = ref(null)
+
+function openDeleteModal(row) {
+  if (!row?.id) return
+  deleteTarget.value = row
+  deleteModalVisible.value = true
+}
+
+function closeDeleteModal() {
+  deleteModalVisible.value = false
+  deleteTarget.value = null
+}
+
+async function confirmDelete() {
+  if (!deleteTarget.value?.id || deleteLoading.value) return
+  deleteLoading.value = true
+  try {
+    await leadSubmissionsApi.destroy(deleteTarget.value.id)
+    closeDeleteModal()
+    toast('success', 'Lead submission deleted successfully.')
+    await load()
+  } catch (e) {
+    toast('error', e?.response?.data?.message || 'Failed to delete lead submission.')
+  } finally {
+    deleteLoading.value = false
+  }
+}
 
 const historyModalVisible = ref(false)
 const historyRecordId = ref(null)
@@ -141,16 +171,16 @@ function buildParams() {
 
 const COLUMN_LABELS = {
   id: 'ID',
-  submitted_at: 'Lead Creation Date',
-  updated_at: 'Updated',
+  submitted_at: 'Submitted At',
+  updated_at: 'Updated At',
   submission_type: 'Request Type',
   account_number: 'Account Number',
   company_name: 'Company Name',
-  authorized_signatory_name: 'Authorized Signatory',
-  email: 'Email',
+  authorized_signatory_name: 'Authorized Signatory Name',
+  email: 'Email ID',
   contact_number_gsm: 'Contact Number',
   alternate_contact_number: 'Alternate Contact Number',
-  address: 'Address',
+  address: 'Complete Address',
   emirate: 'Emirate',
   location_coordinates: 'Location Coordinates',
   category: 'Service Category',
@@ -158,9 +188,11 @@ const COLUMN_LABELS = {
   product: 'Product',
   offer: 'Offer',
   mrc_aed: 'MRC (AED)',
-  quantity: 'Qty',
-  ae_domain: 'AE Domain',
+  quantity: 'Quantity',
+  ae_domain: '.ae Domain',
   gaid: 'GAID',
+  previous_activity: 'Old Activity',
+  resubmission_reason: 'Resubmission Reason',
   remarks: 'Remarks',
   sales_agent: 'Sales Agent',
   team_leader: 'Team Leader',
@@ -168,12 +200,12 @@ const COLUMN_LABELS = {
   status: 'Status',
   sla_timer: 'SLA Timer',
   executive: 'Back Office Executive',
-  status_changed_at: 'Last Updated',
-  creator: 'Created By',
+  status_changed_at: 'Status Updated At',
+  creator: 'Submitter Name',
   call_verification: 'Call Verification',
   pending_from_sales: 'Pending From Sales',
   documents_verification: 'Documents Verification',
-  submission_date_from: 'Submission Date From',
+  submission_date_from: 'Submission Date',
   back_office_notes: 'Back Office Notes',
   activity: 'Activity',
   back_office_account: 'Back Office Account',
@@ -620,13 +652,37 @@ onMounted(async () => {
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-white py-3">
     <div class="w-full space-y-3 px-4">
-      <!-- Top: breadcrumbs + title (left), Bulk Assign + Export (right) -->
-      <div class="flex flex-wrap items-center justify-between gap-4">
-        <div class="flex flex-wrap items-baseline gap-2">
-          <h1 class="text-xl font-semibold text-gray-900 leading-tight">Lead Submissions</h1>
-          <Breadcrumbs />
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
+      <!-- Message when Bulk Assign clicked with no selection -->
+      <div
+        v-if="bulkAssignMessage"
+        class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"
+        role="alert"
+      >
+        {{ bulkAssignMessage }}
+      </div>
+
+      <!-- Export in progress message -->
+      <div
+        v-if="exportLoading"
+        class="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 text-sm text-green-800"
+        role="status"
+        aria-live="polite"
+      >
+        <svg class="h-5 w-5 shrink-0 animate-spin text-green-600" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
+        <span>Exporting… Your CSV will download when ready.</span>
+      </div>
+
+      <FiltersBar
+        :filters="filters"
+        :filter-options="filterOptions"
+        :loading="loading"
+        @apply="applyFilters"
+        @reset="resetFilters"
+      >
+        <template #before-apply>
           <button
             v-if="canBulkAssign"
             type="button"
@@ -667,38 +723,7 @@ onMounted(async () => {
             </svg>
             {{ exportLoading ? 'Exporting...' : 'Export' }}
           </button>
-        </div>
-      </div>
-      <!-- Message when Bulk Assign clicked with no selection -->
-      <div
-        v-if="bulkAssignMessage"
-        class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"
-        role="alert"
-      >
-        {{ bulkAssignMessage }}
-      </div>
-
-      <!-- Export in progress message -->
-      <div
-        v-if="exportLoading"
-        class="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 text-sm text-green-800"
-        role="status"
-        aria-live="polite"
-      >
-        <svg class="h-5 w-5 shrink-0 animate-spin text-green-600" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-        </svg>
-        <span>Exporting… Your CSV will download when ready.</span>
-      </div>
-
-      <FiltersBar
-        :filters="filters"
-        :filter-options="filterOptions"
-        :loading="loading"
-        @apply="applyFilters"
-        @reset="resetFilters"
-      >
+        </template>
         <template #after-reset>
           <button
             type="button"
@@ -748,6 +773,7 @@ onMounted(async () => {
           @open-edit="openEditPage"
           @open-assign="openAssignModal"
           @view-history="openHistoryModal"
+          @delete="openDeleteModal"
         />
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
           <p class="text-sm text-gray-600">
@@ -799,6 +825,15 @@ onMounted(async () => {
       module-name="Lead Submissions"
       :fetch-fn="fetchLeadAudits"
       @close="closeHistoryModal"
+    />
+
+    <DeleteOtpModal
+      :visible="deleteModalVisible"
+      title="Delete Lead Submission"
+      :item-label="deleteTarget?.company_name || `Lead #${deleteTarget?.id ?? ''}`"
+      :loading="deleteLoading"
+      @close="closeDeleteModal"
+      @confirm="confirmDelete"
     />
 
     <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />

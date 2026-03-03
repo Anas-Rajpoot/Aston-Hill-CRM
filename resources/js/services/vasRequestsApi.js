@@ -4,9 +4,21 @@ let _vasBackOfficeOptionsCache = null
 let _vasBackOfficeOptionsCacheAt = 0
 const VAS_BACK_OFFICE_OPTIONS_TTL_MS = 5 * 60 * 1000
 
+let _teamOptionsCache = null
+let _teamOptionsCacheAt = 0
+const TEAM_OPTIONS_TTL_MS = 2 * 60 * 1000
+
 export default {
-  getTeamOptions() {
-    return api.get('/vas-requests/team-options')
+  getTeamOptions(forceRefresh = false) {
+    if (!forceRefresh && _teamOptionsCache && Date.now() - _teamOptionsCacheAt < TEAM_OPTIONS_TTL_MS) {
+      return Promise.resolve(_teamOptionsCache)
+    }
+    const req = api.get('/vas-requests/team-options')
+    req.then((res) => {
+      _teamOptionsCache = res
+      _teamOptionsCacheAt = Date.now()
+    })
+    return req
   },
   getDocumentSchema() {
     return api.get('/vas-requests/document-schema')
@@ -89,11 +101,6 @@ export default {
     return data
   },
 
-  async resubmit(id, payload) {
-    const { data } = await api.post(`/vas-requests/${id}/resubmit`, payload)
-    return data
-  },
-
   async getAudits(vasRequestId) {
     const { data } = await api.get(`/vas-requests/${vasRequestId}/audits`)
     return data
@@ -109,6 +116,11 @@ export default {
 
   async deleteDocument(vasRequestId, documentId) {
     const { data } = await api.delete(`/vas-requests/${vasRequestId}/documents/${documentId}`)
+    return data
+  },
+
+  async destroy(id) {
+    const { data } = await api.delete(`/vas-requests/${id}`)
     return data
   },
 }

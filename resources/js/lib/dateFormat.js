@@ -76,6 +76,57 @@ export function fromDdMmYyyy(str) {
 
 const MONTHS_3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
+function parseDateValue(value) {
+  if (value == null || value === '') return null
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value
+  }
+  const raw = String(value).trim()
+  if (!raw) return null
+
+  const isoLike = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/)
+  if (isoLike) {
+    const year = Number(isoLike[1])
+    const month = Number(isoLike[2]) - 1
+    const day = Number(isoLike[3])
+    const hour = Number(isoLike[4] ?? 0)
+    const minute = Number(isoLike[5] ?? 0)
+    const second = Number(isoLike[6] ?? 0)
+    const localDate = new Date(year, month, day, hour, minute, second)
+    return Number.isNaN(localDate.getTime()) ? null : localDate
+  }
+
+  const parsed = new Date(raw)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+/**
+ * CRM standard for user-entered date fields: DD-MMM-YYYY
+ */
+export function formatUserDate(value, fallback = '—') {
+  const date = parseDateValue(value)
+  if (!date) return fallback
+  const day = String(date.getDate()).padStart(2, '0')
+  const mon = MONTHS_3[date.getMonth()]
+  const year = date.getFullYear()
+  return `${day}-${mon}-${year}`
+}
+
+/**
+ * CRM standard for system-generated datetime fields: DD-MMM-YYYY HH:mm:ss
+ */
+export function formatSystemDateTime(value, fallback = '—') {
+  const date = parseDateValue(value)
+  if (!date) return fallback
+  const day = String(date.getDate()).padStart(2, '0')
+  const mon = MONTHS_3[date.getMonth()]
+  const year = date.getFullYear()
+  const hh = String(date.getHours()).padStart(2, '0')
+  const mm = String(date.getMinutes()).padStart(2, '0')
+  const ss = String(date.getSeconds()).padStart(2, '0')
+  return `${day}-${mon}-${year} ${hh}:${mm}:${ss}`
+}
+
 /**
  * Format date for display: dd Mon yyyy (e.g. 15 Jan 2024, 10 Mar 2024).
  * @param {string} ymd - Date in yyyy-mm-dd or empty
@@ -124,7 +175,7 @@ export function toDdMonYyyyLower(ymd) {
   const mInt = parseInt(m, 10)
   const dInt = parseInt(d, 10)
   if (Number.isNaN(mInt) || Number.isNaN(dInt) || mInt < 1 || mInt > 12) return ''
-  const monthLabel = MONTHS_3_LOWER[mInt - 1]
+  const monthLabel = MONTHS_3[mInt - 1]
   return `${String(dInt).padStart(2, '0')}-${monthLabel}-${y}`
 }
 

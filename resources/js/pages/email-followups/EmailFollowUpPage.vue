@@ -309,7 +309,7 @@ onMounted(async () => {
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700">Email Date <span class="text-red-500">*</span></label>
-            <DateInputDdMmYyyy v-model="form.email_date" placeholder="dd-Mon-yyyy" />
+            <DateInputDdMmYyyy v-model="form.email_date" placeholder="DD-MMM-YYYY" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700">Status <span class="text-red-500">*</span></label>

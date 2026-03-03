@@ -22,7 +22,15 @@ const toastType = ref('success')
 const toastMsg = ref('')
 function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
 
-const REQUEST_TYPES = ['General', 'Support', 'Relocation', 'Renewal', 'Other']
+const REQUEST_TYPES = [
+  'Special Landline Number',
+  'Special Mobile Number',
+  'Sequential Number',
+  'Renewal Offer Approval',
+  'Hard Cap Approval',
+  'Marketing Approval',
+  'Other Request',
+]
 const STATUSES = ['draft', 'submitted', 'approved', 'rejected']
 
 const { errors, generalMessage, setErrors, clearErrors, clearFieldError, getError } = useFormErrors()
@@ -42,47 +50,136 @@ const form = ref({
 const teamOptions = ref({ managers: [], team_leaders: [], sales_agents: [] })
 const settingFromChild = ref(false)
 const settingFromSalesAgent = ref(false)
+const initialFormLoad = ref(false)
+
+const pickFirstValue = (obj, keys) => {
+  for (const key of keys) {
+    const value = obj?.[key]
+    if (value != null && value !== '') return String(value)
+  }
+  return ''
+}
+
+const resolveTeamLeaderManagerId = (teamLeader) => {
+  const direct = pickFirstValue(teamLeader, ['manager_id', 'managerId'])
+  if (direct) return direct
+  const reportsTo = pickFirstValue(teamLeader, ['reports_to', 'reportsTo'])
+  if (reportsTo && (teamOptions.value.managers ?? []).some((m) => String(m.id) === reportsTo)) return reportsTo
+  return ''
+}
 
 const filteredTeamLeaders = computed(() => {
   const mid = form.value.manager_id
   if (!mid) return teamOptions.value.team_leaders
-  return teamOptions.value.team_leaders.filter((t) => String(t.manager_id) === String(mid))
+  return teamOptions.value.team_leaders.filter((t) => resolveTeamLeaderManagerId(t) === String(mid))
 })
 
 const filteredSalesAgents = computed(() => {
   const tlId = form.value.team_leader_id
-  if (!tlId) return teamOptions.value.sales_agents
-  return teamOptions.value.sales_agents.filter((sa) => String(sa.team_leader_id) === String(tlId))
+  const managerId = form.value.manager_id
+  const teamLeaderIdsUnderManager = new Set(
+    (teamOptions.value.team_leaders ?? [])
+      .filter((t) => managerId && resolveTeamLeaderManagerId(t) === String(managerId))
+      .map((t) => String(t.id))
+  )
+
+  const resolveSalesAgentTeamLeaderId = (salesAgent) => {
+    const direct = pickFirstValue(salesAgent, ['team_leader_id', 'teamLeaderId'])
+    const reportsTo = pickFirstValue(salesAgent, ['reports_to', 'reportsTo'])
+    if (direct) return direct
+    if (reportsTo) {
+      const asTeamLeader = (teamOptions.value.team_leaders ?? []).some((t) => String(t.id) === String(reportsTo))
+      if (asTeamLeader) return String(reportsTo)
+    }
+    return ''
+  }
+
+  const resolveSalesAgentManagerId = (salesAgent) => {
+    const direct = pickFirstValue(salesAgent, ['manager_id', 'managerId'])
+    const reportsTo = pickFirstValue(salesAgent, ['reports_to', 'reportsTo'])
+    if (direct) return direct
+    if (reportsTo) {
+      const asManager = (teamOptions.value.managers ?? []).some((m) => String(m.id) === String(reportsTo))
+      if (asManager) return String(reportsTo)
+    }
+    const teamLeaderIdFromAgent = resolveSalesAgentTeamLeaderId(salesAgent)
+    if (teamLeaderIdFromAgent) {
+      const teamLeader = (teamOptions.value.team_leaders ?? []).find((t) => String(t.id) === String(teamLeaderIdFromAgent))
+      const managerIdFromLeader = resolveTeamLeaderManagerId(teamLeader)
+      if (managerIdFromLeader) return managerIdFromLeader
+    }
+    return ''
+  }
+
+  if (tlId) {
+    return teamOptions.value.sales_agents.filter((salesAgent) => resolveSalesAgentTeamLeaderId(salesAgent) === String(tlId))
+  }
+  if (managerId) {
+    return teamOptions.value.sales_agents.filter((salesAgent) => {
+      const resolvedManagerId = resolveSalesAgentManagerId(salesAgent)
+      const resolvedTeamLeaderId = resolveSalesAgentTeamLeaderId(salesAgent)
+      return resolvedManagerId === String(managerId) || teamLeaderIdsUnderManager.has(resolvedTeamLeaderId)
+    })
+  }
+  return teamOptions.value.sales_agents
 })
 
+const deriveSalesHierarchy = (salesAgent) => {
+  let teamLeaderId = pickFirstValue(salesAgent, ['team_leader_id', 'teamLeaderId'])
+  let managerId = pickFirstValue(salesAgent, ['manager_id', 'managerId'])
+  const reportsTo = pickFirstValue(salesAgent, ['reports_to', 'reportsTo'])
+
+  if (!teamLeaderId && reportsTo && (teamOptions.value.team_leaders ?? []).some((u) => String(u.id) === reportsTo)) {
+    teamLeaderId = reportsTo
+  }
+  if (!managerId && reportsTo && (teamOptions.value.managers ?? []).some((u) => String(u.id) === reportsTo)) {
+    managerId = reportsTo
+  }
+  if (!managerId && teamLeaderId) {
+    const teamLeader = (teamOptions.value.team_leaders ?? []).find((u) => String(u.id) === String(teamLeaderId))
+    managerId = resolveTeamLeaderManagerId(teamLeader)
+  }
+  if (!teamLeaderId && managerId) {
+    const leaders = (teamOptions.value.team_leaders ?? []).filter((u) => resolveTeamLeaderManagerId(u) === String(managerId))
+    if (leaders.length === 1) teamLeaderId = String(leaders[0].id)
+  }
+  return { teamLeaderId, managerId }
+}
+
 watch(() => form.value.manager_id, () => {
+  if (initialFormLoad.value) return
   if (settingFromChild.value) { nextTick(() => { settingFromChild.value = false }); return }
   form.value.team_leader_id = ''
   form.value.sales_agent_id = ''
 })
 
 watch(() => form.value.team_leader_id, (val) => {
+  if (initialFormLoad.value) return
   if (val) {
     const tl = teamOptions.value.team_leaders.find((u) => String(u.id) === String(val))
-    if (tl?.manager_id != null) { settingFromChild.value = true; form.value.manager_id = String(tl.manager_id); nextTick(() => { settingFromChild.value = false }) }
+    const managerId = resolveTeamLeaderManagerId(tl)
+    if (managerId) { settingFromChild.value = true; form.value.manager_id = String(managerId); nextTick(() => { settingFromChild.value = false }) }
     if (!settingFromSalesAgent.value) form.value.sales_agent_id = ''
-  } else { form.value.manager_id = '' }
+  } else if (!settingFromSalesAgent.value) { form.value.sales_agent_id = '' }
 })
 
 watch(() => form.value.sales_agent_id, (val) => {
+  if (initialFormLoad.value) return
   if (val) {
     const sa = teamOptions.value.sales_agents.find((u) => String(u.id) === String(val))
     if (sa) {
+      const resolved = deriveSalesHierarchy(sa)
       settingFromSalesAgent.value = true; settingFromChild.value = true
-      if (sa.team_leader_id != null) form.value.team_leader_id = String(sa.team_leader_id)
-      if (sa.manager_id != null) form.value.manager_id = String(sa.manager_id)
+      if (resolved.teamLeaderId) form.value.team_leader_id = resolved.teamLeaderId
+      if (resolved.managerId) form.value.manager_id = resolved.managerId
       nextTick(() => { settingFromSalesAgent.value = false; settingFromChild.value = false })
     }
-  } else { form.value.team_leader_id = ''; form.value.manager_id = '' }
+  } else { form.value.team_leader_id = '' }
 })
 
 async function loadData() {
   loading.value = true
+  initialFormLoad.value = true
   try {
     const [reqData, teamRes] = await Promise.all([
       specialRequestsApi.getRequest(id.value),
@@ -109,9 +206,14 @@ async function loadData() {
       sales_agent_id: reqData.sales_agent_id != null ? String(reqData.sales_agent_id) : '',
     }
     documents.value = Array.isArray(reqData?.documents) ? reqData.documents : []
-    nextTick(() => { settingFromChild.value = false; settingFromSalesAgent.value = false })
+    nextTick(() => {
+      settingFromChild.value = false
+      settingFromSalesAgent.value = false
+      initialFormLoad.value = false
+    })
   } catch (e) {
     setErrors(e)
+    initialFormLoad.value = false
   } finally {
     loading.value = false
   }
@@ -310,16 +412,6 @@ onMounted(() => loadData())
                 </select>
               </div>
             </div>
-              <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                  <label class="block text-xs font-medium text-gray-500">Complete Address</label>
-                  <textarea v-model="form.complete_address" rows="3" placeholder="Enter complete address" :class="`${inputClass('complete_address')} mt-0.5`" />
-              </div>
-              <div>
-                  <label class="block text-xs font-medium text-gray-500">Any Special Instruction</label>
-                  <textarea v-model="form.special_instruction" rows="3" placeholder="Enter Special Instruction" :class="`${inputClass('special_instruction')} mt-0.5`" />
-                </div>
-            </div>
           </section>
 
           <!-- Team Information -->
@@ -349,6 +441,20 @@ onMounted(() => loadData())
                   <option v-for="u in filteredSalesAgents" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
                 </select>
                   <p v-if="getError('sales_agent_id')" class="mt-1 text-xs text-red-600">{{ getError('sales_agent_id') }}</p>
+                </div>
+              </div>
+            </section>
+
+            <section>
+              <h2 class="mb-3 text-sm font-semibold text-gray-900">Address & Instruction</h2>
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Complete Address</label>
+                  <textarea v-model="form.complete_address" rows="3" placeholder="Enter complete address" :class="`${inputClass('complete_address')} mt-0.5`" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Any Special Instruction</label>
+                  <textarea v-model="form.special_instruction" rows="3" placeholder="Enter Special Instruction" :class="`${inputClass('special_instruction')} mt-0.5`" />
                 </div>
               </div>
             </section>

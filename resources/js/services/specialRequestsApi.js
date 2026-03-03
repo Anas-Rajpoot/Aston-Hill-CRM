@@ -70,6 +70,11 @@ export default {
     return data
   },
 
+  async destroy(id) {
+    const { data } = await api.delete(`/special-requests/${id}`)
+    return data
+  },
+
   getTeamOptions() {
     return api.get('/field-submissions/team-options')
   },

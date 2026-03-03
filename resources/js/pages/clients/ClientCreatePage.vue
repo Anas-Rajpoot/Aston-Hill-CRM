@@ -1,7 +1,7 @@
 <script setup>
 /**
  * Add New Client – full form: Company Information, Contact Details, Address,
- * Submission/Product details, Account Ownership, Status & Notes, System Metadata.
+ * Submission/Product details, Account Ownership, System Metadata.
  * Buttons: Cancel, Create Client, Create & Add Another.
  */
 import { ref, onMounted, computed, watch, nextTick } from 'vue'
@@ -79,19 +79,51 @@ function navigateToListing() {
   router.push(resolveListingTarget())
 }
 
-const STATUS_OPTIONS = [
-  { value: 'Normal', label: 'Normal' },
-  { value: 'Churn', label: 'Churn' },
-  { value: 'Clawback', label: 'Clawback' },
-]
-
 const COMPANY_CATEGORY_OPTIONS = [
   { value: '', label: 'Select category' },
-  { value: 'LLC', label: 'LLC' },
-  { value: 'FZCO', label: 'FZCO' },
-  { value: 'FZE', label: 'FZE' },
-  { value: 'Branch', label: 'Branch' },
+  { value: 'Real Estate', label: 'Real Estate' },
+  { value: 'Education', label: 'Education' },
+  { value: 'Healthcare / Medical Services', label: 'Healthcare / Medical Services' },
+  { value: 'Retail / Wholesale', label: 'Retail / Wholesale' },
+  { value: 'Food & Beverage', label: 'Food & Beverage' },
+  { value: 'Tourism & Hospitality', label: 'Tourism & Hospitality' },
+  { value: 'Professional Services', label: 'Professional Services' },
+  { value: 'Industrial / Manufacturing', label: 'Industrial / Manufacturing' },
+  { value: 'Technology / IT Services', label: 'Technology / IT Services' },
+  { value: 'Logistics / Transport / Shipping', label: 'Logistics / Transport / Shipping' },
+  { value: 'Media & Creative', label: 'Media & Creative' },
+  { value: 'Financial Services', label: 'Financial Services' },
+  { value: 'Agriculture / Farming / Fisheries', label: 'Agriculture / Farming / Fisheries' },
+  { value: 'Environmental / Sustainability Services', label: 'Environmental / Sustainability Services' },
+  { value: 'Non-Profit / Charity / NGO', label: 'Non-Profit / Charity / NGO' },
   { value: 'Other', label: 'Other' },
+]
+
+const TRADE_LICENSE_AUTHORITIES = [
+  'DET - Dubai Department of Economy and Tourism',
+  'ADDED - Abu Dhabi Department of Economic Development',
+  'SEDD - Sharjah Economic Development Department',
+  'Ajman DED - Ajman Department of Economic Development',
+  'RAK DED - Ras Al Khaimah Department of Economic Development',
+  'Fujairah Municipality - Fujairah Municipality',
+  'UAQ Municipality - Umm Al Quwain Municipality',
+  'JAFZA - Jebel Ali Free Zone Authority',
+  'DAFZA - Dubai Airport Free Zone Authority',
+  'DMCC - Dubai Multi Commodities Centre',
+  'DIFC - Dubai International Financial Centre',
+  'ADGM - Abu Dhabi Global Market',
+  'SPC - Sharjah Publishing City Free Zone',
+  'SHAMS - Sharjah Media City',
+  'AFZA - Ajman Free Zone Authority',
+  'RAKEZ - Ras Al Khaimah Economic Zone',
+  'ADAFZ - Abu Dhabi Airports Free Zone',
+  'MOE - Ministry of Economy',
+  'TDRA - Telecommunications and Digital Government Regulatory Authority',
+  'MOI - Ministry of Interior',
+  'MOJ - Ministry of Justice',
+  'DHA - Dubai Health Authority',
+  'DoH - Department of Health – Abu Dhabi',
+  'FTA - Federal Tax Authority',
 ]
 
 const YES_NO_OPTIONS = [
@@ -191,6 +223,52 @@ const form = ref({
 })
 
 const { draftLoaded, draftSaving, draftSavedAt, clearDraft } = useFormDraft('client', 'new', form)
+const selectedBillFields = ref(['first_bill'])
+const billsBulkValue = ref('')
+const SERVICE_TYPE_OPTIONS_BY_CATEGORY = {
+  Fixed: ['New Submission', 'Relocation', 'Update WO', 'Contract Renewal', 'Migration', 'Other'],
+  FMS: ['New Submission', 'Relocation', 'Update WO', 'Contract Renewal', 'Migration', 'Other'],
+  GSM: ['New Sim Card', 'C2B Migration', 'B2B Migration', 'MNP', 'MNMI / EC Renwal', 'AS Update', 'MPR', 'Sim Replacement', 'Multi Sim'],
+  Other: ['Office 365', 'Domain Activation', 'Number Swapping', 'Device Request', 'Other Request'],
+}
+const PRODUCT_TYPE_OPTIONS_BY_CATEGORY = {
+  Fixed: ['Business Ultimate', 'Business Essential', 'Business Complete', 'Business Line', 'Business Trunk Line', 'ISDN 30', 'SIP Trunk', 'Fax Line', 'Fixed Other'],
+  FMS: ['Business Starter', 'Business Starter Pro', 'Business Starter Ultra 12M', 'Business Starter Ultra 24M', 'FMS Other'],
+  GSM: ['Simplified', 'Q1', 'BIP', 'Abu Dhabi Offer', 'SPR'],
+}
+const serviceTypeOptions = computed(() => {
+  const category = form.value.service_category || ''
+  return SERVICE_TYPE_OPTIONS_BY_CATEGORY[category] ?? []
+})
+const productTypeOptions = computed(() => {
+  const category = form.value.service_category || ''
+  return PRODUCT_TYPE_OPTIONS_BY_CATEGORY[category] ?? []
+})
+const addressOptions = computed(() => {
+  const options = []
+  for (const addr of (form.value.addresses ?? [])) {
+    const fullAddress = String(addr?.full_address ?? '').trim()
+    const fallbackAddress = [addr?.unit, addr?.building, addr?.area, addr?.emirates]
+      .map((v) => String(v ?? '').trim())
+      .filter(Boolean)
+      .join(', ')
+    const candidate = fullAddress || fallbackAddress
+    if (candidate && !options.includes(candidate)) options.push(candidate)
+  }
+  const currentAddress = String(form.value.address ?? '').trim()
+  if (currentAddress && !options.includes(currentAddress)) options.unshift(currentAddress)
+  return options
+})
+
+function applyBillsBulkAction() {
+  const fields = selectedBillFields.value
+  const value = billsBulkValue.value
+  if (!Array.isArray(fields) || fields.length === 0) return
+  fields.forEach((field) => {
+    form.value.company_detail[field] = value
+    delete fieldErrors.value[field]
+  })
+}
 
 const createdByLabel = computed(() => auth.user?.name ? `${auth.user.name} (Auto)` : 'Current User (Auto)')
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -228,6 +306,7 @@ const ACCOUNT_TRANSFER_GIVEN_TO_OPTIONS = [
   'VEGA GLOBAL BUSINESS SERVICES FZ LLE',
   'VISIONTEL TECHNOLOGY',
   'X SAT FZE',
+  'Other',
 ]
 const createdDateLabel = computed(() => {
   const d = new Date()
@@ -293,6 +372,18 @@ watch(
           settingFromChild.value = false
         })
       }
+    }
+  }
+)
+
+watch(
+  () => form.value.service_category,
+  () => {
+    if (!serviceTypeOptions.value.includes(form.value.service_type)) {
+      form.value.service_type = ''
+    }
+    if (!productTypeOptions.value.includes(form.value.product_type)) {
+      form.value.product_type = ''
     }
   }
 )
@@ -623,17 +714,12 @@ function validateForm() {
     if (!cd.company_category?.trim()) errs.company_category = 'Company Category is required.'
     if (!cd.trade_license_number?.trim()) errs.trade_license_number = 'Trade License Number is required.'
     if (!f.account_number?.trim()) errs.account_number = 'Account Number is required.'
-    if (!cd.first_bill?.trim()) errs.first_bill = 'First Bill is required.'
-    if (!cd.second_bill?.trim()) errs.second_bill = 'Second Bill is required.'
-    if (!cd.third_bill?.trim()) errs.third_bill = 'Third Bill is required.'
-    if (!cd.fourth_bill?.trim()) errs.fourth_bill = 'Fourth Bill is required.'
     if (!cd.account_manager_name?.trim()) errs.account_manager_name = 'Account Manager Name is required.'
   }
 
   if (!isProductMode.value) {
     const hasCsr = f.csrs.some((c) => c.user_id)
     if (!hasCsr) errs.csr = 'At least one CSR is required.'
-    if (!f.status?.trim()) errs.status = 'After Sales Status is required.'
   }
 
   const c0 = f.contacts[0]
@@ -652,13 +738,8 @@ const requiredFieldLabels = {
   account_number: 'Account Number',
   company_category: 'Company Category',
   trade_license_number: 'Trade License Number',
-  first_bill: 'First Bill',
-  second_bill: 'Second Bill',
-  third_bill: 'Third Bill',
-  fourth_bill: 'Fourth Bill',
   account_manager_name: 'Account Manager Name',
   csr: 'CSR (at least one)',
-  status: 'After Sales Status',
   contact_0_name: 'Contact Person Name',
   contact_0_contact_number: 'Contact Number',
   contact_0_email: 'Email ID',
@@ -946,10 +1027,7 @@ function closeToast() {
               <label class="block text-sm font-medium text-gray-700">Trade License Issuing Authority</label>
               <select v-model="form.company_detail.trade_license_issuing_authority" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
                 <option value="">Select authority</option>
-                <option value="DED">DED</option>
-                <option value="JAFZA">JAFZA</option>
-                <option value="DMCC">DMCC</option>
-                <option value="Other">Other</option>
+                <option v-for="authority in TRADE_LICENSE_AUTHORITIES" :key="authority" :value="authority">{{ authority }}</option>
               </select>
             </div>
             <div>
@@ -978,7 +1056,10 @@ function closeToast() {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Account Taken From</label>
-              <input v-model="form.company_detail.account_taken_from" type="text" placeholder="Select" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+              <select v-model="form.company_detail.account_taken_from" class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+                <option value="">Select account taken from</option>
+                <option v-for="opt in ACCOUNT_TRANSFER_GIVEN_TO_OPTIONS" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Account Mapping Date</label>
@@ -996,32 +1077,59 @@ function closeToast() {
               <DateInputDdMmYyyy v-model="form.company_detail.account_transfer_given_date" />
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700">First Bill <span class="text-red-600">*</span></label>
+              <label class="block text-sm font-medium text-gray-700">First Bill</label>
               <select v-model="form.company_detail.first_bill" :class="selectClass('first_bill')">
                 <option v-for="o in PAID_UNPAID_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
               </select>
               <p v-if="fieldErrors.first_bill" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.first_bill }}</p>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700">Second Bill <span class="text-red-600">*</span></label>
+              <label class="block text-sm font-medium text-gray-700">Second Bill</label>
               <select v-model="form.company_detail.second_bill" :class="selectClass('second_bill')">
                 <option v-for="o in PAID_UNPAID_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
               </select>
               <p v-if="fieldErrors.second_bill" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.second_bill }}</p>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700">Third Bill <span class="text-red-600">*</span></label>
+              <label class="block text-sm font-medium text-gray-700">Third Bill</label>
               <select v-model="form.company_detail.third_bill" :class="selectClass('third_bill')">
                 <option v-for="o in PAID_UNPAID_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
               </select>
               <p v-if="fieldErrors.third_bill" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.third_bill }}</p>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700">Fourth Bill <span class="text-red-600">*</span></label>
+              <label class="block text-sm font-medium text-gray-700">Fourth Bill</label>
               <select v-model="form.company_detail.fourth_bill" :class="selectClass('fourth_bill')">
                 <option v-for="o in PAID_UNPAID_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
               </select>
               <p v-if="fieldErrors.fourth_bill" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.fourth_bill }}</p>
+            </div>
+            <div class="sm:col-span-2 lg:col-span-4">
+              <label class="block text-sm font-medium text-gray-700">Bulk Action (Select One or More Bills)</label>
+              <div class="mt-1 flex flex-wrap items-end gap-2">
+                <div class="flex min-h-[42px] flex-wrap items-center gap-3 rounded border border-gray-300 bg-white px-3 py-2">
+                  <label class="inline-flex items-center gap-1.5 text-sm text-gray-700">
+                    <input v-model="selectedBillFields" type="checkbox" value="first_bill" class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500" />
+                    First Bill
+                  </label>
+                  <label class="inline-flex items-center gap-1.5 text-sm text-gray-700">
+                    <input v-model="selectedBillFields" type="checkbox" value="second_bill" class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500" />
+                    Second Bill
+                  </label>
+                  <label class="inline-flex items-center gap-1.5 text-sm text-gray-700">
+                    <input v-model="selectedBillFields" type="checkbox" value="third_bill" class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500" />
+                    Third Bill
+                  </label>
+                  <label class="inline-flex items-center gap-1.5 text-sm text-gray-700">
+                    <input v-model="selectedBillFields" type="checkbox" value="fourth_bill" class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500" />
+                    Fourth Bill
+                  </label>
+                </div>
+                <select v-model="billsBulkValue" class="block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 sm:w-auto sm:min-w-[180px]">
+                  <option v-for="o in PAID_UNPAID_OPTIONS" :key="`bulk-${o.value}`" :value="o.value">{{ o.label }}</option>
+                </select>
+                <button type="button" class="rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700" @click="applyBillsBulkAction">Apply</button>
+              </div>
             </div>
             <div class="sm:col-span-2">
               <label class="block text-sm font-medium text-gray-700">Additional Note</label>
@@ -1094,10 +1202,6 @@ function closeToast() {
                   <option v-for="o in YES_NO_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
                 </select>
               </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Account Transfer Given Date</label>
-              <DateInputDdMmYyyy v-model="contact.as_expiry_date" />
-            </div>
               <div class="sm:col-span-2">
                 <label class="block text-sm font-medium text-gray-700">Additional Note</label>
                 <textarea v-model="contact.additional_note" rows="2" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
@@ -1106,13 +1210,13 @@ function closeToast() {
             <!-- Address for this contact -->
             <div v-if="form.addresses[idx]" class="mt-4 rounded border border-gray-100 bg-white p-3">
               <span class="text-sm font-medium text-gray-700">Address {{ idx + 1 }}</span>
-              <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <div class="sm:col-span-2">
+              <div class="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-4">
+                <div class="lg:col-span-4">
                   <label class="block text-sm font-medium text-gray-700">Full Address</label>
                   <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm text-gray-600">{{ [form.addresses[idx].unit, form.addresses[idx].building, form.addresses[idx].area, form.addresses[idx].emirates].filter(Boolean).join(', ') || '—' }}</p>
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-gray-700">BRN</label>
+                  <label class="block text-sm font-medium text-gray-700">Unit</label>
                   <input v-model="form.addresses[idx].unit" type="text" placeholder="e.g. 1205" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
                 </div>
                 <div>
@@ -1190,51 +1294,40 @@ function closeToast() {
               <label class="block text-sm font-medium text-gray-700">Submission Type</label>
               <select v-model="form.submission_type" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
                 <option value="">Select</option>
-                <option value="New | Submit">New | Submit</option>
-                <option value="Resubmit">Resubmit</option>
+                <option value="New Submission">New Submission</option>
+                <option value="Resubmission">Resubmission</option>
               </select>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Service Category</label>
               <select v-model="form.service_category" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
                 <option value="">Select</option>
-                <option value="New Connection">New Connection</option>
-                <option value="Migration">Migration</option>
-                <option value="Upgrade">Upgrade</option>
-                <option value="Downgrade">Downgrade</option>
-                <option value="Renewal">Renewal</option>
-                <option value="Disconnection">Disconnection</option>
+                <option value="Fixed">Fixed</option>
+                <option value="FMS">FMS</option>
+                <option value="GSM">GSM</option>
+                <option value="Other">Other</option>
               </select>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Service Type</label>
               <select v-model="form.service_type" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
                 <option value="">Select</option>
-                <option value="Voice">Voice</option>
-                <option value="Internet">Internet</option>
-                <option value="IPTV">IPTV</option>
-                <option value="Managed Services">Managed Services</option>
-                <option value="Cloud">Cloud</option>
-                <option value="Security">Security</option>
+                <option v-for="opt in serviceTypeOptions" :key="opt" :value="opt">{{ opt }}</option>
               </select>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Product Type</label>
               <select v-model="form.product_type" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
                 <option value="">Select</option>
-                <option value="SIP Trunk">SIP Trunk</option>
-                <option value="PRI">PRI</option>
-                <option value="Broadband">Broadband</option>
-                <option value="Dedicated Internet">Dedicated Internet</option>
-                <option value="MPLS">MPLS</option>
-                <option value="Hosted PBX">Hosted PBX</option>
-                <option value="SD-WAN">SD-WAN</option>
-                <option value="Firewall">Firewall</option>
+                <option v-for="opt in productTypeOptions" :key="opt" :value="opt">{{ opt }}</option>
               </select>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Address</label>
-              <input v-model="form.address" type="text" placeholder="Enter address" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+              <select v-model="form.address" class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+                <option value="">Select</option>
+                <option v-for="opt in addressOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
             </div>
             <!-- Row 3: Product Name, MRC, Quantity, Offer, Migration Numbers -->
             <div>
@@ -1273,7 +1366,7 @@ function closeToast() {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Migration Numbers</label>
-              <input v-model="form.migration_numbers" type="text" placeholder="Enter Migration Number" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+              <input v-model="form.migration_numbers" type="text" placeholder="Enter Migration / FNP Number" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
             </div>
             <!-- Row 4: Activity, Account Number, Work Order, Work Order Status, Activation Date -->
             <div>
@@ -1302,7 +1395,7 @@ function closeToast() {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Activation Date</label>
-              <DateInputDdMmYyyy v-model="form.activation_date" placeholder="dd-mm-yyyy" />
+              <DateInputDdMmYyyy v-model="form.activation_date" placeholder="DD-MMM-YYYY" />
             </div>
             <!-- Row 5: Contract Term, Deactivation Date, Clawback / Chum, Remarks -->
             <div>
@@ -1315,19 +1408,19 @@ function closeToast() {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Contract End Date</label>
-              <DateInputDdMmYyyy v-model="form.contract_end_date" placeholder="dd-mm-yyyy" />
+              <DateInputDdMmYyyy v-model="form.contract_end_date" placeholder="DD-MMM-YYYY" />
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Clawback / Chum</label>
               <select v-model="form.clawback_chum" class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
                 <option value="">Select</option>
-                <option value="Yes">Yes</option>
-                <option value="No">No</option>
+                <option value="Clawback">Clawback</option>
+                <option value="Churn">Churn</option>
               </select>
             </div>
             <div class="lg:col-span-2">
               <label class="block text-sm font-medium text-gray-700">Remarks</label>
-              <input v-model="form.remarks" type="text" placeholder="Primary connection" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+              <input v-model="form.remarks" type="text" placeholder="Enter remarks if clawback / Churn...... " class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
             </div>
             <!-- Row 6: Additional Note full width -->
             <div class="sm:col-span-2 lg:col-span-5">
@@ -1380,44 +1473,6 @@ function closeToast() {
               <button v-if="form.csrs.length > 1" type="button" class="shrink-0 rounded p-2 text-red-600 hover:bg-red-50" title="Remove CSR" @click="removeCsr(cidx)">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Status & Notes -->
-        <div v-if="!isProductMode" class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <div class="flex items-start gap-3">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#D1FAE5]">
-              <svg class="h-5 w-5 text-[#34D399]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </span>
-            <div>
-              <h2 class="text-xl font-bold text-gray-900">Status & Notes</h2>
-              <p class="mt-0.5 text-sm text-gray-500">After sales status and additional information.</p>
-            </div>
-          </div>
-          <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div>
-              <label class="block text-sm font-medium text-gray-700">After Sales Status <span class="text-red-600">*</span></label>
-              <select v-model="form.status" :class="selectClass('status')">
-                <option value="">Select status</option>
-                <option v-for="s in STATUS_OPTIONS" :key="s.value" :value="s.value">{{ s.label }}</option>
-              </select>
-              <p v-if="fieldErrors.status" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.status }}</p>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Account Taken From</label>
-              <input v-model="form.company_detail.account_taken_from" type="text" placeholder="Enter source" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Account Mapping Date</label>
-              <DateInputDdMmYyyy v-model="form.company_detail.account_mapping_date" />
-            </div>
-            <div class="sm:col-span-3">
-              <label class="block text-sm font-medium text-gray-700">Additional Comment</label>
-              <textarea v-model="form.company_detail.additional_comment_2" rows="3" placeholder="Enter any additional notes or comments" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
             </div>
           </div>
         </div>

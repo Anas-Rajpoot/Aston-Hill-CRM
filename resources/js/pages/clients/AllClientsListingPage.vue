@@ -1016,51 +1016,51 @@ onMounted(() => {
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Submitted From</label>
-            <DateInputDdMmYyyy v-model="filters.submitted_from" placeholder="dd-Mon-yyyy" />
+            <DateInputDdMmYyyy v-model="filters.submitted_from" placeholder="DD-MMM-YYYY" />
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Submitted To</label>
-            <DateInputDdMmYyyy v-model="filters.submitted_to" placeholder="dd-Mon-yyyy" />
+            <DateInputDdMmYyyy v-model="filters.submitted_to" placeholder="DD-MMM-YYYY" />
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Activation From</label>
-            <DateInputDdMmYyyy v-model="filters.activation_from" placeholder="dd-Mon-yyyy" />
+            <DateInputDdMmYyyy v-model="filters.activation_from" placeholder="DD-MMM-YYYY" />
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Activation To</label>
-            <DateInputDdMmYyyy v-model="filters.activation_to" placeholder="dd-Mon-yyyy" />
+            <DateInputDdMmYyyy v-model="filters.activation_to" placeholder="DD-MMM-YYYY" />
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Completion From</label>
-            <DateInputDdMmYyyy v-model="filters.completion_from" placeholder="dd-Mon-yyyy" />
+            <DateInputDdMmYyyy v-model="filters.completion_from" placeholder="DD-MMM-YYYY" />
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Completion To</label>
-            <DateInputDdMmYyyy v-model="filters.completion_to" placeholder="dd-Mon-yyyy" />
+            <DateInputDdMmYyyy v-model="filters.completion_to" placeholder="DD-MMM-YYYY" />
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Contract End From</label>
-            <DateInputDdMmYyyy v-model="filters.contract_end_from" placeholder="dd-Mon-yyyy" />
+            <DateInputDdMmYyyy v-model="filters.contract_end_from" placeholder="DD-MMM-YYYY" />
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Contract End To</label>
-            <DateInputDdMmYyyy v-model="filters.contract_end_to" placeholder="dd-Mon-yyyy" />
+            <DateInputDdMmYyyy v-model="filters.contract_end_to" placeholder="DD-MMM-YYYY" />
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Trade License Expiry From</label>
-            <DateInputDdMmYyyy v-model="filters.trade_license_expiry_from" placeholder="dd-Mon-yyyy" />
+            <DateInputDdMmYyyy v-model="filters.trade_license_expiry_from" placeholder="DD-MMM-YYYY" />
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Trade License Expiry To</label>
-            <DateInputDdMmYyyy v-model="filters.trade_license_expiry_to" placeholder="dd-Mon-yyyy" />
+            <DateInputDdMmYyyy v-model="filters.trade_license_expiry_to" placeholder="DD-MMM-YYYY" />
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Establishment Card Expiry From</label>
-            <DateInputDdMmYyyy v-model="filters.establishment_card_expiry_from" placeholder="dd-Mon-yyyy" />
+            <DateInputDdMmYyyy v-model="filters.establishment_card_expiry_from" placeholder="DD-MMM-YYYY" />
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Establishment Card Expiry To</label>
-            <DateInputDdMmYyyy v-model="filters.establishment_card_expiry_to" placeholder="dd-Mon-yyyy" />
+            <DateInputDdMmYyyy v-model="filters.establishment_card_expiry_to" placeholder="DD-MMM-YYYY" />
           </div>
         </div>
         <div class="mt-3 flex items-center gap-2">

@@ -12,8 +12,8 @@ import FiltersBar from '@/components/customer-support/FiltersBar.vue'
 import AdvancedFilters from '@/components/customer-support/AdvancedFilters.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import CustomerSupportTable from '@/components/customer-support/CustomerSupportTable.vue'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import RecordHistoryModal from '@/components/RecordHistoryModal.vue'
+import DeleteOtpModal from '@/components/DeleteOtpModal.vue'
 import Toast from '@/components/Toast.vue'
 import { debounce } from '@/composables/useApiRequest'
 import { useFilterCache } from '@/composables/useFilterCache'
@@ -57,7 +57,7 @@ const perPageOptions = ref([10, 20, 25, 50, 100])
 const allColumns = ref([])
 const visibleColumns = ref([
   'id', 'submitted_at', 'ticket_number', 'account_number', 'company_name', 'issue_category',
-  'contact_number', 'creator', 'csr', 'sla_timer', 'status', 'workflow_status',
+  'contact_number', 'alternate_contact_number', 'issue_description', 'attachments', 'creator', 'csr', 'sla_timer', 'status', 'workflow_status',
   'pending', 'completion_date', 'updated_at',
   'trouble_ticket', 'activity', 'resolution_remarks', 'internal_remarks',
   'manager', 'team_leader', 'sales_agent',
@@ -78,6 +78,36 @@ const showToast = ref(false)
 const toastType = ref('success')
 const toastMsg = ref('')
 function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
+
+const deleteModalVisible = ref(false)
+const deleteLoading = ref(false)
+const deleteTarget = ref(null)
+
+function openDeleteModal(row) {
+  if (!row?.id) return
+  deleteTarget.value = row
+  deleteModalVisible.value = true
+}
+
+function closeDeleteModal() {
+  deleteModalVisible.value = false
+  deleteTarget.value = null
+}
+
+async function confirmDelete() {
+  if (!deleteTarget.value?.id || deleteLoading.value) return
+  deleteLoading.value = true
+  try {
+    await customerSupportApi.destroy(deleteTarget.value.id)
+    closeDeleteModal()
+    toast('success', 'Customer support request deleted successfully.')
+    await load()
+  } catch (e) {
+    toast('error', e?.response?.data?.message || 'Failed to delete customer support request.')
+  } finally {
+    deleteLoading.value = false
+  }
+}
 
 const canBulkAssign = (() => {
   const roles = auth.user?.roles ?? []
@@ -131,15 +161,16 @@ function buildParams() {
 
 const COLUMN_LABELS = {
   id: 'ID',
-  submitted_at: 'Submission Date',
-  ticket_number: 'Ticket ID',
+  submitted_at: 'Submitted At',
+  ticket_number: 'Ticket Number',
   account_number: 'Account Number',
   company_name: 'Company Name',
   issue_category: 'Issue Category',
   contact_number: 'Contact Number',
+  alternate_contact_number: 'Alternate Contact Number',
   issue_description: 'Issue Description',
   attachments: 'Attachments',
-  creator: 'Submitted By',
+  creator: 'Submitter Name',
   csr: 'CSR Name',
   sla_timer: 'SLA Timer',
   manager: 'Manager',
@@ -149,7 +180,7 @@ const COLUMN_LABELS = {
   workflow_status: 'SLA Status',
   completion_date: 'Completion Date',
   updated_at: 'Last Updated',
-  created_at: 'Created',
+  created_at: 'Created At',
   trouble_ticket: 'Trouble Ticket',
   activity: 'Activity',
   pending: 'Pending With',
@@ -497,12 +528,22 @@ onMounted(async () => {
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-white">
     <div class="w-full space-y-4">
-      <div class="flex flex-wrap items-center justify-between gap-4">
-        <div class="flex flex-wrap items-baseline gap-2">
-          <h1 class="text-xl font-semibold text-gray-900 leading-tight pl-2">Customer Support Requests</h1>
-          <Breadcrumbs />
-        </div>
-        <div class="flex flex-wrap items-center gap-2 pt-2">
+      <div
+        v-if="bulkAssignMessage"
+        class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"
+        role="alert"
+      >
+        {{ bulkAssignMessage }}
+      </div>
+
+      <FiltersBar
+        :filters="filters"
+        :filter-options="filterOptions"
+        :loading="loading"
+        @apply="applyFilters"
+        @reset="resetFilters"
+      >
+        <template #before-apply>
           <button
             v-if="canBulkAssign"
             type="button"
@@ -519,45 +560,28 @@ onMounted(async () => {
             :disabled="loading || exportLoading"
             @click="onExport"
           >
-          <svg
-            v-if="exportLoading"
-            class="mr-1.5 h-4 w-4 animate-spin"
-            fill="none"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-          </svg>
-          <svg
-            v-else
-            class="mr-1.5 h-4 w-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          {{ exportLoading ? 'Exporting...' : 'Export' }}
-        </button>
-        </div>
-      </div>
-
-      <div
-        v-if="bulkAssignMessage"
-        class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"
-        role="alert"
-      >
-        {{ bulkAssignMessage }}
-      </div>
-
-      <FiltersBar
-        :filters="filters"
-        :filter-options="filterOptions"
-        :loading="loading"
-        @apply="applyFilters"
-        @reset="resetFilters"
-      >
+            <svg
+              v-if="exportLoading"
+              class="mr-1.5 h-4 w-4 animate-spin"
+              fill="none"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            <svg
+              v-else
+              class="mr-1.5 h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            {{ exportLoading ? 'Exporting...' : 'Export' }}
+          </button>
+        </template>
         <template #after-reset>
           <button
             type="button"
@@ -605,6 +629,7 @@ onMounted(async () => {
           @update-cell="onUpdateCell"
           @open-assign="openAssignModal"
           @view-history="openHistoryModal"
+          @delete="openDeleteModal"
         />
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
           <p class="text-sm text-gray-600">
@@ -662,6 +687,15 @@ onMounted(async () => {
       :on-assign-bulk="onAssignBulk"
       @close="onAssignModalClose"
       @saved="onAssignModalSaved"
+    />
+
+    <DeleteOtpModal
+      :visible="deleteModalVisible"
+      title="Delete Customer Support Request"
+      :item-label="deleteTarget?.company_name || `Support Request #${deleteTarget?.id ?? ''}`"
+      :loading="deleteLoading"
+      @close="closeDeleteModal"
+      @confirm="confirmDelete"
     />
 
     <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />

@@ -51,6 +51,19 @@ function formatDate(dateStr) {
   return toDdMmYyyy(str) || '—'
 }
 
+function displayValue(val) {
+  if (val == null) return '—'
+  const s = String(val).trim()
+  return s || '—'
+}
+
+function displayNameOrId(nameVal, idVal) {
+  const name = displayValue(nameVal)
+  if (name !== '—') return name
+  if (idVal != null && String(idVal).trim() !== '') return `ID: ${idVal}`
+  return '—'
+}
+
 /** Truncate string to maxLen characters and append "..." if longer. */
 function truncate(val, maxLen = 80) {
   if (val == null || val === '') return ''
@@ -94,7 +107,7 @@ function close() {
 </script>
 
 <template>
-  <div class="space-y-8">
+  <div class="space-y-6">
     <div
       v-if="generalMessage || Object.keys(errors).length"
       class="rounded-lg border border-red-200 bg-red-50 p-4"
@@ -124,7 +137,10 @@ function close() {
       </div>
 
       <!-- Page Title -->
-      <h2 class="text-xl font-bold text-gray-900">Review Lead Submission</h2>
+      <div class="border-b border-gray-200 pb-2">
+        <h2 class="text-xl font-bold text-gray-900">Review Lead Submission</h2>
+        <p class="mt-1 text-sm text-gray-500">Review details and documents before final submission.</p>
+      </div>
 
       <!-- Part 1: Primary Information -->
       <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
@@ -132,67 +148,63 @@ function close() {
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <p class="text-xs text-gray-500">Account Number</p>
-            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.account_number) || '—' }}</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.account_number) }}</p>
           </div>
           <div>
             <p class="text-xs text-gray-500">Company Name as per Trade License</p>
-            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.company_name) || '—' }}</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.company_name) }}</p>
           </div>
           <div>
             <p class="text-xs text-gray-500">Authorized Signatory Name</p>
-            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.authorized_signatory_name) || '—' }}</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.authorized_signatory_name) }}</p>
           </div>
           <div>
             <p class="text-xs text-gray-500">Contact Number</p>
-            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.contact_number_gsm) || '—' }}</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.contact_number_gsm) }}</p>
           </div>
           <div>
             <p class="text-xs text-gray-500">Alternate Contact Number</p>
-            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.alternate_contact_number) || '—' }}</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.alternate_contact_number) }}</p>
           </div>
           <div>
             <p class="text-xs text-gray-500">Email ID</p>
-            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.email) || '—' }}</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.email) }}</p>
           </div>
           <div>
             <p class="text-xs text-gray-500">Complete Address as per Ejari</p>
-            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.address) || '—' }}</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.address) }}</p>
           </div>
           <div>
             <p class="text-xs text-gray-500">Emirates</p>
-            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.emirate) || '—' }}</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.emirate) }}</p>
           </div>
           <div>
             <p class="text-xs text-gray-500">Location Coordinates</p>
-            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.location_coordinates) || '—' }}</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.location_coordinates) }}</p>
           </div>
           <div>
             <p class="text-xs text-gray-500">Product</p>
-            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.product) || '—' }}</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.product) }}</p>
           </div>
           <div>
             <p class="text-xs text-gray-500">Offer</p>
-            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.offer) || '—' }}</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.offer) }}</p>
           </div>
           <div>
             <p class="text-xs text-gray-500">MRC (AED)</p>
-            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.mrc_aed) || '—' }}</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.mrc_aed) }}</p>
           </div>
           <div>
             <p class="text-xs text-gray-500">Quantity</p>
-            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.quantity) || '—' }}</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.quantity) }}</p>
           </div>
           <div>
             <p class="text-xs text-gray-500">.ae Domain</p>
-            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.ae_domain) || '—' }}</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.ae_domain) }}</p>
           </div>
           <div>
             <p class="text-xs text-gray-500">GAID</p>
-            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.gaid) || '—' }}</p>
-          </div>
-          <div class="sm:col-span-2 lg:col-span-3">
-            <p class="text-xs text-gray-500">Comment / Remarks</p>
-            <p class="mt-0.5 whitespace-pre-wrap text-sm font-medium text-gray-900">{{ truncate(lead.remarks) || '—' }}</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.gaid) }}</p>
           </div>
         </div>
       </div>
@@ -203,15 +215,19 @@ function close() {
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <p class="text-xs text-gray-500">Manager Name</p>
-            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.manager_name) || '—' }}</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayNameOrId(lead.manager_name, lead.manager_id) }}</p>
           </div>
           <div>
             <p class="text-xs text-gray-500">Team Leader Name</p>
-            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.team_leader_name) || '—' }}</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayNameOrId(lead.team_leader_name, lead.team_leader_id) }}</p>
           </div>
           <div>
             <p class="text-xs text-gray-500">Sales Agent Name</p>
-            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.sales_agent_name) || '—' }}</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayNameOrId(lead.sales_agent_name, lead.sales_agent_id) }}</p>
+          </div>
+          <div class="sm:col-span-2 lg:col-span-3">
+            <p class="text-xs text-gray-500">Comment / Remarks</p>
+            <p class="mt-0.5 whitespace-pre-wrap text-sm font-medium text-gray-900">{{ displayValue(lead.remarks) }}</p>
           </div>
         </div>
       </div>
@@ -222,11 +238,11 @@ function close() {
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <p class="text-xs text-gray-500">Service Category</p>
-            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.category_name || lead.category?.name) || '—' }}</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayNameOrId(lead.category_name || lead.category?.name, lead.service_category_id) }}</p>
           </div>
           <div>
             <p class="text-xs text-gray-500">Service Type</p>
-            <p class="text-sm font-medium text-gray-900">{{ truncate(lead.type_name || lead.type?.name) || '—' }}</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayNameOrId(lead.type_name || lead.type?.name, lead.service_type_id) }}</p>
           </div>
         </div>
       </div>
@@ -257,38 +273,37 @@ function close() {
       </div>
 
       <!-- Actions -->
-      <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 pt-6">
+      <div class="flex flex-wrap items-center justify-between gap-3 border border-gray-200 rounded-lg bg-white p-4">
         <div class="flex items-center gap-3">
           <button
             type="button"
             @click="goBack"
-            class="inline-flex items-center gap-2 rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-teal-600"
+            class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-green-700"
           >
             <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
             </svg>
             Back
           </button>
-          <span class="rounded-lg bg-[#121d2c] px-4 py-2.5 text-sm font-medium text-white shadow-sm">Step 4</span>
         </div>
         <div class="flex items-center gap-3">
           <button
             type="button"
             @click="close"
-            class="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-teal-600"
+            class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
-            Close
+            Cancel
           </button>
           <button
             type="button"
             @click="submit"
             :disabled="submitting"
-            class="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-black shadow-sm disabled:opacity-50 bg-green-600 hover:bg-green-700"
+            class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-green-700 disabled:opacity-50"
           >
-            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 12L3.269 3.126a59.768 59.768 0 0118.216-8.268 59.768 59.768 0 0118.216 8.268L18 12m-6 0h7.5" />
+            <span class="text-white">{{ submitting ? 'Submitting...' : 'Submit' }}</span>
+            <svg v-if="!submitting" class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M13 6l6 6-6 6" />
             </svg>
-            <span class="text-black">{{ submitting ? 'Submitting...' : 'Submit Lead Submission' }}</span>
           </button>
         </div>
       </div>

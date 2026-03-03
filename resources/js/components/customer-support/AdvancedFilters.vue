@@ -119,7 +119,7 @@ function formatDisplay(ymd) {
               type="text"
               readonly
               :value="formatDisplay(filters.from)"
-              placeholder="dd-Mon-yyyy"
+              placeholder="DD-MMM-YYYY"
               class="w-full cursor-pointer rounded border border-gray-300 bg-white px-2 py-1.5 pr-7 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
               :disabled="loading"
             />
@@ -134,7 +134,7 @@ function formatDisplay(ymd) {
               type="text"
               readonly
               :value="formatDisplay(filters.to)"
-              placeholder="dd-Mon-yyyy"
+              placeholder="DD-MMM-YYYY"
               class="w-full cursor-pointer rounded border border-gray-300 bg-white px-2 py-1.5 pr-7 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
               :disabled="loading"
             />
@@ -149,7 +149,7 @@ function formatDisplay(ymd) {
               type="text"
               readonly
               :value="formatDisplay(filters.submitted_from)"
-              placeholder="dd-Mon-yyyy"
+              placeholder="DD-MMM-YYYY"
               class="w-full cursor-pointer rounded border border-gray-300 bg-white px-2 py-1.5 pr-7 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
               :disabled="loading"
             />
@@ -164,7 +164,7 @@ function formatDisplay(ymd) {
               type="text"
               readonly
               :value="formatDisplay(filters.submitted_to)"
-              placeholder="dd-Mon-yyyy"
+              placeholder="DD-MMM-YYYY"
               class="w-full cursor-pointer rounded border border-gray-300 bg-white px-2 py-1.5 pr-7 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
               :disabled="loading"
             />

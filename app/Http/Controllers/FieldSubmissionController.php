@@ -23,7 +23,9 @@ class FieldSubmissionController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
+            'account_number' => ['nullable', 'string', 'max:255'],
             'company_name' => ['required', 'string', 'max:255'],
+            'authorized_signatory_name' => ['nullable', 'string', 'max:255'],
             'contact_number' => ['required', 'string', 'max:50'],
             'product' => ['required', 'string', 'max:255'],
             'alternate_number' => ['nullable', 'string', 'max:50'],
@@ -79,6 +81,7 @@ class FieldSubmissionController extends Controller
                     ...($includeHierarchy ? [
                         'manager_id' => $user->manager_id ?? $user->teamLeader?->manager_id ?? null,
                         'team_leader_id' => $user->team_leader_id ?? null,
+                        'reports_to' => $user->reports_to ?? null,
                     ] : []),
                 ])->values()->all();
             };
@@ -103,7 +106,7 @@ class FieldSubmissionController extends Controller
                         ->where('status', 'approved')
                         ->with(['teamLeader:id,manager_id', 'manager:id'])
                         ->orderBy('name')
-                        ->get(['id', 'name', 'email', 'manager_id', 'team_leader_id']);
+                        ->get(['id', 'name', 'email', 'manager_id', 'team_leader_id', 'reports_to']);
 
                     $labels[$slotKey] = $mappings[$slotKey]['label'] ?? implode(' ', array_map('ucfirst', explode('_', $slotKey)));
 

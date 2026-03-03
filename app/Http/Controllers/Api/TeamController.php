@@ -106,6 +106,8 @@ class TeamController extends Controller
         $team = Team::create($data);
         $this->syncTeamAssignments($team, $managerIds, $leaderIds, $memberIds);
         $team->load(['manager:id,name', 'teamLeader:id,name']);
+        TeamHierarchyService::flushAllCaches();
+        $this->flushTeamOptionsCache();
 
         try {
             SystemAuditLog::record('team.created', null, [
@@ -180,6 +182,7 @@ class TeamController extends Controller
         }
 
         TeamHierarchyService::flushAllCaches();
+        $this->flushTeamOptionsCache();
 
         return response()->json([
             'message' => 'Team updated successfully.',
@@ -316,6 +319,7 @@ class TeamController extends Controller
         }
 
         TeamHierarchyService::flushAllCaches();
+        $this->flushTeamOptionsCache();
 
         return response()->json([
             'message' => "{$updated} member(s) added to team.",
@@ -344,6 +348,7 @@ class TeamController extends Controller
         }
 
         TeamHierarchyService::flushAllCaches();
+        $this->flushTeamOptionsCache();
 
         return response()->json(['message' => 'Member removed from team.']);
     }
@@ -595,14 +600,42 @@ class TeamController extends Controller
             ->values()
             ->all();
 
+        $managerId = !empty($managerIds) ? (int) $managerIds[0] : null;
+        $primaryLeaderId = !empty($leaderIds) ? (int) $leaderIds[0] : null;
+
         // Remove users no longer selected for this team.
         User::where('team_id', $team->id)
             ->when(! empty($selectedIds), fn ($q) => $q->whereNotIn('id', $selectedIds))
-            ->update(['team_id' => null]);
+            ->update([
+                'team_id' => null,
+                'manager_id' => null,
+                'team_leader_id' => null,
+            ]);
 
         if (! empty($selectedIds)) {
             User::whereIn('id', $selectedIds)->update(['team_id' => $team->id]);
         }
+
+        if (!empty($leaderIds)) {
+            User::whereIn('id', $leaderIds)->update([
+                'team_id' => $team->id,
+                'manager_id' => $managerId,
+                'team_leader_id' => null,
+            ]);
+        }
+
+        if (!empty($memberIds)) {
+            User::whereIn('id', $memberIds)->update([
+                'team_id' => $team->id,
+                'manager_id' => $managerId,
+                'team_leader_id' => $primaryLeaderId,
+            ]);
+        }
+    }
+
+    private function flushTeamOptionsCache(): void
+    {
+        Cache::forget(\App\Http\Controllers\FieldSubmissionController::CACHE_KEY_TEAM_OPTIONS);
     }
 
     private function authorizeAction(Request $request, string $action, array $legacy = []): void

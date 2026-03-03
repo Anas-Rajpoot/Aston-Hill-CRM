@@ -51,7 +51,7 @@ class VasRequestController extends Controller
         }
 
         $vas->update([
-            'status' => 'submitted_under_process',
+            'status' => 'unassigned',
             'submitted_at' => now(),
         ]);
 

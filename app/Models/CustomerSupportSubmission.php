@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\ResolvesClientLink;
+use App\Support\RbacPermission;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
@@ -138,6 +139,14 @@ class CustomerSupportSubmission extends Model
      */
     public function scopeVisibleTo($q, User $user)
     {
+        // Users with explicit module read access can see all customer support submissions.
+        if (RbacPermission::can($user, 'customer_support_requests', 'read', [
+            'customer_support_requests.list',
+            'customer_support_requests.view',
+        ])) {
+            return $q;
+        }
+
         // CSR and support managers see ALL customer support submissions
         if ($user->hasRole('customer_support_representative') || $user->hasRole('support_manager') || $user->hasRole('csr')) {
             return $q;

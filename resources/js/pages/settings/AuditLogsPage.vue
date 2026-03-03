@@ -11,6 +11,7 @@ import { useTablePageSize } from '@/composables/useTablePageSize'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Toast from '@/components/Toast.vue'
 import SkeletonBox from '@/components/skeletons/SkeletonBox.vue'
+import { formatSystemDateTime } from '@/lib/dateFormat'
 
 // ─── Toast ────────────────────────────────────────────────
 const showToast = ref(false)
@@ -202,10 +203,7 @@ async function exportCsv() {
 
 // ─── Helpers ──────────────────────────────────────────────
 function fmtDate(iso) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-    + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+  return formatSystemDateTime(iso, '—')
 }
 
 function actionChipClass(color) {

@@ -126,11 +126,11 @@ const createdToDisplay = computed({
         </div>
         <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Created Date From</label>
-          <DateInputDdMmYyyy v-model="createdFromDisplay" placeholder="dd-Mon-yyyy" :disabled="loading" />
+          <DateInputDdMmYyyy v-model="createdFromDisplay" placeholder="DD-MMM-YYYY" :disabled="loading" />
         </div>
         <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Created Date To</label>
-          <DateInputDdMmYyyy v-model="createdToDisplay" placeholder="dd-Mon-yyyy" :disabled="loading" />
+          <DateInputDdMmYyyy v-model="createdToDisplay" placeholder="DD-MMM-YYYY" :disabled="loading" />
         </div>
       </div>
 

@@ -4,11 +4,9 @@
  * Tab content is lazy-loaded; each async component shows a skeleton while loading (no Suspense).
  */
 import { ref, onMounted, defineAsyncComponent, computed, watch } from 'vue'
-import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import Tabs from '@/components/Tabs.vue'
 import SubmissionFormSkeleton from '@/components/skeletons/SubmissionFormSkeleton.vue'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 
 function asyncForm(loader) {
   return defineAsyncComponent({
@@ -24,7 +22,6 @@ const CustomerSupportForm = asyncForm(() => import('@/forms/CustomerSupportForm/
 const VasRequestWizard = asyncForm(() => import('@/forms/VASRequestForm/VasRequestWizard.vue'))
 const NewSubmissionForm = asyncForm(() => import('@/forms/NewSubmissionForm/NewSubmissionForm.vue'))
 
-const route = useRoute()
 const auth = useAuthStore()
 const activeTab = ref('lead')
 /** Incremented on every tab click so the visible form remounts (clears success message, shows fresh form). */
@@ -75,9 +72,6 @@ function ensureActiveTabAvailable() {
 }
 
 onMounted(() => {
-  if (route.query.vas_request_id != null && route.query.vas_request_id !== '') {
-    activeTab.value = 'vas'
-  }
   ensureActiveTabAvailable()
 })
 
@@ -98,10 +92,6 @@ function onLeadNewSubmission() {
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-white py-6">
     <div class="w-full space-y-6">
-      <div class="flex flex-wrap items-baseline gap-2">
-        <h1 class="text-xl font-semibold text-gray-900 leading-tight ml-4">Submissions</h1>
-        <Breadcrumbs />
-      </div>
       <!-- TABS (dark bar like 1st image) -->
       <Tabs :tabs="tabs" :active="activeTab" @change="onTabChange" />
       <div v-if="hiddenTabsLabels.length" class="mx-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800">

@@ -26,6 +26,9 @@ class VasRequestSubmission extends Model
         'manager_id',
         'team_id',
         'back_office_executive_id',
+        'activity',
+        'completion_date',
+        'remarks',
         'created_by',
         'submitted_at',
         'approved_at',
@@ -44,6 +47,7 @@ class VasRequestSubmission extends Model
 
     protected $casts = [
         'submitted_at' => 'datetime',
+        'completion_date' => 'date',
         'approved_at' => 'datetime',
         'rejected_at' => 'datetime',
     ];
@@ -51,7 +55,7 @@ class VasRequestSubmission extends Model
     public function submit(): void
     {
         $this->update([
-            'status' => 'submitted_under_process',
+            'status' => 'unassigned',
             'submitted_at' => now(),
         ]);
     }

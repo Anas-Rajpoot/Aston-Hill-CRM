@@ -25,26 +25,78 @@ const primaryRole = computed(() => {
 
 const navItems = [
   { to: '/', label: 'Dashboard', abbr: 'Da' },
-  { to: '/submissions', label: 'Submissions', abbr: 'Su' },
-  { to: '/lead-submissions', label: 'Lead Submissions', abbr: 'LS' },
-  { to: '/field-submissions', label: 'Field Submissions', abbr: 'FS' },
-  { to: '/customer-support', label: 'Customer Support', abbr: 'CS' },
-  { to: '/vas-requests', label: 'VAS Requests', abbr: 'VR' },
-  { to: '/special-requests', label: 'Special Requests', abbr: 'SR' },
-  { to: '/all-clients', label: 'All Clients', abbr: 'AC' },
-  { to: '/clients', label: 'Clients', abbr: 'Cl' },
-  { to: '/order-status', label: 'Order Status', abbr: 'OS' },
-  { to: '/dsp-tracker', label: 'DSP Tracker', abbr: 'DT' },
-  { to: '/verifiers-detail', label: 'Verifiers Detail', abbr: 'VD' },
-  { to: '/cisco-extensions', label: 'Cisco Extensions', abbr: 'CE' },
-  { to: '/attendance-log', label: 'Attendance Log', abbr: 'AL' },
-  { to: '/expenses', label: 'Expense Tracker', abbr: 'ET' },
-  { to: '/personal-notes', label: 'Personal Notes', abbr: 'PN' },
-  { to: '/email-followups', label: 'Email Follow Up', abbr: 'EF' },
-  { to: '/reports', label: 'Reports', abbr: 'Re' },
 ]
 
 const visibleNavItems = computed(() => navItems.filter((item) => canAccessRoute(auth.user, item.to)))
+
+const emailFollowUpItem = computed(() => {
+  const item = { to: '/email-followups', label: 'Email Follow Up', abbr: 'EF' }
+  return canAccessRoute(auth.user, item.to) ? item : null
+})
+
+const submissionsChildren = computed(() => {
+  const items = [
+    { to: '/submissions', label: 'Submissions', abbr: 'Su' },
+    { to: '/lead-submissions', label: 'Lead Submissions', abbr: 'LS' },
+    { to: '/field-submissions', label: 'Field Submissions', abbr: 'FS' },
+    { to: '/customer-support', label: 'Customer Support', abbr: 'CS' },
+    { to: '/vas-requests', label: 'VAS Requests', abbr: 'VR' },
+    { to: '/special-requests', label: 'Special Requests', abbr: 'SR' },
+  ]
+  return items.filter((item) => canAccessRoute(auth.user, item.to))
+})
+
+const submissionsOpen = ref(false)
+
+const submissionsGroupActive = computed(() =>
+  submissionsChildren.value.some((c) => isActive(c.to))
+)
+
+function toggleSubmissions() {
+  submissionsOpen.value = !submissionsOpen.value
+}
+
+const clientsChildren = computed(() => {
+  const items = [
+    { to: '/clients', label: 'Clients', abbr: 'Cl' },
+    { to: '/all-clients', label: 'All Clients', abbr: 'AC' },
+  ]
+  return items.filter((item) => canAccessRoute(auth.user, item.to))
+})
+
+const clientsOpen = ref(false)
+
+const clientsGroupActive = computed(() =>
+  clientsChildren.value.some((c) => isActive(c.to))
+)
+
+function toggleClients() {
+  clientsOpen.value = !clientsOpen.value
+}
+
+const operationsChildren = computed(() => {
+  const items = [
+    { to: '/order-status', label: 'Order Status', abbr: 'OS' },
+    { to: '/dsp-tracker', label: 'DSP Tracker', abbr: 'DT' },
+    { to: '/verifiers-detail', label: 'Verifiers Detail', abbr: 'VD' },
+    { to: '/cisco-extensions', label: 'Cisco Extensions', abbr: 'CE' },
+    { to: '/attendance-log', label: 'Attendance Log', abbr: 'AL' },
+    { to: '/expenses', label: 'Expense Tracker', abbr: 'ET' },
+    { to: '/personal-notes', label: 'Personal Notes', abbr: 'PN' },
+    { to: '/reports', label: 'Reports', abbr: 'Re' },
+  ]
+  return items.filter((item) => canAccessRoute(auth.user, item.to))
+})
+
+const operationsOpen = ref(false)
+
+const operationsGroupActive = computed(() =>
+  operationsChildren.value.some((c) => isActive(c.to))
+)
+
+function toggleOperations() {
+  operationsOpen.value = !operationsOpen.value
+}
 
 const settingsChildren = computed(() => {
   const items = []
@@ -77,6 +129,66 @@ const isActive = (to) => {
   if (to === '/') return route.path === '/' || route.path === '/dashboard'
   return route.path.startsWith(to)
 }
+
+const SEGMENT_LABELS = {
+  '': 'Home',
+  submissions: 'Submissions',
+  'lead-submissions': 'Lead Submissions',
+  'field-submissions': 'Field Submissions',
+  users: 'Users',
+  teams: 'Teams',
+  roles: 'Roles',
+  clients: 'Clients',
+  reports: 'Reports',
+  settings: 'Settings',
+  notifications: 'Notifications',
+  accounts: 'Accounts',
+  expenses: 'Expenses',
+}
+
+const breadcrumbItems = computed(() => {
+  const path = route.path
+  if (!path || path === '/') {
+    return [{ label: 'Home', to: null, current: true }]
+  }
+
+  const segments = path.replace(/^\/+|\/+$/g, '').split('/')
+  const items = [{ label: 'Home', to: '/', current: false }]
+  let acc = ''
+
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i]
+    const isNumber = /^\d+$/.test(seg)
+    const parent = i > 0 ? segments[i - 1] : ''
+    let label = SEGMENT_LABELS[seg]
+
+    if (label === undefined) {
+      if (isNumber) {
+        if (parent === 'users') label = `User #${seg}`
+        else if (parent === 'roles') label = 'Role'
+        else label = `#${seg}`
+      } else {
+        label = seg.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+      }
+    }
+
+    acc += (acc ? '/' : '') + seg
+    const isLast = i === segments.length - 1
+    items.push({
+      label,
+      to: isLast ? null : `/${acc}`,
+      current: isLast,
+    })
+  }
+
+  return items
+})
+
+const currentPageTitle = computed(() => {
+  const current = breadcrumbItems.value.find((item) => item.current)
+  return current?.label || 'Dashboard'
+})
+
 </script>
 
 <template>
@@ -84,9 +196,27 @@ const isActive = (to) => {
     class="h-screen flex flex-col flex-shrink-0 overflow-hidden bg-gray-900 text-gray-200 transition-all duration-300 ease-in-out"
     :class="collapsed ? 'w-[68px]' : 'w-64'"
   >
-    <!-- Logo / Title + Toggle -->
-    <div class="h-16 flex items-center border-b border-gray-700" :class="collapsed ? 'justify-center px-2' : 'justify-between px-4'">
-      <span v-if="!collapsed" class="text-lg font-semibold text-white truncate">Aston Hill</span>
+    <!-- Top controls -->
+    <div
+      class="border-b border-gray-700"
+      :class="collapsed ? 'h-16 flex items-center justify-center px-2' : 'min-h-16 flex items-start justify-between px-4 py-3 gap-3'"
+    >
+      <div v-if="!collapsed" class="min-w-0">
+        <h1 class="text-base font-semibold text-white leading-tight truncate">{{ currentPageTitle }}</h1>
+        <div class="mt-1 flex flex-wrap items-center gap-1 text-xs text-gray-300">
+          <template v-for="(crumb, index) in breadcrumbItems" :key="`${crumb.label}-${index}`">
+            <span v-if="index > 0" class="text-gray-500">/</span>
+            <router-link
+              v-if="crumb.to"
+              :to="crumb.to"
+              class="hover:text-lime-300 hover:underline"
+            >
+              {{ crumb.label }}
+            </router-link>
+            <span v-else class="truncate text-gray-200">{{ crumb.label }}</span>
+          </template>
+        </div>
+      </div>
       <button
         type="button"
         class="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
@@ -114,6 +244,143 @@ const isActive = (to) => {
         dark
         :active="isActive(item.to)"
       />
+
+      <div v-if="submissionsChildren.length" class="pt-0.5">
+        <button
+          type="button"
+          class="group relative w-full rounded-md text-sm font-medium transition-colors"
+          :class="[
+            collapsed ? 'flex items-center justify-center px-0 py-2' : 'flex items-center justify-between px-3 py-2',
+            submissionsGroupActive ? 'bg-lime-600/20 text-lime-400' : 'text-gray-300 hover:bg-gray-800 hover:text-white',
+          ]"
+          :title="collapsed ? 'Submissions' : undefined"
+          @click="toggleSubmissions"
+        >
+          <span v-if="collapsed" class="text-xs font-bold leading-none">Su</span>
+          <span v-else>Submissions</span>
+          <svg
+            v-if="!collapsed"
+            class="w-4 h-4 transition-transform duration-200"
+            :class="submissionsOpen || submissionsGroupActive ? 'rotate-180' : ''"
+            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+          <span
+            v-if="collapsed"
+            class="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap rounded bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100"
+          >Submissions</span>
+        </button>
+
+        <div v-show="!collapsed && (submissionsOpen || submissionsGroupActive)" class="ml-3 mt-0.5 space-y-0.5 border-l border-gray-700 pl-2">
+          <SidebarLink
+            v-for="child in submissionsChildren"
+            :key="child.to"
+            :to="child.to"
+            :label="child.label"
+            :abbr="child.abbr"
+            :collapsed="false"
+            dark
+            sub
+            :active="isActive(child.to)"
+          />
+        </div>
+      </div>
+
+      <SidebarLink
+        v-if="emailFollowUpItem"
+        :to="emailFollowUpItem.to"
+        :label="emailFollowUpItem.label"
+        :abbr="emailFollowUpItem.abbr"
+        :collapsed="collapsed"
+        dark
+        :active="isActive(emailFollowUpItem.to)"
+      />
+
+      <div v-if="clientsChildren.length" class="pt-0.5">
+        <button
+          type="button"
+          class="group relative w-full rounded-md text-sm font-medium transition-colors"
+          :class="[
+            collapsed ? 'flex items-center justify-center px-0 py-2' : 'flex items-center justify-between px-3 py-2',
+            clientsGroupActive ? 'bg-lime-600/20 text-lime-400' : 'text-gray-300 hover:bg-gray-800 hover:text-white',
+          ]"
+          :title="collapsed ? 'Clients' : undefined"
+          @click="toggleClients"
+        >
+          <span v-if="collapsed" class="text-xs font-bold leading-none">Cl</span>
+          <span v-else>Clients</span>
+          <svg
+            v-if="!collapsed"
+            class="w-4 h-4 transition-transform duration-200"
+            :class="clientsOpen || clientsGroupActive ? 'rotate-180' : ''"
+            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+          <span
+            v-if="collapsed"
+            class="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap rounded bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100"
+          >Clients</span>
+        </button>
+
+        <div v-show="!collapsed && (clientsOpen || clientsGroupActive)" class="ml-3 mt-0.5 space-y-0.5 border-l border-gray-700 pl-2">
+          <SidebarLink
+            v-for="child in clientsChildren"
+            :key="child.to"
+            :to="child.to"
+            :label="child.label"
+            :abbr="child.abbr"
+            :collapsed="false"
+            dark
+            sub
+            :active="isActive(child.to)"
+          />
+        </div>
+      </div>
+
+      <div v-if="operationsChildren.length" class="pt-0.5">
+        <button
+          type="button"
+          class="group relative w-full rounded-md text-sm font-medium transition-colors"
+          :class="[
+            collapsed ? 'flex items-center justify-center px-0 py-2' : 'flex items-center justify-between px-3 py-2',
+            operationsGroupActive ? 'bg-lime-600/20 text-lime-400' : 'text-gray-300 hover:bg-gray-800 hover:text-white',
+          ]"
+          :title="collapsed ? 'Operations' : undefined"
+          @click="toggleOperations"
+        >
+          <span v-if="collapsed" class="text-xs font-bold leading-none">Op</span>
+          <span v-else>Operations</span>
+          <svg
+            v-if="!collapsed"
+            class="w-4 h-4 transition-transform duration-200"
+            :class="operationsOpen || operationsGroupActive ? 'rotate-180' : ''"
+            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+          <span
+            v-if="collapsed"
+            class="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap rounded bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100"
+          >Operations</span>
+        </button>
+
+        <div v-show="!collapsed && (operationsOpen || operationsGroupActive)" class="ml-3 mt-0.5 space-y-0.5 border-l border-gray-700 pl-2">
+          <SidebarLink
+            v-for="child in operationsChildren"
+            :key="child.to"
+            :to="child.to"
+            :label="child.label"
+            :abbr="child.abbr"
+            :collapsed="false"
+            dark
+            sub
+            :active="isActive(child.to)"
+          />
+        </div>
+      </div>
+
       <!-- Settings group -->
       <div v-if="settingsChildren.length" class="pt-2">
         <button

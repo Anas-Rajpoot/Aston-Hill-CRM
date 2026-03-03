@@ -9,7 +9,9 @@ class FieldSubmission extends Model
     protected $fillable = [
         'client_id',
         'created_by',
+        'account_number',
         'company_name',
+        'authorized_signatory_name',
         'contact_number',
         'product',
         'alternate_number',
@@ -46,7 +48,7 @@ class FieldSubmission extends Model
 
     protected $casts = [
         'submitted_at' => 'datetime',
-        'meeting_date' => 'date',
+        'meeting_date' => 'datetime',
         'updated_at' => 'datetime',
     ];
 

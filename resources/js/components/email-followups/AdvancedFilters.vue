@@ -56,7 +56,7 @@ const activeCount = computed(() => {
           <label class="mb-0.5 block text-xs font-medium text-gray-600">Email Date From</label>
           <DateInputDdMmYyyy
             v-model="filters.from"
-            placeholder="dd-Mon-yyyy"
+            placeholder="DD-MMM-YYYY"
             :disabled="loading"
           />
         </div>
@@ -64,7 +64,7 @@ const activeCount = computed(() => {
           <label class="mb-0.5 block text-xs font-medium text-gray-600">Email Date To</label>
           <DateInputDdMmYyyy
             v-model="filters.to"
-            placeholder="dd-Mon-yyyy"
+            placeholder="DD-MMM-YYYY"
             :disabled="loading"
           />
         </div>

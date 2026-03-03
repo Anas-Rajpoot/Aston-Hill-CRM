@@ -10,13 +10,14 @@ import AdvancedFilters from '@/components/field-submissions/AdvancedFilters.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import AssignModal from '@/components/AssignModal.vue'
 import FieldTable from '@/components/field-submissions/FieldTable.vue'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import DeleteOtpModal from '@/components/DeleteOtpModal.vue'
 import api from '@/lib/axios'
 import Toast from '@/components/Toast.vue'
 import RecordHistoryModal from '@/components/RecordHistoryModal.vue'
 import { debounce } from '@/composables/useApiRequest'
 import { useFilterCache } from '@/composables/useFilterCache'
 import { canModuleAction } from '@/lib/accessControl'
+import { formatSystemDateTime } from '@/lib/dateFormat'
 
 const auth = useAuthStore()
 let listAbortController = null
@@ -37,8 +38,8 @@ const meta = ref({ current_page: 1, last_page: 1, per_page: auth.defaultTablePag
 const perPageOptions = ref([10, 20, 25, 50, 100])
 const allColumns = ref([])
 const visibleColumns = ref([
-  'id', 'created_at', 'company_name', 'contact_number', 'product', 'emirates', 'complete_address',
-  'sales_agent', 'team_leader', 'manager', 'field_agent', 'field_status', 'target_date', 'sla_timer', 'sla_status', 'last_updated', 'creator',
+  'id', 'created_at', 'account_number', 'company_name', 'authorized_signatory_name', 'contact_number', 'product', 'alternate_number', 'emirates', 'location_coordinates', 'complete_address',
+  'manager', 'team_leader', 'sales_agent', 'additional_notes', 'special_instruction', 'field_agent', 'field_status', 'target_date', 'remarks_by_field_agent', 'sla_timer', 'sla_status', 'status', 'last_updated', 'creator',
 ])
 const assignModalVisible = ref(false)
 const assignRow = ref(null)
@@ -51,6 +52,36 @@ const showToast = ref(false)
 const toastType = ref('success')
 const toastMsg  = ref('')
 function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
+
+const deleteModalVisible = ref(false)
+const deleteLoading = ref(false)
+const deleteTarget = ref(null)
+
+function openDeleteModal(row) {
+  if (!row?.id) return
+  deleteTarget.value = row
+  deleteModalVisible.value = true
+}
+
+function closeDeleteModal() {
+  deleteModalVisible.value = false
+  deleteTarget.value = null
+}
+
+async function confirmDelete() {
+  if (!deleteTarget.value?.id || deleteLoading.value) return
+  deleteLoading.value = true
+  try {
+    await fieldSubmissionsApi.destroy(deleteTarget.value.id)
+    closeDeleteModal()
+    toast('success', 'Field submission deleted successfully.')
+    await load()
+  } catch (e) {
+    toast('error', e?.response?.data?.message || 'Failed to delete field submission.')
+  } finally {
+    deleteLoading.value = false
+  }
+}
 
 const historyModalVisible = ref(false)
 const historyRecordId = ref(null)
@@ -125,23 +156,30 @@ function buildParams() {
 
 const COLUMN_LABELS = {
   id: 'ID',
-  created_at: 'Created',
+  created_at: 'Submitted At',
+  account_number: 'Account Number',
   company_name: 'Company Name',
+  authorized_signatory_name: 'Authorized Signatory Name',
   contact_number: 'Contact Number',
   product: 'Product',
+  alternate_number: 'Alternate Contact Number',
   emirates: 'Emirates',
-  complete_address: 'Address',
+  location_coordinates: 'Location Coordinates',
+  complete_address: 'Complete Address',
+  additional_notes: 'Additional Notes',
+  special_instruction: 'Special Instruction',
   sales_agent: 'Sales Agent',
   team_leader: 'Team Leader',
   manager: 'Manager',
   field_agent: 'Field Agent',
   status: 'Status',
-  field_status: 'Status',
-  target_date: 'Target Date',
+  field_status: 'Field Status',
+  target_date: 'Meeting Date',
+  remarks_by_field_agent: 'Field Agent Remarks',
   sla_timer: 'SLA Timer',
   sla_status: 'SLA Status',
   last_updated: 'Last Updated',
-  creator: 'Created By',
+  creator: 'Submitter Name',
 }
 
 function escapeCsv(val) {
@@ -310,7 +348,7 @@ async function onUpdateCell(submissionId, field, value) {
   if (apiField === 'meeting_date') {
     payload.meeting_date = value || null
     if (row) {
-      row.target_date = value ? new Date(value).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : null
+      row.target_date = value ? formatSystemDateTime(value, null) : null
       row.meeting_date = value
     }
   } else {
@@ -533,13 +571,35 @@ onMounted(async () => {
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-white py-3 pr-4">
     <div class="w-full space-y-3">
-      <!-- Top: breadcrumbs + title (left), Bulk Assign + Export (right) -->
-      <div class="flex flex-wrap items-center justify-between gap-4">
-        <div class="flex flex-wrap items-baseline gap-2">
-          <h1 class="text-xl font-semibold text-gray-900 leading-tight ml-4">Field Submissions</h1>
-          <Breadcrumbs />
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
+      <div
+        v-if="bulkAssignMessage"
+        class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"
+        role="alert"
+      >
+        {{ bulkAssignMessage }}
+      </div>
+
+      <div
+        v-if="exportLoading"
+        class="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 text-sm text-green-800"
+        role="status"
+        aria-live="polite"
+      >
+        <svg class="h-5 w-5 shrink-0 animate-spin text-green-600" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
+        <span>Exporting… Your CSV will download when ready.</span>
+      </div>
+
+      <FiltersBar
+        :filters="filters"
+        :filter-options="filterOptions"
+        :loading="loading"
+        @apply="applyFilters"
+        @reset="resetFilters"
+      >
+        <template #before-apply>
           <button
             v-if="canBulkAssign"
             type="button"
@@ -580,36 +640,7 @@ onMounted(async () => {
             </svg>
             {{ exportLoading ? 'Exporting...' : 'Export' }}
           </button>
-        </div>
-      </div>
-      <div
-        v-if="bulkAssignMessage"
-        class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"
-        role="alert"
-      >
-        {{ bulkAssignMessage }}
-      </div>
-
-      <div
-        v-if="exportLoading"
-        class="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 text-sm text-green-800"
-        role="status"
-        aria-live="polite"
-      >
-        <svg class="h-5 w-5 shrink-0 animate-spin text-green-600" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-        </svg>
-        <span>Exporting… Your CSV will download when ready.</span>
-      </div>
-
-      <FiltersBar
-        :filters="filters"
-        :filter-options="filterOptions"
-        :loading="loading"
-        @apply="applyFilters"
-        @reset="resetFilters"
-      >
+        </template>
         <template #after-reset>
           <button
             type="button"
@@ -657,6 +688,7 @@ onMounted(async () => {
           @update-cell="onUpdateCell"
           @assign-technician="openAssignModal"
           @view-history="openHistoryModal"
+          @delete="openDeleteModal"
         />
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
           <p class="text-sm text-gray-600">
@@ -713,6 +745,15 @@ onMounted(async () => {
       module-name="Field Submissions"
       :fetch-fn="fetchFieldAudits"
       @close="closeHistoryModal"
+    />
+
+    <DeleteOtpModal
+      :visible="deleteModalVisible"
+      title="Delete Field Submission"
+      :item-label="deleteTarget?.company_name || `Field Submission #${deleteTarget?.id ?? ''}`"
+      :loading="deleteLoading"
+      @close="closeDeleteModal"
+      @confirm="confirmDelete"
     />
 
     <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />

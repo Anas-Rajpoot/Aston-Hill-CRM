@@ -18,6 +18,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -29,10 +30,14 @@ class CustomerSupportApiController extends Controller
     use \App\Traits\ResolvesAuditDisplayValues;
     private const MODULE = 'customer_support_submissions';
 
+    /** @var array<int, string>|null */
+    private ?array $tableColumns = null;
+
     private const ALLOWED_COLUMNS = [
         'id', 'submitted_at', 'created_at', 'created_by',
         'ticket_number', 'issue_category', 'company_name', 'account_number', 'contact_number',
-        'issue_description',
+        'alternate_contact_number',
+        'issue_description', 'attachments',
         'manager_id', 'team_leader_id', 'sales_agent_id',
         'csr_id', 'csr_name', 'status', 'workflow_status',
         'completion_date', 'updated_at',
@@ -41,6 +46,7 @@ class CustomerSupportApiController extends Controller
     ];
 
     private const BASE_COLUMNS = ['id', 'status'];
+    private const STATUSS_EXCLUDED_FROM_LISTING = ['draft', 'submitted', 'approved'];
 
     public function __construct()
     {
@@ -63,7 +69,7 @@ class CustomerSupportApiController extends Controller
             'account_number' => ['sometimes', 'nullable', 'string', 'max:100'],
             'contact_number' => ['sometimes', 'nullable', 'string', 'max:50'],
             'issue_category' => ['sometimes', 'nullable', 'string', 'max:100'],
-            'status' => ['sometimes', 'nullable', 'string', Rule::in(CustomerSupportSubmission::STATUSES)],
+            'status' => ['sometimes', 'nullable', 'string', Rule::in(array_merge(CustomerSupportSubmission::STATUSES, ['unassigned']))],
             'from' => ['sometimes', 'nullable', 'date'],
             'to' => ['sometimes', 'nullable', 'date', 'after_or_equal:from'],
             'submitted_from' => ['sometimes', 'nullable', 'date'],
@@ -142,6 +148,7 @@ class CustomerSupportApiController extends Controller
         $row['manager_name'] = $customerSupportSubmission->manager?->name;
         $row['team_leader_name'] = $customerSupportSubmission->teamLeader?->name;
         $row['sales_agent_name'] = $customerSupportSubmission->salesAgent?->name;
+        $row['alternate_contact_number'] = $customerSupportSubmission->alternate_contact_number;
         $row['csr_user_name'] = $customerSupportSubmission->csrUser?->name;
         $row['creator_name'] = $customerSupportSubmission->creator?->name;
         $firstRole = $customerSupportSubmission->creator?->roles->first();
@@ -169,6 +176,22 @@ class CustomerSupportApiController extends Controller
         return response()->json($row);
     }
 
+    public function destroy(Request $request, CustomerSupportSubmission $customerSupportSubmission): JsonResponse
+    {
+        $this->authorize('delete', $customerSupportSubmission);
+
+        $submissionId = (int) $customerSupportSubmission->id;
+        $customerSupportSubmission->delete();
+
+        Storage::disk('public')->deleteDirectory("customer-support/{$submissionId}");
+
+        SystemAuditLog::record('customer_support_submission.deleted', [
+            'customer_support_submission_id' => $submissionId,
+        ], null, $request->user()->id, 'customer_support_submission', $submissionId);
+
+        return response()->json(['message' => 'Customer support request deleted.']);
+    }
+
     private function resolveColumns($user, ?array $requestColumns): array
     {
         $allAllowed = array_merge(self::ALLOWED_COLUMNS, ['manager', 'team_leader', 'sales_agent', 'csr', 'creator']);
@@ -193,7 +216,11 @@ class CustomerSupportApiController extends Controller
     private function applyFilters($query, array $validated): void
     {
         if (! empty($validated['status'])) {
-            $query->where('status', $validated['status']);
+            if (strtolower((string) $validated['status']) === 'unassigned') {
+                $query->whereNull('csr_id');
+            } else {
+                $query->where('status', $validated['status']);
+            }
         }
         if (! empty($validated['from'])) {
             $query->where('created_at', '>=', $validated['from'] . ' 00:00:00');
@@ -245,6 +272,8 @@ class CustomerSupportApiController extends Controller
     private function applySort($query, string $sort, string $order): void
     {
         $direction = strtolower($order) === 'asc' ? 'asc' : 'desc';
+        $existing = $this->getExistingTableColumns();
+
         if ($sort === 'creator') {
             $query->leftJoin('users as creator_users', 'customer_support_submissions.created_by', '=', 'creator_users.id')
                 ->orderBy('creator_users.name', $direction);
@@ -263,44 +292,55 @@ class CustomerSupportApiController extends Controller
             return;
         }
         if ($sort === 'sla_timer') {
-            $query->orderByRaw("COALESCE(customer_support_submissions.submitted_at, customer_support_submissions.created_at) {$direction}");
+            if (in_array('submitted_at', $existing, true)) {
+                $query->orderByRaw("COALESCE(customer_support_submissions.submitted_at, customer_support_submissions.created_at) {$direction}");
+            } else {
+                $query->orderBy('customer_support_submissions.created_at', $direction);
+            }
             return;
         }
-        $query->orderBy('customer_support_submissions.' . $sort, $direction);
+        if (in_array($sort, $existing, true)) {
+            $query->orderBy('customer_support_submissions.' . $sort, $direction);
+            return;
+        }
+
+        $fallback = in_array('submitted_at', $existing, true) ? 'submitted_at' : 'created_at';
+        $query->orderBy('customer_support_submissions.' . $fallback, $direction);
     }
 
     private function buildSelectColumns(array $columns): array
     {
-        $base = ['customer_support_submissions.id', 'customer_support_submissions.status'];
+        $base = ['id', 'status'];
         $map = [
-            'submitted_at' => 'customer_support_submissions.submitted_at',
-            'created_at' => 'customer_support_submissions.created_at',
-            'updated_at' => 'customer_support_submissions.updated_at',
-            'created_by' => 'customer_support_submissions.created_by',
-            'creator' => 'customer_support_submissions.created_by',
-            'issue_category' => 'customer_support_submissions.issue_category',
-            'company_name' => 'customer_support_submissions.company_name',
-            'account_number' => 'customer_support_submissions.account_number',
-            'contact_number' => 'customer_support_submissions.contact_number',
-            'issue_description' => 'customer_support_submissions.issue_description',
-            'attachments' => 'customer_support_submissions.attachments',
-            'manager_id' => 'customer_support_submissions.manager_id',
-            'manager' => 'customer_support_submissions.manager_id',
-            'team_leader_id' => 'customer_support_submissions.team_leader_id',
-            'team_leader' => 'customer_support_submissions.team_leader_id',
-            'sales_agent_id' => 'customer_support_submissions.sales_agent_id',
-            'sales_agent' => 'customer_support_submissions.sales_agent_id',
-            'csr_id' => 'customer_support_submissions.csr_id',
-            'csr' => 'customer_support_submissions.csr_id',
-            'csr_name' => 'customer_support_submissions.csr_name',
-            'ticket_number' => 'customer_support_submissions.ticket_number',
-            'workflow_status' => 'customer_support_submissions.workflow_status',
-            'completion_date' => 'customer_support_submissions.completion_date',
-            'trouble_ticket' => 'customer_support_submissions.trouble_ticket',
-            'activity' => 'customer_support_submissions.activity',
-            'pending' => 'customer_support_submissions.pending',
-            'resolution_remarks' => 'customer_support_submissions.resolution_remarks',
-            'internal_remarks' => 'customer_support_submissions.internal_remarks',
+            'submitted_at' => 'submitted_at',
+            'created_at' => 'created_at',
+            'updated_at' => 'updated_at',
+            'created_by' => 'created_by',
+            'creator' => 'created_by',
+            'issue_category' => 'issue_category',
+            'company_name' => 'company_name',
+            'account_number' => 'account_number',
+            'contact_number' => 'contact_number',
+            'alternate_contact_number' => 'alternate_contact_number',
+            'issue_description' => 'issue_description',
+            'attachments' => 'attachments',
+            'manager_id' => 'manager_id',
+            'manager' => 'manager_id',
+            'team_leader_id' => 'team_leader_id',
+            'team_leader' => 'team_leader_id',
+            'sales_agent_id' => 'sales_agent_id',
+            'sales_agent' => 'sales_agent_id',
+            'csr_id' => 'csr_id',
+            'csr' => 'csr_id',
+            'csr_name' => 'csr_name',
+            'ticket_number' => 'ticket_number',
+            'workflow_status' => 'workflow_status',
+            'completion_date' => 'completion_date',
+            'trouble_ticket' => 'trouble_ticket',
+            'activity' => 'activity',
+            'pending' => 'pending',
+            'resolution_remarks' => 'resolution_remarks',
+            'internal_remarks' => 'internal_remarks',
         ];
         foreach ($columns as $col) {
             if ($col === 'id' || $col === 'status') {
@@ -311,16 +351,47 @@ class CustomerSupportApiController extends Controller
             }
         }
         if (in_array('sla_timer', $columns, true)) {
-            $base[] = 'customer_support_submissions.submitted_at';
-            $base[] = 'customer_support_submissions.created_at';
-            $base[] = 'customer_support_submissions.csr_id';
+            $base[] = 'submitted_at';
+            $base[] = 'created_at';
+            $base[] = 'csr_id';
         }
-        return array_unique($base);
+
+        $base = array_unique($base);
+        $existing = $this->getExistingTableColumns();
+        $base = array_values(array_filter($base, fn ($c) => in_array($c, $existing, true)));
+
+        return array_map(fn ($c) => 'customer_support_submissions.' . $c, $base);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function getExistingTableColumns(): array
+    {
+        if ($this->tableColumns !== null) {
+            return $this->tableColumns;
+        }
+
+        try {
+            $this->tableColumns = Schema::getColumnListing('customer_support_submissions');
+        } catch (\Throwable $e) {
+            $this->tableColumns = self::ALLOWED_COLUMNS;
+        }
+
+        return $this->tableColumns;
     }
 
     private function formatRow(CustomerSupportSubmission $row, array $columns): array
     {
         $out = [];
+        $status = $row->status ?? null;
+        if (empty($row->csr_id)) {
+            $statusText = strtolower((string) ($status ?? ''));
+            if ($statusText === '' || in_array($statusText, self::STATUSS_EXCLUDED_FROM_LISTING, true)) {
+                $status = 'unassigned';
+            }
+        }
+
         foreach ($columns as $col) {
             if ($col === 'manager') {
                 $out['manager_id'] = $row->manager_id;
@@ -363,9 +434,25 @@ class CustomerSupportApiController extends Controller
                 $out[$col] = $row->completion_date ? $row->completion_date->format('d-M-Y') : null;
                 continue;
             }
+            if ($col === 'status') {
+                $out['status'] = $status;
+                continue;
+            }
+
             $out[$col] = $row->$col ?? null;
         }
         return $out;
+    }
+
+    /** @return array<int, string> */
+    private function listingStatuses(): array
+    {
+        $filtered = array_values(array_filter(
+            CustomerSupportSubmission::STATUSES,
+            fn ($s) => ! in_array(strtolower((string) $s), self::STATUSS_EXCLUDED_FROM_LISTING, true),
+        ));
+
+        return array_values(array_unique(array_merge(['unassigned'], $filtered)));
     }
 
     private function computeSlaTimer(CustomerSupportSubmission $row): ?string
@@ -430,7 +517,7 @@ class CustomerSupportApiController extends Controller
 
             return [
                 'issue_categories' => array_values($issueCategories),
-                'statuses' => array_map(fn ($s) => ['value' => $s, 'label' => ucfirst($s)], CustomerSupportSubmission::STATUSES),
+                'statuses' => array_map(fn ($s) => ['value' => $s, 'label' => $s === 'unassigned' ? 'UnAssigned' : ucfirst($s)], $this->listingStatuses()),
                 'managers' => $managers,
                 'team_leaders' => $teamLeaders,
                 'sales_agents' => $salesAgents,

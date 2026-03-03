@@ -8,7 +8,7 @@ import { useRoute, useRouter } from 'vue-router'
 import clientsApi from '@/services/clientsApi'
 import { useAuthStore } from '@/stores/auth'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
-import { toDdMmYyyy } from '@/lib/dateFormat'
+import { toDdMmYyyy, formatSystemDateTime } from '@/lib/dateFormat'
 import ClientTable from '@/components/clients/ClientTable.vue'
 import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
@@ -1405,19 +1405,19 @@ onMounted(() => {
                   </div>
                   <div>
                     <label class="block text-xs font-medium text-gray-600 mb-1">Expiry From</label>
-                    <DateInputDdMmYyyy v-model="alertAdvFilters.expiry_from" placeholder="dd-Mon-yyyy" />
+                    <DateInputDdMmYyyy v-model="alertAdvFilters.expiry_from" placeholder="DD-MMM-YYYY" />
                   </div>
                   <div>
                     <label class="block text-xs font-medium text-gray-600 mb-1">Expiry To</label>
-                    <DateInputDdMmYyyy v-model="alertAdvFilters.expiry_to" placeholder="dd-Mon-yyyy" />
+                    <DateInputDdMmYyyy v-model="alertAdvFilters.expiry_to" placeholder="DD-MMM-YYYY" />
                   </div>
                   <div>
                     <label class="block text-xs font-medium text-gray-600 mb-1">Created From</label>
-                    <DateInputDdMmYyyy v-model="alertAdvFilters.created_from" placeholder="dd-Mon-yyyy" />
+                    <DateInputDdMmYyyy v-model="alertAdvFilters.created_from" placeholder="DD-MMM-YYYY" />
                   </div>
                   <div>
                     <label class="block text-xs font-medium text-gray-600 mb-1">Created To</label>
-                    <DateInputDdMmYyyy v-model="alertAdvFilters.created_to" placeholder="dd-Mon-yyyy" />
+                    <DateInputDdMmYyyy v-model="alertAdvFilters.created_to" placeholder="DD-MMM-YYYY" />
                   </div>
                   <div>
                     <label class="block text-xs font-medium text-gray-600 mb-1">Days Remaining From</label>
@@ -1596,7 +1596,7 @@ onMounted(() => {
                     </div>
                     <div>
                       <label class="block text-sm font-medium text-gray-700 mb-1">Expiry Date <span class="text-red-500">*</span></label>
-                      <DateInputDdMmYyyy v-model="alertForm.expiry_date" placeholder="dd-Mon-yyyy" />
+                      <DateInputDdMmYyyy v-model="alertForm.expiry_date" placeholder="DD-MMM-YYYY" />
                       <p v-if="alertFormErrors.expiry_date" class="mt-1 text-xs text-red-600">{{ alertFormErrors.expiry_date }}</p>
                     </div>
                     <div>
@@ -1667,7 +1667,7 @@ onMounted(() => {
                     <span class="text-green-600"><TruncatedText :text="a.new_value ?? ''" empty-label="(empty)" /></span>
                   </div>
                   <p class="mt-1.5 text-xs text-gray-500">
-                    {{ new Date(a.changed_at).toLocaleString() }} by {{ a.changed_by_name || a.changed_by || '—' }}
+                    {{ formatSystemDateTime(a.changed_at, '—') }} by {{ a.changed_by_name || a.changed_by || '—' }}
                   </p>
                 </div>
               </div>

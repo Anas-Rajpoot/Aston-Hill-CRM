@@ -2,6 +2,8 @@
 /**
  * Default filters: Status, Category.
  */
+import HorizontalScrollToolbar from '@/components/common/HorizontalScrollToolbar.vue'
+
 defineProps({
   filters: { type: Object, required: true },
   filterOptions: {
@@ -15,11 +17,12 @@ const emit = defineEmits(['apply', 'reset'])
 </script>
 
 <template>
-  <div class="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
+  <div class="rounded-lg border border-gray-200 bg-white px-2 py-2">
+    <HorizontalScrollToolbar>
     <label class="sr-only">Status</label>
     <select
       v-model="filters.status"
-      class="min-w-[180px] rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+      class="w-[180px] shrink-0 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
       :disabled="loading"
     >
       <option value="">By Default</option>
@@ -31,7 +34,7 @@ const emit = defineEmits(['apply', 'reset'])
     <label class="sr-only">Category</label>
     <select
       v-model="filters.category"
-      class="min-w-[200px] rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+      class="w-[200px] shrink-0 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
       :disabled="loading"
     >
       <option value="">Category</option>
@@ -40,10 +43,10 @@ const emit = defineEmits(['apply', 'reset'])
       </option>
     </select>
 
-    <div class="flex w-full lg:w-auto flex-wrap items-center gap-2 lg:ml-auto">
+    <div class="ml-auto flex shrink-0 items-center gap-2">
       <button
         type="button"
-        class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+        class="inline-flex shrink-0 items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 disabled:opacity-50"
         :disabled="loading"
         @click="$emit('apply')"
       >
@@ -51,15 +54,16 @@ const emit = defineEmits(['apply', 'reset'])
       </button>
       <button
         type="button"
-        class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        class="shrink-0 rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
         :disabled="loading"
         @click="$emit('reset')"
       >
         Reset
       </button>
     </div>
-    <div class="ml-0 flex items-center gap-2 lg:ml-2">
+    <div class="ml-2 flex shrink-0 items-center gap-2">
       <slot name="after-reset" />
     </div>
+    </HorizontalScrollToolbar>
   </div>
 </template>

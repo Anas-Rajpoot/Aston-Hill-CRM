@@ -6,6 +6,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { canModuleAction } from '@/lib/accessControl'
+import { formatSystemDateTime } from '@/lib/dateFormat'
 
 const props = defineProps({
   columns: { type: Array, required: true },
@@ -21,12 +22,13 @@ const props = defineProps({
   editOptions: { type: Object, default: () => ({}) },
 })
 
-const emit = defineEmits(['sort', 'updateStatus', 'assignTechnician', 'update:selectedIds', 'updateCell', 'viewHistory'])
+const emit = defineEmits(['sort', 'updateStatus', 'assignTechnician', 'update:selectedIds', 'updateCell', 'viewHistory', 'delete'])
 const router = useRouter()
 const auth = useAuthStore()
 const canViewAction = computed(() => canModuleAction(auth.user, 'field', 'view'))
 const canEditAction = computed(() => canModuleAction(auth.user, 'field', 'edit'))
 const canHistoryAction = computed(() => canViewAction.value)
+const canDeleteAction = computed(() => canModuleAction(auth.user, 'field', 'delete'))
 const perms = computed(() => auth.user?.permissions ?? [])
 const canEdit = computed(() => perms.value.includes('field_head.view') || perms.value.includes('field_head.list'))
 
@@ -51,15 +53,6 @@ function goToEdit(row) {
   if (row?.id) router.push(`/field-submissions/${row.id}/edit`)
 }
 
-function canResubmit(row) {
-  if (row.status === 'approved') return false
-  const roles = auth.user?.roles ?? []
-  const isSuperAdmin = Array.isArray(roles) && roles.some((r) => (typeof r === 'string' ? r : r?.name) === 'superadmin')
-  if (isSuperAdmin) return true
-  const creatorId = row.creator_id ?? row.created_by
-  return creatorId != null && Number(creatorId) === Number(auth.user?.id)
-}
-
 function goToView(row) {
   if (row?.id) router.push(`/field-submissions/${row.id}`)
 }
@@ -69,29 +62,36 @@ function rowNumber(index) {
 }
 
 const hasAnyRowAction = computed(() => {
-  if (canViewAction.value || canEditAction.value || canHistoryAction.value) return true
-  return canEditAction.value && (props.data || []).some((row) => canResubmit(row))
+  if (canViewAction.value || canEditAction.value || canHistoryAction.value || canDeleteAction.value) return true
+  return false
 })
 
 const columnLabels = {
-  id: 'SR',
-  created_at: 'Created',
+  id: 'ID',
+  created_at: 'Submitted At',
+  account_number: 'Account Number',
   company_name: 'Company Name',
+  authorized_signatory_name: 'Authorized Signatory Name',
   contact_number: 'Contact Number',
+  alternate_number: 'Alternate Contact Number',
   product: 'Product',
   emirates: 'Emirates',
-  complete_address: 'Address',
+  location_coordinates: 'Location Coordinates',
+  complete_address: 'Complete Address',
+  additional_notes: 'Additional Notes',
+  special_instruction: 'Special Instruction',
   sales_agent: 'Sales Agent',
   team_leader: 'Team Leader',
   manager: 'Manager',
   field_agent: 'Field Agent',
   status: 'Status',
-  field_status: 'Status',
-  target_date: 'Target Date',
+  field_status: 'Field Status',
+  target_date: 'Meeting Date',
+  remarks_by_field_agent: 'Field Agent Remarks',
   sla_timer: 'SLA Timer',
   sla_status: 'SLA Status',
   last_updated: 'Last Updated',
-  creator: 'Created By',
+  creator: 'Submitter Name',
 }
 
 const SORTABLE_COLUMNS = [
@@ -123,14 +123,7 @@ function formatValue(row, col) {
 }
 
 function formatDate(d) {
-  if (!d) return '—'
-  const date = new Date(d)
-  if (Number.isNaN(date.getTime())) return '—'
-  const day = String(date.getDate()).padStart(2, '0')
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-  return `${day}-${months[date.getMonth()]}-${date.getFullYear()} ${hours}:${minutes}`
+  return formatSystemDateTime(d, '—')
 }
 
 /** Single row per cell: 30 chars + "..." and full value on hover. */
@@ -188,6 +181,13 @@ function toggleRow(id) {
 const STATUS_BADGES = {
   draft: 'bg-gray-100 text-gray-700',
   submitted: 'bg-blue-100 text-blue-700',
+  unassigned: 'bg-amber-100 text-amber-800',
+}
+
+function formatStatusLabel(status) {
+  if (!status) return '—'
+  if (status === 'unassigned') return 'UnAssigned'
+  return status.charAt(0).toUpperCase() + status.slice(1)
 }
 
 /** Badges for field workflow status (field_status) */
@@ -271,7 +271,13 @@ function getCellValueForEdit(row, col) {
     if (!v) return ''
     const d = new Date(v)
     if (Number.isNaN(d.getTime())) return ''
-    return d.toISOString().slice(0, 10)
+    const yyyy = d.getFullYear()
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+    const hh = String(d.getHours()).padStart(2, '0')
+    const mi = String(d.getMinutes()).padStart(2, '0')
+    const ss = String(d.getSeconds()).padStart(2, '0')
+    return `${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}`
   }
   return row[col] != null ? String(row[col]) : ''
 }
@@ -310,7 +316,7 @@ function saveInlineEdit() {
     }
   }
   if (col === 'status') {
-    emit('updateStatus', rowId, value)
+    emit('updateCell', rowId, 'field_status', value || null)
     editingCell.value = null
     inlineEditError.value = ''
     return
@@ -333,7 +339,10 @@ function getOptionsForColumn(col) {
   const opt = props.editOptions || {}
   switch (col) {
     case 'status':
-      return (opt.field_statuses || []).map((s) => ({ value: s.value, label: s.label || s.value }))
+      return [
+        { value: '', label: 'UnAssigned' },
+        ...(opt.field_statuses || []).map((s) => ({ value: s.value, label: s.label || s.value })),
+      ]
     case 'emirates':
       return (opt.emirates || []).map((e) => ({ value: typeof e === 'string' ? e : e.value, label: typeof e === 'string' ? e : (e.label || e.value) }))
     case 'manager':
@@ -345,7 +354,10 @@ function getOptionsForColumn(col) {
     case 'field_agent':
       return [{ value: null, label: 'Unassigned' }, ...(opt.field_executives || []).map((e) => ({ value: e.id, label: e.name }))]
     case 'field_status':
-      return (opt.field_statuses || []).map((s) => ({ value: s.value, label: s.label || s.value }))
+      return [
+        { value: '', label: 'UnAssigned' },
+        ...(opt.field_statuses || []).map((s) => ({ value: s.value, label: s.label || s.value })),
+      ]
     default:
       return []
   }
@@ -353,6 +365,15 @@ function getOptionsForColumn(col) {
 
 function isEditing(rowId, col) {
   return editingCell.value && editingCell.value.rowId === rowId && editingCell.value.col === col
+}
+
+function displayStatusText(row) {
+  return row?.field_status || 'UnAssigned'
+}
+
+function statusDisplayClass(row) {
+  if (!row?.field_status) return 'bg-amber-100 text-amber-800'
+  return fieldStatusBadgeClass(row.field_status)
 }
 </script>
 
@@ -496,7 +517,8 @@ function isEditing(rowId, col) {
                 <input
                   v-else
                   v-model="inlineEditValue"
-                  :type="col === 'target_date' ? 'date' : 'text'"
+                  :type="col === 'target_date' ? 'datetime-local' : 'text'"
+                  :step="col === 'target_date' ? 1 : undefined"
                   class="w-full min-w-[100px] max-w-[220px] rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
                   @keydown.enter="saveInlineEdit"
                   @keydown.esc="cancelInlineEdit"
@@ -513,17 +535,17 @@ function isEditing(rowId, col) {
             </template>
             <template v-else-if="col === 'status' && canInlineEdit">
               <span
-                :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium cursor-pointer hover:ring-2 hover:ring-green-400', statusBadgeClass(row.status)]"
+                :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium cursor-pointer hover:ring-2 hover:ring-green-400', statusDisplayClass(row)]"
                 @dblclick="openDropdownEdit(row, 'status')"
               >
-                {{ row.status ? row.status.charAt(0).toUpperCase() + row.status.slice(1) : '—' }}
+                {{ displayStatusText(row) }}
               </span>
             </template>
             <template v-else-if="col === 'status'">
               <span
-                :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', statusBadgeClass(row.status)]"
+                :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', statusDisplayClass(row)]"
               >
-                {{ row.status ? row.status.charAt(0).toUpperCase() + row.status.slice(1) : '—' }}
+                {{ displayStatusText(row) }}
               </span>
             </template>
             <template v-else-if="col === 'field_agent' && canOpenAssignFieldAgent && row[col] === 'Unassigned'">
@@ -651,14 +673,18 @@ function isEditing(rowId, col) {
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </button>
+                <button
+                  v-if="canDeleteAction"
+                  type="button"
+                  class="rounded-full p-1.5 text-red-600 hover:bg-red-50"
+                  title="Delete"
+                  @click="$emit('delete', row)"
+                >
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+                  </svg>
+                </button>
               </div>
-              <router-link
-                v-if="canEditAction && canResubmit(row)"
-                :to="`/field-submissions/${row.id}/edit`"
-                class="rounded bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700"
-              >
-                Resubmit
-              </router-link>
             </div>
           </td>
         </tr>

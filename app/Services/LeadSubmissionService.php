@@ -90,7 +90,6 @@ class LeadSubmissionService
 
     /**
      * Save resubmission documents: for each key, replace existing with uploaded files.
-     * Used by resubmit flow (trade_license, establishment_card, owner_emirates_id).
      */
     public function saveResubmissionDocuments(Request $request, LeadSubmission $leadSubmission, array $docKeys): void
     {

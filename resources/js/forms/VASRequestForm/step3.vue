@@ -86,7 +86,7 @@ async function submit() {
 </script>
 
 <template>
-  <div class="space-y-8">
+  <div class="space-y-6">
     <div
       v-if="generalMessage || Object.keys(errors).length"
       class="rounded-lg border border-red-200 bg-red-50 p-4"
@@ -211,14 +211,20 @@ async function submit() {
           <button
             type="button"
             @click="emit('back')"
-            class="inline-flex items-center gap-2 rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-teal-600"
+            class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-green-700"
           >
             <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
             </svg>
             Back
           </button>
-          <span class="rounded-lg bg-[#121d2c] px-4 py-2.5 text-sm font-medium text-white shadow-sm">Step 3</span>
+          <button
+            type="button"
+            @click="emit('back')"
+            class="rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-green-700"
+          >
+            Cancel
+          </button>
         </div>
         <div class="flex flex-wrap items-center gap-3">
           <button
@@ -234,20 +240,14 @@ async function submit() {
           </button>
           <button
             type="button"
-            class="rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-teal-600"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
             @click="submit"
             :disabled="saving || submitting"
-            class="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-black shadow-sm disabled:opacity-50 bg-green-600 hover:bg-green-700"
+            class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-green-700 disabled:opacity-50"
           >
-            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 12L3.269 3.126a59.768 59.768 0 0118.216-8.268 59.768 59.768 0 0118.216 8.268L18 12m-6 0h7.5" />
+            <span class="text-white">{{ submitting ? 'Submitting...' : 'Submit' }}</span>
+            <svg v-if="!submitting" class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M13 6l6 6-6 6" />
             </svg>
-            <span class="text-black">{{ submitting ? 'Submitting...' : 'Submit VAS Request' }}</span>
           </button>
         </div>
       </div>

@@ -17,6 +17,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
@@ -28,6 +29,9 @@ class FieldSubmissionApiController extends Controller
     use \App\Traits\ResolvesAuditDisplayValues;
     use StoresFieldSubmissionDocuments;
 
+    /** @var array<int, string>|null */
+    private ?array $tableColumns = null;
+
     private const MODULE = 'field_submissions';
 
     private const MAX_DOCUMENT_SIZE_MB = 10;
@@ -35,10 +39,11 @@ class FieldSubmissionApiController extends Controller
     private const MAX_DOCUMENTS_TOTAL_MB = 20;
 
     private const ALLOWED_COLUMNS = [
-        'id', 'company_name', 'contact_number', 'product', 'emirates', 'complete_address',
+        'id', 'account_number', 'company_name', 'authorized_signatory_name', 'contact_number', 'product', 'alternate_number', 'emirates', 'location_coordinates', 'complete_address',
+        'additional_notes', 'special_instruction',
         'status', 'created_at', 'created_by',
         'manager_id', 'team_leader_id', 'sales_agent_id',
-        'field_executive_id', 'field_status', 'meeting_date', 'updated_at',
+        'field_executive_id', 'field_status', 'meeting_date', 'remarks_by_field_agent', 'updated_at',
     ];
 
     /** Columns that are computed or from relations in formatRow (no direct DB select). */
@@ -158,7 +163,11 @@ class FieldSubmissionApiController extends Controller
     private function applyFilters($query, array $validated): void
     {
         if (!empty($validated['status'])) {
-            $query->where('status', $validated['status']);
+            if ($validated['status'] === 'unassigned') {
+                $query->whereNull('field_executive_id');
+            } else {
+                $query->where('status', $validated['status']);
+            }
         }
         if (!empty($validated['from'])) {
             $query->where('created_at', '>=', $validated['from'] . ' 00:00:00');
@@ -209,6 +218,8 @@ class FieldSubmissionApiController extends Controller
 
     private function applySort($query, string $sort, string $order): void
     {
+        $existing = $this->getExistingTableColumns();
+
         if ($sort === 'creator') {
             $query->join('users as creator_users', 'field_submissions.created_by', '=', 'creator_users.id')
                 ->orderBy('creator_users.name', $order);
@@ -222,13 +233,26 @@ class FieldSubmissionApiController extends Controller
                 ->orderBy('field_agent_users.name', $order);
         } elseif (in_array($sort, ['target_date', 'sla_timer', 'sla_status', 'last_updated'], true)) {
             if ($sort === 'sla_timer' || $sort === 'sla_status') {
-                $query->orderByRaw("COALESCE(field_submissions.submitted_at, field_submissions.created_at) {$order}");
+                if (in_array('submitted_at', $existing, true)) {
+                    $query->orderByRaw("COALESCE(field_submissions.submitted_at, field_submissions.created_at) {$order}");
+                } else {
+                    $query->orderBy('field_submissions.created_at', $order);
+                }
             } else {
                 $dbCol = $sort === 'target_date' ? 'meeting_date' : 'updated_at';
-                $query->orderBy('field_submissions.' . $dbCol, $order);
+                if (in_array($dbCol, $existing, true)) {
+                    $query->orderBy('field_submissions.' . $dbCol, $order);
+                } else {
+                    $query->orderBy('field_submissions.created_at', $order);
+                }
             }
         } elseif (in_array($sort, self::ALLOWED_COLUMNS, true)) {
-            $query->orderBy('field_submissions.' . $sort, $order);
+            if (in_array($sort, $existing, true)) {
+                $query->orderBy('field_submissions.' . $sort, $order);
+            } else {
+                $fallback = in_array('submitted_at', $existing, true) ? 'submitted_at' : 'created_at';
+                $query->orderBy('field_submissions.' . $fallback, $order);
+            }
         }
     }
 
@@ -245,6 +269,9 @@ class FieldSubmissionApiController extends Controller
                 $base[] = $idCol;
             }
         }
+        if (in_array('status', $columns, true) && in_array('field_executive_id', $base, true) === false) {
+            $base[] = 'field_executive_id';
+        }
         if (in_array('field_status', $columns, true) || in_array('target_date', $columns, true) || in_array('sla_timer', $columns, true) || in_array('sla_status', $columns, true)) {
             $base[] = 'meeting_date';
             $base[] = 'field_status';
@@ -256,7 +283,28 @@ class FieldSubmissionApiController extends Controller
             $base[] = 'updated_at';
         }
         $base = array_unique($base);
+        $existing = $this->getExistingTableColumns();
+        $base = array_values(array_filter($base, fn ($c) => in_array($c, $existing, true)));
+
         return array_map(fn ($c) => 'field_submissions.' . $c, $base);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function getExistingTableColumns(): array
+    {
+        if ($this->tableColumns !== null) {
+            return $this->tableColumns;
+        }
+
+        try {
+            $this->tableColumns = Schema::getColumnListing('field_submissions');
+        } catch (\Throwable $e) {
+            $this->tableColumns = self::ALLOWED_COLUMNS;
+        }
+
+        return $this->tableColumns;
     }
 
     private function formatRow(FieldSubmission $row, array $columns): array
@@ -281,17 +329,20 @@ class FieldSubmissionApiController extends Controller
                 $out['field_agent'] = $name ?: 'Unassigned';
                 $out['field_executive_id'] = $row->field_executive_id;
             } elseif ($col === 'target_date') {
-                $out['target_date'] = $row->meeting_date ? $row->meeting_date->format('d/M/Y H:i') : null;
+                $out['target_date'] = $row->meeting_date ? $row->meeting_date->format('d-M-Y H:i:s') : null;
+                $out['meeting_date'] = $row->meeting_date ? $row->meeting_date->toIso8601String() : null;
             } elseif ($col === 'last_updated') {
-                $out['last_updated'] = $row->updated_at ? $row->updated_at->format('d/M/Y H:i') : null;
+                    $out['last_updated'] = $row->updated_at ? $row->updated_at->format('d-M-Y H:i:s') : null;
             } elseif ($col === 'sla_timer') {
                 $out['sla_timer'] = $this->computeSlaTimer($row);
             } elseif ($col === 'sla_status') {
                 $out['sla_status'] = $this->computeSlaStatus($row);
             } elseif (in_array($col, ['submitted_at'], true)) {
-                $out[$col] = $row->$col ? $row->$col->format('d/M/Y H:i') : null;
+                    $out[$col] = $row->$col ? $row->$col->format('d-M-Y H:i:s') : null;
             } elseif (in_array($col, ['created_at'], true)) {
                 $out[$col] = $row->$col ? $row->$col->toIso8601String() : null;
+            } elseif ($col === 'status') {
+                $out['status'] = empty($row->field_executive_id) ? 'unassigned' : ($row->status ?? null);
             } else {
                 $out[$col] = $row->$col ?? null;
             }
@@ -392,7 +443,11 @@ class FieldSubmissionApiController extends Controller
                 ->all();
 
             return [
-                'statuses' => array_map(fn ($s) => ['value' => $s, 'label' => ucfirst($s)], FieldSubmission::STATUSES),
+                'statuses' => [
+                    ['value' => 'draft', 'label' => 'Draft'],
+                    ['value' => 'submitted', 'label' => 'Submitted'],
+                    ['value' => 'unassigned', 'label' => 'UnAssigned'],
+                ],
                 'products' => array_values($products),
                 'emirates' => array_values($emirates),
             ];
@@ -496,7 +551,9 @@ class FieldSubmissionApiController extends Controller
 
         return response()->json([
             'id' => $fieldSubmission->id,
+            'account_number' => $fieldSubmission->account_number,
             'company_name' => $fieldSubmission->company_name,
+            'authorized_signatory_name' => $fieldSubmission->authorized_signatory_name,
             'contact_number' => $fieldSubmission->contact_number,
             'product' => $fieldSubmission->product,
             'alternate_number' => $fieldSubmission->alternate_number,
@@ -509,7 +566,7 @@ class FieldSubmissionApiController extends Controller
             'team_leader_id' => $fieldSubmission->team_leader_id,
             'sales_agent_id' => $fieldSubmission->sales_agent_id,
             'field_executive_id' => $fieldSubmission->field_executive_id,
-            'meeting_date' => $fieldSubmission->meeting_date?->format('Y-m-d'),
+            'meeting_date' => $fieldSubmission->meeting_date?->format('Y-m-d\\TH:i:s'),
             'field_status' => $fieldSubmission->field_status,
             'remarks_by_field_agent' => $fieldSubmission->remarks_by_field_agent,
             'status' => $fieldSubmission->status,
@@ -523,6 +580,22 @@ class FieldSubmissionApiController extends Controller
             'creator_name' => $fieldSubmission->creator?->name,
             'documents' => $documents,
         ]);
+    }
+
+    public function destroy(Request $request, FieldSubmission $fieldSubmission): JsonResponse
+    {
+        $this->authorize('delete', $fieldSubmission);
+
+        $submissionId = (int) $fieldSubmission->id;
+        $fieldSubmission->delete();
+
+        Storage::disk('public')->deleteDirectory("field-submissions/{$submissionId}");
+
+        SystemAuditLog::record('field_submission.deleted', [
+            'field_submission_id' => $submissionId,
+        ], null, $request->user()->id, 'field_submission', $submissionId);
+
+        return response()->json(['message' => 'Field submission deleted.']);
     }
 
     /**

@@ -2,8 +2,6 @@
 import { ref, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Step1 from './step1.vue'
-import Step2 from './step2.vue'
-import Step3 from './step3.vue'
 import Step4 from './step4.vue'
 import leadSubmissionsApi from '@/services/leadSubmissionsApi'
 
@@ -21,11 +19,7 @@ const STORAGE_KEY = 'lead_submission_wizard'
 const currentStep = ref(1)
 const leadId = ref(null)
 const submitted = ref(false)
-const step2CategoryId = ref(null)
-const step2TypeId = ref(null)
 const isTransitioning = ref(false)
-/** Incremented when returning from step 4 to step 3 so Step3 remounts and refetches documents. */
-const step3RefreshKey = ref(0)
 /** True only after we've restored/validated from storage (so we don't render steps with a stale leadId). */
 const restoreDone = ref(false)
 
@@ -45,8 +39,6 @@ function saveStateToStorage() {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
       step: currentStep.value,
       leadId: leadId.value,
-      step2CategoryId: step2CategoryId.value,
-      step2TypeId: step2TypeId.value,
     }))
   } catch (_) {}
 }
@@ -60,10 +52,8 @@ function loadStateFromStorage() {
     const id = data.leadId != null ? parseInt(data.leadId, 10) : null
     if (!id || Number.isNaN(id)) return
     if (step >= 1 && step <= 4) {
-      currentStep.value = step
+      currentStep.value = step <= 1 ? 1 : 4
       leadId.value = id
-      step2CategoryId.value = data.step2CategoryId ?? null
-      step2TypeId.value = data.step2TypeId ?? null
     }
   } catch (_) {}
 }
@@ -77,8 +67,6 @@ function clearStorage() {
 function resetToStep1() {
   currentStep.value = 1
   leadId.value = null
-  step2CategoryId.value = null
-  step2TypeId.value = null
 }
 
 /** Fetch lead from API; hydrate step and step2 from DB (source of truth). Clear state if lead is submitted. */
@@ -94,9 +82,8 @@ async function validateAndHydrateFromLead() {
       resetToStep1()
       return null
     }
-    currentStep.value = Math.min(4, Math.max(1, parseInt(data.step, 10) || 1))
-    step2CategoryId.value = data.service_category_id ?? null
-    step2TypeId.value = data.service_type_id ?? null
+    const hydratedStep = Math.min(4, Math.max(1, parseInt(data.step, 10) || 1))
+    currentStep.value = hydratedStep <= 1 ? 1 : 4
     return data
   } catch (e) {
     if (e?.response?.status === 404) {
@@ -122,9 +109,8 @@ async function restoreFromCurrentDraft() {
       const draft = res?.data?.draft
       if (draft?.id && draft?.status === 'draft') {
         leadId.value = draft.id
-        currentStep.value = Math.min(4, Math.max(1, parseInt(draft.step, 10) || 1))
-        step2CategoryId.value = draft.service_category_id ?? null
-        step2TypeId.value = draft.service_type_id ?? null
+        const draftStep = Math.min(4, Math.max(1, parseInt(draft.step, 10) || 1))
+        currentStep.value = draftStep <= 1 ? 1 : 4
       }
     } catch (_) {}
   }
@@ -154,7 +140,7 @@ onMounted(async () => {
 })
 
 watch(
-  [currentStep, leadId, step2CategoryId, step2TypeId],
+  [currentStep, leadId],
   () => { saveStateToStorage() },
   { deep: true }
 )
@@ -162,7 +148,7 @@ watch(
 const onStep1Next = (id) => {
   isTransitioning.value = true
   leadId.value = id
-  currentStep.value = 2
+  currentStep.value = 4
   afterStepChange()
 }
 
@@ -170,49 +156,15 @@ const onStep1DraftSaved = (id) => {
   if (id != null) leadId.value = id
 }
 
-const onStep2Back = () => {
-  isTransitioning.value = true
-  currentStep.value = 1
-  afterStepChange()
-}
-
-const onStep2SelectionUpdate = (categoryId, typeId) => {
-  if (categoryId != null && categoryId !== '') step2CategoryId.value = categoryId
-  if (typeId != null && typeId !== '') step2TypeId.value = typeId
-}
-
-const onStep2Next = (categoryId, typeId) => {
-  isTransitioning.value = true
-  step2CategoryId.value = categoryId
-  step2TypeId.value = typeId
-  currentStep.value = 3
-  afterStepChange()
-}
-
-const onStep3Back = () => {
-  isTransitioning.value = true
-  currentStep.value = 2
-  afterStepChange()
-}
-
-const onStep3Next = () => {
-  isTransitioning.value = true
-  currentStep.value = 4
-  afterStepChange()
-}
-
 const onStep4Back = () => {
   isTransitioning.value = true
-  step3RefreshKey.value += 1
-  currentStep.value = 3
+  currentStep.value = 1
   afterStepChange()
 }
 
 const onSubmitted = () => {
   submitted.value = true
   leadId.value = null
-  step2CategoryId.value = null
-  step2TypeId.value = null
   currentStep.value = 1
   clearStorage()
   if (route.query.step || route.query.lead_id) {
@@ -240,12 +192,11 @@ function startNewSubmission() {
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
       <h3 class="text-lg font-semibold text-green-800">Lead submission completed</h3>
-      <p class="mt-1 text-sm text-green-600">Your lead submission has been submitted successfully.</p>
-      <p class="mt-3 text-sm text-gray-600">Click the button below to start a new lead submission, or click the Lead Submissions tab to open a new form.</p>
+      <p class="mt-1 text-sm text-green-600">Your lead has been submitted successfully. Back Office will review and process.</p>
       <button
         type="button"
         @click="startNewSubmission"
-        class="mt-4 inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-black shadow-sm hover:bg-green-700"
+        class="mt-4 inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-green-700"
       >
         New lead submission
       </button>
@@ -287,22 +238,6 @@ function startNewSubmission() {
           :skip-load-draft="props.forceNewForm"
           @next="onStep1Next"
           @draft-saved="onStep1DraftSaved"
-        />
-        <Step2
-          v-else-if="currentStep === 2"
-          :lead-id="leadId"
-          :initial-category-id="step2CategoryId"
-          :initial-type-id="step2TypeId"
-          @back="onStep2Back"
-          @next="onStep2Next"
-          @update-selection="onStep2SelectionUpdate"
-        />
-        <Step3
-          v-else-if="currentStep === 3"
-          :key="`step3-${leadId}-${step3RefreshKey}`"
-          :lead-id="leadId"
-          @back="onStep3Back"
-          @next="onStep3Next"
         />
         <Step4
           v-else-if="currentStep === 4"

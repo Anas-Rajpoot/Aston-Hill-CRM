@@ -9,7 +9,7 @@ import { useTablePageSize } from '@/composables/useTablePageSize'
 import api from '@/lib/axios'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Toast from '@/components/Toast.vue'
-import { toDdMonYyyy } from '@/lib/dateFormat'
+import { formatSystemDateTime } from '@/lib/dateFormat'
 import { canModuleAction } from '@/lib/accessControl'
 
 const auth = useAuthStore()
@@ -421,14 +421,7 @@ function formatVerifierId(id) {
 }
 
 function formatDateTime(iso) {
-  if (!iso || typeof iso !== 'string') return '—'
-  const s = iso.trim()
-  const datePart = s.slice(0, 10)
-  const timePart = s.slice(11, 16)
-  const ddMonYyyy = toDdMonYyyy(datePart)
-  if (!ddMonYyyy) return '—'
-  if (timePart && timePart.length === 5) return `${ddMonYyyy}, ${timePart}`
-  return ddMonYyyy
+  return formatSystemDateTime(iso, '—')
 }
 
 function openDetailModal(row) {

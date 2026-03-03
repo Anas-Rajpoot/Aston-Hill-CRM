@@ -263,6 +263,8 @@ class VasRequestController extends Controller
         $data['team_leader_name'] = $vasRequest->teamLeader?->name;
         $data['sales_agent_name'] = $vasRequest->salesAgent?->name;
         $data['back_office_executive_name'] = $vasRequest->backOfficeExecutive?->name;
+        $data['request_description'] = $vasRequest->description;
+        $data['description'] = $vasRequest->description;
         $data['documents'] = $documents;
 
         return response()->json($data);
@@ -292,6 +294,9 @@ class VasRequestController extends Controller
             'description' => ['nullable', 'string', 'max:5000'],
             'request_description' => ['nullable', 'string', 'max:5000'],
             'additional_notes' => ['nullable', 'string', 'max:2000'],
+            'activity' => ['nullable', 'string', 'max:255'],
+            'completion_date' => ['nullable', 'date'],
+            'remarks' => ['nullable', 'string', 'max:2000'],
             'manager_id' => ['required', 'exists:users,id'],
             'team_leader_id' => ['nullable', 'exists:users,id'],
             'sales_agent_id' => ['nullable', 'exists:users,id'],
@@ -316,55 +321,6 @@ class VasRequestController extends Controller
         $vasRequest->update($data);
         return response()->json([
             'message' => 'VAS request updated.',
-            'id' => $vasRequest->id,
-        ]);
-    }
-
-    /**
-     * POST /api/vas-requests/{vasRequest}/resubmit
-     * Allows updating a rejected VAS request and re-submitting it.
-     */
-    public function resubmit(Request $request, VasRequestSubmission $vasRequest): JsonResponse
-    {
-        if ($request->exists('back_office_executive_id')) {
-            $this->authorize('assign', $vasRequest);
-        }
-        $this->authorize('update', $vasRequest);
-
-        if ($vasRequest->status === 'approved') {
-            return response()->json([
-                'message' => 'Approved requests cannot be resubmitted.',
-            ], 422);
-        }
-
-        $types = self::requestTypes();
-        $data = $request->validate([
-            'request_type' => ['required', 'string', Rule::in($types)],
-            'account_number' => ['nullable', 'string', 'max:100'],
-            'company_name' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string', 'max:5000'],
-            'manager_id' => ['required', 'exists:users,id'],
-            'team_leader_id' => ['nullable', 'exists:users,id'],
-            'sales_agent_id' => ['nullable', 'exists:users,id'],
-            'back_office_executive_id' => ['nullable', 'exists:users,id'],
-        ]);
-
-        if (array_key_exists('back_office_executive_id', $data) && ! empty($data['back_office_executive_id'])) {
-            $assignee = User::find((int) $data['back_office_executive_id']);
-            if (! $assignee || ! VasRequestPolicy::isValidAssignee($assignee)) {
-                return response()->json([
-                    'message' => 'Selected assignee must be a back office user.',
-                ], 422);
-            }
-        }
-
-        $vasRequest->update(array_merge($data, [
-            'status' => 'submitted_under_process',
-            'submitted_at' => now(),
-        ]));
-
-        return response()->json([
-            'message' => 'VAS request resubmitted successfully.',
             'id' => $vasRequest->id,
         ]);
     }

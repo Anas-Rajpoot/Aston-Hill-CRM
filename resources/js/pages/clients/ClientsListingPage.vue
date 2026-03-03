@@ -658,27 +658,27 @@ onMounted(() => {
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Submitted From</label>
-            <DateInputDdMmYyyy v-model="filters.submitted_from" placeholder="dd-Mon-yyyy" />
+            <DateInputDdMmYyyy v-model="filters.submitted_from" placeholder="DD-MMM-YYYY" />
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Submitted To</label>
-            <DateInputDdMmYyyy v-model="filters.submitted_to" placeholder="dd-Mon-yyyy" />
+            <DateInputDdMmYyyy v-model="filters.submitted_to" placeholder="DD-MMM-YYYY" />
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Activation From</label>
-            <DateInputDdMmYyyy v-model="filters.activation_from" placeholder="dd-Mon-yyyy" />
+            <DateInputDdMmYyyy v-model="filters.activation_from" placeholder="DD-MMM-YYYY" />
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Activation To</label>
-            <DateInputDdMmYyyy v-model="filters.activation_to" placeholder="dd-Mon-yyyy" />
+            <DateInputDdMmYyyy v-model="filters.activation_to" placeholder="DD-MMM-YYYY" />
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Contract End From</label>
-            <DateInputDdMmYyyy v-model="filters.contract_end_from" placeholder="dd-Mon-yyyy" />
+            <DateInputDdMmYyyy v-model="filters.contract_end_from" placeholder="DD-MMM-YYYY" />
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Contract End To</label>
-            <DateInputDdMmYyyy v-model="filters.contract_end_to" placeholder="dd-Mon-yyyy" />
+            <DateInputDdMmYyyy v-model="filters.contract_end_to" placeholder="DD-MMM-YYYY" />
           </div>
         </div>
         <div class="mt-3 flex items-center gap-2">

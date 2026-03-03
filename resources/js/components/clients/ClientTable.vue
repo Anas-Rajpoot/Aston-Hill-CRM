@@ -3,18 +3,11 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { canModuleAction } from '@/lib/accessControl'
+import { formatSystemDateTime } from '@/lib/dateFormat'
 
 const MONTHS_3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 function formatDateTime(val) {
-  if (!val || typeof val !== 'string') return '—'
-  const date = new Date(val)
-  if (isNaN(date.getTime())) return val
-  const dd = String(date.getDate()).padStart(2, '0')
-  const mon = MONTHS_3[date.getMonth()]
-  const yyyy = date.getFullYear()
-  const hh = String(date.getHours()).padStart(2, '0')
-  const mm = String(date.getMinutes()).padStart(2, '0')
-  return `${dd}-${mon}-${yyyy} ${hh}:${mm}`
+  return formatSystemDateTime(val, '—')
 }
 
 function formatDateOnly(val) {

@@ -343,8 +343,8 @@ const cancel = () => window.history.back()
       </ul>
     </div>
 
-    <!-- Document cards (two-column grid) -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <!-- Document cards (three-column grid) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
       <div
         v-for="doc in docDefs"
         :key="doc.key"
@@ -461,7 +461,7 @@ const cancel = () => window.history.back()
         <button
           type="button"
           @click="goBack"
-          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-gray-100 text-gray-700 text-sm font-medium hover:bg-gray-200"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -492,9 +492,9 @@ const cancel = () => window.history.back()
           type="button"
           :disabled="submitting"
           @click="goNext"
-          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-black text-sm font-medium disabled:opacity-50 bg-green-600 hover:bg-green-700"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-50 bg-green-600 hover:bg-green-700"
         >
-          <span class="text-black">{{ submitting ? 'Saving...' : 'Next' }}</span>
+          <span class="text-white">{{ submitting ? 'Saving...' : 'Next' }}</span>
           <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
           </svg>

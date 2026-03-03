@@ -26,12 +26,13 @@ const props = defineProps({
   selectedIds: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['sort', 'updateCell', 'update:selectedIds', 'viewHistory'])
+const emit = defineEmits(['sort', 'updateCell', 'update:selectedIds', 'viewHistory', 'delete'])
 
 const auth = useAuthStore()
 const canViewAction = computed(() => canModuleAction(auth.user, 'special', 'view'))
 const canEditAction = computed(() => canModuleAction(auth.user, 'special', 'edit'))
 const canHistoryAction = computed(() => canViewAction.value)
+const canDeleteAction = computed(() => canModuleAction(auth.user, 'special', 'delete'))
 const canInlineEdit = computed(() => {
   const roles = auth.user?.roles ?? []
   if (!Array.isArray(roles)) return false
@@ -40,22 +41,22 @@ const canInlineEdit = computed(() => {
     return name === 'superadmin' || name === 'backoffice' || name === 'back_office'
   })
 })
-const hasAnyRowAction = computed(() => canViewAction.value || canEditAction.value || canHistoryAction.value)
+const hasAnyRowAction = computed(() => canViewAction.value || canEditAction.value || canHistoryAction.value || canDeleteAction.value)
 
 const COLUMN_LABELS = {
-  id: 'SR',
-  submitted_at: 'Submission Date',
-  created_at: 'Created',
+  id: 'ID',
+  submitted_at: 'Submitted At',
+  created_at: 'Created At',
   company_name: 'Company Name',
   account_number: 'Account Number',
   request_type: 'Request Type',
-  complete_address: 'Address',
+  complete_address: 'Complete Address',
   special_instruction: 'Special Instruction',
   sales_agent: 'Sales Agent',
   team_leader: 'Team Leader',
   manager: 'Manager',
   status: 'Status',
-  creator: 'Created By',
+  creator: 'Submitter Name',
   updated_at: 'Last Updated',
 }
 
@@ -297,6 +298,9 @@ function toggleRow(id) {
               </button>
               <button v-if="canHistoryAction" type="button" class="rounded p-1 text-purple-600 hover:bg-purple-50" title="History" @click="$emit('viewHistory', row)">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              </button>
+              <button v-if="canDeleteAction" type="button" class="rounded p-1 text-red-600 hover:bg-red-50" title="Delete" @click="$emit('delete', row)">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" /></svg>
               </button>
             </div>
           </td>

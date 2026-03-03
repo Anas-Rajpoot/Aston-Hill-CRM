@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import specialRequestsApi from '@/services/specialRequestsApi'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import TruncatedText from '@/components/TruncatedText.vue'
+import { formatSystemDateTime } from '@/lib/dateFormat'
 
 const route = useRoute()
 const router = useRouter()
@@ -29,15 +30,7 @@ function displayVal(val) {
 }
 
 function formatDateTime(d) {
-  if (!d) return '—'
-  const date = new Date(d)
-  if (Number.isNaN(date.getTime())) return '—'
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = MONTH_NAMES[date.getMonth()]
-  const year = date.getFullYear()
-  const h = String(date.getHours()).padStart(2, '0')
-  const m = String(date.getMinutes()).padStart(2, '0')
-  return `${day}-${month}-${year} ${h}:${m}`
+  return formatSystemDateTime(d, '—')
 }
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -47,15 +40,7 @@ function formatAuditSingleValue(val) {
   if (val == null || val === '') return null
   const s = String(val)
   if (DATE_PATTERN.test(s)) {
-    const date = new Date(s)
-    if (!Number.isNaN(date.getTime())) {
-      const day = String(date.getDate()).padStart(2, '0')
-      const mon = MONTH_NAMES[date.getMonth()]
-      const year = date.getFullYear()
-      const h = String(date.getHours()).padStart(2, '0')
-      const m = String(date.getMinutes()).padStart(2, '0')
-      return `${day}-${mon}-${year} ${h}:${m}`
-    }
+    return formatSystemDateTime(s, s)
   }
   return s
 }

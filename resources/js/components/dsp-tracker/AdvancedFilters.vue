@@ -63,11 +63,11 @@ const emit = defineEmits(['apply', 'reset'])
         </div>
         <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Appointment Date From</label>
-          <DateInputDdMmYyyy v-model="filters.appointment_date_from" placeholder="dd-Mon-yyyy" :disabled="loading" />
+          <DateInputDdMmYyyy v-model="filters.appointment_date_from" placeholder="DD-MMM-YYYY" :disabled="loading" />
         </div>
         <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Appointment Date To</label>
-          <DateInputDdMmYyyy v-model="filters.appointment_date_to" placeholder="dd-Mon-yyyy" :disabled="loading" />
+          <DateInputDdMmYyyy v-model="filters.appointment_date_to" placeholder="DD-MMM-YYYY" :disabled="loading" />
         </div>
         <div>
           <label class="mb-1 block text-xs font-medium text-gray-600">Product</label>
