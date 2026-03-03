@@ -15,6 +15,10 @@ Route::get('favicon.ico', fn () => response()->file(public_path('favicon.ico'), 
 Route::get('/', $spa);
 
 Route::get('/dashboard', $spa)->name('dashboard');
+Route::get('/login', $spa)->name('login');
+Route::get('/register', $spa)->name('register');
+Route::get('/forgot-password', $spa)->name('password.request');
+Route::get('/reset-password/{token}', $spa)->name('password.reset');
 
 Route::get('/permissions', $spa)->name('app.permissions');
 

@@ -5,6 +5,12 @@ import Dashboard from '@/pages/Dashboard.vue'
 import PlaceholderPage from '@/pages/PlaceholderPage.vue'
 import UserShow from '@/pages/users/UserShow.vue'
 import UserEdit from '@/pages/users/UserEdit.vue'
+import LoginPage from '@/pages/auth/Login.vue'
+import RegisterPage from '@/pages/auth/Register.vue'
+import ForgotPasswordPage from '@/pages/auth/ForgotPassword.vue'
+import ResetPasswordPage from '@/pages/auth/ResetPassword.vue'
+import TwoFactorVerifyPage from '@/pages/auth/TwoFactorVerify.vue'
+import ChangePasswordPage from '@/pages/auth/ChangePassword.vue'
 import { useAuthStore } from '@/stores/auth'
 import { canAccessRoute } from '@/lib/accessControl'
 
@@ -12,12 +18,12 @@ import { canAccessRoute } from '@/lib/accessControl'
 const ph = (title) => ({ component: PlaceholderPage, props: { title } })
 
 const authRoutes = [
-  { path: '/login', name: 'login', component: () => import('@/pages/auth/Login.vue') },
-  { path: '/register', name: 'register', component: () => import('@/pages/auth/Register.vue') },
-  { path: '/forgot-password', name: 'forgot-password', component: () => import('@/pages/auth/ForgotPassword.vue') },
-  { path: '/reset-password/:token', name: 'reset-password', component: () => import('@/pages/auth/ResetPassword.vue') },
-  { path: '/2fa/verify', name: '2fa-verify', component: () => import('@/pages/auth/TwoFactorVerify.vue') },
-  { path: '/change-password', name: 'change-password', component: () => import('@/pages/auth/ChangePassword.vue') },
+  { path: '/login', name: 'login', component: LoginPage },
+  { path: '/register', name: 'register', component: RegisterPage },
+  { path: '/forgot-password', name: 'forgot-password', component: ForgotPasswordPage },
+  { path: '/reset-password/:token', name: 'reset-password', component: ResetPasswordPage },
+  { path: '/2fa/verify', name: '2fa-verify', component: TwoFactorVerifyPage },
+  { path: '/change-password', name: 'change-password', component: ChangePasswordPage },
 ]
 
 const routes = [
@@ -126,6 +132,13 @@ const router = createRouter({
 const authPaths = ['/login', '/register', '/forgot-password', '/2fa/verify', '/change-password']
 const isAuthPath = (path) => authPaths.includes(path) || path.startsWith('/reset-password')
 
+function withTimeout(promise, ms = 3000) {
+  return Promise.race([
+    promise,
+    new Promise((resolve) => setTimeout(resolve, ms)),
+  ])
+}
+
 // Note: In-flight API requests are cancelled by composables (e.g. useUserEditData) via AbortController in onUnmounted when navigating away.
 
 router.beforeEach(async (to, from, next) => {
@@ -137,17 +150,33 @@ router.beforeEach(async (to, from, next) => {
     return next()
   }
 
+  // Allow auth pages to render immediately; never block UI on bootstrap APIs.
+  // If already authenticated, move away from login/register screens.
+  if (authPath && to.path !== '/change-password') {
+    if (auth.isAuthenticated) return next('/')
+    auth.fetchUser()
+      .then(() => {
+        if (auth.isAuthenticated && router.currentRoute.value.path === to.path) {
+          router.replace('/')
+        }
+      })
+      .catch(() => {})
+    return next()
+  }
+
   // Allow /change-password for authenticated users who must change their password
   if (to.path === '/change-password') {
     if (!auth.user && !auth.isAuthenticated) {
-      await auth.fetchUser()
+      await withTimeout(auth.fetchUser(), 3000)
     }
     // If not authenticated at all, go to login
     if (!auth.isAuthenticated) return next('/login')
     return next()
   }
 
-  if (!auth.user || !auth.user.pending2FA) await auth.fetchUser()
+  if (!auth.user || !auth.user.pending2FA) {
+    await withTimeout(auth.fetchUser(), 3000)
+  }
 
   if (authPath && auth.isAuthenticated) {
     return next('/')
@@ -174,6 +203,21 @@ router.beforeEach(async (to, from, next) => {
   }
 
   next()
+})
+
+// Recover from occasional chunk-load/startup race by reloading once.
+router.onError((err) => {
+  const msg = String(err?.message || '')
+  if (/Loading chunk \d+ failed|Failed to fetch dynamically imported module|Importing a module script failed/i.test(msg)) {
+    const key = '__router_chunk_retry__'
+    const retried = sessionStorage.getItem(key) === '1'
+    if (!retried) {
+      sessionStorage.setItem(key, '1')
+      window.location.reload()
+      return
+    }
+    sessionStorage.removeItem(key)
+  }
 })
 
 export default router

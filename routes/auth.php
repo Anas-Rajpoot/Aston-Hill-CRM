@@ -12,12 +12,6 @@ use App\Http\Controllers\Auth\VerifyEmailController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
-    // Serve Vue SPA for auth pages (no sidebar, topbar, footer)
-    Route::get('register', fn () => view('layouts.app'))->name('register');
-    Route::get('login', fn () => view('layouts.app'))->name('login');
-    Route::get('forgot-password', fn () => view('layouts.app'))->name('password.request');
-    Route::get('reset-password/{token}', fn () => view('layouts.app'))->name('password.reset');
-
     Route::post('register', [RegisteredUserController::class, 'store']);
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
     Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])

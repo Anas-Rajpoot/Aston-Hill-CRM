@@ -27,11 +27,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
         // Minimal stack for SPA document requests: no auth, no CSRF, no BreadcrumbTrail. Auth deferred to Vue + API.
+        // IMPORTANT: keep this stack DB-independent so /, /login, /register always render even if DB is down/slow.
         $middleware->group('spa_shell', [
-            \App\Http\Middleware\ApplySecuritySettings::class,
-            \Illuminate\Cookie\Middleware\EncryptCookies::class,
-            \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
-            \Illuminate\Session\Middleware\StartSession::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ]);
         $middleware->alias([

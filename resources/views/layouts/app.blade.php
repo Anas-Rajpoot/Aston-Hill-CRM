@@ -3,7 +3,7 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="csrf-token" content="{{ csrf_token() }}">
+        <meta name="csrf-token" content="">
 
         <title>{{ config('app.name', 'Aston Hill') }}</title>
 
@@ -19,7 +19,36 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="font-sans antialiased">
-        <div id="app"></div>
+        <div id="app">
+            @if (request()->is('login'))
+                <div id="boot-fallback" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f3f4f6;padding:16px;">
+                    <div style="width:100%;max-width:420px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 10px 15px -3px rgba(0,0,0,.1),0 4px 6px -4px rgba(0,0,0,.1);padding:24px;">
+                        <h1 style="margin:0 0 8px 0;font-size:22px;font-weight:600;color:#111827;">Sign in</h1>
+                        <p style="margin:0 0 16px 0;font-size:14px;color:#4b5563;">Fallback login is shown because app initialization is delayed.</p>
+                        @if (session('status'))
+                            <div style="margin-bottom:12px;padding:10px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:8px;color:#1d4ed8;font-size:13px;">
+                                {{ session('status') }}
+                            </div>
+                        @endif
+                        @if (isset($errors) && $errors->any())
+                            <div style="margin-bottom:12px;padding:10px;border:1px solid #fecaca;background:#fef2f2;border-radius:8px;color:#b91c1c;font-size:13px;">
+                                {{ $errors->first() }}
+                            </div>
+                        @endif
+                        <form method="POST" action="{{ route('login') }}">
+                            @csrf
+                            <label for="fallback_email" style="display:block;margin-bottom:6px;font-size:13px;color:#374151;">Email</label>
+                            <input id="fallback_email" type="email" name="email" value="{{ old('email') }}" required autocomplete="username" style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:10px 12px;margin-bottom:12px;outline:none;" />
+                            <label for="fallback_password" style="display:block;margin-bottom:6px;font-size:13px;color:#374151;">Password</label>
+                            <input id="fallback_password" type="password" name="password" required autocomplete="current-password" style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:10px 12px;margin-bottom:16px;outline:none;" />
+                            <button type="submit" style="width:100%;border:0;border-radius:8px;padding:10px 12px;background:#16a34a;color:#fff;font-weight:600;cursor:pointer;">
+                                Sign in
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            @endif
+        </div>
 
 <script>
 (function () {
@@ -55,7 +84,7 @@ function markNotificationRead(id) {
     fetch(`/notifications/${id}/read`, {
         method: 'POST',
         headers: {
-            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+            'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''),
             'Accept': 'application/json'
         }
     }).then(() => {

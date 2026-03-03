@@ -6,6 +6,19 @@ import path from 'path'
 export default defineConfig({
     server: {
         host: '127.0.0.1', // Match Laravel origin; avoid [::1] vs 127.0.0.1 mismatch
+        port: 5173,
+        strictPort: true,
+        // Allow Laravel app origin to load Vite dev scripts without CORS mismatch.
+        cors: {
+            origin: ['http://127.0.0.1:8000', 'http://localhost:8000'],
+        },
+        hmr: {
+            host: '127.0.0.1',
+            protocol: 'ws',
+            port: 5173,
+            clientPort: 5173,
+            timeout: 20000,
+        },
     },
     plugins: [
         laravel({
