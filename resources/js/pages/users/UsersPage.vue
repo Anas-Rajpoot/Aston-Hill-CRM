@@ -1097,15 +1097,22 @@ watch(editUserRolesDropdownOpen, (open) => {
     </div>
 
     <!-- Table: sortable + editable -->
-    <div class="relative overflow-x-auto">
-      <div v-if="loading" class="flex justify-center items-center py-16">
-        <svg class="animate-spin h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-        </svg>
+    <div class="relative overflow-x-auto overflow-hidden rounded-lg border-2 border-black bg-white shadow-sm">
+      <div
+        v-if="loading"
+        class="absolute inset-0 z-10 flex items-center justify-center bg-white/80"
+        aria-live="polite"
+        aria-busy="true"
+      >
+        <div class="flex flex-col items-center gap-2">
+          <svg class="h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
+          <span class="text-sm font-medium text-gray-600">Updating...</span>
+        </div>
       </div>
-      <div v-else>
-        <table class="min-w-full border-2 border-black border-collapse">
+      <table class="min-w-full border-collapse">
           <thead>
             <tr class="border-b-2 border-black bg-green-600">
               <th class="w-10 px-4 py-3">
@@ -1120,7 +1127,6 @@ watch(editUserRolesDropdownOpen, (open) => {
                 v-for="col in visibleColumns"
                 :key="col"
                 class="whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-white cursor-pointer"
-                :class="{ 'bg-green-700': sort === col }"
                 @click="toggleSort(col)"
               >
                 <span class="inline-flex items-center gap-1">
@@ -1128,10 +1134,13 @@ watch(editUserRolesDropdownOpen, (open) => {
                   <span v-if="sort === col" class="text-white">{{ order === 'asc' ? '↑' : '↓' }}</span>
                 </span>
               </th>
-              <th class="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold text-white">Actions</th>
+              <th class="whitespace-nowrap px-4 py-3 text-center text-sm font-semibold text-white">Actions</th>
             </tr>
           </thead>
           <tbody class="bg-white">
+            <tr v-if="!loading && users.length === 0" class="border-b border-black">
+              <td :colspan="visibleColumns.length + 2" class="px-4 py-12 text-center text-sm text-gray-500">No users found.</td>
+            </tr>
             <tr v-for="(user, rowIndex) in users" :key="user.id" class="border-b border-black bg-white hover:bg-gray-50/50">
               <td class="px-4 py-3">
                 <input
@@ -1203,80 +1212,56 @@ watch(editUserRolesDropdownOpen, (open) => {
                   <span v-else class="text-sm text-gray-700" :class="{ 'whitespace-nowrap': col === 'last_login_at' }">{{ displayCellValue(user, col) }}</span>
                 </template>
               </td>
-              <td class="px-4 py-3 text-right align-top">
-                <div class="relative inline-block text-left">
+              <td class="whitespace-nowrap px-4 py-3 text-center">
+                <div class="inline-flex items-center justify-center gap-1">
                   <button
                     type="button"
-                    @click.stop="toggleActionMenu(user.id)"
-                    class="p-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
-                    aria-haspopup="true"
-                    :aria-expanded="actionMenuOpen === user.id"
+                    class="rounded-full p-1.5 text-blue-600 hover:bg-blue-50"
+                    title="View details"
+                    @click="openUserDetail(user)"
                   >
-                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                     </svg>
                   </button>
-                  <div
-                    v-if="actionMenuOpen === user.id"
-                    class="absolute right-0 top-full z-[100] mt-1 min-w-[11rem] rounded-lg border border-gray-200 bg-white py-1.5 shadow-xl"
-                    @click.stop
+                  <button
+                    v-if="canEditRow(user)"
+                    type="button"
+                    class="rounded-full p-1.5 text-green-600 hover:bg-green-50"
+                    title="Edit Submission"
+                    @click="openEditUserModal(user)"
                   >
-                    <button
-                      type="button"
-                      class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                      @click="openUserDetail(user)"
-                    >
-                      <svg class="h-4 w-4 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                      View Details
-                    </button>
-                    <button
-                      v-if="canEditRow(user)"
-                      type="button"
-                      class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                      @click="openEditUserModal(user)"
-                    >
-                      <svg class="h-4 w-4 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                      </svg>
-                      Edit Employee
-                    </button>
-                    <button
-                      v-if="canEditRow(user) && !(user.roles || []).includes('superadmin')"
-                      type="button"
-                      class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
-                      @click="openDeactivateModal(user)"
-                    >
-                      <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-500 text-white">
-                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </span>
-                      Deactivate
-                    </button>
-                    <button
-                      v-if="canEditRow(user)"
-                      type="button"
-                      class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                      @click="openResetPasswordModal(user)"
-                    >
-                      <svg class="h-4 w-4 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                      </svg>
-                      Reset Password
-                    </button>
-                  </div>
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded-full p-1.5 text-amber-600 hover:bg-amber-50"
+                    title="View History"
+                    @click="openHistory(user.id)"
+                  >
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </button>
+                  <button
+                    v-if="canEditRow(user) && !(user.roles || []).includes('superadmin')"
+                    type="button"
+                    class="rounded-full p-1.5 text-red-600 hover:bg-red-50"
+                    title="Delete"
+                    @click="openDeactivateModal(user)"
+                  >
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+                    </svg>
+                  </button>
                 </div>
               </td>
             </tr>
-            <tr v-if="!loading && users.length === 0" class="border-b border-black">
-              <td :colspan="visibleColumns.length + 2" class="px-4 py-12 text-center text-sm text-gray-500">No users found.</td>
-            </tr>
           </tbody>
         </table>
-      </div>
 
       <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
         <p class="text-sm text-gray-600">

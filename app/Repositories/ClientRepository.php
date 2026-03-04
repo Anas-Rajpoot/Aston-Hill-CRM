@@ -2,7 +2,7 @@
 
 namespace App\Repositories;
 
-use Illuminate\Pagination\CursorPaginator;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
 class ClientRepository
@@ -13,12 +13,13 @@ class ClientRepository
      * @param  array<string,mixed>  $params
      * @param  array<int,string>  $columns
      */
-    public function list(array $params, array $columns = []): CursorPaginator
+    public function list(array $params, array $columns = []): LengthAwarePaginator
     {
         $this->applyQueryTimeoutGuard();
 
         $perPage = (int) ($params['per_page'] ?? 20);
         $perPage = max(1, min($perPage, 50));
+        $page = max(1, (int) ($params['page'] ?? 1));
         $sort = (string) ($params['sort'] ?? 'submitted_at');
         $order = strtolower((string) ($params['order'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
 
@@ -40,12 +41,12 @@ class ClientRepository
         } else {
             $query->orderBy($sortColumn, $order);
         }
-        // Stable secondary sort for cursor pagination.
+        // Stable secondary sort for deterministic pagination.
         if ($sortColumn !== 'c.id') {
             $query->orderBy('c.id', 'desc');
         }
 
-        return $query->cursorPaginate($perPage);
+        return $query->paginate($perPage, ['*'], 'page', $page);
     }
 
     /**
@@ -56,8 +57,10 @@ class ClientRepository
     {
         $default = [
             'c.id',
+            'c.activity',
             'c.company_name',
             'c.account_number',
+            'c.wo_number',
             'c.status',
             'c.submitted_at',
             'c.activation_date',
@@ -72,7 +75,11 @@ class ClientRepository
             'c.contract_type',
             'c.clawback_chum',
             'c.remarks',
+            'c.additional_notes',
             'c.mrc',
+            'c.quantity',
+            'c.other',
+            'c.migration_numbers',
             'c.created_at',
             'm.name as manager',
             'tl.name as team_leader',
@@ -91,8 +98,10 @@ class ClientRepository
 
         $map = [
             'id' => 'c.id',
+            'activity' => 'c.activity',
             'company_name' => 'c.company_name',
             'account_number' => 'c.account_number',
+            'wo_number' => 'c.wo_number',
             'status' => 'c.status',
             'submitted_at' => 'c.submitted_at',
             'activation_date' => 'c.activation_date',
@@ -107,7 +116,11 @@ class ClientRepository
             'contract_type' => 'c.contract_type',
             'clawback_chum' => 'c.clawback_chum',
             'remarks' => 'c.remarks',
+            'additional_notes' => 'c.additional_notes',
             'mrc' => 'c.mrc',
+            'quantity' => 'c.quantity',
+            'other' => 'c.other',
+            'migration_numbers' => 'c.migration_numbers',
             'manager' => 'm.name as manager',
             'team_leader' => 'tl.name as team_leader',
             'sales_agent' => 'sa.name as sales_agent',
@@ -138,12 +151,17 @@ class ClientRepository
         $prefixLike = static function ($value): string {
             return addcslashes((string) $value, '%_\\') . '%';
         };
+        $containsLike = static function ($value): string {
+            return '%' . addcslashes((string) $value, '%_\\') . '%';
+        };
         $dayStart = static fn (string $date): string => $date . ' 00:00:00';
         $dayEnd = static fn (string $date): string => $date . ' 23:59:59';
 
         $query->when(! empty($params['status']), fn ($q) => $q->where('c.status', (string) $params['status']))
+            ->when(! empty($params['activity']), fn ($q) => $q->where('c.activity', 'like', $containsLike($params['activity'])))
             ->when(! empty($params['company_name']), fn ($q) => $q->where('c.company_name', 'like', $prefixLike($params['company_name'])))
             ->when(! empty($params['account_number']), fn ($q) => $q->where('c.account_number', 'like', $prefixLike($params['account_number'])))
+            ->when(! empty($params['wo_number']), fn ($q) => $q->where('c.wo_number', 'like', $containsLike($params['wo_number'])))
             ->when(! empty($params['manager_id']), fn ($q) => $q->where('c.manager_id', (int) $params['manager_id']))
             ->when(! empty($params['team_leader_id']), fn ($q) => $q->where('c.team_leader_id', (int) $params['team_leader_id']))
             ->when(! empty($params['sales_agent_id']), fn ($q) => $q->where('c.sales_agent_id', (int) $params['sales_agent_id']))
@@ -151,7 +169,13 @@ class ClientRepository
             ->when(! empty($params['service_type']), fn ($q) => $q->where('c.service_type', 'like', $prefixLike($params['service_type'])))
             ->when(! empty($params['product_type']), fn ($q) => $q->where('c.product_type', 'like', $prefixLike($params['product_type'])))
             ->when(! empty($params['product_name']), fn ($q) => $q->where('c.product_name', 'like', $prefixLike($params['product_name'])))
-            ->when(! empty($params['work_order_status']), fn ($q) => $q->where('c.work_order_status', 'like', $prefixLike($params['work_order_status'])))
+            ->when(! empty($params['work_order_status']), function ($q) use ($params, $containsLike) {
+                $term = $containsLike($params['work_order_status']);
+                $q->where(function ($inner) use ($term) {
+                    $inner->where('c.work_order_status', 'like', $term)
+                        ->orWhere('c.status', 'like', $term);
+                });
+            })
             ->when(! empty($params['payment_connection']), fn ($q) => $q->where('c.payment_connection', 'like', $prefixLike($params['payment_connection'])))
             ->when(! empty($params['contract_type']), fn ($q) => $q->where('c.contract_type', 'like', $prefixLike($params['contract_type'])))
             ->when(! empty($params['submitted_from']), fn ($q) => $q->where('c.submitted_at', '>=', $dayStart((string) $params['submitted_from'])))
@@ -187,7 +211,7 @@ class ClientRepository
             'sales_agent' => ['sa.name', false],
             'creator' => ['cr.name', false],
             'company_category' => ['cd.company_category', false],
-            default => [in_array($sort, ['id', 'company_name', 'account_number', 'status', 'submitted_at', 'activation_date', 'completion_date', 'contract_end_date', 'service_category', 'service_type', 'product_type', 'product_name', 'work_order_status', 'payment_connection', 'contract_type', 'created_at'], true) ? 'c.' . $sort : 'c.submitted_at', false],
+            default => [in_array($sort, ['id', 'activity', 'company_name', 'account_number', 'wo_number', 'status', 'submitted_at', 'activation_date', 'completion_date', 'contract_end_date', 'service_category', 'service_type', 'product_type', 'product_name', 'work_order_status', 'payment_connection', 'contract_type', 'additional_notes', 'created_at'], true) ? 'c.' . $sort : 'c.submitted_at', false],
         };
     }
 

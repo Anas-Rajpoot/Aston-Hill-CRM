@@ -87,9 +87,6 @@ const allSelected = computed({
 /* ───── Delete modal ───── */
 const deleteModal = ref({ visible: false, team: null, loading: false })
 
-/* ───── Action menu ───── */
-const actionMenuOpen = ref(null)
-
 /* ───── Computed ───── */
 const activeColumns = computed(() =>
   visibleColumns.value.map((key) => ({
@@ -246,7 +243,6 @@ async function bulkDeleteSelected() {
 /* ───── Single Delete ───── */
 function confirmDelete(team) {
   deleteModal.value = { visible: true, team, loading: false }
-  actionMenuOpen.value = null
 }
 
 async function executeDelete() {
@@ -442,54 +438,56 @@ onMounted(async () => {
 
     <!-- Table -->
     <div class="rounded-xl border-2 border-black bg-white shadow-sm overflow-hidden">
-      <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-gray-200 bg-gray-50">
-        <h2 class="text-sm font-semibold text-gray-700">
-          Showing <span class="text-green-700">{{ tableMeta.total }}</span> teams
-        </h2>
-      </div>
-
-      <div class="overflow-x-auto">
-        <table class="min-w-full">
-          <thead class="bg-gray-50 border-b-2 border-black">
-            <tr>
-              <th v-if="hasSelectionColumn" class="w-10 px-3 py-3">
+      <div class="relative overflow-x-auto">
+        <div
+          v-if="tableLoading"
+          class="absolute inset-0 z-10 flex items-center justify-center bg-white/80"
+          aria-live="polite"
+          aria-busy="true"
+        >
+          <div class="flex flex-col items-center gap-2">
+            <svg class="h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            <span class="text-sm font-medium text-gray-600">Updating...</span>
+          </div>
+        </div>
+        <table class="min-w-full border-2 border-black border-collapse">
+          <thead>
+            <tr class="border-b-2 border-black bg-green-600">
+              <th v-if="hasSelectionColumn" class="w-10 px-3 py-3 text-left">
                 <input type="checkbox" v-model="allSelected" class="rounded border-gray-300 text-green-600 focus:ring-green-500" />
               </th>
               <th
                 v-for="col in activeColumns"
                 :key="col.key"
-                class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 transition-colors"
+                class="whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-white cursor-pointer select-none"
                 @click="onSort(col.key)"
               >
                 <div class="flex items-center gap-1">
                   <span>{{ col.label }}</span>
-                  <span v-if="sort === col.key" class="text-green-600">
+                  <span v-if="sort === col.key" class="text-white">
                     <svg v-if="order === 'asc'" class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
                     <svg v-else class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                   </span>
-                  <span v-else class="text-gray-300">
+                  <span v-else class="text-white/70">
                     <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
                   </span>
                 </div>
               </th>
-              <th v-if="hasAnyRowAction" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Actions</th>
+              <th v-if="hasAnyRowAction" class="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold text-white w-28">Actions</th>
             </tr>
           </thead>
           <tbody class="bg-white">
-            <tr v-if="tableLoading" class="border-b border-black">
-              <td :colspan="activeColumns.length + (hasSelectionColumn ? 1 : 0) + (hasAnyRowAction ? 1 : 0)" class="px-4 py-12 text-center">
-                <svg class="mx-auto h-6 w-6 animate-spin text-gray-400 mb-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
-                <p class="text-sm text-gray-400">Loading teams…</p>
-              </td>
+            <tr v-if="!tableData.length" class="border-b border-black">
+              <td :colspan="activeColumns.length + (hasSelectionColumn ? 1 : 0) + (hasAnyRowAction ? 1 : 0)" class="px-4 py-12 text-center text-sm text-gray-500">No teams found.</td>
             </tr>
-            <tr v-else-if="!tableData.length" class="border-b border-black">
-              <td :colspan="activeColumns.length + (hasSelectionColumn ? 1 : 0) + (hasAnyRowAction ? 1 : 0)" class="px-4 py-12 text-center text-sm text-gray-400">No teams found</td>
-            </tr>
-            <tr v-else v-for="(row, rowIndex) in tableData" :key="row.id" class="border-b border-black hover:bg-gray-50 transition-colors">
-              <td v-if="hasSelectionColumn" class="w-10 px-3 py-2.5">
+            <tr v-for="(row, rowIndex) in tableData" :key="row.id" class="border-b border-black bg-white hover:bg-gray-50/50">
+              <td v-if="hasSelectionColumn" class="w-10 px-3 py-3">
                 <input type="checkbox" :value="row.id" v-model="selectedIds" class="rounded border-gray-300 text-green-600 focus:ring-green-500" />
               </td>
-              <td v-for="col in activeColumns" :key="col.key" class="px-4 py-2.5 text-sm whitespace-nowrap">
+              <td v-for="col in activeColumns" :key="col.key" class="whitespace-nowrap px-4 py-3 text-sm text-gray-900">
                 <template v-if="col.key === 'sr'">
                   <span class="text-gray-700">{{ ((tableMeta.current_page - 1) * tableMeta.per_page) + rowIndex + 1 }}</span>
                 </template>
@@ -535,29 +533,40 @@ onMounted(async () => {
               </td>
 
               <!-- Actions column -->
-              <td v-if="hasAnyRowAction" class="px-4 py-2.5 text-right relative">
-                <div class="relative inline-block">
-                  <button type="button" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100" @click="actionMenuOpen = actionMenuOpen === row.id ? null : row.id">
-                    <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="4" r="2" /><circle cx="10" cy="10" r="2" /><circle cx="10" cy="16" r="2" /></svg>
+              <td v-if="hasAnyRowAction" class="whitespace-nowrap px-4 py-3 text-right">
+                <div class="inline-flex items-center justify-end gap-1">
+                  <router-link
+                    v-if="canViewAction"
+                    :to="`/teams/${row.id}`"
+                    class="rounded-full p-1.5 text-blue-600 hover:bg-blue-50"
+                    title="View details"
+                  >
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  </router-link>
+                  <router-link
+                    v-if="canEdit"
+                    :to="`/teams/${row.id}/edit`"
+                    class="rounded-full p-1.5 text-green-600 hover:bg-green-50"
+                    title="Edit team"
+                  >
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                  </router-link>
+                  <button
+                    v-if="canDelete"
+                    type="button"
+                    class="rounded-full p-1.5 text-red-600 hover:bg-red-50"
+                    title="Delete team"
+                    @click="confirmDelete(row)"
+                  >
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+                    </svg>
                   </button>
-                  <Transition enter-active-class="transition ease-out duration-100" enter-from-class="opacity-0 scale-95" enter-to-class="opacity-100 scale-100" leave-active-class="transition ease-in duration-75" leave-from-class="opacity-100 scale-100" leave-to-class="opacity-0 scale-95">
-                    <div v-if="actionMenuOpen === row.id" class="absolute right-0 top-full mt-1 z-30 w-44 rounded-lg border border-gray-200 bg-white shadow-lg py-1" @mouseleave="actionMenuOpen = null">
-                      <router-link v-if="canViewAction" :to="`/teams/${row.id}`" class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                        <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                        View Details
-                      </router-link>
-                      <router-link v-if="canEdit" :to="`/teams/${row.id}/edit`" class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                        <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                        Edit Team
-                      </router-link>
-                      <div v-if="canDelete" class="border-t border-gray-100 mt-1 pt-1">
-                        <button type="button" class="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50" @click="confirmDelete(row)">
-                          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                          Delete Team
-                        </button>
-                      </div>
-                    </div>
-                  </Transition>
                 </div>
               </td>
             </tr>

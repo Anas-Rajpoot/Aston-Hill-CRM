@@ -190,23 +190,23 @@ function onDelete(row) {
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
-        <span class="text-sm font-medium text-gray-600">Loading...</span>
+        <span class="text-sm font-medium text-gray-600">Updating...</span>
       </div>
     </div>
 
     <table class="min-w-full border-2 border-black border-collapse bg-white">
       <thead>
-        <tr class="border-b-2 border-black bg-sky-50">
+        <tr class="border-b-2 border-black bg-green-600">
           <th
             v-for="col in orderedColumns"
             :key="col"
             scope="col"
-            class="whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-gray-800"
+            class="whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-white"
           >
             <button
               v-if="sortable(col)"
               type="button"
-              class="inline-flex items-center gap-1 font-semibold text-gray-800 hover:text-gray-600"
+              class="inline-flex items-center gap-1 font-semibold text-white hover:text-white/90"
               @click="toggleSort(col)"
             >
               {{ label(col) }}
@@ -214,9 +214,9 @@ function onDelete(row) {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
               </svg>
             </button>
-            <span v-else class="font-semibold text-gray-800">{{ label(col) }}</span>
+            <span v-else class="font-semibold text-white">{{ label(col) }}</span>
           </th>
-          <th v-if="hasAnyRowAction" scope="col" class="whitespace-nowrap px-4 py-3 text-center text-sm font-semibold text-gray-800 bg-sky-50">Actions</th>
+          <th v-if="hasAnyRowAction" scope="col" class="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold text-white">Actions</th>
         </tr>
       </thead>
       <tbody class="bg-white">
@@ -226,7 +226,7 @@ function onDelete(row) {
         <tr
           v-for="row in data"
           :key="row.id"
-          class="border-b border-black bg-white hover:bg-gray-50/30"
+          class="border-b border-black bg-white hover:bg-gray-50/50"
         >
           <td
             v-for="col in orderedColumns"
@@ -397,13 +397,13 @@ function onDelete(row) {
               <span :title="isEditable(col) ? 'Double-click to edit' : undefined">{{ formatValue(row, col) }}</span>
             </template>
           </td>
-          <td v-if="hasAnyRowAction" class="whitespace-nowrap px-4 py-3 text-center">
-            <div class="inline-flex items-center gap-1">
+          <td v-if="hasAnyRowAction" class="whitespace-nowrap px-4 py-3 text-right">
+            <div class="inline-flex items-center justify-end gap-1">
               <button
                 v-if="effectiveCanView"
                 type="button"
-                class="rounded p-1.5 text-blue-600 hover:bg-blue-50"
-                title="View"
+                class="rounded-full p-1.5 text-blue-600 hover:bg-blue-50"
+                title="View details"
                 @click.stop="goToView(row)"
               >
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -414,8 +414,8 @@ function onDelete(row) {
               <button
                 v-if="effectiveCanEdit"
                 type="button"
-                class="rounded p-1.5 text-green-600 hover:bg-green-50"
-                title="Edit (open edit form)"
+                class="rounded-full p-1.5 text-green-600 hover:bg-green-50"
+                title="Edit Submission"
                 @click.stop="openEditModal(row)"
               >
                   <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -425,7 +425,7 @@ function onDelete(row) {
                 <button
                   v-if="effectiveCanHistory"
                   type="button"
-                  class="rounded p-1.5 text-amber-600 hover:bg-amber-50"
+                  class="rounded-full p-1.5 text-amber-600 hover:bg-amber-50"
                   title="View History"
                   @click.stop="goToViewHistory(row)"
                 >
@@ -436,7 +436,7 @@ function onDelete(row) {
                 <button
                   v-if="effectiveCanDelete"
                   type="button"
-                  class="rounded p-1.5 text-red-600 hover:bg-red-50"
+                  class="rounded-full p-1.5 text-red-600 hover:bg-red-50"
                   title="Delete"
                   @click.stop="onDelete(row)"
                 >

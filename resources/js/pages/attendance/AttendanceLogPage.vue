@@ -8,12 +8,13 @@ import { ref, computed, onMounted } from 'vue'
 import { useTablePageSize } from '@/composables/useTablePageSize'
 import attendanceLogApi from '@/services/attendanceLogApi'
 import { useAuthStore } from '@/stores/auth'
-import { toDdMmYyyy, fromDdMmYyyy, toDdMonYyyyDash } from '@/lib/dateFormat'
+import { toDdMonYyyyDash } from '@/lib/dateFormat'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import FiltersBar from '@/components/attendance/FiltersBar.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import Toast from '@/components/Toast.vue'
 import { canModuleAction } from '@/lib/accessControl'
+import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
 
 const auth = useAuthStore()
 const canView = computed(() =>
@@ -217,15 +218,6 @@ function formatLoginDateDisplay(str) {
   const day = String(d.getDate()).padStart(2, '0')
   return toDdMonYyyyDash(`${y}-${m}-${day}`) || '—'
 }
-
-const fromDisplay = computed({
-  get: () => toDdMmYyyy(filters.value.from),
-  set: (v) => { filters.value.from = fromDdMmYyyy(v) || '' },
-})
-const toDisplay = computed({
-  get: () => toDdMmYyyy(filters.value.to),
-  set: (v) => { filters.value.to = fromDdMmYyyy(v) || '' },
-})
 
 function openForceLogoutConfirm(row) {
   if (!canForceLogout.value || !row?.id) return
@@ -432,33 +424,28 @@ onMounted(() => {
         </FiltersBar>
 
         <div v-show="advancedVisible" class="rounded-lg border border-gray-200 bg-gray-50/50 p-4">
-          <h3 class="mb-3 text-sm font-medium text-gray-700">Advanced Filters</h3>
-          <div class="flex flex-wrap items-end gap-4">
-            <div>
+          <div class="grid grid-cols-1 gap-3 md:grid-cols-12 md:items-end">
+            <div class="md:col-span-4">
               <label class="block text-xs font-medium text-gray-600">From</label>
-              <input
-                v-model="fromDisplay"
-                type="text"
-                placeholder="dd-mm-yyyy"
-                class="mt-0.5 min-w-[120px] rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              <DateInputDdMmYyyy
+                v-model="filters.from"
+                placeholder="DD-MMM-YYYY"
                 :disabled="loading"
               />
             </div>
-            <div>
+            <div class="md:col-span-4">
               <label class="block text-xs font-medium text-gray-600">To</label>
-              <input
-                v-model="toDisplay"
-                type="text"
-                placeholder="dd-mm-yyyy"
-                class="mt-0.5 min-w-[120px] rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              <DateInputDdMmYyyy
+                v-model="filters.to"
+                placeholder="DD-MMM-YYYY"
                 :disabled="loading"
               />
             </div>
-            <div>
+            <div class="md:col-span-2">
               <label class="block text-xs font-medium text-gray-600">Status</label>
               <select
                 v-model="filters.status"
-                class="mt-0.5 min-w-[140px] rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
                 :disabled="loading"
               >
                 <option value="">All</option>
@@ -469,7 +456,7 @@ onMounted(() => {
             </div>
             <button
               type="button"
-              class="rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+              class="rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 md:col-span-1"
               :disabled="loading"
               @click="applyFilters"
             >
@@ -477,7 +464,7 @@ onMounted(() => {
             </button>
             <button
               type="button"
-              class="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              class="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 md:col-span-1"
               :disabled="loading"
               @click="resetFilters"
             >

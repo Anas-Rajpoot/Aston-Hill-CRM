@@ -319,7 +319,7 @@ onBeforeUnmount(() => {
             </button>
             <button
               type="button"
-              class="rounded bg-[#6BC100] px-4 py-2 text-sm font-medium text-white hover:bg-[#5da800] transition-colors"
+              class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
               @click="close"
             >
               Close

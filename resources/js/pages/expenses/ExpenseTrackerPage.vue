@@ -587,7 +587,7 @@ onMounted(() => {
         @reset="resetFilters"
       />
 
-      <div v-if="canView" class="overflow-hidden rounded-lg border-2 border-black bg-white shadow-sm">
+      <div v-if="canView" class="overflow-hidden rounded-xl border-2 border-black bg-white shadow-sm">
         <ExpenseTable
           :columns="visibleColumns"
           :data="expenses"

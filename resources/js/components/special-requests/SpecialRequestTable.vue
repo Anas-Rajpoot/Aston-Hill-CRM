@@ -191,7 +191,6 @@ function toggleRow(id) {
           <th class="w-10 border-b border-black px-3 py-2.5 text-center">
             <input type="checkbox" v-model="allSelected" class="rounded border-gray-300 text-green-600 focus:ring-green-500" />
           </th>
-          <th class="w-10 border-b border-black px-3 py-2.5 text-center text-xs font-semibold text-white uppercase">SR</th>
           <th
             v-for="col in columns"
             :key="col"
@@ -213,7 +212,7 @@ function toggleRow(id) {
       </thead>
       <tbody>
         <tr v-if="loading">
-          <td :colspan="columns.length + 2 + (hasAnyRowAction ? 1 : 0)" class="px-4 py-12 text-center">
+          <td :colspan="columns.length + 1 + (hasAnyRowAction ? 1 : 0)" class="px-4 py-12 text-center">
             <svg class="mx-auto h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -221,11 +220,11 @@ function toggleRow(id) {
           </td>
         </tr>
         <tr v-else-if="!data.length">
-          <td :colspan="columns.length + 2 + (hasAnyRowAction ? 1 : 0)" class="px-4 py-10 text-center text-sm text-gray-500">No special requests found.</td>
+          <td :colspan="columns.length + 1 + (hasAnyRowAction ? 1 : 0)" class="px-4 py-10 text-center text-sm text-gray-500">No special requests found.</td>
         </tr>
         <tr
           v-else
-          v-for="(row, idx) in data"
+          v-for="row in data"
           :key="row.id"
           class="group transition-colors hover:bg-gray-50"
           :class="{ 'bg-green-50/40': selectedIds.includes(row.id) }"
@@ -233,7 +232,6 @@ function toggleRow(id) {
           <td class="border-b border-gray-200 px-3 py-2 text-center">
             <input type="checkbox" :checked="selectedIds.includes(row.id)" @change="toggleRow(row.id)" class="rounded border-gray-300 text-green-600 focus:ring-green-500" />
           </td>
-          <td class="border-b border-gray-200 px-3 py-2 text-xs text-gray-500">{{ (currentPage - 1) * perPage + idx + 1 }}</td>
           <td
             v-for="col in columns"
             :key="col"

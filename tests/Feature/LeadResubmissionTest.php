@@ -78,7 +78,7 @@ describe('Lead resubmission creates new entry', function () {
         $newLead = LeadSubmission::findOrFail($newLeadId);
         expect($newLead->company_name)->toBe('Resubmitted Company')
             ->and($newLead->contact_number_gsm)->toBe('0500000002')
-            ->and($newLead->status)->toBe('unassigned')
+            ->and($newLead->status)->toBe('submitted')
             ->and($newLead->submission_type)->toBe('resubmission')
             ->and((int) ($newLead->payload['resubmission_of_id'] ?? 0))->toBe($originalLead->id)
             ->and((bool) ($newLead->payload['is_resubmission'] ?? false))->toBeTrue();

@@ -81,6 +81,7 @@ class ClientApiController extends Controller
             'order' => ['sometimes', 'string', Rule::in(['asc', 'desc'])],
             'columns' => ['sometimes', 'array'],
             'columns.*' => ['string', Rule::in(array_merge(self::ALLOWED_COLUMNS, ['manager', 'team_leader', 'sales_agent', 'creator']))],
+            'activity' => ['sometimes', 'nullable', 'string', 'max:200'],
             'company_name' => ['sometimes', 'nullable', 'string', 'max:200'],
             'account_number' => ['sometimes', 'nullable', 'string', 'max:100'],
             'wo_number' => ['sometimes', 'nullable', 'string', 'max:100'],
@@ -135,9 +136,13 @@ class ClientApiController extends Controller
                     'data' => $items,
                     'message' => 'Clients fetched successfully.',
                     'meta' => [
+                        'current_page' => $paginator->currentPage(),
+                        'last_page' => $paginator->lastPage(),
+                        'total' => $paginator->total(),
                         'per_page' => $paginator->perPage(),
-                        'next_cursor' => optional($paginator->nextCursor())->encode(),
-                        'prev_cursor' => optional($paginator->previousCursor())->encode(),
+                        // Keep compatibility keys expected by older clients.
+                        'next_cursor' => null,
+                        'prev_cursor' => null,
                         'has_more' => $paginator->hasMorePages(),
                     ],
                 ];
@@ -220,6 +225,7 @@ class ClientApiController extends Controller
 
         $applyLike($query, 'company_name', $validated['company_name'] ?? null);
         $applyLike($query, 'account_number', $validated['account_number'] ?? null);
+        $applyLike($query, 'activity', $validated['activity'] ?? null);
         $applyLike($query, 'wo_number', $validated['wo_number'] ?? null);
         $applyLike($query, 'submission_type', $validated['submission_type'] ?? null);
         $applyLike($query, 'service_category', $validated['service_category'] ?? null);

@@ -43,7 +43,7 @@ const canImport = computed(() => canModuleAction(authStore.user, 'all-clients', 
 const loading = ref(true)
 const clients = ref([])
 const TABLE_MODULE = 'all-clients'
-const perPageOptions = ref([10, 20, 25, 50, 100])
+const perPageOptions = ref([10, 20, 25, 50])
 const meta = ref({ current_page: 1, last_page: 1, per_page: authStore.defaultTablePageSize || 25, total: 0 })
 const allColumns = ref([])
 const defaultColumns = ref([])
@@ -128,11 +128,29 @@ const filters = ref({
   establishment_card_expiry_to: '',
 })
 
+const toPositiveInt = (value, fallback = 1) => {
+  const n = Number(value)
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback
+}
+
+function normalizeMeta(incoming) {
+  const current = meta.value || {}
+  const next = incoming || {}
+  return {
+    current_page: toPositiveInt(next.current_page, toPositiveInt(current.current_page, 1)),
+    last_page: toPositiveInt(next.last_page, toPositiveInt(current.last_page, 1)),
+    per_page: toPositiveInt(next.per_page, toPositiveInt(current.per_page, 25)),
+    total: toPositiveInt(next.total, toPositiveInt(current.total, 0)),
+  }
+}
+
 function buildParams() {
   const f = filters.value
+  const currentPage = toPositiveInt(meta.value.current_page, 1)
+  const perPage = Math.min(toPositiveInt(meta.value.per_page, 25), 50)
   const p = {
-    page: meta.value.current_page,
-    per_page: meta.value.per_page,
+    page: currentPage,
+    per_page: perPage,
     sort: sort.value,
     order: order.value,
     columns: visibleColumns.value,
@@ -457,7 +475,7 @@ function downloadSampleCsv() {
 }
 
 async function onExport() {
-  const params = { ...buildParams(), page: 1, per_page: 100 }
+  const params = { ...buildParams(), page: 1, per_page: 50 }
   exportLoading.value = true
   try {
     const data = await clientsApi.index(params)
@@ -516,7 +534,7 @@ async function load() {
   try {
     const data = await clientsApi.index(buildParams())
     clients.value = data.data ?? []
-    meta.value = data.meta ?? meta.value
+    meta.value = normalizeMeta(data.meta)
   } finally {
     loading.value = false
     window.scrollTo(0, 0)
@@ -697,12 +715,12 @@ async function onSaveColumns(cols) {
 }
 
 function onPageChange(page) {
-  meta.value.current_page = page
+  meta.value.current_page = toPositiveInt(page, 1)
   load()
 }
 
 async function onPerPageChange(event) {
-  const newPerPage = Number(event.target.value)
+  const newPerPage = Math.min(toPositiveInt(event.target.value, 25), 50)
   meta.value.per_page = newPerPage
   meta.value.current_page = 1
   try {
@@ -714,8 +732,11 @@ async function onPerPageChange(event) {
 async function loadTablePreference() {
   try {
     const { data } = await api.get(`/table-preferences/${TABLE_MODULE}`)
-    if (data.per_page) meta.value.per_page = Number(data.per_page)
-    if (Array.isArray(data.options) && data.options.length) perPageOptions.value = data.options
+    if (data.per_page) meta.value.per_page = Math.min(toPositiveInt(data.per_page, 25), 50)
+    if (Array.isArray(data.options) && data.options.length) {
+      perPageOptions.value = [...new Set(data.options.map((opt) => Math.min(toPositiveInt(opt, 25), 50)))]
+        .filter((opt) => opt <= 50)
+    }
   } catch { /* use system default */ }
 }
 

@@ -297,7 +297,7 @@ onMounted(async () => {
       <!-- Add Email Follow-Up Entry -->
       <div v-if="canCreate" class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
         <h2 class="mb-4 text-sm font-semibold text-gray-900">Add Email Follow-Up Entry</h2>
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <label class="block text-sm font-medium text-gray-700">Added By <span class="text-red-500">*</span></label>
             <input
@@ -321,21 +321,21 @@ onMounted(async () => {
               <option value="approved">Approved</option>
             </select>
           </div>
-          <div class="sm:col-span-2">
-            <label class="block text-sm font-medium text-gray-700">Subject</label>
-            <input
-              v-model="form.subject"
-              type="text"
-              placeholder="Enter email subject"
-              class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            />
-          </div>
           <div>
             <label class="block text-sm font-medium text-gray-700">Request From</label>
             <input
               v-model="form.request_from"
               type="text"
               placeholder="Company or person name"
+              class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            />
+          </div>
+          <div class="sm:col-span-2 lg:col-span-2">
+            <label class="block text-sm font-medium text-gray-700">Subject</label>
+            <input
+              v-model="form.subject"
+              type="text"
+              placeholder="Enter email subject"
               class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
             />
           </div>

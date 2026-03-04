@@ -1,9 +1,9 @@
 <script setup>
 /**
- * Attendance Log filters bar – Employee, Role only; Apply, Reset; slot for Advanced Filters + Customize Columns.
- * From, To, Status are in Advanced Filters (see AttendanceLogPage).
+ * Attendance Log filters bar – fluid layout without horizontal scroller.
+ * Employee, Role, Apply/Reset and extra actions should adapt when sidebar toggles.
  */
-import HorizontalScrollToolbar from '@/components/common/HorizontalScrollToolbar.vue'
+import { ref, nextTick, onMounted, onBeforeUnmount } from 'vue'
 
 defineProps({
   filters: { type: Object, required: true },
@@ -15,55 +15,121 @@ defineProps({
 })
 
 const emit = defineEmits(['apply', 'reset'])
+
+const scroller = ref(null)
+const canScrollLeft = ref(false)
+const canScrollRight = ref(false)
+
+function updateScrollState() {
+  const el = scroller.value
+  if (!el) {
+    canScrollLeft.value = false
+    canScrollRight.value = false
+    return
+  }
+  canScrollLeft.value = el.scrollLeft > 2
+  canScrollRight.value = (el.scrollLeft + el.clientWidth) < (el.scrollWidth - 2)
+}
+
+function scrollLeft() {
+  scroller.value?.scrollBy({ left: -300, behavior: 'smooth' })
+}
+
+function scrollRight() {
+  scroller.value?.scrollBy({ left: 300, behavior: 'smooth' })
+}
+
+onMounted(() => {
+  nextTick(() => {
+    updateScrollState()
+    const el = scroller.value
+    if (!el) return
+    el.addEventListener('scroll', updateScrollState, { passive: true })
+    window.addEventListener('resize', updateScrollState)
+  })
+})
+
+onBeforeUnmount(() => {
+  const el = scroller.value
+  if (el) el.removeEventListener('scroll', updateScrollState)
+  window.removeEventListener('resize', updateScrollState)
+})
 </script>
 
 <template>
-  <div class="rounded-lg border border-gray-200 bg-white px-2 py-2">
-    <HorizontalScrollToolbar>
-    <div class="shrink-0">
-      <label class="block text-xs font-medium text-gray-600">Employee</label>
-      <select
-        v-model="filters.user_id"
-        class="mt-0.5 w-32 rounded border border-gray-300 bg-white px-2.5 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
-        :disabled="loading"
-      >
-        <option value="">All</option>
-        <option v-for="u in filterOptions.users" :key="u.id" :value="u.id">{{ u.name }}</option>
-      </select>
-    </div>
-    <div class="shrink-0 ml-2">
-      <label class="block text-xs font-medium text-gray-600">Role</label>
-      <select
-        v-model="filters.role"
-        class="mt-0.5 w-32 rounded border border-gray-300 bg-white px-2.5 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
-        :disabled="loading"
-      >
-        <option value="">All</option>
-        <option v-for="r in filterOptions.roles" :key="r.value" :value="r.value">{{ r.label }}</option>
-      </select>
-    </div>
-    <div class="ml-auto flex shrink-0 items-center gap-2">
+  <div class="rounded-lg border border-gray-200 bg-white p-3">
+    <div class="relative">
       <button
         type="button"
-        class="inline-flex items-center whitespace-nowrap rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 disabled:opacity-50"
-        :disabled="loading"
-        @click="$emit('apply')"
+        class="absolute left-1 top-1/2 z-10 -translate-y-1/2 rounded border border-gray-300 bg-white p-1 text-gray-600 shadow-sm hover:bg-gray-50 disabled:opacity-40"
+        :disabled="!canScrollLeft"
+        @click="scrollLeft"
       >
-        <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
         </svg>
-        Apply
       </button>
+      <div
+        ref="scroller"
+        class="overflow-x-auto overflow-y-hidden px-8 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+      >
+      <div class="inline-flex min-w-max items-end gap-3 whitespace-nowrap">
+        <div class="w-52 shrink-0">
+          <label class="block text-xs font-medium text-gray-600">Employee</label>
+          <select
+            v-model="filters.user_id"
+            class="mt-0.5 w-full rounded border border-gray-300 bg-white px-2.5 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            :disabled="loading"
+          >
+            <option value="">All</option>
+            <option v-for="u in filterOptions.users" :key="u.id" :value="u.id">{{ u.name }}</option>
+          </select>
+        </div>
+        <div class="w-52 shrink-0">
+          <label class="block text-xs font-medium text-gray-600">Role</label>
+          <select
+            v-model="filters.role"
+            class="mt-0.5 w-full rounded border border-gray-300 bg-white px-2.5 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            :disabled="loading"
+          >
+            <option value="">All</option>
+            <option v-for="r in filterOptions.roles" :key="r.value" :value="r.value">{{ r.label }}</option>
+          </select>
+        </div>
+        <div class="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            class="inline-flex items-center whitespace-nowrap rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+            :disabled="loading"
+            @click="$emit('apply')"
+          >
+            <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            Apply
+          </button>
+          <button
+            type="button"
+            class="whitespace-nowrap rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            :disabled="loading"
+            @click="$emit('reset')"
+          >
+            Reset
+          </button>
+          <slot name="after-reset" />
+        </div>
+      </div>
+      </div>
       <button
         type="button"
-        class="whitespace-nowrap rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-        :disabled="loading"
-        @click="$emit('reset')"
+        class="absolute right-1 top-1/2 z-10 -translate-y-1/2 rounded border border-gray-300 bg-white p-1 text-gray-600 shadow-sm hover:bg-gray-50 disabled:opacity-40"
+        :disabled="!canScrollRight"
+        @click="scrollRight"
       >
-        Reset
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
       </button>
-      <slot name="after-reset" />
     </div>
-    </HorizontalScrollToolbar>
   </div>
 </template>
