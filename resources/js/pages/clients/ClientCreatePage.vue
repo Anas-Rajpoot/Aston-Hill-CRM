@@ -9,7 +9,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import clientsApi from '@/services/clientsApi'
 import leadSubmissionsApi from '@/services/leadSubmissionsApi'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Toast from '@/components/Toast.vue'
 import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
 import { fromDdMmYyyy } from '@/lib/dateFormat'
@@ -136,6 +135,15 @@ const PAID_UNPAID_OPTIONS = [
   { value: '', label: 'Select' },
   { value: 'paid', label: 'Paid' },
   { value: 'unpaid', label: 'Unpaid' },
+]
+
+const WORK_ORDER_STATUS_OPTIONS = [
+  'Under Process',
+  'Appointment Scheduled',
+  'Completed',
+  'To be Resubmit',
+  'Rejected',
+  'IT Issue',
 ]
 
 const MAX_CONTACTS = 5
@@ -748,13 +756,13 @@ const requiredFieldLabels = {
 function inputClass(fieldKey) {
   return fieldErrors.value[fieldKey]
     ? 'mt-1 block w-full rounded border border-red-500 px-3 py-2 text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500'
-    : 'mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500'
+    : 'mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary'
 }
 
 function selectClass(fieldKey) {
   return fieldErrors.value[fieldKey]
     ? 'mt-1 block w-full rounded border border-red-500 px-3 py-2 text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500'
-    : 'mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500'
+    : 'mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary'
 }
 
 async function submit(andAddAnother = false) {
@@ -922,7 +930,7 @@ function closeToast() {
     <!-- Loader overlay when request is in progress -->
     <div v-if="loading" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/40">
       <div class="flex flex-col items-center gap-3 rounded-xl bg-white px-8 py-6 shadow-lg">
-        <svg class="h-10 w-10 animate-spin text-[#21A67B]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+        <svg class="h-10 w-10 animate-spin text-brand-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
         </svg>
@@ -935,15 +943,15 @@ function closeToast() {
       <div v-if="showResultModal" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" :aria-labelledby="resultModalType === 'success' ? 'result-success-title' : 'result-error-title'">
       <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
         <div v-if="resultModalType === 'success'" class="flex flex-col items-center text-center">
-          <div class="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
-            <svg class="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div class="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-brand-primary-light">
+            <svg class="h-8 w-8 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
             </svg>
           </div>
           <h2 id="result-success-title" class="text-lg font-semibold text-gray-900">Success</h2>
           <p class="mt-2 text-gray-700">{{ resultModalMessage }}</p>
           <p class="mt-3 text-sm text-gray-500">Redirecting in {{ redirectCountdown }} seconds…</p>
-          <button type="button" class="mt-4 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700" @click="goToClients">
+          <button type="button" class="mt-4 rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover" @click="goToClients">
             {{ goToListingLabel }}
           </button>
         </div>
@@ -962,7 +970,7 @@ function closeToast() {
     </Teleport>
 
     <div class="max-w-full space-y-4">
-      <router-link v-if="!isProductMode" :to="resolveListingTarget()" class="inline-block text-sm text-blue-600 hover:text-blue-700">
+      <router-link v-if="!isProductMode" :to="resolveListingTarget()" class="inline-block text-sm text-brand-primary hover:text-brand-primary-hover">
         {{ backToListingLabel }}
       </router-link>
       <div>
@@ -971,11 +979,9 @@ function closeToast() {
             <h1 class="text-2xl font-semibold text-gray-900">{{ isProductMode ? 'Add Product' : 'Add New Client' }}</h1>
             <span v-if="draftSavedAt" class="text-xs text-gray-400 flex items-center gap-1">
               <svg v-if="draftSaving" class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="4" class="opacity-25" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-              <svg v-else class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+              <svg v-else class="w-3 h-3 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
               Draft saved
-            </span>
-            <Breadcrumbs />
-          </div>
+            </span>          </div>
           <button
             v-if="isProductMode"
             type="button"
@@ -993,7 +999,7 @@ function closeToast() {
       <div v-if="error" ref="errorAlertEl" class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
         {{ error }}
       </div>
-      <div v-if="successMessage" ref="successAlertEl" class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700" role="status">
+      <div v-if="successMessage" ref="successAlertEl" class="rounded-lg border border-brand-primary-muted bg-brand-primary-light px-4 py-3 text-sm text-brand-primary-hover" role="status">
         {{ successMessage }}
       </div>
 
@@ -1001,8 +1007,8 @@ function closeToast() {
         <!-- Company Information -->
         <div v-if="!isProductMode" class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <div class="flex items-start gap-3 border-b border-gray-200 pb-3">
-            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#E0F7F2]">
-              <svg class="h-5 w-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-primary-light">
+              <svg class="h-5 w-5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
             </div>
@@ -1025,7 +1031,7 @@ function closeToast() {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Trade License Issuing Authority</label>
-              <select v-model="form.company_detail.trade_license_issuing_authority" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <select v-model="form.company_detail.trade_license_issuing_authority" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
                 <option value="">Select authority</option>
                 <option v-for="authority in TRADE_LICENSE_AUTHORITIES" :key="authority" :value="authority">{{ authority }}</option>
               </select>
@@ -1048,7 +1054,7 @@ function closeToast() {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Establishment Card Number</label>
-              <input v-model="form.company_detail.establishment_card_number" type="text" placeholder="Enter establishment card number" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+              <input v-model="form.company_detail.establishment_card_number" type="text" placeholder="Enter establishment card number" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Establishment Card Expiry Date</label>
@@ -1056,7 +1062,7 @@ function closeToast() {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Account Taken From</label>
-              <select v-model="form.company_detail.account_taken_from" class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <select v-model="form.company_detail.account_taken_from" class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
                 <option value="">Select account taken from</option>
                 <option v-for="opt in ACCOUNT_TRANSFER_GIVEN_TO_OPTIONS" :key="opt" :value="opt">{{ opt }}</option>
               </select>
@@ -1067,7 +1073,7 @@ function closeToast() {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Account Transfer Given To</label>
-              <select v-model="form.company_detail.account_transfer_given_to" class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <select v-model="form.company_detail.account_transfer_given_to" class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
                 <option value="">Select account transfer given to</option>
                 <option v-for="opt in ACCOUNT_TRANSFER_GIVEN_TO_OPTIONS" :key="opt" :value="opt">{{ opt }}</option>
               </select>
@@ -1109,35 +1115,35 @@ function closeToast() {
               <div class="mt-1 flex flex-wrap items-end gap-2">
                 <div class="flex min-h-[42px] flex-wrap items-center gap-3 rounded border border-gray-300 bg-white px-3 py-2">
                   <label class="inline-flex items-center gap-1.5 text-sm text-gray-700">
-                    <input v-model="selectedBillFields" type="checkbox" value="first_bill" class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500" />
+                    <input v-model="selectedBillFields" type="checkbox" value="first_bill" class="h-4 w-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary" />
                     First Bill
                   </label>
                   <label class="inline-flex items-center gap-1.5 text-sm text-gray-700">
-                    <input v-model="selectedBillFields" type="checkbox" value="second_bill" class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500" />
+                    <input v-model="selectedBillFields" type="checkbox" value="second_bill" class="h-4 w-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary" />
                     Second Bill
                   </label>
                   <label class="inline-flex items-center gap-1.5 text-sm text-gray-700">
-                    <input v-model="selectedBillFields" type="checkbox" value="third_bill" class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500" />
+                    <input v-model="selectedBillFields" type="checkbox" value="third_bill" class="h-4 w-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary" />
                     Third Bill
                   </label>
                   <label class="inline-flex items-center gap-1.5 text-sm text-gray-700">
-                    <input v-model="selectedBillFields" type="checkbox" value="fourth_bill" class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500" />
+                    <input v-model="selectedBillFields" type="checkbox" value="fourth_bill" class="h-4 w-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary" />
                     Fourth Bill
                   </label>
                 </div>
-                <select v-model="billsBulkValue" class="block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 sm:w-auto sm:min-w-[180px]">
+                <select v-model="billsBulkValue" class="block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary sm:w-auto sm:min-w-[180px]">
                   <option v-for="o in PAID_UNPAID_OPTIONS" :key="`bulk-${o.value}`" :value="o.value">{{ o.label }}</option>
                 </select>
-                <button type="button" class="rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700" @click="applyBillsBulkAction">Apply</button>
+                <button type="button" class="rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover" @click="applyBillsBulkAction">Apply</button>
               </div>
             </div>
             <div class="sm:col-span-2">
               <label class="block text-sm font-medium text-gray-700">Additional Note</label>
-              <textarea v-model="form.company_detail.additional_comment_1" rows="2" placeholder="Additional notes" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+              <textarea v-model="form.company_detail.additional_comment_1" rows="2" placeholder="Additional notes" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
             </div>
             <div class="sm:col-span-2">
               <label class="block text-sm font-medium text-gray-700">Additional Note</label>
-              <textarea v-model="form.company_detail.additional_comment_2" rows="2" placeholder="Additional notes" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+              <textarea v-model="form.company_detail.additional_comment_2" rows="2" placeholder="Additional notes" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
             </div>
           </div>
         </div>
@@ -1146,21 +1152,21 @@ function closeToast() {
         <div v-if="!isProductMode" class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <div class="flex flex-wrap items-start justify-between gap-4 border-b border-gray-200 pb-3">
             <div class="flex items-start gap-3">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#E8F0FE]">
-                <svg class="h-5 w-5 text-[#4285F4]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-primary-light">
+                <svg class="h-5 w-5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
               </div>
               <div>
-                <h2 class="text-base font-semibold text-[#202124]">Contact Details</h2>
-                <p class="mt-1 text-sm text-[#5F6368]">Add up to 5 contact persons and addresses.</p>
+                <h2 class="text-base font-semibold text-gray-900">Contact Details</h2>
+                <p class="mt-1 text-sm text-gray-500">Add up to 5 contact persons and addresses.</p>
               </div>
             </div>
             <span
               v-if="form.contacts.length < MAX_CONTACTS"
               role="button"
               tabindex="0"
-              class="shrink-0 cursor-pointer text-sm font-medium text-[#21A67B] hover:underline focus:outline-none focus:ring-0"
+              class="shrink-0 cursor-pointer text-sm font-medium text-brand-primary hover:underline focus:outline-none focus:ring-0"
               @click="addContact()"
               @keydown.enter.space.prevent="addContact()"
             >
@@ -1175,36 +1181,36 @@ function closeToast() {
             <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <div>
                 <label class="block text-sm font-medium text-gray-700">Contact Person Name <span class="text-red-600">*</span></label>
-                <input v-model="contact.name" type="text" placeholder="Enter contact person name" :class="idx === 0 ? inputClass('contact_0_name') : 'mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500'" />
+                <input v-model="contact.name" type="text" placeholder="Enter contact person name" :class="idx === 0 ? inputClass('contact_0_name') : 'mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary'" />
                 <p v-if="idx === 0 && fieldErrors.contact_0_name" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.contact_0_name }}</p>
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">Designation</label>
-                <input v-model="contact.designation" type="text" placeholder="Enter designation" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+                <input v-model="contact.designation" type="text" placeholder="Enter designation" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">Contact Number <span class="text-red-600">*</span></label>
-                <input v-model="contact.contact_number" type="text" placeholder="Enter contact number" :class="idx === 0 ? inputClass('contact_0_contact_number') : 'mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500'" />
+                <input v-model="contact.contact_number" type="text" placeholder="Enter contact number" :class="idx === 0 ? inputClass('contact_0_contact_number') : 'mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary'" />
                 <p v-if="idx === 0 && fieldErrors.contact_0_contact_number" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.contact_0_contact_number }}</p>
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">Alternate Contact Number</label>
-                <input v-model="contact.alternate_number" type="text" placeholder="Enter alternate number" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+                <input v-model="contact.alternate_number" type="text" placeholder="Enter alternate number" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">Email ID <span class="text-red-600">*</span></label>
-                <input v-model="contact.email" type="email" placeholder="Enter email address" :class="idx === 0 ? inputClass('contact_0_email') : 'mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500'" />
+                <input v-model="contact.email" type="email" placeholder="Enter email address" :class="idx === 0 ? inputClass('contact_0_email') : 'mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary'" />
                 <p v-if="idx === 0 && fieldErrors.contact_0_email" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.contact_0_email }}</p>
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">AS Updated or Not</label>
-                <select v-model="contact.as_updated_or_not" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+                <select v-model="contact.as_updated_or_not" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
                   <option v-for="o in YES_NO_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
                 </select>
               </div>
               <div class="sm:col-span-2">
                 <label class="block text-sm font-medium text-gray-700">Additional Note</label>
-                <textarea v-model="contact.additional_note" rows="2" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+                <textarea v-model="contact.additional_note" rows="2" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
               </div>
             </div>
             <!-- Address for this contact -->
@@ -1217,19 +1223,19 @@ function closeToast() {
                 </div>
                 <div>
                   <label class="block text-sm font-medium text-gray-700">Unit</label>
-                  <input v-model="form.addresses[idx].unit" type="text" placeholder="e.g. 1205" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+                  <input v-model="form.addresses[idx].unit" type="text" placeholder="e.g. 1205" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
                 </div>
                 <div>
                   <label class="block text-sm font-medium text-gray-700">Building</label>
-                  <input v-model="form.addresses[idx].building" type="text" placeholder="Enter building" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+                  <input v-model="form.addresses[idx].building" type="text" placeholder="Enter building" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
                 </div>
                 <div>
                   <label class="block text-sm font-medium text-gray-700">Area</label>
-                  <input v-model="form.addresses[idx].area" type="text" placeholder="Enter area" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+                  <input v-model="form.addresses[idx].area" type="text" placeholder="Enter area" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
                 </div>
                 <div>
                   <label class="block text-sm font-medium text-gray-700">Emirates</label>
-                  <select v-model="form.addresses[idx].emirates" class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+                  <select v-model="form.addresses[idx].emirates" class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
                     <option value="">Select Emirates</option>
                     <option value="Abu Dhabi">Abu Dhabi</option>
                     <option value="Dubai">Dubai</option>
@@ -1261,7 +1267,7 @@ function closeToast() {
                 :readonly="isProductMode"
                 :class="isProductMode
                   ? 'mt-1 block w-full rounded border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-700'
-                  : 'mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500'"
+                  : 'mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary'"
               />
             </div>
             <div>
@@ -1270,21 +1276,21 @@ function closeToast() {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Manager Name</label>
-              <select v-model="form.manager_id" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <select v-model="form.manager_id" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
                 <option :value="null">Select</option>
                 <option v-for="m in teamOptions.managers" :key="m.id" :value="m.id">{{ m.name }}</option>
               </select>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Team Leader</label>
-              <select v-model="form.team_leader_id" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <select v-model="form.team_leader_id" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
                 <option :value="null">Select</option>
                 <option v-for="t in filteredTeamLeaders" :key="t.id" :value="t.id">{{ t.name }}</option>
               </select>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Sales Agent Name</label>
-              <select v-model="form.sales_agent_id" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <select v-model="form.sales_agent_id" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
                 <option :value="null">Select</option>
                 <option v-for="s in filteredSalesAgents" :key="s.id" :value="s.id">{{ s.name }}</option>
               </select>
@@ -1292,7 +1298,7 @@ function closeToast() {
             <!-- Row 2: Submission Type, Service Category, Service Type, Product Type, Address -->
             <div>
               <label class="block text-sm font-medium text-gray-700">Submission Type</label>
-              <select v-model="form.submission_type" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <select v-model="form.submission_type" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
                 <option value="">Select</option>
                 <option value="New Submission">New Submission</option>
                 <option value="Resubmission">Resubmission</option>
@@ -1300,7 +1306,7 @@ function closeToast() {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Service Category</label>
-              <select v-model="form.service_category" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <select v-model="form.service_category" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
                 <option value="">Select</option>
                 <option value="Fixed">Fixed</option>
                 <option value="FMS">FMS</option>
@@ -1310,21 +1316,21 @@ function closeToast() {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Service Type</label>
-              <select v-model="form.service_type" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <select v-model="form.service_type" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
                 <option value="">Select</option>
                 <option v-for="opt in serviceTypeOptions" :key="opt" :value="opt">{{ opt }}</option>
               </select>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Product Type</label>
-              <select v-model="form.product_type" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <select v-model="form.product_type" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
                 <option value="">Select</option>
                 <option v-for="opt in productTypeOptions" :key="opt" :value="opt">{{ opt }}</option>
               </select>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Address</label>
-              <select v-model="form.address" class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <select v-model="form.address" class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
                 <option value="">Select</option>
                 <option v-for="opt in addressOptions" :key="opt" :value="opt">{{ opt }}</option>
               </select>
@@ -1332,11 +1338,11 @@ function closeToast() {
             <!-- Row 3: Product Name, MRC, Quantity, Offer, Migration Numbers -->
             <div>
               <label class="block text-sm font-medium text-gray-700">Product Name</label>
-              <input v-model="form.product_name" type="text" placeholder="Product Name" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+              <input v-model="form.product_name" type="text" placeholder="Product Name" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">MRC</label>
-              <input v-model="form.mrc" type="text" placeholder="Enter MRC" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+              <input v-model="form.mrc" type="text" placeholder="Enter MRC" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Quantity</label>
@@ -1349,7 +1355,7 @@ function closeToast() {
                 >
                   -
                 </button>
-                <input v-model="form.quantity" type="number" min="0" placeholder="Enter Quantity" class="block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+                <input v-model="form.quantity" type="number" min="0" placeholder="Enter Quantity" class="block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
                 <button
                   type="button"
                   class="inline-flex h-9 w-9 items-center justify-center rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
@@ -1362,16 +1368,16 @@ function closeToast() {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Offer</label>
-              <input v-model="form.offer" type="text" placeholder="Enter Offer" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+              <input v-model="form.offer" type="text" placeholder="Enter Offer" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Migration Numbers</label>
-              <input v-model="form.migration_numbers" type="text" placeholder="Enter Migration / FNP Number" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+              <input v-model="form.migration_numbers" type="text" placeholder="Enter Migration / FNP Number" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
             </div>
             <!-- Row 4: Activity, Account Number, Work Order, Work Order Status, Activation Date -->
             <div>
               <label class="block text-sm font-medium text-gray-700">Activity</label>
-              <input v-model="form.activity" type="text" placeholder="Enter Activity" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+              <input v-model="form.activity" type="text" placeholder="Enter Activity" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Account Number</label>
@@ -1382,16 +1388,19 @@ function closeToast() {
                 :readonly="isProductMode"
                 :class="isProductMode
                   ? 'mt-1 block w-full rounded border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-700'
-                  : 'mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500'"
+                  : 'mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary'"
               />
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Work Order</label>
-              <input v-model="form.wo_number" type="text" placeholder="Enter Work Order" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+              <input v-model="form.wo_number" type="text" placeholder="Enter Work Order" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Work Order Status</label>
-              <input v-model="form.work_order_status" type="text" placeholder="Enter Work Order Status" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+              <select v-model="form.work_order_status" class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
+                <option value="">Select Work Order Status</option>
+                <option v-for="status in WORK_ORDER_STATUS_OPTIONS" :key="status" :value="status">{{ status }}</option>
+              </select>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Activation Date</label>
@@ -1400,7 +1409,7 @@ function closeToast() {
             <!-- Row 5: Contract Term, Deactivation Date, Clawback / Chum, Remarks -->
             <div>
               <label class="block text-sm font-medium text-gray-700">Contract Type Term</label>
-              <select v-model="form.contract_type" class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" @change="onContractTypeChange">
+              <select v-model="form.contract_type" class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" @change="onContractTypeChange">
                 <option value="">Select</option>
                 <option value="12 months">12 months</option>
                 <option value="24 months">24 months</option>
@@ -1412,7 +1421,7 @@ function closeToast() {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Clawback / Chum</label>
-              <select v-model="form.clawback_chum" class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <select v-model="form.clawback_chum" class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
                 <option value="">Select</option>
                 <option value="Clawback">Clawback</option>
                 <option value="Churn">Churn</option>
@@ -1420,12 +1429,12 @@ function closeToast() {
             </div>
             <div class="lg:col-span-2">
               <label class="block text-sm font-medium text-gray-700">Remarks</label>
-              <input v-model="form.remarks" type="text" placeholder="Enter remarks if clawback / Churn...... " class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+              <input v-model="form.remarks" type="text" placeholder="Enter remarks if clawback / Churn...... " class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
             </div>
             <!-- Row 6: Additional Note full width -->
             <div class="sm:col-span-2 lg:col-span-5">
               <label class="block text-sm font-medium text-gray-700">Additional Note</label>
-              <textarea v-model="form.additional_notes" rows="2" placeholder="Additional notes" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+              <textarea v-model="form.additional_notes" rows="2" placeholder="Additional notes" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
             </div>
           </div>
         </div>
@@ -1434,8 +1443,8 @@ function closeToast() {
         <div v-if="!isProductMode" class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <div class="flex flex-wrap items-start justify-between gap-4 border-b border-gray-200 pb-3">
             <div class="flex items-start gap-3">
-              <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-[#EFE6FF]">
-                <svg class="h-5 w-5 text-[#7A5AF8]" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-brand-primary-light">
+                <svg class="h-5 w-5 text-brand-primary" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
                 </svg>
               </span>
@@ -1444,7 +1453,7 @@ function closeToast() {
                 <p class="mt-0.5 text-sm text-gray-500">Assign account manager and customer service representatives.</p>
               </div>
             </div>
-            <button type="button" class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700" @click="addCsr">
+            <button type="button" class="inline-flex items-center rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover" @click="addCsr">
               Add CSR
             </button>
           </div>
@@ -1464,7 +1473,7 @@ function closeToast() {
             <div v-for="(csr, cidx) in form.csrs" :key="cidx" class="flex items-end gap-2">
               <div class="min-w-0 flex-1">
                 <label class="block text-sm font-medium text-gray-700">CSR Name <span class="text-red-600">*</span></label>
-                <select v-model="csr.user_id" :class="cidx === 0 ? selectClass('csr') : 'mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500'">
+                <select v-model="csr.user_id" :class="cidx === 0 ? selectClass('csr') : 'mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary'">
                   <option :value="null">Select CSR</option>
                   <option v-for="s in csrOptionsForIndex(cidx)" :key="s.id" :value="s.id">{{ s.name }}</option>
                 </select>
@@ -1507,13 +1516,13 @@ function closeToast() {
         <div class="border-t border-gray-200 bg-white pt-6">
           <p class="mb-4 text-sm text-gray-500">All actions will be logged in Audit Logs.</p>
           <div class="flex flex-wrap items-center justify-end gap-3">
-            <button type="button" class="inline-flex items-center rounded-lg border border-blue-500 bg-white px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50" :disabled="loading" @click="cancel">
+            <button type="button" class="inline-flex items-center rounded-lg border border-brand-primary bg-white px-4 py-2 text-sm font-medium text-brand-primary hover:bg-brand-primary-light disabled:opacity-50" :disabled="loading" @click="cancel">
               {{ isProductMode ? 'Close' : 'Cancel' }}
             </button>
-            <button type="submit" class="inline-flex items-center rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50" :disabled="loading">
+            <button type="submit" class="inline-flex items-center rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50" :disabled="loading">
               {{ loading ? 'Creating…' : (isProductMode ? 'Create Product' : 'Create Client') }}
             </button>
-            <button type="button" class="inline-flex items-center rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50" :disabled="loading" @click="submit(true)">
+            <button type="button" class="inline-flex items-center rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50" :disabled="loading" @click="submit(true)">
               <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
               </svg>

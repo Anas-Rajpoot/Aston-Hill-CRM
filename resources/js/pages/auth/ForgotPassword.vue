@@ -38,8 +38,8 @@ const submit = async () => {
           <input v-model="email" type="email" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="you@example.com" />
         </div>
         <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
-        <p v-if="success" class="text-sm text-green-600">{{ success }}</p>
-        <button type="submit" :disabled="loading" class="w-full py-2.5 px-4 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 focus:ring-green-500 disabled:opacity-50">
+        <p v-if="success" class="text-sm text-brand-primary">{{ success }}</p>
+        <button type="submit" :disabled="loading" class="w-full py-2.5 px-4 rounded-lg bg-brand-primary text-white font-medium hover:bg-brand-primary-hover focus:ring-brand-primary disabled:opacity-50">
           {{ loading ? 'Sending...' : 'Email Password Reset Link' }}
         </button>
       </form>

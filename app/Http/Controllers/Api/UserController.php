@@ -11,16 +11,20 @@ use App\Models\User;
 use App\Models\UserAudit;
 use App\Models\UserColumnPreference;
 use App\Models\UserLoginLog;
+use App\Models\UserMonthlyTargetHistory;
 use App\Notifications\UserApprovalStatusNotification;
 use App\Rules\MeetsPasswordPolicy;
 use App\Support\RbacPermission;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class UserController extends Controller
 {
@@ -31,7 +35,7 @@ class UserController extends Controller
     private const ALLOWED_COLUMNS = [
         'id', 'name', 'email', 'phone', 'country', 'roles', 'status', 'last_login_at',
         'created_at', 'employee_number', 'department', 'extension', 'joining_date', 'terminate_date',
-        'manager', 'team_leader',
+        'manager', 'team_leader', 'monthly_target',
     ];
 
     public function __construct()
@@ -68,8 +72,19 @@ class UserController extends Controller
             'role' => ['sometimes', 'nullable', 'string', 'max:100'],
             'status' => ['sometimes', 'nullable', 'string'], // comma-separated or single
             'country' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'department' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'manager_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'team_leader_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'joining_from' => ['sometimes', 'nullable', 'date'],
+            'joining_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:joining_from'],
+            'terminate_from' => ['sometimes', 'nullable', 'date'],
+            'terminate_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:terminate_from'],
             'created_from' => ['sometimes', 'nullable', 'date'],
             'created_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:created_from'],
+            'target_month_from' => ['sometimes', 'nullable', 'string', 'regex:/^\d{4}-\d{2}$/'],
+            'target_month_to' => ['sometimes', 'nullable', 'string', 'regex:/^\d{4}-\d{2}$/'],
+            'target_min' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'target_max' => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'q' => ['sometimes', 'nullable', 'string', 'max:200'],
         ]);
 
@@ -102,20 +117,30 @@ class UserController extends Controller
         }
 
         $roles = $this->cachedRolesList();
-        $statsQuery = User::query()
-            ->when(! $requestUser->hasRole('superadmin'), fn ($q) => $q->whereDoesntHave('roles', fn ($r) => $r->where('name', 'superadmin')));
-        $statsRow = $statsQuery
-            ->selectRaw('COUNT(*) as total')
-            ->selectRaw("SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as active")
-            ->selectRaw("SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as inactive")
-            ->selectRaw("SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending")
-            ->first();
-        $stats = [
-            'total' => (int) ($statsRow->total ?? 0),
-            'active' => (int) ($statsRow->active ?? 0),
-            'inactive' => (int) ($statsRow->inactive ?? 0),
-            'pending' => (int) ($statsRow->pending ?? 0),
-        ];
+
+        // Cache stats for 30s to avoid expensive scan on every list request
+        $statsCacheKey = 'user_stats_' . ($requestUser->hasRole('superadmin') ? 'sa' : 'non_sa');
+        $stats = Cache::remember($statsCacheKey, 30, function () use ($requestUser) {
+            $statsQuery = User::query()
+                ->when(! $requestUser->hasRole('superadmin'), fn ($q) => $q->whereDoesntHave('roles', fn ($r) => $r->where('name', 'superadmin')));
+            $statsRow = $statsQuery
+                ->selectRaw('COUNT(*) as total')
+                ->selectRaw("SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as active")
+                ->selectRaw("SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as inactive")
+                ->selectRaw("SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending")
+                ->first();
+            $totalTargetMrc = User::query()
+                ->when(! $requestUser->hasRole('superadmin'), fn ($q) => $q->whereDoesntHave('roles', fn ($r) => $r->where('name', 'superadmin')))
+                ->where('status', 'approved')
+                ->sum('monthly_target');
+            return [
+                'total' => (int) ($statsRow->total ?? 0),
+                'active' => (int) ($statsRow->active ?? 0),
+                'inactive' => (int) ($statsRow->inactive ?? 0),
+                'pending' => (int) ($statsRow->pending ?? 0),
+                'total_target_mrc' => round((float) $totalTargetMrc, 2),
+            ];
+        });
 
         $items = $users->map(function ($u) use ($lastLogins, $columns) {
             $log = $lastLogins->get($u->id);
@@ -137,6 +162,7 @@ class UserController extends Controller
                 'terminate_date' => $u->terminate_date?->format('Y-m-d'),
                 'manager' => $u->manager?->name,
                 'team_leader' => $u->teamLeader?->name,
+                'monthly_target' => $u->monthly_target,
             ];
             return array_intersect_key($row, array_fill_keys(array_merge(['id'], $columns), true));
         });
@@ -206,6 +232,51 @@ class UserController extends Controller
         if (! empty($validated['created_to'])) {
             $query->whereDate('created_at', '<=', $validated['created_to']);
         }
+        if (! empty($validated['department'])) {
+            $query->where('department', $validated['department']);
+        }
+        if (! empty($validated['manager_id'])) {
+            $query->where('manager_id', $validated['manager_id']);
+        }
+        if (! empty($validated['team_leader_id'])) {
+            $query->where('team_leader_id', $validated['team_leader_id']);
+        }
+        if (! empty($validated['joining_from'])) {
+            $query->whereDate('joining_date', '>=', $validated['joining_from']);
+        }
+        if (! empty($validated['joining_to'])) {
+            $query->whereDate('joining_date', '<=', $validated['joining_to']);
+        }
+        if (! empty($validated['terminate_from'])) {
+            $query->whereDate('terminate_date', '>=', $validated['terminate_from']);
+        }
+        if (! empty($validated['terminate_to'])) {
+            $query->whereDate('terminate_date', '<=', $validated['terminate_to']);
+        }
+        // Monthly target range filters (via history table)
+        if (! empty($validated['target_month_from']) || ! empty($validated['target_month_to'])) {
+            $query->whereHas('monthlyTargetHistory', function ($q) use ($validated) {
+                if (! empty($validated['target_month_from'])) {
+                    $q->where('month', '>=', $validated['target_month_from']);
+                }
+                if (! empty($validated['target_month_to'])) {
+                    $q->where('month', '<=', $validated['target_month_to']);
+                }
+                if (! empty($validated['target_min'])) {
+                    $q->where('target_amount', '>=', (float) $validated['target_min']);
+                }
+                if (! empty($validated['target_max'])) {
+                    $q->where('target_amount', '<=', (float) $validated['target_max']);
+                }
+            });
+        } elseif (! empty($validated['target_min']) || ! empty($validated['target_max'])) {
+            if (! empty($validated['target_min'])) {
+                $query->where('monthly_target', '>=', (float) $validated['target_min']);
+            }
+            if (! empty($validated['target_max'])) {
+                $query->where('monthly_target', '<=', (float) $validated['target_max']);
+            }
+        }
     }
 
     private function applySort($query, string $sort, string $order): void
@@ -239,6 +310,29 @@ class UserController extends Controller
             ->values()
             ->all();
 
+        $departments = User::whereNotNull('department')
+            ->where('department', '!=', '')
+            ->distinct()
+            ->pluck('department')
+            ->sort()
+            ->map(fn ($d) => ['value' => $d, 'label' => ucfirst($d)])
+            ->values()
+            ->all();
+
+        $managers = User::whereHas('roles', fn ($q) => $q->whereIn('name', ['manager', 'superadmin']))
+            ->where('status', 'approved')
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($u) => ['value' => $u->id, 'label' => $u->name])
+            ->all();
+
+        $teamLeaders = User::whereHas('roles', fn ($q) => $q->whereIn('name', ['team_leader', 'manager', 'superadmin']))
+            ->where('status', 'approved')
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($u) => ['value' => $u->id, 'label' => $u->name])
+            ->all();
+
         return response()->json([
             'statuses' => [
                 ['value' => 'approved', 'label' => 'Active'],
@@ -246,6 +340,9 @@ class UserController extends Controller
                 ['value' => 'pending', 'label' => 'Pending Approval'],
             ],
             'roles' => $roles,
+            'departments' => $departments,
+            'managers' => $managers,
+            'team_leaders' => $teamLeaders,
         ]);
     }
 
@@ -317,7 +414,7 @@ class UserController extends Controller
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
+            'password' => $validated['password'],
             'phone' => $validated['phone'] ?? null,
             'country' => $validated['country'] ?? null,
             'status' => $validated['status'] ?? 'pending',
@@ -351,8 +448,10 @@ class UserController extends Controller
     public function bulkActivate(Request $request): JsonResponse
     {
         $validated = $request->validate(['ids' => ['required', 'array'], 'ids.*' => ['integer', 'exists:users,id']]);
-        $ids = $validated['ids'];
-        $count = User::whereIn('id', $ids)->update([
+        $ids = collect($validated['ids']);
+        $superAdminIds = User::whereIn('id', $ids)->whereHas('roles', fn ($r) => $r->where('name', 'superadmin'))->pluck('id');
+        $idsToActivate = $ids->diff($superAdminIds)->values()->all();
+        $count = User::whereIn('id', $idsToActivate)->update([
             'status' => 'approved',
             'approved_by' => auth()->id(),
             'approved_at' => now(),
@@ -361,7 +460,7 @@ class UserController extends Controller
             'rejection_reason' => null,
         ]);
         try {
-            SystemAuditLog::record('user.bulk_activated', null, ['user_ids' => $ids, 'count' => count($ids)], $request->user()->id, 'user');
+            SystemAuditLog::record('user.bulk_activated', null, ['user_ids' => $idsToActivate, 'count' => count($idsToActivate)], $request->user()->id, 'user');
         } catch (\Throwable $e) {}
         app(PermissionRegistrar::class)->forgetCachedPermissions();
         return response()->json(['message' => "{$count} user(s) activated.", 'count' => $count]);
@@ -381,6 +480,72 @@ class UserController extends Controller
         // Roles are preserved on deactivation; only super admin / authorized user can change roles explicitly.
         app(PermissionRegistrar::class)->forgetCachedPermissions();
         return response()->json(['message' => "{$count} user(s) deactivated.", 'count' => $count]);
+    }
+
+    public function bulkAssignMonthlyTarget(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer', 'exists:users,id'],
+            'monthly_target' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],
+            'month' => ['required', 'string', 'regex:/^\d{4}-\d{2}$/'],
+        ]);
+
+        $ids = collect($validated['ids'])->unique()->values();
+        $superAdminIds = User::whereIn('id', $ids)
+            ->whereHas('roles', fn ($r) => $r->where('name', 'superadmin'))
+            ->pluck('id');
+
+        $idsToAssign = $ids->diff($superAdminIds)->values();
+        if ($idsToAssign->isEmpty()) {
+            return response()->json([
+                'message' => 'No eligible users selected for target assignment.',
+                'count' => 0,
+            ]);
+        }
+
+        $target = (float) $validated['monthly_target'];
+        $month = $validated['month'];
+        $actorId = (int) $request->user()->id;
+        $now = now();
+
+        DB::transaction(function () use ($idsToAssign, $target, $month, $actorId, $now) {
+            User::whereIn('id', $idsToAssign->all())->update([
+                'monthly_target' => $target,
+                'updated_at' => $now,
+            ]);
+
+            $historyRows = $idsToAssign
+                ->map(fn ($id) => [
+                    'user_id' => (int) $id,
+                    'month' => $month,
+                    'target_amount' => $target,
+                    'set_by' => $actorId,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ])
+                ->all();
+
+            UserMonthlyTargetHistory::insert($historyRows);
+        });
+
+        try {
+            SystemAuditLog::record(
+                'user.bulk_monthly_target_assigned',
+                null,
+                ['user_ids' => $idsToAssign->all(), 'month' => $month, 'target' => $target, 'count' => $idsToAssign->count()],
+                $actorId,
+                'user'
+            );
+        } catch (\Throwable $e) {}
+
+        Cache::forget('user_stats_sa');
+        Cache::forget('user_stats_non_sa');
+
+        return response()->json([
+            'message' => $idsToAssign->count() . ' user(s) monthly target updated.',
+            'count' => $idsToAssign->count(),
+        ]);
     }
 
     public function show(User $user): JsonResponse
@@ -528,6 +693,7 @@ class UserController extends Controller
 
         $user->fill(collect($validated)->except(['password', 'roles', 'manager_id', 'team_leader_id'])->toArray());
 
+        $statusChanged = false;
         if (array_key_exists('roles', $validated) && !empty($validated['roles'])) {
             $requestedStatus = $validated['status'] ?? null;
             if ($requestedStatus !== 'rejected') {
@@ -550,7 +716,7 @@ class UserController extends Controller
         $user->save();
 
         if (!empty($validated['password'])) {
-            $user->password = Hash::make($validated['password']);
+            $user->password = $validated['password'];
             $user->save();
         }
 
@@ -628,7 +794,7 @@ class UserController extends Controller
         $validated = $request->validate([
             'field' => ['required', 'string', Rule::in([
                 'name', 'email', 'phone', 'country', 'status', 'employee_number',
-                'department', 'extension', 'joining_date', 'terminate_date',
+                'department', 'extension', 'joining_date', 'terminate_date', 'monthly_target',
             ])],
             'value' => ['nullable'],
         ]);
@@ -741,9 +907,9 @@ class UserController extends Controller
     private function resolveActionForMethod(string $method): array
     {
         return match ($method) {
-            'store' => ['create', ['users.create', 'users.add']],
-            'update', 'patch', 'bulkActivate', 'bulkDeactivate', 'sendPasswordReset' => ['update', ['users.edit', 'users.update']],
-            'destroy' => ['delete', ['users.delete']],
+            'store', 'bulkImport' => ['create', ['users.create', 'users.add']],
+            'update', 'patch', 'bulkActivate', 'bulkDeactivate', 'sendPasswordReset', 'updateMonthlyTarget', 'bulkAssignMonthlyTarget' => ['update', ['users.edit', 'users.update']],
+            'destroy', 'otpDelete' => ['delete', ['users.delete']],
             default => ['read', ['users.list', 'users.view']],
         };
     }
@@ -757,5 +923,323 @@ class UserController extends Controller
         if (! $user || ! RbacPermission::can($user, 'users', $action, $legacy)) {
             abort(403, 'Unauthorized');
         }
+    }
+
+    // ─────────────────────────────────────────────
+    //  BULK EXPORT — Streamed CSV
+    // ─────────────────────────────────────────────
+    public function export(Request $request): StreamedResponse
+    {
+        $requestUser = $request->user();
+        $query = User::query()
+            ->with(['roles:id,name', 'manager:id,name', 'teamLeader:id,name'])
+            ->when(! $requestUser->hasRole('superadmin'), fn ($q) => $q->whereDoesntHave('roles', fn ($r) => $r->where('name', 'superadmin')));
+
+        $validated = $request->validate([
+            'status' => ['sometimes', 'nullable', 'string'],
+            'role'   => ['sometimes', 'nullable', 'string'],
+        ]);
+        $this->applyFilters($query, $validated);
+        $query->orderBy('name');
+
+        $headers = [
+            'Name', 'Email', 'Phone', 'Country', 'Department', 'Employee Number',
+            'Extension', 'Status', 'Roles', 'Joining Date', 'Terminate Date',
+            'Monthly Target', 'Manager', 'Team Leader', 'Created At',
+        ];
+
+        return response()->streamDownload(function () use ($query, $headers) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, $headers);
+
+            $query->chunk(500, function ($users) use ($out) {
+                foreach ($users as $u) {
+                    fputcsv($out, [
+                        $u->name,
+                        $u->email,
+                        $u->phone,
+                        $u->country,
+                        $u->department,
+                        $u->employee_number,
+                        $u->extension,
+                        $u->status,
+                        $u->roles->pluck('name')->implode(', '),
+                        $u->joining_date?->format('Y-m-d'),
+                        $u->terminate_date?->format('Y-m-d'),
+                        $u->monthly_target,
+                        $u->manager?->name,
+                        $u->teamLeader?->name,
+                        $u->created_at?->format('Y-m-d H:i'),
+                    ]);
+                }
+            });
+
+            fclose($out);
+        }, 'users_export_' . now()->format('Ymd_His') . '.csv', [
+            'Content-Type' => 'text/csv',
+        ]);
+    }
+
+    // ─────────────────────────────────────────────
+    //  IMPORT TEMPLATE — CSV with headers + 2 sample rows
+    // ─────────────────────────────────────────────
+    public function importTemplate(): StreamedResponse
+    {
+        $headers = [
+            'name', 'email', 'phone', 'country', 'department', 'employee_number',
+            'extension', 'status', 'roles', 'joining_date', 'terminate_date',
+            'monthly_target', 'password',
+        ];
+
+        $samples = [
+            ['John Doe', 'john.doe@company.com', '971501234567', 'UAE', 'sales', 'EMP001', '1001', 'approved', 'sales_agent', '2026-01-15', '', '5000.00', 'Password@1'],
+            ['Jane Smith', 'jane.smith@company.com', '971509876543', 'UAE', 'backoffice', 'EMP002', '1002', 'approved', 'csr', '2026-02-01', '', '3000.00', 'Password@1'],
+        ];
+
+        return response()->streamDownload(function () use ($headers, $samples) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, $headers);
+            foreach ($samples as $row) {
+                fputcsv($out, $row);
+            }
+            fclose($out);
+        }, 'users_import_template.csv', [
+            'Content-Type' => 'text/csv',
+        ]);
+    }
+
+    // ─────────────────────────────────────────────
+    //  BULK IMPORT — CSV upload with validation
+    // ─────────────────────────────────────────────
+    public function bulkImport(Request $request): JsonResponse
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:csv,txt', 'max:5120'],
+        ]);
+
+        $file = $request->file('file');
+        $handle = fopen($file->getRealPath(), 'r');
+        $headerRow = fgetcsv($handle);
+
+        if (! $headerRow) {
+            fclose($handle);
+            return response()->json(['message' => 'CSV file is empty or unreadable.'], 422);
+        }
+
+        $headerRow = array_map(fn ($h) => strtolower(trim($h)), $headerRow);
+        $requiredHeaders = ['name', 'email', 'password'];
+        $missing = array_diff($requiredHeaders, $headerRow);
+        if (! empty($missing)) {
+            fclose($handle);
+            return response()->json([
+                'message' => 'Missing required columns: ' . implode(', ', $missing),
+            ], 422);
+        }
+
+        $imported = 0;
+        $errors = [];
+        $rowNum = 1;
+        $existingEmails = User::pluck('email')->map(fn ($e) => strtolower($e))->toArray();
+        $allRoles = Role::where('guard_name', 'web')->pluck('id', 'name');
+
+        while (($row = fgetcsv($handle)) !== false) {
+            $rowNum++;
+            if (count($row) !== count($headerRow)) {
+                $errors[] = ['row' => $rowNum, 'error' => 'Column count mismatch.'];
+                continue;
+            }
+
+            $data = array_combine($headerRow, $row);
+
+            // Validate each row
+            $v = Validator::make($data, [
+                'name'            => ['required', 'string', 'max:255'],
+                'email'           => ['required', 'email', 'max:255'],
+                'password'        => ['required', 'string', 'min:8'],
+                'phone'           => ['nullable', 'string'],
+                'country'         => ['nullable', 'string', 'max:100'],
+                'department'      => ['nullable', 'string', 'max:100'],
+                'employee_number' => ['nullable', 'string', 'max:50'],
+                'extension'       => ['nullable', 'string', 'max:20'],
+                'status'          => ['nullable', 'string', 'in:pending,approved,rejected'],
+                'joining_date'    => ['nullable', 'date'],
+                'terminate_date'  => ['nullable', 'date'],
+                'monthly_target'  => ['nullable', 'numeric', 'min:0'],
+            ]);
+
+            if ($v->fails()) {
+                $errors[] = ['row' => $rowNum, 'error' => $v->errors()->first()];
+                continue;
+            }
+
+            $email = strtolower(trim($data['email']));
+            if (in_array($email, $existingEmails, true)) {
+                $errors[] = ['row' => $rowNum, 'error' => "Email {$email} already exists."];
+                continue;
+            }
+
+            try {
+                $user = User::create([
+                    'name'            => trim($data['name']),
+                    'email'           => $email,
+                    'password'        => $data['password'],
+                    'phone'           => ! empty($data['phone']) ? trim($data['phone']) : null,
+                    'country'         => ! empty($data['country']) ? trim($data['country']) : null,
+                    'department'      => ! empty($data['department']) ? trim($data['department']) : null,
+                    'employee_number' => ! empty($data['employee_number']) ? trim($data['employee_number']) : null,
+                    'extension'       => ! empty($data['extension']) ? trim($data['extension']) : null,
+                    'status'          => ! empty($data['status']) ? trim($data['status']) : 'pending',
+                    'joining_date'    => ! empty($data['joining_date']) ? $data['joining_date'] : null,
+                    'terminate_date'  => ! empty($data['terminate_date']) ? $data['terminate_date'] : null,
+                    'monthly_target'  => ! empty($data['monthly_target']) ? (float) $data['monthly_target'] : null,
+                    'must_change_password' => true,
+                    'password_changed_at'  => now(),
+                ]);
+
+                // Assign roles from CSV (comma-separated role names)
+                if (! empty($data['roles'])) {
+                    $roleNames = array_map('trim', explode(',', $data['roles']));
+                    $roleIds = [];
+                    foreach ($roleNames as $rn) {
+                        $rn = strtolower($rn);
+                        if ($rn === 'superadmin') continue;
+                        if ($allRoles->has($rn)) {
+                            $roleIds[] = $allRoles[$rn];
+                        }
+                    }
+                    if (! empty($roleIds)) {
+                        $user->syncRoles(Role::whereIn('id', $roleIds)->get());
+                    }
+                }
+
+                if ($user->status === 'approved') {
+                    $user->update([
+                        'approved_by' => auth()->id(),
+                        'approved_at' => now(),
+                    ]);
+                }
+
+                $existingEmails[] = $email;
+                $imported++;
+            } catch (\Throwable $e) {
+                $errors[] = ['row' => $rowNum, 'error' => 'Database error: ' . $e->getMessage()];
+            }
+        }
+
+        fclose($handle);
+
+        try {
+            SystemAuditLog::record('user.bulk_imported', null, ['imported' => $imported, 'errors' => count($errors)], $request->user()->id, 'user');
+        } catch (\Throwable $e) {}
+
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        return response()->json([
+            'message'  => "{$imported} user(s) imported successfully.",
+            'imported' => $imported,
+            'errors'   => $errors,
+        ]);
+    }
+
+    // ─────────────────────────────────────────────
+    //  MONTHLY TARGET — Update + History
+    // ─────────────────────────────────────────────
+    public function updateMonthlyTarget(Request $request, User $user): JsonResponse
+    {
+        $validated = $request->validate([
+            'monthly_target' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],
+            'month'          => ['required', 'string', 'regex:/^\d{4}-\d{2}$/'],
+        ]);
+
+        $user->monthly_target = $validated['monthly_target'];
+        $user->save();
+
+        UserMonthlyTargetHistory::create([
+            'user_id' => $user->id,
+            'month' => $validated['month'],
+            'target_amount' => $validated['monthly_target'],
+            'set_by' => auth()->id(),
+        ]);
+
+        Cache::forget('user_stats_sa');
+        Cache::forget('user_stats_non_sa');
+
+        return response()->json([
+            'message'        => 'Monthly target updated.',
+            'monthly_target' => $user->monthly_target,
+        ]);
+    }
+
+    public function monthlyTargetHistory(User $user): JsonResponse
+    {
+        $history = UserMonthlyTargetHistory::where('user_id', $user->id)
+            ->with('setByUser:id,name')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->limit(50)
+            ->get()
+            ->map(fn ($h) => [
+                'id'            => $h->id,
+                'month'         => $h->month,
+                'target_amount' => $h->target_amount,
+                'set_by_name'   => $h->setByUser?->name ?? '—',
+                'created_at'    => $h->created_at?->toIso8601String(),
+            ]);
+
+        return response()->json(['data' => $history]);
+    }
+
+    // ─────────────────────────────────────────────
+    //  OTP-VERIFIED DELETE
+    // ─────────────────────────────────────────────
+    public function otpDelete(Request $request, User $user): JsonResponse
+    {
+        $validated = $request->validate([
+            'otp' => ['required', 'string', 'size:6'],
+        ]);
+
+        $authUser = $request->user();
+
+        // Verify OTP — check against the session-stored OTP
+        $storedOtp = session('delete_otp_' . $user->id);
+        $storedExpiry = session('delete_otp_expiry_' . $user->id);
+
+        if (! $storedOtp || $storedOtp !== $validated['otp'] || now()->timestamp > ($storedExpiry ?? 0)) {
+            return response()->json(['message' => 'Invalid or expired OTP.'], 422);
+        }
+
+        // Clear OTP from session
+        session()->forget(['delete_otp_' . $user->id, 'delete_otp_expiry_' . $user->id]);
+
+        $oldData = ['id' => $user->id, 'name' => $user->name, 'email' => $user->email];
+        try {
+            SystemAuditLog::record('user.deleted', $oldData, null, $authUser->id, 'user', $user->id);
+        } catch (\Throwable $e) {}
+
+        $user->delete();
+
+        return response()->json(['message' => 'User deleted successfully.']);
+    }
+
+    public function requestDeleteOtp(Request $request, User $user): JsonResponse
+    {
+        if ($user->hasRole('superadmin') && $request->user()->id !== $user->id) {
+            return response()->json(['message' => 'Cannot delete super admin.'], 403);
+        }
+
+        // Generate 6-digit OTP
+        $otp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+        // Store in session with 5 min expiry
+        session([
+            'delete_otp_' . $user->id        => $otp,
+            'delete_otp_expiry_' . $user->id  => now()->addMinutes(5)->timestamp,
+        ]);
+
+        // In production, send OTP via email/SMS. For now, return in response for admin.
+        return response()->json([
+            'message' => 'OTP generated. Valid for 5 minutes.',
+            'otp'     => $otp, // Remove in production — send via notification instead
+        ]);
     }
 }

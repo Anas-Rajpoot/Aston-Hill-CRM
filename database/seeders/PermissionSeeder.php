@@ -16,6 +16,12 @@ class PermissionSeeder extends Seeder
      */
     public function run(): void
     {
+        // Guard against accidental production execution
+        if (app()->environment('production') && ! $this->command?->confirm('WARNING: This will reset ALL role-permission assignments. Continue?', false)) {
+            $this->command?->warn('Aborted. No changes made.');
+            return;
+        }
+
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         // 0) Reset permission matrix (preserve roles/users, refresh role<->permission links)

@@ -5,7 +5,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import teamsApi from '@/services/teamsApi'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import api from '@/lib/axios'
 
 const route = useRoute()
@@ -358,7 +357,7 @@ const save = async () => {
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-white p-6">
     <div v-if="pageLoading" class="flex justify-center py-16">
-      <svg class="h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+      <svg class="h-8 w-8 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
     </div>
 
     <template v-else>
@@ -372,10 +371,8 @@ const save = async () => {
           Back to Teams
         </router-link>
       </div>
-      <Breadcrumbs class="mb-4" />
-
       <div v-if="error" class="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{{ error }}</div>
-      <div v-if="successMessage" class="mb-4 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-700">{{ successMessage }}</div>
+      <div v-if="successMessage" class="mb-4 rounded-lg border border-brand-primary-muted bg-brand-primary-light p-4 text-sm text-brand-primary-hover">{{ successMessage }}</div>
 
       <form @submit.prevent="save" class="w-full">
         <div class="mb-6 rounded border border-black">
@@ -386,13 +383,13 @@ const save = async () => {
             <div class="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2 lg:grid-cols-3">
               <div class="lg:col-span-2">
                 <label class="mb-1 block text-sm font-medium text-gray-700">Team Name <span class="text-red-500">*</span></label>
-                <input v-model="form.name" type="text" required class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="{ 'border-red-400': fieldError('name') }" />
+                <input v-model="form.name" type="text" required class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" :class="{ 'border-red-400': fieldError('name') }" />
                 <p v-if="fieldError('name')" class="mt-1 text-xs text-red-600">{{ fieldError('name') }}</p>
               </div>
 
               <div>
                 <label class="mb-1 block text-sm font-medium text-gray-700">Department <span class="text-red-500">*</span></label>
-                <select v-model="form.department" required class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="{ 'border-red-400': fieldError('department') }">
+                <select v-model="form.department" required class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" :class="{ 'border-red-400': fieldError('department') }">
                   <option value="">Select Department</option>
                   <option v-for="d in DEPARTMENTS" :key="d.value" :value="d.value">{{ d.label }}</option>
                 </select>
@@ -401,13 +398,13 @@ const save = async () => {
 
               <div class="lg:col-span-2">
                 <label class="mb-1 block text-sm font-medium text-gray-700">Description</label>
-                <textarea v-model="form.description" rows="3" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+                <textarea v-model="form.description" rows="3" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
                 <p class="mt-1 text-xs text-gray-400">{{ (form.description || '').length }}/1000</p>
               </div>
 
               <div>
                 <label class="mb-1 block text-sm font-medium text-gray-700">Max Members</label>
-                <input v-model="form.max_members" type="number" min="1" max="100" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="{ 'border-red-400': fieldError('max_members') }" placeholder="Unlimited if blank" @input="validateMaxMembersConstraint" />
+                <input v-model="form.max_members" type="number" min="1" max="100" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" :class="{ 'border-red-400': fieldError('max_members') }" placeholder="Unlimited if blank" @input="validateMaxMembersConstraint" />
                 <p v-if="fieldError('max_members')" class="mt-1 text-xs text-red-600">{{ fieldError('max_members') }}</p>
               </div>
             </div>
@@ -424,15 +421,15 @@ const save = async () => {
                 <label class="mb-1 block text-sm font-medium text-gray-700">Manager <span class="text-red-500">*</span></label>
                 <div class="rounded border border-gray-300 px-3 py-2 text-sm" @click="managerDropdownOpen = true">
                   <div v-if="selectedManagers.length" class="mb-2 flex flex-wrap gap-1.5">
-                    <span v-for="u in selectedManagers" :key="u.id" class="inline-flex items-center gap-1 rounded bg-green-100 px-2 py-1 text-xs text-green-800">
+                    <span v-for="u in selectedManagers" :key="u.id" class="inline-flex items-center gap-1 rounded bg-brand-primary-light px-2 py-1 text-xs text-brand-primary-hover">
                       {{ u.name }}
-                      <button type="button" class="text-green-700 hover:text-green-900" @click.stop="removeManager(u.id)">&times;</button>
+                      <button type="button" class="text-brand-primary-hover hover:text-brand-primary-dark" @click.stop="removeManager(u.id)">&times;</button>
                     </span>
                   </div>
                   <input v-model="managerSearch" type="text" class="w-full border-0 p-0 text-sm focus:ring-0" placeholder="Select team manager" @focus="managerDropdownOpen = true" @blur="closeManagerDropdownSoon" />
                   <div v-if="managerDropdownOpen" class="absolute left-0 right-0 top-full z-20 mt-1 max-h-52 overflow-y-auto rounded border border-gray-200 bg-white shadow-lg">
                     <button v-for="u in filteredManagers.slice(0, 40)" :key="u.id" type="button" class="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-gray-50" @mousedown.prevent="toggleManager(u)">
-                      <input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-green-600" :checked="(form.manager_ids || []).includes(u.id)" />
+                      <input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-brand-primary" :checked="(form.manager_ids || []).includes(u.id)" />
                       <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-[9px] font-bold text-gray-600">{{ initials(u.name) }}</span>
                       <div class="min-w-0">
                         <p class="truncate text-sm text-gray-900">{{ u.name }}</p>
@@ -442,7 +439,7 @@ const save = async () => {
                     <p v-if="!filteredManagers.length" class="px-3 py-2 text-xs text-gray-500">No users found.</p>
                     <div class="sticky bottom-0 flex flex-col gap-2 border-t border-gray-200 bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-end">
                       <button type="button" class="w-full rounded border border-gray-300 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 sm:w-auto" @mousedown.prevent="closeManagerDropdown">Close</button>
-                      <button type="button" class="w-full rounded bg-green-600 px-3 py-2 text-xs text-white hover:bg-green-700 sm:w-auto" @mousedown.prevent="doneManagerDropdown">Done</button>
+                      <button type="button" class="w-full rounded bg-brand-primary px-3 py-2 text-xs text-white hover:bg-brand-primary-hover sm:w-auto" @mousedown.prevent="doneManagerDropdown">Done</button>
                     </div>
                   </div>
                 </div>
@@ -453,15 +450,15 @@ const save = async () => {
                 <label class="mb-1 block text-sm font-medium text-gray-700">Team Leader <span class="text-red-500">*</span></label>
                 <div class="rounded border border-gray-300 px-3 py-2 text-sm" @click="leaderDropdownOpen = true">
                   <div v-if="selectedLeaders.length" class="mb-2 flex flex-wrap gap-1.5">
-                    <span v-for="u in selectedLeaders" :key="u.id" class="inline-flex items-center gap-1 rounded bg-blue-100 px-2 py-1 text-xs text-blue-800">
+                    <span v-for="u in selectedLeaders" :key="u.id" class="inline-flex items-center gap-1 rounded bg-brand-primary-light px-2 py-1 text-xs text-brand-primary-hover">
                       {{ u.name }}
-                      <button type="button" class="text-blue-700 hover:text-blue-900" @click.stop="removeLeader(u.id)">&times;</button>
+                      <button type="button" class="text-brand-primary-hover hover:text-brand-primary-dark" @click.stop="removeLeader(u.id)">&times;</button>
                     </span>
                   </div>
                   <input v-model="leaderSearch" type="text" class="w-full border-0 p-0 text-sm focus:ring-0" placeholder="Select team leader" @focus="leaderDropdownOpen = true" @blur="closeLeaderDropdownSoon" />
                   <div v-if="leaderDropdownOpen" class="absolute left-0 right-0 top-full z-20 mt-1 max-h-52 overflow-y-auto rounded border border-gray-200 bg-white shadow-lg">
                     <button v-for="u in filteredLeaders.slice(0, 40)" :key="u.id" type="button" class="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-gray-50" @mousedown.prevent="toggleLeader(u)">
-                      <input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600" :checked="(form.team_leader_ids || []).includes(u.id)" />
+                      <input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-brand-primary" :checked="(form.team_leader_ids || []).includes(u.id)" />
                       <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-[9px] font-bold text-gray-600">{{ initials(u.name) }}</span>
                       <div class="min-w-0">
                         <p class="truncate text-sm text-gray-900">{{ u.name }}</p>
@@ -471,7 +468,7 @@ const save = async () => {
                     <p v-if="!filteredLeaders.length" class="px-3 py-2 text-xs text-gray-500">No users found.</p>
                     <div class="sticky bottom-0 flex flex-col gap-2 border-t border-gray-200 bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-end">
                       <button type="button" class="w-full rounded border border-gray-300 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 sm:w-auto" @mousedown.prevent="closeLeaderDropdown">Close</button>
-                      <button type="button" class="w-full rounded bg-green-600 px-3 py-2 text-xs text-white hover:bg-green-700 sm:w-auto" @mousedown.prevent="doneLeaderDropdown">Done</button>
+                      <button type="button" class="w-full rounded bg-brand-primary px-3 py-2 text-xs text-white hover:bg-brand-primary-hover sm:w-auto" @mousedown.prevent="doneLeaderDropdown">Done</button>
                     </div>
                   </div>
                 </div>
@@ -500,7 +497,7 @@ const save = async () => {
                     <p v-if="!filteredMembers.length" class="px-3 py-2 text-xs text-gray-500">No users found.</p>
                     <div class="sticky bottom-0 flex flex-col gap-2 border-t border-gray-200 bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-end">
                       <button type="button" class="w-full rounded border border-gray-300 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 sm:w-auto" @mousedown.prevent="closeMemberDropdown">Close</button>
-                      <button type="button" class="w-full rounded bg-green-600 px-3 py-2 text-xs text-white hover:bg-green-700 sm:w-auto" @mousedown.prevent="doneMemberDropdown">Done</button>
+                      <button type="button" class="w-full rounded bg-brand-primary px-3 py-2 text-xs text-white hover:bg-brand-primary-hover sm:w-auto" @mousedown.prevent="doneMemberDropdown">Done</button>
                     </div>
                   </div>
                 </div>
@@ -517,17 +514,17 @@ const save = async () => {
           <div class="p-5">
             <div class="flex items-center gap-4">
               <label class="text-sm font-medium text-gray-700">Status</label>
-              <button type="button" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors" :class="form.status === 'active' ? 'bg-green-600' : 'bg-gray-300'" @click="form.status = form.status === 'active' ? 'inactive' : 'active'">
+              <button type="button" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors" :class="form.status === 'active' ? 'bg-brand-primary' : 'bg-gray-300'" @click="form.status = form.status === 'active' ? 'inactive' : 'active'">
                 <span class="inline-block h-4 w-4 rounded-full bg-white transition-transform" :class="form.status === 'active' ? 'translate-x-6' : 'translate-x-1'" />
               </button>
-              <span class="text-sm" :class="form.status === 'active' ? 'font-medium text-green-700' : 'text-gray-500'">{{ form.status === 'active' ? 'Active' : 'Inactive' }}</span>
+              <span class="text-sm" :class="form.status === 'active' ? 'font-medium text-brand-primary-hover' : 'text-gray-500'">{{ form.status === 'active' ? 'Active' : 'Inactive' }}</span>
             </div>
           </div>
         </div>
 
         <div class="flex items-center justify-end gap-3 pt-2">
           <router-link :to="`/teams/${route.params.id}`" class="rounded border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</router-link>
-          <button type="submit" :disabled="loading" class="rounded bg-green-600 px-6 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 disabled:opacity-50">
+          <button type="submit" :disabled="loading" class="rounded bg-brand-primary px-6 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-primary-hover disabled:opacity-50">
             {{ loading ? 'Saving…' : 'Save Changes' }}
           </button>
         </div>

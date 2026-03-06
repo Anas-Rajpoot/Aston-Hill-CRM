@@ -237,7 +237,7 @@ function onDelete(row) {
       aria-busy="true"
     >
       <div class="flex flex-col items-center gap-2">
-        <svg class="h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+        <svg class="h-8 w-8 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
@@ -247,17 +247,17 @@ function onDelete(row) {
 
     <table class="min-w-full border-2 border-black border-collapse bg-white">
       <thead>
-        <tr class="border-b-2 border-black bg-gray-50">
+        <tr class="bg-brand-primary border-b-2 border-green-700">
           <th
             v-for="col in columns"
             :key="col"
             scope="col"
-            class="whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-gray-900"
+            class="whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-white"
           >
             <button
               v-if="sortable(col)"
               type="button"
-              class="inline-flex items-center gap-1 font-semibold text-gray-900 hover:text-gray-700"
+              class="inline-flex items-center gap-1 font-semibold text-white hover:text-white/70"
               @click="toggleSort(col)"
             >
               {{ label(col) }}
@@ -265,9 +265,9 @@ function onDelete(row) {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
               </svg>
             </button>
-            <span v-else class="font-semibold text-gray-900">{{ label(col) }}</span>
+            <span v-else class="font-semibold text-white">{{ label(col) }}</span>
           </th>
-          <th v-if="hasAnyRowAction" scope="col" class="whitespace-nowrap px-4 py-3 text-center text-sm font-semibold text-gray-900">Actions</th>
+          <th v-if="hasAnyRowAction" scope="col" class="whitespace-nowrap px-4 py-3 text-center text-sm font-semibold text-white">Actions</th>
         </tr>
       </thead>
       <tbody class="bg-white">
@@ -293,14 +293,14 @@ function onDelete(row) {
             <template v-else-if="col === 'extension' && !isEditing(row.id, col)">
               <span
                 v-if="isEditableColumn(col)"
-                class="cursor-pointer text-blue-600 hover:text-blue-800 hover:underline"
+                class="cursor-pointer text-brand-primary hover:text-brand-primary-hover hover:underline"
                 title="Click to edit"
                 @click="openInputEdit(row, col)"
               >{{ row.extension || '—' }}</span>
               <button
                 v-else-if="canView && row.extension"
                 type="button"
-                class="text-left text-blue-600 hover:text-blue-800 hover:underline bg-transparent border-none cursor-pointer p-0"
+                class="text-left text-brand-primary hover:text-brand-primary-hover hover:underline bg-transparent border-none cursor-pointer p-0"
                 @click="goToView(row)"
               >
                 {{ row.extension }}
@@ -310,7 +310,7 @@ function onDelete(row) {
             <template v-else-if="col === 'password' && !isEditing(row.id, col)">
               <span
                 v-if="isEditableColumn(col)"
-                class="cursor-pointer text-blue-600 hover:text-blue-800 hover:underline"
+                class="cursor-pointer text-brand-primary hover:text-brand-primary-hover hover:underline"
                 title="Double-click to edit password"
                 @dblclick="openInputEdit(row, col)"
               >{{ row.password ? '••••••••' : '—' }}</span>
@@ -323,7 +323,7 @@ function onDelete(row) {
                   <select
                     v-if="col === 'gateway'"
                     v-model="inlineEditValue"
-                    class="min-w-[120px] rounded border border-gray-300 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                    class="min-w-[120px] rounded border border-gray-300 px-2 py-1 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   >
                     <option value="">—</option>
                     <option v-for="opt in getGatewayOptions()" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
@@ -331,33 +331,33 @@ function onDelete(row) {
                   <select
                     v-else-if="col === 'status'"
                     v-model="inlineEditValue"
-                    class="min-w-[120px] rounded border border-gray-300 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                    class="min-w-[120px] rounded border border-gray-300 px-2 py-1 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   >
                     <option v-for="opt in getStatusOptions()" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                   </select>
                   <select
                     v-else-if="col === 'assigned_to_name'"
                     v-model="inlineEditValue"
-                    class="min-w-[140px] rounded border border-gray-300 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                    class="min-w-[140px] rounded border border-gray-300 px-2 py-1 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   >
                     <option v-for="opt in getAssignedOptions()" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                   </select>
                   <select
                     v-else-if="col === 'manager'"
                     v-model="inlineEditValue"
-                    class="min-w-[140px] rounded border border-gray-300 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                    class="min-w-[140px] rounded border border-gray-300 px-2 py-1 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   >
                     <option v-for="opt in getManagerOptions()" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                   </select>
                   <select
                     v-else-if="col === 'team_leader'"
                     v-model="inlineEditValue"
-                    class="min-w-[140px] rounded border border-gray-300 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                    class="min-w-[140px] rounded border border-gray-300 px-2 py-1 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   >
                     <option v-for="opt in getTeamLeaderOptions()" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                   </select>
                   <span class="inline-flex items-center gap-1 shrink-0">
-                    <button type="button" class="rounded bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
+                    <button type="button" class="rounded bg-brand-primary px-2 py-1 text-xs font-medium text-white hover:bg-brand-primary-hover" @click="saveInlineEdit">Save</button>
                     <button type="button" class="rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
                   </span>
                 </span>
@@ -378,7 +378,7 @@ function onDelete(row) {
                   data-lpignore="true"
                   data-1p-ignore="true"
                   data-bwignore="true"
-                  class="min-w-[100px] rounded border border-gray-300 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="min-w-[100px] rounded border border-gray-300 px-2 py-1 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   @input="editingCell?.col === 'landline_number' && (inlineEditValue = String(inlineEditValue ?? '').replace(/\D/g, '').slice(0, 12))"
                   @keydown.enter="saveInlineEdit"
                   @keydown.escape="cancelInlineEdit"
@@ -392,7 +392,7 @@ function onDelete(row) {
                   {{ showPasswordInline ? 'Hide' : 'View' }}
                 </button>
                 <span class="inline-flex items-center gap-1 shrink-0">
-                  <button type="button" class="rounded bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
+                  <button type="button" class="rounded bg-brand-primary px-2 py-1 text-xs font-medium text-white hover:bg-brand-primary-hover" @click="saveInlineEdit">Save</button>
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
                 </span>
               </span>
@@ -441,7 +441,7 @@ function onDelete(row) {
               <button
                 v-if="canView"
                 type="button"
-                class="rounded-full p-1.5 text-blue-600 hover:bg-blue-50"
+                class="rounded-full p-1.5 text-brand-primary hover:bg-brand-primary-light"
                 title="View"
                 @click="goToView(row)"
               >
@@ -453,7 +453,7 @@ function onDelete(row) {
               <button
                 v-if="canEdit"
                 type="button"
-                class="rounded-full p-1.5 text-green-600 hover:bg-green-50"
+                class="rounded-full p-1.5 text-brand-primary hover:bg-brand-primary-light"
                 title="Edit"
                 @click="goToEdit(row)"
               >

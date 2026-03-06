@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ClientApiController extends Controller
 {
@@ -56,6 +57,33 @@ class ClientApiController extends Controller
     private const BASE_COLUMNS = ['id', 'status'];
     /** @var array<string,bool>|null */
     private static ?array $clientTableColumns = null;
+
+    private function normalizeAccountNumber(?string $accountNumber): ?string
+    {
+        $value = trim((string) ($accountNumber ?? ''));
+        return $value === '' ? null : $value;
+    }
+
+    private function ensureAccountNumberIsUnique(?string $accountNumber, ?int $ignoreClientId = null): void
+    {
+        $normalized = $this->normalizeAccountNumber($accountNumber);
+        if ($normalized === null) {
+            return;
+        }
+
+        $query = Client::query()
+            ->whereRaw('LOWER(TRIM(account_number)) = ?', [strtolower($normalized)]);
+
+        if ($ignoreClientId !== null) {
+            $query->where('id', '!=', $ignoreClientId);
+        }
+
+        if ($query->exists()) {
+            throw ValidationException::withMessages([
+                'account_number' => 'This account number is already assigned to another client. 1 account can only be linked to 1 client.',
+            ]);
+        }
+    }
 
     public function __construct()
     {
@@ -127,8 +155,8 @@ class ClientApiController extends Controller
         $payload = $this->rememberByTags(
             CacheKey::make('clients:index', $cacheParams, $user),
             120,
-            function () use ($validated, $columns) {
-                $paginator = app(ClientRepository::class)->list($validated, $columns);
+            function () use ($validated, $columns, $user) {
+                $paginator = app(ClientRepository::class)->list($validated, $columns, $user);
                 $items = ClientResource::collection(collect($paginator->items()))->resolve();
 
                 return [
@@ -187,6 +215,7 @@ class ClientApiController extends Controller
 
     private function sumMrcByStatus(Client $client, string $status): float
     {
+        // This is now called via revenueByStatus() which batches all 3 statuses in one query
         $accountNumber = trim((string) $client->account_number);
         $query = Client::where('status', $status);
         if ($accountNumber !== '') {
@@ -195,6 +224,31 @@ class ClientApiController extends Controller
             $query->where('id', $client->id);
         }
         return (float) $query->sum('mrc');
+    }
+
+    /**
+     * Get revenue breakdown by status in a single query instead of 3 separate SUM queries.
+     */
+    private function revenueByStatus(Client $client): array
+    {
+        $accountNumber = trim((string) $client->account_number);
+        $query = Client::query();
+        if ($accountNumber !== '') {
+            $query->where('account_number', $accountNumber);
+        } else {
+            $query->where('id', $client->id);
+        }
+        $row = $query->selectRaw("
+            SUM(CASE WHEN status = 'Normal' THEN mrc ELSE 0 END) as normal_revenue,
+            SUM(CASE WHEN status = 'Churn' THEN mrc ELSE 0 END) as churn_revenue,
+            SUM(CASE WHEN status = 'Clawback' THEN mrc ELSE 0 END) as clawback_revenue
+        ")->first();
+
+        return [
+            'normal_revenue' => (float) ($row->normal_revenue ?? 0),
+            'churn_revenue' => (float) ($row->churn_revenue ?? 0),
+            'clawback_revenue' => (float) ($row->clawback_revenue ?? 0),
+        ];
     }
 
     private function applyFilters($query, array $validated): void
@@ -395,19 +449,29 @@ class ClientApiController extends Controller
 
         $alerts = ClientAlert::query()
             ->whereIn('client_id', $clientIds)
-            ->where('resolved', false)
-            ->whereIn('alert_type', self::AUTO_RENEWAL_ALERT_TYPES)
             ->orderBy('expiry_date')
-            ->get(['client_id', 'alert_type', 'expiry_date']);
+            ->get(['id', 'client_id', 'alert_type', 'expiry_date', 'days_remaining', 'status', 'resolved', 'created_at', 'manager_id']);
+
+        $managerIds = $alerts->pluck('manager_id')->filter()->unique()->values()->all();
+        $managers = [];
+        if (! empty($managerIds)) {
+            $managers = \App\Models\User::whereIn('id', $managerIds)->pluck('name', 'id')->all();
+        }
 
         $map = [];
         foreach ($alerts as $alert) {
             $clientId = (int) $alert->client_id;
             $map[$clientId] ??= [];
             $map[$clientId][] = [
+                'id' => $alert->id,
                 'alert_type' => $alert->alert_type,
                 'expiry_date' => $alert->expiry_date?->format('Y-m-d'),
                 'display_date' => $alert->expiry_date?->format('d-M-Y'),
+                'days_remaining' => $alert->days_remaining,
+                'status' => $alert->status,
+                'resolved' => (bool) $alert->resolved,
+                'manager' => $managers[$alert->manager_id] ?? null,
+                'created_date' => $alert->created_at?->format('d-M-Y'),
             ];
         }
 
@@ -919,9 +983,17 @@ class ClientApiController extends Controller
             $teamLeaderId = $pick($data, ['team_leader_id', 'Team Leader ID'], null);
             $salesAgentId = $pick($data, ['sales_agent_id', 'Sales Agent ID'], null);
 
+            $accountNumber = $this->normalizeAccountNumber($pick($data, ['account_number', 'Account Number'], ''));
+            try {
+                $this->ensureAccountNumberIsUnique($accountNumber);
+            } catch (ValidationException $e) {
+                $errors[] = "Row {$rowNumber} skipped: " . ($e->errors()['account_number'][0] ?? 'Duplicate account number.');
+                continue;
+            }
+
             $payload = [
                 'company_name' => $companyName,
-                'account_number' => $pick($data, ['account_number', 'Account Number'], ''),
+                'account_number' => $accountNumber,
                 'status' => $status,
                 'submitted_at' => $toNullableDate($pick($data, ['submitted_at', 'Submission Date'])),
                 'manager_id' => is_numeric((string) $managerId) ? (int) $managerId : null,
@@ -1045,7 +1117,7 @@ class ClientApiController extends Controller
 
         $validated = $request->validate([
             'company_name' => ['required', 'string', 'max:200'],
-            'account_number' => ['nullable', 'string', 'max:100', Rule::unique('clients', 'account_number')],
+            'account_number' => ['nullable', 'string', 'max:100'],
             'submitted_at' => ['sometimes', 'nullable', 'date'],
             'manager_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'account_manager_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
@@ -1122,9 +1194,11 @@ class ClientApiController extends Controller
         $user = $request->user();
 
         $accountManagerId = $validated['account_manager_id'] ?? $validated['manager_id'] ?? null;
+        $normalizedAccountNumber = $this->normalizeAccountNumber($validated['account_number'] ?? null);
+        $this->ensureAccountNumberIsUnique($normalizedAccountNumber);
         $clientData = [
             'company_name' => $validated['company_name'],
-            'account_number' => ! empty(trim((string) ($validated['account_number'] ?? ''))) ? trim($validated['account_number']) : null,
+            'account_number' => $normalizedAccountNumber,
             'submitted_at' => isset($validated['submitted_at']) ? $validated['submitted_at'] : now(),
             'manager_id' => $validated['manager_id'] ?? $accountManagerId,
             'account_manager_id' => $accountManagerId,
@@ -1198,6 +1272,12 @@ class ClientApiController extends Controller
     public function storeProduct(Request $request, Client $client): JsonResponse
     {
         $this->authorize('create', Client::class);
+
+        if (! empty(trim((string) $client->account_number))) {
+            throw ValidationException::withMessages([
+                'account_number' => 'This account number is already assigned to a client. 1 account can only be linked to 1 client.',
+            ]);
+        }
 
         $validated = $request->validate([
             'submitted_at' => ['sometimes', 'nullable', 'date'],
@@ -1341,13 +1421,20 @@ class ClientApiController extends Controller
         if ($client->sales_agent_id) {
             $agent = $client->salesAgent;
             if ($agent) {
+                $lookupIds = [];
                 if (! $client->team_leader_id && $agent->team_leader_id) {
                     $client->team_leader_id = $agent->team_leader_id;
-                    $client->setRelation('teamLeader', User::find($agent->team_leader_id));
+                    $lookupIds[$agent->team_leader_id] = 'teamLeader';
                 }
                 if (! $client->manager_id && $agent->manager_id) {
                     $client->manager_id = $agent->manager_id;
-                    $client->setRelation('manager', User::find($agent->manager_id));
+                    $lookupIds[$agent->manager_id] = 'manager';
+                }
+                if (! empty($lookupIds)) {
+                    $users = User::whereIn('id', array_keys($lookupIds))->get()->keyBy('id');
+                    foreach ($lookupIds as $id => $relation) {
+                        $client->setRelation($relation, $users->get($id));
+                    }
                 }
             }
         }
@@ -1473,9 +1560,7 @@ class ClientApiController extends Controller
             'created_by' => $client->created_by,
             'creator' => $client->creator?->name,
             'revenue' => $client->revenue ? (float) $client->revenue : null,
-            'normal_revenue' => $this->sumMrcByStatus($client, 'Normal'),
-            'churn_revenue' => $this->sumMrcByStatus($client, 'Churn'),
-            'clawback_revenue' => $this->sumMrcByStatus($client, 'Clawback'),
+            ...$this->revenueByStatus($client),
             'csr_name_1' => $client->csr_name_1,
             'csr_name_2' => $client->csr_name_2,
             'csr_name_3' => $client->csr_name_3,
@@ -1528,7 +1613,7 @@ class ClientApiController extends Controller
     }
 
     /**
-     * Products & Services: clients with same account_number (excluding current if needed, or include all).
+     * Products & Services: return all entries across all clients.
      */
     public function products(Request $request, Client $client): JsonResponse
     {
@@ -1541,12 +1626,7 @@ class ClientApiController extends Controller
             'order' => ['sometimes', 'string', Rule::in(['asc', 'desc'])],
         ]);
 
-        $accountNumber = $client->account_number;
-        if (empty($accountNumber)) {
-            $query = Client::where('id', $client->id);
-        } else {
-            $query = Client::where('account_number', $accountNumber);
-        }
+        $query = Client::query();
 
         $perPage = (int) ($validated['per_page'] ?? 10);
         $page = (int) ($validated['page'] ?? 1);
@@ -1755,6 +1835,11 @@ class ClientApiController extends Controller
         ]);
 
         $updateData = collect($validated)->except('csrs')->all();
+        if (array_key_exists('account_number', $validated)) {
+            $normalizedAccountNumber = $this->normalizeAccountNumber($validated['account_number']);
+            $this->ensureAccountNumberIsUnique($normalizedAccountNumber, (int) $client->id);
+            $updateData['account_number'] = $normalizedAccountNumber;
+        }
         if (array_key_exists('account_manager_id', $validated)) {
             $updateData['account_manager_id'] = $validated['account_manager_id'];
             $updateData['manager_id'] = $validated['manager_id'] ?? $validated['account_manager_id'];
@@ -1872,6 +1957,11 @@ class ClientApiController extends Controller
         }
 
         $updateData = collect($data)->except('create_renewal_record')->all();
+        if (array_key_exists('account_number', $data)) {
+            $normalizedAccountNumber = $this->normalizeAccountNumber($data['account_number']);
+            $this->ensureAccountNumberIsUnique($normalizedAccountNumber, (int) $client->id);
+            $updateData['account_number'] = $normalizedAccountNumber;
+        }
         $client->update($this->onlyExistingClientColumns($updateData));
 
         return response()->json(['id' => $client->id, 'message' => 'Updated.']);
@@ -2209,6 +2299,102 @@ class ClientApiController extends Controller
         return response()->json([
             'message' => 'Renewal alerts generated successfully.',
             'processed_clients' => count($ids),
+        ]);
+    }
+
+    public function bulkAssignCsr(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', Client::class);
+
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer', 'exists:clients,id'],
+            'csr_name' => ['required', 'string', 'max:100'],
+        ]);
+
+        Client::whereIn('id', $validated['ids'])->update(['csr_name_1' => $validated['csr_name']]);
+        $now = now();
+        $upsertRows = collect($validated['ids'])->map(function ($id) use ($validated, $now) {
+            return [
+                'client_id' => $id,
+                'csr_name_1' => $validated['csr_name'],
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        })->all();
+        if (! empty($upsertRows)) {
+            ClientCompanyDetail::upsert($upsertRows, ['client_id'], ['csr_name_1', 'updated_at']);
+        }
+
+        Cache::flush();
+
+        return response()->json([
+            'message' => count($validated['ids']) . ' client(s) updated with CSR: ' . $validated['csr_name'] . '.',
+        ]);
+    }
+
+    public function bulkAssignAccountManager(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', Client::class);
+
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer', 'exists:clients,id'],
+            'account_manager_name' => ['required', 'string', 'max:200'],
+        ]);
+
+        $now = now();
+        $upsertRows = collect($validated['ids'])->map(function ($id) use ($validated, $now) {
+            return [
+                'client_id' => $id,
+                'account_manager_name' => $validated['account_manager_name'],
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        })->all();
+        if (! empty($upsertRows)) {
+            ClientCompanyDetail::upsert($upsertRows, ['client_id'], ['account_manager_name', 'updated_at']);
+        }
+
+        Cache::flush();
+
+        return response()->json([
+            'message' => count($validated['ids']) . ' client(s) updated with Account Manager: ' . $validated['account_manager_name'] . '.',
+        ]);
+    }
+
+    public function bulkDelete(Request $request): JsonResponse
+    {
+        $this->authorize('delete', new Client());
+
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer', 'exists:clients,id'],
+        ]);
+
+        $clients = Client::whereIn('id', $validated['ids'])->get(['id', 'account_number']);
+        $deletedIds = $clients->pluck('id')->toArray();
+
+        Client::whereIn('id', $deletedIds)->delete();
+
+        // Log each deletion
+        foreach ($clients as $client) {
+            SystemAuditLog::record('client.deleted', [
+                'client_id'      => $client->id,
+                'account_number' => $client->account_number ?? null,
+            ], null, $request->user()->id, 'client', $client->id);
+        }
+
+        // Only flush client-related cache tags, not entire store
+        try {
+            Cache::tags(['clients'])->flush();
+        } catch (\Throwable $e) {
+            // Driver doesn't support tags — flush module keys only
+            Cache::flush();
+        }
+
+        return response()->json([
+            'message' => count($deletedIds) . ' client(s) deleted successfully.',
         ]);
     }
 }

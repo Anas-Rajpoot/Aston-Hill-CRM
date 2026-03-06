@@ -7,7 +7,6 @@ import { ref, computed, onMounted, watch, provide } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import clientsApi from '@/services/clientsApi'
 import { useAuthStore } from '@/stores/auth'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import { toDdMmYyyy, formatSystemDateTime } from '@/lib/dateFormat'
 import ClientTable from '@/components/clients/ClientTable.vue'
 import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
@@ -187,7 +186,7 @@ function formatDate(d) {
 
 function statusBadgeClass(status) {
   const s = (status || '').toLowerCase()
-  if (s === 'active' || s === 'completed') return 'bg-green-100 text-green-700'
+  if (s === 'active' || s === 'completed') return 'bg-brand-primary-light text-brand-primary-hover'
   if (s === 'pending' || s.includes('pending')) return 'bg-amber-100 text-amber-800'
   if (s === 'cancelled' || s === 'rejected') return 'bg-red-100 text-red-700'
   return 'bg-gray-100 text-gray-700'
@@ -732,7 +731,7 @@ onMounted(() => {
         <div>
           <router-link
             to="/clients"
-            class="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-green-600"
+            class="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-brand-primary"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
@@ -742,14 +741,12 @@ onMounted(() => {
           <div class="mt-1 flex flex-wrap items-baseline gap-2">
             <h1 class="text-xl font-semibold text-gray-900">
               Client Profile – {{ client?.company_name ?? '…' }}
-            </h1>
-            <Breadcrumbs />
-          </div>
+            </h1>          </div>
         </div>
       </div>
 
       <div v-if="loading" class="flex justify-center py-16">
-        <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+        <svg class="h-10 w-10 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
@@ -788,19 +785,21 @@ onMounted(() => {
 
         <!-- Tabs -->
         <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
-          <div class="flex border-b border-gray-200">
-            <button
-              v-for="tab in tabs"
-              :key="tab.key"
-              type="button"
-              class="inline-flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors"
-              :class="activeTab === tab.key
-                ? 'border-green-600 text-green-600'
-                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
-              @click="activeTab = tab.key"
-            >
-              <span>{{ tab.label }}</span>
-            </button>
+          <div class="overflow-x-auto border-b border-gray-200 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <div class="flex w-max min-w-full">
+              <button
+                v-for="tab in tabs"
+                :key="tab.key"
+                type="button"
+                class="inline-flex flex-none items-center gap-2 border-b-2 px-3 py-2.5 text-xs font-medium whitespace-nowrap transition-colors sm:flex-1 sm:justify-center sm:px-4 sm:py-3 sm:text-sm"
+                :class="activeTab === tab.key
+                  ? 'border-brand-primary text-brand-primary'
+                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
+                @click="activeTab = tab.key"
+              >
+                <span>{{ tab.label }}</span>
+              </button>
+            </div>
           </div>
 
           <div class="p-4">
@@ -822,7 +821,7 @@ onMounted(() => {
                   <router-link
                     v-if="canEdit"
                     :to="`/clients/${id}/edit`"
-                    class="inline-flex items-center gap-1 rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+                    class="inline-flex items-center gap-1 rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover"
                   >
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -924,7 +923,7 @@ onMounted(() => {
                   <button
                     v-if="canEdit"
                     type="button"
-                    class="inline-flex items-center rounded bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700"
+                    class="inline-flex items-center rounded bg-brand-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-primary-hover"
                     @click="addContact"
                   >
                     + Add Contact
@@ -1028,7 +1027,7 @@ onMounted(() => {
                   <button
                     v-if="canEdit"
                     type="button"
-                    class="inline-flex items-center rounded bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700"
+                    class="inline-flex items-center rounded bg-brand-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-primary-hover"
                     @click="addAddress"
                   >
                     + Add Address
@@ -1118,7 +1117,7 @@ onMounted(() => {
                 </button>
                 <button
                   type="button"
-                  class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                  class="rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50"
                   :disabled="contactSaveLoading"
                   @click="saveContactDetails"
                 >
@@ -1148,7 +1147,7 @@ onMounted(() => {
                   <router-link
                     v-if="canEdit"
                     :to="`/clients/create?mode=product&client_id=${id}`"
-                    class="inline-flex items-center rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+                    class="inline-flex items-center rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover"
                   >
                     + Add Product
                   </router-link>
@@ -1183,7 +1182,7 @@ onMounted(() => {
                     <span class="whitespace-nowrap font-medium">Number of rows</span>
                     <select
                       :value="productsMeta.per_page || auth.defaultTablePageSize || 25"
-                      class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                      class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                       @change="onProductsPerPageChange"
                     >
                       <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
@@ -1206,7 +1205,7 @@ onMounted(() => {
               </p>
               <div class="overflow-x-auto rounded-lg border border-gray-200">
                 <table class="min-w-full border-collapse">
-                  <thead class="bg-green-700 text-white">
+                  <thead class="bg-brand-primary border-b-2 border-green-700 text-white">
                     <tr>
                       <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">SR</th>
                       <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Created</th>
@@ -1268,7 +1267,7 @@ onMounted(() => {
               </p>
               <div class="overflow-x-auto rounded-lg border border-gray-200">
                 <table class="min-w-full border-collapse">
-                  <thead class="bg-green-700 text-white">
+                  <thead class="bg-brand-primary border-b-2 border-green-700 text-white">
                     <tr>
                       <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">ID</th>
                       <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Submission Date</th>
@@ -1352,7 +1351,7 @@ onMounted(() => {
                   <button
                     v-if="canEdit"
                     type="button"
-                    class="inline-flex items-center gap-1 rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+                    class="inline-flex items-center gap-1 rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover"
                     @click="openAlertModal"
                   >
                     + Add Manual Alert
@@ -1376,7 +1375,7 @@ onMounted(() => {
                     <option v-for="s in ALERT_STATUS_OPTIONS" :key="s" :value="s">{{ s }}</option>
                   </select>
                 </div>
-                <button type="button" class="rounded bg-green-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-green-700" @click="applyAlertFilters">Apply</button>
+                <button type="button" class="rounded bg-brand-primary px-4 py-1.5 text-sm font-medium text-white hover:bg-brand-primary-hover" @click="applyAlertFilters">Apply</button>
                 <button type="button" class="rounded border border-gray-300 bg-white px-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100" @click="clearAlertFilters">Clear Filters</button>
                 <button type="button" class="ml-auto inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100" @click="showAlertAdvanced = !showAlertAdvanced">
                   <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
@@ -1427,7 +1426,7 @@ onMounted(() => {
                     <label class="block text-xs font-medium text-gray-600 mb-1">Days Remaining To</label>
                     <input v-model="alertAdvFilters.days_remaining_to" type="number" min="0" class="rounded border border-gray-300 px-3 py-1.5 text-sm min-w-[170px]" />
                   </div>
-                  <button type="button" class="rounded bg-green-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-green-700" @click="applyAlertFilters">Apply</button>
+                  <button type="button" class="rounded bg-brand-primary px-4 py-1.5 text-sm font-medium text-white hover:bg-brand-primary-hover" @click="applyAlertFilters">Apply</button>
                   <button type="button" class="rounded border border-gray-300 bg-white px-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100" @click="clearAlertAdvFilters">Clear Advanced</button>
                 </div>
               </div>
@@ -1435,7 +1434,7 @@ onMounted(() => {
               <!-- Alerts table -->
               <div class="overflow-x-auto rounded-lg border border-gray-200">
                 <table class="min-w-full border-collapse">
-                  <thead class="bg-gray-100">
+                  <thead class="bg-brand-primary border-b-2 border-green-700">
                     <tr>
                       <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold text-gray-700">SR</th>
                       <th
@@ -1448,8 +1447,8 @@ onMounted(() => {
                         <span class="inline-flex items-center gap-1">
                           {{ alertColLabel(col) }}
                           <template v-if="ALERT_SORTABLE.includes(col)">
-                            <svg v-if="alertSort === col && alertOrder === 'asc'" class="h-3.5 w-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
-                            <svg v-else-if="alertSort === col && alertOrder === 'desc'" class="h-3.5 w-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                            <svg v-if="alertSort === col && alertOrder === 'asc'" class="h-3.5 w-3.5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
+                            <svg v-else-if="alertSort === col && alertOrder === 'desc'" class="h-3.5 w-3.5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                             <svg v-else class="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
                           </template>
                         </span>
@@ -1482,7 +1481,7 @@ onMounted(() => {
                           <select
                             v-if="ALERT_DROPDOWN_COLS.includes(col)"
                             v-model="alertEditValue"
-                            class="w-full rounded border border-green-400 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                            class="w-full rounded border border-brand-primary px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary"
                             @blur="saveAlertCellEdit"
                             @keydown.enter="saveAlertCellEdit"
                             @keydown.escape="cancelAlertEdit"
@@ -1494,7 +1493,7 @@ onMounted(() => {
                             v-else-if="col === 'expiry_date'"
                             v-model="alertEditValue"
                             type="date"
-                            class="w-full rounded border border-green-400 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                            class="w-full rounded border border-brand-primary px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary"
                             @blur="saveAlertCellEdit"
                             @keydown.enter="saveAlertCellEdit"
                             @keydown.escape="cancelAlertEdit"
@@ -1504,7 +1503,7 @@ onMounted(() => {
                             v-model="alertEditValue"
                             type="number"
                             min="0"
-                            class="w-full rounded border border-green-400 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                            class="w-full rounded border border-brand-primary px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary"
                             @blur="saveAlertCellEdit"
                             @keydown.enter="saveAlertCellEdit"
                             @keydown.escape="cancelAlertEdit"
@@ -1513,7 +1512,7 @@ onMounted(() => {
                             v-else
                             v-model="alertEditValue"
                             type="text"
-                            class="w-full rounded border border-green-400 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                            class="w-full rounded border border-brand-primary px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary"
                             @blur="saveAlertCellEdit"
                             @keydown.enter="saveAlertCellEdit"
                             @keydown.escape="cancelAlertEdit"
@@ -1526,7 +1525,7 @@ onMounted(() => {
                               v-if="row.days_remaining != null"
                               :class="[
                                 'inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium',
-                                row.days_remaining <= 14 ? 'bg-red-100 text-red-700' : row.days_remaining <= 30 ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-700',
+                                row.days_remaining <= 14 ? 'bg-red-100 text-red-700' : row.days_remaining <= 30 ? 'bg-amber-100 text-amber-800' : 'bg-brand-primary-light text-brand-primary-hover',
                               ]"
                             >{{ row.days_remaining }} days</span>
                             <span v-else>—</span>
@@ -1535,15 +1534,15 @@ onMounted(() => {
                             <span
                               :class="[
                                 'inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium',
-                                row.status === 'Active' ? 'bg-green-100 text-green-700' :
+                                row.status === 'Active' ? 'bg-brand-primary-light text-brand-primary-hover' :
                                 row.status === 'Expired' ? 'bg-red-100 text-red-700' :
-                                row.status === 'Resolved' ? 'bg-blue-100 text-blue-700' :
+                                row.status === 'Resolved' ? 'bg-brand-primary-light text-brand-primary-hover' :
                                 'bg-yellow-100 text-yellow-700',
                               ]"
                             >{{ row.status || '—' }}</span>
                           </template>
                           <template v-else-if="col === 'resolved'">
-                            <span :class="row.resolved ? 'text-green-600 font-medium' : 'text-gray-500'">{{ row.resolved ? 'Yes' : 'No' }}</span>
+                            <span :class="row.resolved ? 'text-brand-primary font-medium' : 'text-gray-500'">{{ row.resolved ? 'Yes' : 'No' }}</span>
                           </template>
                           <template v-else>{{ row[col] != null && row[col] !== '' ? row[col] : '—' }}</template>
                         </template>
@@ -1552,14 +1551,14 @@ onMounted(() => {
                         <button
                           v-if="!row.resolved"
                           type="button"
-                          class="inline-flex items-center gap-1 text-sm font-medium text-green-600 hover:text-green-800"
+                          class="inline-flex items-center gap-1 text-sm font-medium text-brand-primary hover:text-brand-primary-hover"
                           @click="resolveAlert(row)"
                         >
                           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
                           Resolve
                         </button>
                         <span v-else class="inline-flex items-center gap-1 text-xs text-gray-400">
-                          <svg class="h-3.5 w-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                          <svg class="h-3.5 w-3.5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
                           Resolved
                         </span>
                       </td>
@@ -1580,7 +1579,7 @@ onMounted(() => {
                   <div class="grid grid-cols-2 gap-4">
                     <div class="col-span-2">
                       <label class="block text-sm font-medium text-gray-700 mb-1">Alert Type <span class="text-red-500">*</span></label>
-                      <select v-model="alertForm.alert_type" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+                      <select v-model="alertForm.alert_type" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
                         <option value="">Select type</option>
                         <option v-for="t in ALERT_TYPE_OPTIONS" :key="t" :value="t">{{ t }}</option>
                       </select>
@@ -1601,18 +1600,18 @@ onMounted(() => {
                     </div>
                     <div>
                       <label class="block text-sm font-medium text-gray-700 mb-1">Days Remaining</label>
-                      <input v-model="alertForm.days_remaining" type="number" min="0" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" placeholder="Auto or manual" />
+                      <input v-model="alertForm.days_remaining" type="number" min="0" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" placeholder="Auto or manual" />
                     </div>
                     <div>
                       <label class="block text-sm font-medium text-gray-700 mb-1">Manager</label>
-                      <select v-model="alertForm.manager_id" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+                      <select v-model="alertForm.manager_id" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
                         <option value="">Select manager</option>
                         <option v-for="m in managerOptions" :key="m.id" :value="m.id">{{ m.name }}</option>
                       </select>
                     </div>
                     <div>
                       <label class="block text-sm font-medium text-gray-700 mb-1">Status <span class="text-red-500">*</span></label>
-                      <select v-model="alertForm.status" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+                      <select v-model="alertForm.status" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
                         <option value="">Select status</option>
                         <option v-for="s in ALERT_STATUS_OPTIONS" :key="s" :value="s">{{ s }}</option>
                       </select>
@@ -1621,7 +1620,7 @@ onMounted(() => {
                   </div>
                   <div class="flex justify-end gap-3 pt-2">
                     <button type="button" class="rounded border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="showAlertModal = false">Cancel</button>
-                    <button type="submit" :disabled="alertSaving" class="rounded bg-green-600 px-5 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50">
+                    <button type="submit" :disabled="alertSaving" class="rounded bg-brand-primary px-5 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50">
                       {{ alertSaving ? 'Saving…' : 'Save Alert' }}
                     </button>
                   </div>
@@ -1664,7 +1663,7 @@ onMounted(() => {
                     <span class="font-medium text-gray-700">{{ a.field_label || a.field_name }}:</span>
                     <span class="text-red-500 line-through"><TruncatedText :text="a.old_value ?? ''" empty-label="(empty)" /></span>
                     <span class="text-gray-400">&rarr;</span>
-                    <span class="text-green-600"><TruncatedText :text="a.new_value ?? ''" empty-label="(empty)" /></span>
+                    <span class="text-brand-primary"><TruncatedText :text="a.new_value ?? ''" empty-label="(empty)" /></span>
                   </div>
                   <p class="mt-1.5 text-xs text-gray-500">
                     {{ formatSystemDateTime(a.changed_at, '—') }} by {{ a.changed_by_name || a.changed_by || '—' }}

@@ -173,7 +173,7 @@ function onEdit() {
             <button
               v-if="canEdit"
               type="button"
-              class="inline-flex items-center gap-2 rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+              class="inline-flex items-center gap-2 rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover"
               @click="onEdit"
             >
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

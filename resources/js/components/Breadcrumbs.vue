@@ -45,7 +45,7 @@ const SEGMENT_LABELS = {
   announcements: 'Announcements',
   notifications: 'Notifications',
   accounts: 'Accounts',
-  'email-followups': 'Email Follow Up',
+  'email-followups': 'Email Follow-Up',
   'login-logs': 'Login Logs',
   expenses: 'Expenses',
   'personal-notes': 'Personal Notes',
@@ -124,7 +124,7 @@ const breadcrumbs = computed(() => {
         <router-link
           v-if="crumb.to"
           :to="crumb.to"
-          class="hover:text-green-600 hover:underline"
+          class="hover:text-brand-primary hover:underline"
         >
           {{ crumb.label }}
         </router-link>

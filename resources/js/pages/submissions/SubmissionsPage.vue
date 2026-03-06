@@ -91,7 +91,7 @@ function onLeadNewSubmission() {
 
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-white py-6">
-    <div class="w-full space-y-6">
+    <div class="w-full space-y-4 px-2 sm:space-y-6 sm:px-0">
       <!-- TABS (dark bar like 1st image) -->
       <Tabs :tabs="tabs" :active="activeTab" @change="onTabChange" />
       <div v-if="hiddenTabsLabels.length" class="mx-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800">
@@ -99,7 +99,7 @@ function onLeadNewSubmission() {
       </div>
 
       <!-- TAB CONTENT: one async component per tab; each shows skeleton while loading. -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100 px-6 pb-6 pt-3 sm:px-8 sm:pb-8 sm:pt-4 !mt-0">
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 px-3 pb-5 pt-3 sm:px-8 sm:pb-8 sm:pt-4 !mt-0">
         <LeadSubmissionWizard
           v-if="activeTab === 'lead'"
           :key="`lead-${formKey}`"

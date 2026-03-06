@@ -279,7 +279,7 @@ async function submit() {
                     type="text"
                     placeholder="DD-MMM-YYYY"
                     readonly
-                    class="w-full cursor-pointer rounded border border-gray-300 bg-white px-3 py-2 pr-9 text-sm text-gray-900 placeholder-gray-400 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                    class="w-full cursor-pointer rounded border border-gray-300 bg-white px-3 py-2 pr-9 text-sm text-gray-900 placeholder-gray-400 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                     :class="fieldErrors.expense_date ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : ''"
                     @input="onExpenseDateInput"
                     @click="openDatePicker"
@@ -313,7 +313,7 @@ async function submit() {
                   v-if="categories?.length"
                   id="add-expense-category"
                   v-model="form.product_category"
-                  class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   :class="fieldErrors.product_category ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : ''"
                 >
                   <option disabled value="">Select Category</option>
@@ -326,7 +326,7 @@ async function submit() {
                   id="add-expense-category"
                   v-model="form.product_category"
                   type="text"
-                  class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   :class="fieldErrors.product_category ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : ''"
                   placeholder="Select Category"
                 />
@@ -340,7 +340,7 @@ async function submit() {
                   id="add-expense-invoice"
                   v-model="form.invoice_number"
                   type="text"
-                  class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   placeholder="INV-2024-XXXX"
                 />
               </div>
@@ -353,7 +353,7 @@ async function submit() {
                   :value="addedByDisplayName"
                   type="text"
                   readonly
-                  class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                 />
               </div>
             </div>
@@ -367,7 +367,7 @@ async function submit() {
                 <select
                   id="add-expense-vat"
                   v-model="form.vat_percent"
-                  class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                 >
                   <option v-for="opt in vatOptions" :key="opt.value" :value="opt.value">
                     {{ opt.label }}
@@ -384,7 +384,7 @@ async function submit() {
                   type="number"
                   min="0"
                   step="0.01"
-                  class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   placeholder="0.00"
                 />
               </div>
@@ -415,7 +415,7 @@ async function submit() {
                 id="add-expense-desc"
                 v-model="form.product_description"
                 type="text"
-                class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                 :class="fieldErrors.product_description ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : ''"
                 placeholder="Enter detailed description of the expense"
               />
@@ -431,7 +431,7 @@ async function submit() {
                 id="add-expense-comment"
                 v-model="form.comment"
                 rows="3"
-                class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-green-500 focus:ring-1 focus:ring-green-500 resize-none"
+                class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none"
                 :class="fieldErrors.comment ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : ''"
                 placeholder="Add any additional notes or remarks"
               />
@@ -457,7 +457,7 @@ async function submit() {
                   />
                   <button
                     type="button"
-                    class="inline-flex items-center gap-1.5 rounded px-2 py-1.5 text-sm font-medium text-[#1890FF] hover:bg-blue-50 transition-colors"
+                    class="inline-flex items-center gap-1.5 rounded px-2 py-1.5 text-sm font-medium text-brand-primary hover:bg-brand-primary-light transition-colors"
                     @click="triggerInvoiceUpload"
                   >
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -483,7 +483,7 @@ async function submit() {
                   />
                   <button
                     type="button"
-                    class="inline-flex items-center gap-1.5 rounded px-2 py-1.5 text-sm font-medium text-[#1890FF] hover:bg-blue-50 transition-colors"
+                    class="inline-flex items-center gap-1.5 rounded px-2 py-1.5 text-sm font-medium text-brand-primary hover:bg-brand-primary-light transition-colors"
                     @click="triggerSupportingUpload"
                   >
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -508,7 +508,7 @@ async function submit() {
               </button>
               <button
                 type="submit"
-                class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
+                class="rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50 transition-colors"
                 :disabled="submitting"
               >
                 {{ submitting ? 'Adding...' : 'Add Expense' }}

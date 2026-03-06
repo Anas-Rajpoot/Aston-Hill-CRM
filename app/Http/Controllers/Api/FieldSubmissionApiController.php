@@ -643,7 +643,7 @@ class FieldSubmissionApiController extends Controller
             'field_status' => ['nullable', 'string', 'max:80', Rule::in(FieldSubmission::FIELD_STATUSES)],
             'remarks_by_field_agent' => ['nullable', 'string', 'max:5000'],
             'documents' => ['sometimes', 'array', 'max:10'],
-            'documents.*' => ['file', 'max:' . (self::MAX_DOCUMENT_SIZE_MB * 1024)],
+            'documents.*' => ['file', 'max:' . (self::MAX_DOCUMENT_SIZE_MB * 1024), 'mimes:pdf,doc,docx,jpg,jpeg,png,eml'],
         ];
 
         $data = $request->validate($rules);

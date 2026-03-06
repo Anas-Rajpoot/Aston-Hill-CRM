@@ -139,10 +139,10 @@ class UserController extends Controller
             'roles.*' => 'exists:roles,id',
         ]);
 
-        $user->update($request->except('password'));
+        $user->update($request->only(['name', 'email', 'phone', 'country', 'cnic_number']));
 
         if ($request->password) {
-            $user->password = Hash::make($request->password);
+            $user->password = $request->password;
             $user->save();
         }
 

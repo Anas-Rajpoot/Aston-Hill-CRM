@@ -6,7 +6,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import leadSubmissionsApi from '@/services/leadSubmissionsApi'
 import { useAuthStore } from '@/stores/auth'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import Toast from '@/components/Toast.vue'
 import { useFormDraft } from '@/composables/useFormDraft'
 import { formatSystemDateTime } from '@/lib/dateFormat'
 
@@ -17,6 +17,12 @@ const auth = useAuthStore()
 const loading = ref(true)
 const saving = ref(false)
 const lead = ref(null)
+
+/* ───── Toast ───── */
+const showToast = ref(false)
+const toastType = ref('success')
+const toastMsg  = ref('')
+function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
 const primarySectionCollapsed = ref(false)
 const teamSectionCollapsed = ref(false)
 const backOfficeSectionCollapsed = ref(false)
@@ -83,6 +89,18 @@ const STATUS_OPTIONS = [
   { value: 'pending_for_finance', label: 'Pending with Finance' },
   { value: 'pending_for_ata', label: 'Pending for ATA' },
 ]
+
+function normalizeLeadStatus(status) {
+  const value = String(status || '').trim().toLowerCase()
+  if (!value || value === 'submitted') return 'unassigned'
+  return value
+}
+
+function normalizeDuStatus(status) {
+  const value = String(status || '').trim().toLowerCase()
+  if (value === 'submitted') return 'In Progress'
+  return status ?? ''
+}
 
 const EMIRATES_OPTIONS = [
   'Abu Dhabi',
@@ -188,7 +206,7 @@ async function loadLead() {
   try {
     const [leadRes, optionsRes, categoriesRes, teamRes] = await Promise.all([
       leadSubmissionsApi.getLead(id),
-      leadSubmissionsApi.getBackOfficeOptions().catch(() => ({})),
+      leadSubmissionsApi.getBackOfficeOptions(true).catch(() => ({})),
       leadSubmissionsApi.getCategories().catch(() => ({ data: [] })),
       leadSubmissionsApi.getTeamOptions().catch(() => ({})),
     ])
@@ -231,7 +249,7 @@ async function loadLead() {
       team_leader_id: data.team_leader_id != null ? Number(data.team_leader_id) : null,
       manager_id: data.manager_id != null ? Number(data.manager_id) : null,
       executive_id: data.executive_id != null ? Number(data.executive_id) : null,
-      status: data.status || 'unassigned',
+      status: normalizeLeadStatus(data.status),
       call_verification: data.call_verification ?? '',
       documents_verification: data.documents_verification ?? '',
       submission_date_from: data.submission_date_from ?? '',
@@ -239,7 +257,7 @@ async function loadLead() {
       activity: data.activity ?? '',
       back_office_account: data.back_office_account ?? '',
       work_order: data.work_order ?? '',
-      du_status: data.du_status ?? '',
+      du_status: normalizeDuStatus(data.du_status),
       completion_date: data.completion_date ?? '',
       du_remarks: data.du_remarks ?? '',
       additional_note: data.additional_note ?? '',
@@ -307,7 +325,7 @@ function addDocumentSlot() {
 async function uploadFromInput(e) {
   const input = e?.target
   if (!input?.files?.length) {
-    alert('Please select one or more files (PDF, DOC, DOCX, EML).')
+    toast('error', 'Please select one or more files (PDF, DOC, DOCX, EML).')
     return
   }
   const id = leadId.value
@@ -323,7 +341,7 @@ async function uploadFromInput(e) {
     input.value = ''
   } catch (err) {
     const msg = err.response?.data?.message || err.message || 'Upload failed.'
-    alert(msg)
+    toast('error', msg)
   } finally {
     uploadingDocs.value = false
   }
@@ -341,7 +359,7 @@ async function removeDocument(doc) {
     }
   } catch (err) {
     const msg = err.response?.data?.message || err.message || 'Remove failed.'
-    alert(msg)
+    toast('error', msg)
   } finally {
     removingDocId.value = null
   }
@@ -439,7 +457,7 @@ async function save() {
     goBack()
   } catch (err) {
     const msg = err.response?.data?.message || err.message || 'Failed to save.'
-    alert(msg)
+    toast('error', msg)
   } finally {
     saving.value = false
   }
@@ -463,17 +481,15 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] p-0">
+  <div class="min-h-[calc(100vh-4rem)] bg-gray-100 p-0">
     <div class="w-full">
       <!-- Header + Breadcrumb: background and border -->
       <div class="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div class="flex flex-wrap items-baseline gap-2">
-            <h1 class="text-xl font-semibold text-gray-900">Edit Lead Submission #{{ leadId }}</h1>
-            <Breadcrumbs />
-            <span v-if="draftSavedAt" class="text-xs text-gray-400 flex items-center gap-1">
+            <h1 class="text-xl font-semibold text-gray-900">Edit Lead Submission #{{ leadId }}</h1>            <span v-if="draftSavedAt" class="text-xs text-gray-400 flex items-center gap-1">
               <svg v-if="draftSaving" class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="4" class="opacity-25" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-              <svg v-else class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+              <svg v-else class="w-3 h-3 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
               Draft saved
             </span>
           </div>
@@ -487,7 +503,7 @@ onMounted(() => {
       </div>
 
       <div v-if="loading" class="flex justify-center py-16">
-        <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+        <svg class="h-10 w-10 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
@@ -500,13 +516,13 @@ onMounted(() => {
         <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
           <div class="px-6 py-4">
             <!-- Info banner -->
-            <div v-if="canEditBackOffice" class="mb-6 flex gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
-              <svg class="h-5 w-5 shrink-0 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+            <div v-if="canEditBackOffice" class="mb-6 flex gap-2 rounded-lg border border-brand-primary-muted bg-brand-primary-light px-4 py-3">
+              <svg class="h-5 w-5 shrink-0 text-brand-primary" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
               </svg>
               <div>
-                <p class="font-medium text-blue-800">Back Office Verification</p>
-                <p class="text-sm text-blue-700">Review all information and documents. Edit the back office section below and save changes.</p>
+                <p class="font-medium text-brand-primary-hover">Back Office Verification</p>
+                <p class="text-sm text-brand-primary-hover">Review all information and documents. Edit the back office section below and save changes.</p>
               </div>
             </div>
 
@@ -586,7 +602,7 @@ onMounted(() => {
                   <template v-if="canEditBackOffice">
                     <input v-model="form.ae_domain" type="text" placeholder="Enter Domain (e.g. example.ae)" class="mt-0.5 w-full rounded border bg-white px-3 py-2 text-sm" :class="fieldErrors.ae_domain ? 'border-red-500' : 'border-gray-300'" @input="fieldErrors.ae_domain = null" />
                     <p v-if="fieldErrors.ae_domain" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.ae_domain }}</p>
-                    <p v-else-if="form.ae_domain?.trim() && aeDomainValidation.valid && aeDomainValidation.message" class="mt-0.5 text-xs text-green-600">{{ aeDomainValidation.message }}</p>
+                    <p v-else-if="form.ae_domain?.trim() && aeDomainValidation.valid && aeDomainValidation.message" class="mt-0.5 text-xs text-brand-primary">{{ aeDomainValidation.message }}</p>
                     <p v-else-if="form.ae_domain?.trim() && !aeDomainValidation.valid" class="mt-0.5 text-xs text-red-600">{{ aeDomainValidation.message }}</p>
                   </template>
                   <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.ae_domain) }}</div>
@@ -865,7 +881,7 @@ onMounted(() => {
                   <div class="flex shrink-0 items-center gap-1">
                     <button
                       type="button"
-                      class="rounded p-1.5 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                      class="rounded p-1.5 text-brand-primary hover:bg-brand-primary-light hover:text-brand-primary-hover"
                       title="Download"
                       @click="downloadDoc(doc)"
                     >
@@ -895,10 +911,10 @@ onMounted(() => {
                   <h3 class="text-base font-semibold text-gray-900">Add Document</h3>
                   <button
                     type="button"
-                    class="inline-flex items-center gap-2 text-sm font-medium text-green-600 hover:text-green-700"
+                    class="inline-flex items-center gap-2 text-sm font-medium text-brand-primary hover:text-brand-primary-hover"
                     @click="addDocumentSlot"
                   >
-                    <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-5 h-5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                     </svg>
                     Add Document
@@ -922,7 +938,7 @@ onMounted(() => {
                       </div>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
-                      <label class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-green-500 bg-white text-green-700 text-sm font-medium cursor-pointer hover:bg-green-50 shrink-0 disabled:opacity-50" :class="{ 'opacity-50 pointer-events-none': uploadingDocs }">
+                      <label class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-brand-primary bg-white text-brand-primary-hover text-sm font-medium cursor-pointer hover:bg-brand-primary-light shrink-0 disabled:opacity-50" :class="{ 'opacity-50 pointer-events-none': uploadingDocs }">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                         </svg>
@@ -941,7 +957,7 @@ onMounted(() => {
               <button
                 type="button"
                 :disabled="saving"
-                class="inline-flex items-center gap-2 rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70"
+                class="inline-flex items-center gap-2 rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70"
                 @click="save"
               >
                 <svg v-if="saving" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -955,5 +971,7 @@ onMounted(() => {
         </div>
       </div>
     </div>
+
+    <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />
   </div>
 </template>

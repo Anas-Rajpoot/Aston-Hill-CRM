@@ -32,6 +32,9 @@ const currentIndex = ref(0)
 const loading = ref(true)
 const showDeleteModal = ref(false)
 const deleting = ref(false)
+const editing = ref(false)
+const saving = ref(false)
+const editForm = ref({ title: '', body: '' })
 
 const showToast = ref(false)
 const toastType = ref('success')
@@ -62,12 +65,14 @@ function formatDateDisplay(isoString) {
 
 function goPrev() {
   if (!canGoPrev.value) return
+  editing.value = false
   currentIndex.value -= 1
   updateRoute()
 }
 
 function goNext() {
   if (!canGoNext.value) return
+  editing.value = false
   currentIndex.value += 1
   updateRoute()
 }
@@ -81,6 +86,7 @@ function updateRoute() {
 
 function selectNoteByIndex(index) {
   if (index >= 0 && index < notes.value.length) {
+    editing.value = false
     currentIndex.value = index
     updateRoute()
   }
@@ -120,7 +126,35 @@ function addNote() {
 function editNote() {
   if (!canEdit.value) return
   const note = currentNote.value
-  if (note?.id) router.push(`/personal-notes/${note.id}/edit`)
+  if (!note?.id) return
+  editForm.value = { title: note.title || '', body: note.body || '' }
+  editing.value = true
+}
+
+function cancelEdit() {
+  editing.value = false
+  editForm.value = { title: '', body: '' }
+}
+
+async function saveEdit() {
+  if (!canEdit.value) return
+  const note = currentNote.value
+  if (!note?.id) return
+  saving.value = true
+  try {
+    await personalNotesApi.update(note.id, editForm.value)
+    // Update local data
+    const idx = notes.value.findIndex(n => n.id === note.id)
+    if (idx >= 0) {
+      notes.value[idx] = { ...notes.value[idx], ...editForm.value, updated_at: new Date().toISOString() }
+    }
+    editing.value = false
+    toast('success', 'Note updated successfully.')
+  } catch (e) {
+    toast('error', e?.response?.data?.message || 'Failed to update note.')
+  } finally {
+    saving.value = false
+  }
 }
 
 function openDeleteModal() {
@@ -173,7 +207,7 @@ watch(
 <template>
   <div class="flex h-[calc(100vh-4rem)] flex-col bg-white">
     <!-- Dark teal header -->
-    <header class="flex shrink-0 items-center justify-between bg-[#0D7377] px-4 py-3 text-white">
+    <header class="flex shrink-0 items-center justify-between bg-brand-primary-hover px-4 py-3 text-white">
       <div class="flex items-center gap-3">
         <span class="flex h-9 w-9 items-center justify-center rounded bg-white/20">
           <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -224,12 +258,12 @@ watch(
     <!-- Main: sidebar + note content -->
     <div class="flex min-h-0 flex-1">
       <!-- Left sidebar: note list (oval placeholders) -->
-      <aside class="flex w-14 shrink-0 flex-col items-center gap-2 border-r border-gray-300 bg-[#E8E8E8] py-4">
+      <aside class="flex w-14 shrink-0 flex-col items-center gap-2 border-r border-gray-300 bg-gray-100 py-4">
         <div
           v-for="(note, idx) in notes"
           :key="note.id"
           class="h-8 w-8 shrink-0 rounded-full transition-colors"
-          :class="idx === currentIndex ? 'bg-[#0D7377]' : 'bg-gray-300'"
+          :class="idx === currentIndex ? 'bg-brand-primary-hover' : 'bg-gray-300'"
           :title="note.title"
           role="button"
           tabindex="0"
@@ -239,19 +273,53 @@ watch(
       </aside>
 
       <!-- Note content -->
-      <main class="min-w-0 flex-1 overflow-y-auto bg-[#E8E8E8] p-6">
+      <main class="min-w-0 flex-1 overflow-y-auto bg-gray-100 p-6">
         <div v-if="!canView" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           You do not have permission to view personal notes.
         </div>
         <div v-if="loading" class="flex items-center justify-center py-16">
-          <svg class="h-8 w-8 animate-spin text-[#0D7377]" fill="none" viewBox="0 0 24 24">
+          <svg class="h-8 w-8 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
         </div>
         <template v-else-if="currentNote">
-          <h2 class="mb-2 text-xl font-bold text-gray-900">{{ currentNote.title }}</h2>
-          <p class="whitespace-pre-line text-sm text-gray-700">{{ currentNote.body || 'No content.' }}</p>
+          <template v-if="editing">
+            <input
+              v-model="editForm.title"
+              type="text"
+              class="mb-3 w-full rounded border border-gray-300 px-3 py-2 text-xl font-bold text-gray-900 focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
+              placeholder="Note title"
+            />
+            <textarea
+              v-model="editForm.body"
+              rows="12"
+              class="w-full flex-1 resize-none rounded border border-gray-300 px-3 py-2 text-sm text-gray-700 focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
+              placeholder="Note content..."
+            />
+            <div class="mt-3 flex items-center gap-2">
+              <button
+                type="button"
+                class="rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50"
+                :disabled="saving || !editForm.title.trim()"
+                @click="saveEdit"
+              >
+                {{ saving ? 'Saving…' : 'Save' }}
+              </button>
+              <button
+                type="button"
+                class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                :disabled="saving"
+                @click="cancelEdit"
+              >
+                Cancel
+              </button>
+            </div>
+          </template>
+          <template v-else>
+            <h2 class="mb-2 text-xl font-bold text-gray-900">{{ currentNote.title }}</h2>
+            <p class="whitespace-pre-line text-sm text-gray-700">{{ currentNote.body || 'No content.' }}</p>
+          </template>
         </template>
         <div v-else class="py-16 text-center text-gray-500">
           <p>No note selected.</p>
@@ -261,7 +329,7 @@ watch(
     </div>
 
     <!-- Footer: Created (left), Last updated + prev/next (right) -->
-    <footer class="flex shrink-0 items-center justify-between border-t border-gray-300 bg-[#E8E8E8] px-6 py-3">
+    <footer class="flex shrink-0 items-center justify-between border-t border-gray-300 bg-gray-100 px-6 py-3">
       <p class="text-sm text-gray-500">
         Created: {{ currentNote ? formatDateDisplay(currentNote.created_at) : '—' }}
       </p>

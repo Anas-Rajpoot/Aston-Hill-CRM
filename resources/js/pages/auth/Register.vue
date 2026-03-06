@@ -162,7 +162,7 @@ const submit = async () => {
         </div>
         <PasswordStrengthMeter ref="strengthMeter" :password="form.password" :policy="policy" />
         <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
-        <button type="submit" :disabled="loading" class="w-full py-2.5 px-4 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 focus:ring-green-500 disabled:opacity-50">
+        <button type="submit" :disabled="loading" class="w-full py-2.5 px-4 rounded-lg bg-brand-primary text-white font-medium hover:bg-brand-primary-hover focus:ring-brand-primary disabled:opacity-50">
           {{ loading ? 'Registering...' : 'Register' }}
         </button>
       </form>

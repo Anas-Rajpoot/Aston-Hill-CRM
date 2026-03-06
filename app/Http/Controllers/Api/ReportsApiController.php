@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Client;
 use App\Models\CustomerSupportSubmission;
 use App\Models\FieldSubmission;
 use App\Models\LeadSubmission;
@@ -11,6 +12,7 @@ use App\Models\VasRequestSubmission;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -254,6 +256,18 @@ class ReportsApiController extends Controller
         $user = $request->user();
         $from = $request->filled('from') ? Carbon::parse($request->from)->startOfDay() : null;
         $to   = $request->filled('to') ? Carbon::parse($request->to)->endOfDay() : null;
+
+        // Cache the heavy SLA computation for 2 minutes per user + filter combination
+        $cacheKey = 'sla_perf_' . $user->id . '_' . md5(json_encode([$from?->toDateString(), $to?->toDateString()]));
+        $payload = Cache::remember($cacheKey, 120, function () use ($user, $from, $to) {
+            return $this->computeSlaPerformance($user, $from, $to);
+        });
+
+        return response()->json($payload);
+    }
+
+    private function computeSlaPerformance($user, ?Carbon $from, ?Carbon $to): array
+    {
         $now  = Carbon::now();
 
         $rules = SlaRule::cached()->keyBy('module_key');
@@ -441,7 +455,7 @@ class ReportsApiController extends Controller
 
         $insights = $this->generateInsights($departments, $priority, $kpis, $monthlyTrend);
 
-        return response()->json([
+        return [
             'kpis'            => $kpis,
             'departments'     => $departments,
             'categories'      => $categories,
@@ -449,7 +463,7 @@ class ReportsApiController extends Controller
             'monthly_trend'   => $monthlyTrend,
             'recent_breaches' => $recentBreaches,
             'insights'        => $insights,
-        ]);
+        ];
     }
 
     /* ──── SLA helpers ──────────────────────────────────────────────── */
@@ -610,6 +624,141 @@ class ReportsApiController extends Controller
         }
 
         return $insights;
+    }
+
+    /**
+     * GET /api/reports/support-stats
+     * KPIs for Customer Support: total, by_status, by_csr, monthly trend, avg resolution time.
+     */
+    public function supportStats(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', CustomerSupportSubmission::class);
+
+        $validated = $request->validate([
+            'from'       => ['sometimes', 'nullable', 'date'],
+            'to'         => ['sometimes', 'nullable', 'date', 'after_or_equal:from'],
+            'status'     => ['sometimes', 'nullable', 'string'],
+            'csr_id'     => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+        ]);
+
+        $query = CustomerSupportSubmission::query()->visibleTo($request->user());
+        if (! empty($validated['from'])) $query->where('created_at', '>=', $validated['from'] . ' 00:00:00');
+        if (! empty($validated['to']))   $query->where('created_at', '<=', $validated['to'] . ' 23:59:59');
+        if (! empty($validated['status'])) $query->where('status', $validated['status']);
+        if (! empty($validated['csr_id'])) $query->where('csr_id', $validated['csr_id']);
+
+        $total = (clone $query)->count();
+        $open  = (clone $query)->whereIn('status', ['open', 'submitted'])->count();
+        $resolved = (clone $query)->whereIn('status', ['resolved', 'closed', 'completed'])->count();
+
+        $byStatus = (clone $query)->select('status', DB::raw('count(*) as count'))
+            ->groupBy('status')->pluck('count', 'status')->toArray();
+
+        $byCsr = (clone $query)
+            ->leftJoin('users', 'customer_support_submissions.csr_id', '=', 'users.id')
+            ->select('users.name', DB::raw('count(customer_support_submissions.id) as count'))
+            ->groupBy('users.id', 'users.name')
+            ->orderByDesc('count')->limit(10)
+            ->get()
+            ->map(fn ($r) => ['name' => $r->name ?? 'Unassigned', 'count' => (int) $r->count])
+            ->toArray();
+
+        $monthlyTrend = (clone $query)
+            ->select(DB::raw('YEAR(created_at) as year'), DB::raw('MONTH(created_at) as month'), DB::raw('count(*) as count'))
+            ->groupBy('year', 'month')
+            ->orderBy('year')->orderBy('month')
+            ->get()
+            ->map(fn ($r) => [
+                'label' => date('M Y', mktime(0, 0, 0, (int) $r->month, 1, (int) $r->year)),
+                'count' => (int) $r->count,
+            ])->toArray();
+
+        return response()->json([
+            'total_tickets'    => $total,
+            'open_tickets'     => $open,
+            'resolved_tickets' => $resolved,
+            'resolution_rate'  => $total > 0 ? round(100 * $resolved / $total, 1) : 0,
+            'by_status'        => $byStatus,
+            'by_csr'           => $byCsr,
+            'monthly_trend'    => $monthlyTrend,
+        ]);
+    }
+
+    /**
+     * GET /api/reports/client-stats
+     * Client & Company reports: total, by_status, top clients by submissions, revenue overview.
+     */
+    public function clientStats(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', Client::class);
+
+        $validated = $request->validate([
+            'from'   => ['sometimes', 'nullable', 'date'],
+            'to'     => ['sometimes', 'nullable', 'date', 'after_or_equal:from'],
+            'status' => ['sometimes', 'nullable', 'string'],
+        ]);
+
+        $query = Client::query();
+        if (! empty($validated['from'])) $query->where('clients.created_at', '>=', $validated['from'] . ' 00:00:00');
+        if (! empty($validated['to']))   $query->where('clients.created_at', '<=', $validated['to'] . ' 23:59:59');
+        if (! empty($validated['status'])) $query->where('clients.status', $validated['status']);
+
+        $total  = (clone $query)->count();
+
+        $byStatus = (clone $query)->select('status', DB::raw('count(*) as count'))
+            ->groupBy('status')->pluck('count', 'status')->toArray();
+
+        // Top 10 clients by submission count (across all modules)
+        $topClients = Client::select('clients.id', 'clients.company_name', 'clients.account_number')
+            ->selectRaw('(SELECT COUNT(*) FROM lead_submissions WHERE lead_submissions.client_id = clients.id) +
+                         (SELECT COUNT(*) FROM field_submissions WHERE field_submissions.client_id = clients.id) +
+                         (SELECT COUNT(*) FROM customer_support_submissions WHERE customer_support_submissions.client_id = clients.id) +
+                         (SELECT COUNT(*) FROM vas_request_submissions WHERE vas_request_submissions.client_id = clients.id) as total_submissions')
+            ->orderByDesc('total_submissions')
+            ->limit(10)
+            ->get()
+            ->map(fn ($c) => [
+                'company_name'     => $c->company_name,
+                'account_number'   => $c->account_number,
+                'total_submissions' => (int) $c->total_submissions,
+            ])->toArray();
+
+        // Monthly client growth
+        $monthlyGrowth = Client::select(
+                DB::raw('YEAR(created_at) as year'),
+                DB::raw('MONTH(created_at) as month'),
+                DB::raw('count(*) as count')
+            )
+            ->groupBy('year', 'month')
+            ->orderBy('year')->orderBy('month')
+            ->get()
+            ->map(fn ($r) => [
+                'label' => date('M Y', mktime(0, 0, 0, (int) $r->month, 1, (int) $r->year)),
+                'count' => (int) $r->count,
+            ])->toArray();
+
+        // Revenue summary (MRC from Lead Submissions)
+        $revenueSummary = LeadSubmission::query()
+            ->whereNotNull('mrc_aed')
+            ->where('mrc_aed', '>', 0)
+            ->select(
+                DB::raw('SUM(mrc_aed) as total_mrc'),
+                DB::raw('AVG(mrc_aed) as avg_mrc'),
+                DB::raw('COUNT(*) as deals_with_mrc')
+            )
+            ->first();
+
+        return response()->json([
+            'total_clients'     => $total,
+            'by_status'         => $byStatus,
+            'top_clients'       => $topClients,
+            'monthly_growth'    => $monthlyGrowth,
+            'revenue_summary'   => [
+                'total_mrc'      => round((float) ($revenueSummary->total_mrc ?? 0), 2),
+                'avg_mrc'        => round((float) ($revenueSummary->avg_mrc ?? 0), 2),
+                'deals_with_mrc' => (int) ($revenueSummary->deals_with_mrc ?? 0),
+            ],
+        ]);
     }
 
     private function applyLeadFilters($query, array $validated): void

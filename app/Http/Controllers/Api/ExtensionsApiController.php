@@ -73,7 +73,12 @@ class ExtensionsApiController extends Controller
             'manager:id,name',
         ]);
         $this->applyFilters($query, $validated);
-        $total = $query->count();
+
+        // Cache count for 30s
+        $countCacheKey = 'extensions_count_' . md5(json_encode($validated));
+        $total = Cache::remember($countCacheKey, 30, function () use ($query) {
+            return (clone $query)->count();
+        });
 
         $this->applySort($query, $sort, $order);
         $canViewPassword = $request->user() && ($request->user()->hasRole('superadmin') || $request->user()->can('extensions.edit'));

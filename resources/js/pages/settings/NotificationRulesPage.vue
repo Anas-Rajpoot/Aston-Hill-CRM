@@ -16,7 +16,6 @@ import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import api from '@/lib/axios'
 import draggable from 'vuedraggable'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Toast from '@/components/Toast.vue'
 import SkeletonBox from '@/components/skeletons/SkeletonBox.vue'
 import EmailTemplateModal from '@/components/notifications/EmailTemplateModal.vue'
@@ -628,7 +627,7 @@ function triggerLabel(key) {
   return (key ?? '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 function statusClass(s) {
-  if (s === 'sent')   return 'bg-green-100 text-green-800'
+  if (s === 'sent')   return 'bg-brand-primary-light text-brand-primary-hover'
   if (s === 'failed') return 'bg-red-100 text-red-800'
   return 'bg-yellow-100 text-yellow-800'
 }
@@ -647,9 +646,7 @@ function channelIcon(ch) {
     <!-- ═══ Header ═══ -->
     <div>
       <div class="flex items-center gap-3">
-        <h1 class="text-2xl font-bold text-gray-900">Notifications & Email Rules</h1>
-        <Breadcrumbs />
-        <span v-if="!configLoading && !canEditSettings && !canManageChannels" class="inline-flex items-center gap-1.5 rounded-lg bg-green-50 border border-green-200 px-3 py-1.5 text-xs font-semibold text-green-700">
+        <h1 class="text-2xl font-bold text-gray-900">Notifications & Email Rules</h1>        <span v-if="!configLoading && !canEditSettings && !canManageChannels" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-primary-light border border-brand-primary-muted px-3 py-1.5 text-xs font-semibold text-brand-primary-hover">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
           Super Admin Only
         </span>
@@ -716,13 +713,13 @@ function channelIcon(ch) {
             <button
               type="button" role="switch" :aria-checked="channels[ch.key]" :aria-label="ch.label"
               :disabled="!canManageChannels || !!channelSaving[ch.key]"
-              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              :class="channels[ch.key] ? 'bg-blue-600' : 'bg-gray-300'"
+              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              :class="channels[ch.key] ? 'bg-brand-primary' : 'bg-gray-300'"
               @click="toggleChannel(ch.key)"
             >
               <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform" :class="channels[ch.key] ? 'translate-x-6' : 'translate-x-1'" />
             </button>
-            <span class="text-sm" :class="channels[ch.key] ? 'text-blue-700 font-medium' : 'text-gray-500'">{{ channels[ch.key] ? 'Enabled' : 'Disabled' }}</span>
+            <span class="text-sm" :class="channels[ch.key] ? 'text-brand-primary-hover font-medium' : 'text-gray-500'">{{ channels[ch.key] ? 'Enabled' : 'Disabled' }}</span>
           </div>
         </div>
       </div>
@@ -740,10 +737,10 @@ function channelIcon(ch) {
       <div v-else class="overflow-x-auto">
         <table class="min-w-full text-sm">
           <thead>
-            <tr class="border-b border-gray-400 bg-gray-50 text-left">
-              <th class="px-6 py-3 font-semibold text-gray-700 whitespace-nowrap">Event / Trigger</th>
-              <th class="px-4 py-3 font-semibold text-gray-700 whitespace-nowrap">Module</th>
-              <th v-for="col in triggerCols" :key="col.key" class="px-4 py-3 font-semibold text-gray-700 text-center whitespace-nowrap">
+            <tr class="bg-brand-primary border-b-2 border-green-700 text-left">
+              <th class="px-6 py-3 font-semibold text-white whitespace-nowrap">Event / Trigger</th>
+              <th class="px-4 py-3 font-semibold text-white whitespace-nowrap">Module</th>
+              <th v-for="col in triggerCols" :key="col.key" class="px-4 py-3 font-semibold text-white text-center whitespace-nowrap">
                 <span class="inline-flex items-center gap-1">
                   {{ col.label }}
                   <svg v-if="isColumnLockedGlobal(col)" class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" :title="col.label + ' channel is disabled globally'">
@@ -778,7 +775,7 @@ function channelIcon(ch) {
                   :disabled="!!triggerSaving[`${tr.id}_${col.key}`]"
                   class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-40 disabled:cursor-not-allowed"
                   :class="tr[col.key]
-                    ? (col.key === 'email_alert_enabled' ? 'bg-amber-500 focus:ring-amber-400' : 'bg-green-500 focus:ring-green-400')
+                    ? (col.key === 'email_alert_enabled' ? 'bg-amber-500 focus:ring-amber-400' : 'bg-brand-primary focus:ring-brand-primary')
                     : 'bg-gray-300 focus:ring-gray-400'"
                   @click="toggleTriggerField(tr, col.key)"
                 >
@@ -814,7 +811,7 @@ function channelIcon(ch) {
           <p class="text-sm text-gray-500 mt-0.5">Configure SLA breach escalation recipients in order. Drag rows to reorder.</p>
         </div>
         <div v-if="escalationCanUpdate" class="flex items-center gap-2">
-          <button type="button" class="text-sm font-medium text-blue-600 hover:text-blue-700" :disabled="escalationSaving" @click="addEscalationLevel">+ Add Level</button>
+          <button type="button" class="text-sm font-medium text-brand-primary hover:text-brand-primary-hover" :disabled="escalationSaving" @click="addEscalationLevel">+ Add Level</button>
         </div>
       </div>
 
@@ -832,13 +829,13 @@ function channelIcon(ch) {
       <div v-else class="overflow-x-auto">
         <table class="min-w-full text-sm">
           <thead>
-            <tr class="border-b border-gray-300 bg-gray-50 text-left">
+            <tr class="bg-brand-primary border-b-2 border-green-700 text-left">
               <th class="w-10 px-3 py-3"></th>
-              <th class="px-4 py-3 font-semibold text-gray-700 whitespace-nowrap">Level</th>
-              <th class="px-4 py-3 font-semibold text-gray-700 whitespace-nowrap">Recipient Type</th>
-              <th class="px-4 py-3 font-semibold text-gray-700 whitespace-nowrap">Custom User / Email</th>
-              <th class="px-4 py-3 font-semibold text-gray-700 text-center whitespace-nowrap">Status</th>
-              <th class="px-4 py-3 font-semibold text-gray-700 text-center whitespace-nowrap">Actions</th>
+              <th class="px-4 py-3 font-semibold text-white whitespace-nowrap">Level</th>
+              <th class="px-4 py-3 font-semibold text-white whitespace-nowrap">Recipient Type</th>
+              <th class="px-4 py-3 font-semibold text-white whitespace-nowrap">Custom User / Email</th>
+              <th class="px-4 py-3 font-semibold text-white text-center whitespace-nowrap">Status</th>
+              <th class="px-4 py-3 font-semibold text-white text-center whitespace-nowrap">Actions</th>
             </tr>
           </thead>
           <draggable
@@ -846,7 +843,7 @@ function channelIcon(ch) {
             tag="tbody"
             item-key="id"
             handle=".drag-handle"
-            ghost-class="bg-blue-50"
+            ghost-class="bg-brand-primary-light"
             :disabled="!escalationCanUpdate"
             class="divide-y divide-gray-200"
             @end="onEscalationDragEnd"
@@ -862,7 +859,7 @@ function channelIcon(ch) {
 
                 <!-- Level number -->
                 <td class="px-4 py-3">
-                  <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">{{ lvl.level }}</span>
+                  <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-brand-primary-light text-brand-primary-hover text-xs font-bold">{{ lvl.level }}</span>
                 </td>
 
                 <!-- Recipient Type (shows roles from the system) -->
@@ -877,7 +874,7 @@ function channelIcon(ch) {
                   </template>
                   <template v-else>
                     <span class="inline-flex items-center gap-1.5 text-sm font-medium text-gray-800">
-                      <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                      <span class="w-2 h-2 rounded-full bg-brand-primary"></span>
                       {{ getRoleLabel(lvl.recipient_type) }}
                     </span>
                   </template>
@@ -907,7 +904,7 @@ function channelIcon(ch) {
                     <button
                       type="button" role="switch" :aria-checked="editingLevelDraft.is_active"
                       class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1"
-                      :class="editingLevelDraft.is_active ? 'bg-green-500 focus:ring-green-400' : 'bg-gray-300 focus:ring-gray-400'"
+                      :class="editingLevelDraft.is_active ? 'bg-brand-primary focus:ring-brand-primary' : 'bg-gray-300 focus:ring-gray-400'"
                       @click="editingLevelDraft.is_active = !editingLevelDraft.is_active"
                     >
                       <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform" :class="editingLevelDraft.is_active ? 'translate-x-[18px]' : 'translate-x-[3px]'" />
@@ -918,7 +915,7 @@ function channelIcon(ch) {
                       type="button" role="switch" :aria-checked="lvl.is_active"
                       :disabled="!escalationCanUpdate"
                       class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-40 disabled:cursor-not-allowed"
-                      :class="lvl.is_active ? 'bg-green-500 focus:ring-green-400' : 'bg-gray-300 focus:ring-gray-400'"
+                      :class="lvl.is_active ? 'bg-brand-primary focus:ring-brand-primary' : 'bg-gray-300 focus:ring-gray-400'"
                       @click="toggleEscalationActive(lvl)"
                     >
                       <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform" :class="lvl.is_active ? 'translate-x-[18px]' : 'translate-x-[3px]'" />
@@ -931,7 +928,7 @@ function channelIcon(ch) {
                   <div v-if="escalationCanUpdate" class="flex items-center justify-center gap-1">
                     <template v-if="editingLevelId === lvl.id">
                       <!-- Save -->
-                      <button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-green-600 text-white text-xs font-medium hover:bg-green-700 transition-colors" title="Save" :disabled="escalationSaving" @click="saveEditLevel(lvl)">
+                      <button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-brand-primary text-white text-xs font-medium hover:bg-brand-primary-hover transition-colors" title="Save" :disabled="escalationSaving" @click="saveEditLevel(lvl)">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
                         Save
                       </button>
@@ -943,7 +940,7 @@ function channelIcon(ch) {
                     </template>
                     <template v-else>
                       <!-- Edit -->
-                      <button type="button" class="p-1.5 text-teal-500 hover:bg-teal-50 rounded transition-colors" title="Edit" @click="startEditLevel(lvl)">
+                      <button type="button" class="p-1.5 text-brand-primary hover:bg-brand-primary-light rounded transition-colors" title="Edit" @click="startEditLevel(lvl)">
                         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" /><path d="M4 24h16" /></svg>
                       </button>
                       <!-- Delete -->
@@ -1017,7 +1014,7 @@ function channelIcon(ch) {
         <button
           v-if="tplCanUpdate"
           type="button"
-          class="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors"
+          class="inline-flex items-center gap-1.5 rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover transition-colors"
           @click="openCreateTemplate"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
@@ -1030,12 +1027,12 @@ function channelIcon(ch) {
       <div v-else class="overflow-x-auto">
         <table class="min-w-full text-sm">
           <thead>
-            <tr class="border-b border-gray-300 bg-gray-50 text-left">
-              <th class="px-6 py-3 font-semibold text-gray-700">Template Name</th>
-              <th class="px-6 py-3 font-semibold text-gray-700">Trigger</th>
-              <th class="px-6 py-3 font-semibold text-gray-700">Subject</th>
-              <th class="px-6 py-3 font-semibold text-gray-700">Last Updated</th>
-              <th class="px-6 py-3 font-semibold text-gray-700 text-center">Actions</th>
+            <tr class="bg-brand-primary border-b-2 border-green-700 text-left">
+              <th class="px-6 py-3 font-semibold text-white">Template Name</th>
+              <th class="px-6 py-3 font-semibold text-white">Trigger</th>
+              <th class="px-6 py-3 font-semibold text-white">Subject</th>
+              <th class="px-6 py-3 font-semibold text-white">Last Updated</th>
+              <th class="px-6 py-3 font-semibold text-white text-center">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200">
@@ -1083,7 +1080,7 @@ function channelIcon(ch) {
                 <div class="flex items-center justify-center gap-1">
                   <template v-if="editingTplId === tpl.id">
                     <!-- Save -->
-                    <button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-green-600 text-white text-xs font-medium hover:bg-green-700 transition-colors" @click="saveEditTemplate(tpl)">
+                    <button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-brand-primary text-white text-xs font-medium hover:bg-brand-primary-hover transition-colors" @click="saveEditTemplate(tpl)">
                       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
                       Save
                     </button>
@@ -1095,11 +1092,11 @@ function channelIcon(ch) {
                   </template>
                   <template v-else>
                     <!-- View/Edit in modal (for full body editing) -->
-                    <button type="button" class="p-1.5 text-blue-500 hover:bg-blue-50 rounded transition-colors" title="View / Edit Body" @click="openTemplate(tpl.id)">
+                    <button type="button" class="p-1.5 text-brand-primary hover:bg-brand-primary-light rounded transition-colors" title="View / Edit Body" @click="openTemplate(tpl.id)">
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                     </button>
                     <!-- Edit inline -->
-                    <button v-if="tplCanUpdate" type="button" class="p-1.5 text-teal-500 hover:bg-teal-50 rounded transition-colors" title="Edit" @click="startEditTemplate(tpl)">
+                    <button v-if="tplCanUpdate" type="button" class="p-1.5 text-brand-primary hover:bg-brand-primary-light rounded transition-colors" title="Edit" @click="startEditTemplate(tpl)">
                       <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" /><path d="M4 24h16" /></svg>
                     </button>
                     <!-- Delete -->
@@ -1162,13 +1159,13 @@ function channelIcon(ch) {
       <div v-else class="overflow-x-auto">
         <table class="min-w-full text-sm">
           <thead>
-            <tr class="border-b border-gray-300 bg-gray-50 text-left">
-              <th class="px-6 py-3 font-semibold text-gray-700 whitespace-nowrap">Date &amp; Time</th>
-              <th class="px-6 py-3 font-semibold text-gray-700 whitespace-nowrap">Trigger</th>
-              <th class="px-6 py-3 font-semibold text-gray-700 whitespace-nowrap">Channel</th>
-              <th class="px-6 py-3 font-semibold text-gray-700 whitespace-nowrap">Module</th>
-              <th class="px-6 py-3 font-semibold text-gray-700 whitespace-nowrap">Sent To</th>
-              <th class="px-6 py-3 font-semibold text-gray-700 whitespace-nowrap">Status</th>
+            <tr class="bg-brand-primary border-b-2 border-green-700 text-left">
+              <th class="px-6 py-3 font-semibold text-white whitespace-nowrap">Date &amp; Time</th>
+              <th class="px-6 py-3 font-semibold text-white whitespace-nowrap">Trigger</th>
+              <th class="px-6 py-3 font-semibold text-white whitespace-nowrap">Channel</th>
+              <th class="px-6 py-3 font-semibold text-white whitespace-nowrap">Module</th>
+              <th class="px-6 py-3 font-semibold text-white whitespace-nowrap">Sent To</th>
+              <th class="px-6 py-3 font-semibold text-white whitespace-nowrap">Status</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200">
@@ -1207,7 +1204,7 @@ function channelIcon(ch) {
             <option v-for="tr in triggers" :key="tr.key" :value="tr.key">{{ tr.name }}</option>
           </select>
         </div>
-        <button type="button" :disabled="testSending || !testEmail || !testTrigger" class="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 transition-colors" @click="sendTest">
+        <button type="button" :disabled="testSending || !testEmail || !testTrigger" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50 transition-colors" @click="sendTest">
           <svg v-if="testSending" class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
           {{ testSending ? 'Sending…' : 'Send Test' }}
         </button>
@@ -1221,7 +1218,7 @@ function channelIcon(ch) {
           v-if="canUpdate"
           type="button"
           :disabled="!anyDirty || anySaving"
-          class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          class="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           @click="saveAll"
         >
           <svg v-if="anySaving" class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
@@ -1232,11 +1229,11 @@ function channelIcon(ch) {
     </div>
 
     <!-- ═══ § 8 Audit & Safety Notes ═══ -->
-    <div class="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 flex gap-3">
-      <svg class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
+    <div class="rounded-xl border border-brand-primary-muted bg-brand-primary-light px-5 py-4 flex gap-3">
+      <svg class="w-5 h-5 text-brand-primary flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
       <div>
-        <p class="font-semibold text-blue-900">Audit &amp; Safety</p>
-        <ul class="mt-2 space-y-1 text-sm text-blue-800">
+        <p class="font-semibold text-brand-primary-dark">Audit &amp; Safety</p>
+        <ul class="mt-2 space-y-1 text-sm text-brand-primary-hover">
           <li>• Only Super Admin can modify notification rules.</li>
           <li>• Email templates follow SLA configuration and system behaviour.</li>
           <li>• Email templates are managed by system administrator.</li>

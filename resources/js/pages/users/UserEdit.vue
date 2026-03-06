@@ -7,7 +7,6 @@ import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import usersApi from '@/services/usersApi'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import UserEditSectionSkeleton from '@/components/skeletons/UserEditSectionSkeleton.vue'
 import { useUserEditData } from '@/composables/useUserEditData'
 import { toDdMmYyyy, fromDdMmYyyy, toDdMonYyyyLower, fromDdMonYyyyLower } from '@/lib/dateFormat'
@@ -377,9 +376,7 @@ onUnmounted(() => {
     <!-- Shell: always visible -->
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="flex flex-wrap items-baseline gap-2">
-        <h1 class="text-2xl font-bold text-gray-900 leading-tight">Edit Employee</h1>
-        <Breadcrumbs />
-      </div>
+        <h1 class="text-2xl font-bold text-gray-900 leading-tight">Edit Employee</h1>      </div>
       <button
         type="button"
         class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -420,7 +417,7 @@ onUnmounted(() => {
         <div class="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Employee Name <span class="text-red-500">*</span></label>
-            <input v-model="form.name" type="text" required class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Enter full name" />
+            <input v-model="form.name" type="text" required class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-brand-primary focus:border-brand-primary" placeholder="Enter full name" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Employee ID <span class="text-red-500">*</span></label>
@@ -428,14 +425,14 @@ onUnmounted(() => {
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Department <span class="text-red-500">*</span></label>
-            <select v-model="form.department" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500">
+            <select v-model="form.department" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-brand-primary focus:border-brand-primary">
               <option value="">Select department</option>
               <option v-for="d in DEPARTMENTS" :key="d.value" :value="d.value">{{ d.label }}</option>
             </select>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Employee Status <span class="text-red-500">*</span></label>
-            <select v-model="form.status" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500">
+            <select v-model="form.status" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-brand-primary focus:border-brand-primary">
               <option v-for="s in STATUS_OPTIONS" :key="s.value" :value="s.value">{{ s.label }}</option>
             </select>
           </div>
@@ -449,7 +446,7 @@ onUnmounted(() => {
               <input
                 v-model="terminateDateDisplay"
                 type="text"
-                class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 pr-10"
+                class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-brand-primary focus:border-brand-primary pr-10"
                 placeholder="e.g. 11-feb-2026"
               />
               <span class="absolute right-0 top-0 flex h-full w-10 items-center justify-center">
@@ -484,7 +481,7 @@ onUnmounted(() => {
               <label class="block text-sm font-medium text-gray-700 mb-1">Role(s) <span class="text-red-500">*</span></label>
               <button
                 type="button"
-                class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-left text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 flex items-center justify-between gap-2"
+                class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-left text-sm shadow-sm focus:ring-brand-primary focus:border-brand-primary flex items-center justify-between gap-2"
                 @click.stop="rolesDropdownOpen = !rolesDropdownOpen"
               >
                 <span class="text-gray-700 truncate min-w-0">
@@ -507,7 +504,7 @@ onUnmounted(() => {
                     <input
                       type="checkbox"
                       :checked="selectedRoleIdsSet.has(Number(r.id))"
-                      class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      class="rounded border-gray-300 text-brand-primary focus:ring-brand-primary"
                       @change="toggleRole(r.id)"
                     />
                     <span class="text-sm text-gray-700">{{ formatRoleForDisplay(r.name) }}</span>
@@ -516,7 +513,7 @@ onUnmounted(() => {
                 <div class="border-t border-gray-200 px-3 py-2">
                   <button
                     type="button"
-                    class="w-full rounded-md bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700"
+                    class="w-full rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-primary-hover"
                     @click.stop="rolesDropdownOpen = false"
                   >
                     Done
@@ -526,7 +523,7 @@ onUnmounted(() => {
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Extension</label>
-              <select v-model="form.extension" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500">
+              <select v-model="form.extension" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-brand-primary focus:border-brand-primary">
                 <option value="">Select extension</option>
                 <option v-for="opt in composableExtensionOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
               </select>
@@ -546,7 +543,7 @@ onUnmounted(() => {
         <div class="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Email ID</label>
-            <input v-model="form.email" type="email" name="edit_user_contact_email" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" required class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="employee@company.com" />
+            <input v-model="form.email" type="email" name="edit_user_contact_email" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" required class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-brand-primary focus:border-brand-primary" placeholder="employee@company.com" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Contact Number</label>
@@ -554,7 +551,7 @@ onUnmounted(() => {
               v-model="form.phone"
               type="text"
               maxlength="12"
-              class="w-full rounded-lg border shadow-sm focus:ring-blue-500 focus:border-blue-500"
+              class="w-full rounded-lg border shadow-sm focus:ring-brand-primary focus:border-brand-primary"
               :class="phoneError ? 'border-red-500' : 'border-gray-300'"
               placeholder="971XXXXXXXXX"
               @input="onPhoneInput"
@@ -563,14 +560,14 @@ onUnmounted(() => {
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Country</label>
-            <select v-model="form.country" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500">
+            <select v-model="form.country" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-brand-primary focus:border-brand-primary">
               <option value="">Select country</option>
               <option v-for="c in composableCountries" :key="c.id" :value="c.code || c.name">{{ c.name }}</option>
             </select>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">CNIC Number</label>
-            <input v-model="form.cnic_number" type="text" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="---------" />
+            <input v-model="form.cnic_number" type="text" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-brand-primary focus:border-brand-primary" placeholder="---------" />
           </div>
         </div>
       </div>
@@ -586,12 +583,12 @@ onUnmounted(() => {
         <div class="px-6 py-5 space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">System Login Email <span class="text-red-500">*</span></label>
-            <input v-model="form.email" type="email" name="edit_user_login_email" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" required class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="login@company.com" />
+            <input v-model="form.email" type="email" name="edit_user_login_email" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" required class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-brand-primary focus:border-brand-primary" placeholder="login@company.com" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">System Password</label>
             <div class="relative">
-              <input v-model="form.password" :type="showPassword ? 'text' : 'password'" name="edit_user_new_password" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 pr-10" placeholder="Enter secure password (leave blank to keep current)" />
+              <input v-model="form.password" :type="showPassword ? 'text' : 'password'" name="edit_user_new_password" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-brand-primary focus:border-brand-primary pr-10" placeholder="Enter secure password (leave blank to keep current)" />
               <button type="button" @click="showPassword = !showPassword" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                 <svg v-if="!showPassword" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                 <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
@@ -601,10 +598,10 @@ onUnmounted(() => {
           </div>
           <div v-if="form.password">
             <label class="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
-            <input v-model="form.password_confirmation" type="password" name="edit_user_new_password_confirmation" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Confirm new password" />
+            <input v-model="form.password_confirmation" type="password" name="edit_user_new_password_confirmation" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-brand-primary focus:border-brand-primary" placeholder="Confirm new password" />
           </div>
           <label class="flex items-center gap-2 cursor-pointer">
-            <input v-model="form.force_password_reset" type="checkbox" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+            <input v-model="form.force_password_reset" type="checkbox" class="rounded border-gray-300 text-brand-primary focus:ring-brand-primary" />
             <span class="text-sm text-gray-700">Force password reset on first login</span>
           </label>
         </div>
@@ -620,7 +617,7 @@ onUnmounted(() => {
         </div>
         <div class="px-6 py-5">
           <label class="block text-sm font-medium text-gray-700 mb-1">Internal Comment</label>
-          <textarea v-model="form.additional_notes" rows="4" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Add any internal notes or comments about this employee..." />
+          <textarea v-model="form.additional_notes" rows="4" class="w-full rounded-lg border border-gray-300 shadow-sm focus:ring-brand-primary focus:border-brand-primary" placeholder="Add any internal notes or comments about this employee..." />
         </div>
       </div>
 
@@ -643,7 +640,7 @@ onUnmounted(() => {
         <button
           type="submit"
           :disabled="saving"
-          class="inline-flex items-center gap-2 rounded-lg border border-green-600 bg-green-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+          class="inline-flex items-center gap-2 rounded-lg border border-brand-primary bg-brand-primary px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />

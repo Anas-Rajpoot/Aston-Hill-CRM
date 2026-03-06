@@ -9,7 +9,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import expensesApi from '@/services/expensesApi'
 import { toDdMonYyyyDash, fromDdMmYyyy, fromDdMonYyyyLower } from '@/lib/dateFormat'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 
 const VAT_OPTIONS_DEFAULT = [
   { value: 0, label: '0% (Exempt)' },
@@ -282,9 +281,7 @@ async function uploadNewAttachments() {
       <!-- Header -->
       <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 class="text-xl font-bold text-gray-900">Edit Expense Tracker</h1>
-          <Breadcrumbs class="mt-1" />
-        </div>
+          <h1 class="text-xl font-bold text-gray-900">Edit Expense Tracker</h1>        </div>
         <button
           type="button"
           class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -295,7 +292,7 @@ async function uploadNewAttachments() {
       </div>
 
       <div v-if="loading" class="flex justify-center py-12">
-        <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+        <svg class="h-10 w-10 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
@@ -327,7 +324,7 @@ async function uploadNewAttachments() {
                   v-model="form.expense_date_display"
                   type="text"
                   placeholder="DD-MMM-YYYY"
-                  class="w-full rounded border border-gray-300 bg-white px-3 py-2 pr-9 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full rounded border border-gray-300 bg-white px-3 py-2 pr-9 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   :class="fieldErrors.expense_date ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : ''"
                   :readonly="!canEdit"
                   @input="onExpenseDateInput"
@@ -353,7 +350,7 @@ async function uploadNewAttachments() {
                 v-if="filterOptions.categories?.length"
                 id="edit-expense-category"
                 v-model="form.product_category"
-                class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                 :class="fieldErrors.product_category ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : ''"
                 :disabled="!canEdit"
               >
@@ -378,7 +375,7 @@ async function uploadNewAttachments() {
                 id="edit-expense-invoice"
                 v-model="form.invoice_number"
                 type="text"
-                class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                 placeholder="INV-2024-XXXX"
                 :readonly="!canEdit"
               />
@@ -390,7 +387,7 @@ async function uploadNewAttachments() {
                 :value="addedByDisplayName"
                 type="text"
                 readonly
-                class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
               />
             </div>
           </div>
@@ -399,7 +396,7 @@ async function uploadNewAttachments() {
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <label for="edit-expense-vat" class="mb-1 block text-sm font-medium text-gray-700">VAT %</label>
-              <select id="edit-expense-vat" v-model="form.vat_percent" class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :disabled="!canEdit">
+              <select id="edit-expense-vat" v-model="form.vat_percent" class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" :disabled="!canEdit">
                 <option v-for="opt in vatOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
               </select>
             </div>
@@ -411,7 +408,7 @@ async function uploadNewAttachments() {
                 type="number"
                 min="0"
                 step="0.01"
-                class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                 :readonly="!canEdit"
               />
             </div>
@@ -432,7 +429,7 @@ async function uploadNewAttachments() {
               id="edit-expense-desc"
               v-model="form.product_description"
               type="text"
-              class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
               :class="fieldErrors.product_description ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : ''"
               placeholder="Enter detailed description of the expense"
               :readonly="!canEdit"
@@ -447,7 +444,7 @@ async function uploadNewAttachments() {
               id="edit-expense-comment"
               v-model="form.comment"
               rows="3"
-              class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 resize-none"
+              class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none"
               :class="fieldErrors.comment ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : ''"
               placeholder="Add any additional notes or remarks"
               :readonly="!canEdit"
@@ -500,7 +497,7 @@ async function uploadNewAttachments() {
               />
               <button
                 type="button"
-                class="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+                class="inline-flex items-center gap-2 rounded-lg border border-brand-primary-muted bg-brand-primary-light px-3 py-2 text-sm font-medium text-brand-primary-hover hover:bg-brand-primary-light disabled:opacity-50"
                 :disabled="uploadingAttachments"
                 @click="triggerAddInvoice"
               >
@@ -514,7 +511,7 @@ async function uploadNewAttachments() {
 
         <div class="flex justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4">
           <button type="button" class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="back">Cancel</button>
-          <button v-if="canEdit" type="submit" class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50" :disabled="saving">
+          <button v-if="canEdit" type="submit" class="rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50" :disabled="saving">
             {{ saving ? 'Updating...' : 'Update Expense' }}
           </button>
         </div>

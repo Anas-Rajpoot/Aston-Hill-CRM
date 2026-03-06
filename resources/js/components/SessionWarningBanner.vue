@@ -72,7 +72,7 @@ function formatCountdown(secs) {
             <button
               type="button"
               :disabled="extending"
-              class="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 transition focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+              class="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-brand-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50 transition focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2"
               @click="emit('stay')"
             >
               <svg v-if="extending" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>

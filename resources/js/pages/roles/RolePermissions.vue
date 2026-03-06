@@ -7,7 +7,6 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import api from '@/lib/axios'
 import SkeletonPermissionCards from '@/components/skeletons/SkeletonPermissionCards.vue'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -49,7 +48,7 @@ const moduleOrderIndex = new Map(MODULE_DISPLAY_ORDER.map((key, idx) => [key, id
 const priorityClass = (p) => {
   if (p === 'high') return 'bg-red-100 text-red-800'
   if (p === 'medium') return 'bg-amber-100 text-amber-800'
-  return 'bg-blue-100 text-blue-800'
+  return 'bg-brand-primary-light text-brand-primary-hover'
 }
 
 /** Filter modules by search; each module keeps full permissions for counts but exposes filtered list for display. */
@@ -143,6 +142,8 @@ const save = async () => {
   }
 }
 
+const isSuperadmin = computed(() => (role.value?.name ?? '').toLowerCase() === 'superadmin')
+
 const goBack = () => router.push('/roles')
 
 onMounted(load)
@@ -170,9 +171,9 @@ watch(roleId, load)
       </div>
       <button
         type="button"
-        :disabled="saving"
+        :disabled="saving || isSuperadmin"
         @click="save"
-        class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+        class="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50"
       >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
@@ -180,13 +181,14 @@ watch(roleId, load)
         {{ saving ? 'Saving…' : 'Save Changes' }}
       </button>
     </div>
-    <Breadcrumbs />
-
-    <div v-if="successMessage" class="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700">
+    <div v-if="successMessage" class="rounded-xl bg-brand-primary-light border border-brand-primary-muted px-4 py-3 text-sm text-brand-primary-hover">
       {{ successMessage }}
     </div>
     <div v-if="errorMessage" class="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
       {{ errorMessage }}
+    </div>
+    <div v-if="isSuperadmin" class="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-700">
+      <strong>Read-only:</strong> Superadmin permissions are managed by the system and cannot be modified.
     </div>
 
     <!-- Section-level async: skeleton until permissions-page data loads -->
@@ -230,7 +232,7 @@ watch(roleId, load)
           <div class="flex flex-wrap items-center justify-between gap-4 px-4 py-3 bg-gray-50 border-b border-gray-200">
             <div class="flex items-center gap-3">
               <span
-                :class="mod.key === 'dashboard' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600'"
+                :class="mod.key === 'dashboard' ? 'bg-brand-primary-light text-brand-primary' : 'bg-gray-200 text-gray-600'"
                 class="flex h-10 w-10 items-center justify-center rounded-lg"
               >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

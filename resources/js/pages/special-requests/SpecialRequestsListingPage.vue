@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import specialRequestsApi from '@/services/specialRequestsApi'
@@ -98,6 +98,10 @@ const advancedVisible = ref(false)
 const columnModalVisible = ref(false)
 const exportLoading = ref(false)
 const selectedIds = ref([])
+const canCreate = computed(() => canModuleAction(auth.user, 'special', 'create', ['special-requests.create']))
+const canEdit = computed(() => canModuleAction(auth.user, 'special', 'edit', ['special-requests.edit']))
+const canDelete = computed(() => canModuleAction(auth.user, 'special', 'delete', ['special-requests.delete']))
+const canViewAction = computed(() => canModuleAction(auth.user, 'special', 'view', ['special-requests.view']))
 const canExport = () => canModuleAction(auth.user, 'special', 'export')
 
 const filters = ref({
@@ -347,7 +351,7 @@ onMounted(async () => {
           <button
             v-if="canExport()"
             type="button"
-            class="inline-flex items-center rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70"
+            class="inline-flex items-center rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70"
             :disabled="loading || exportLoading"
             @click="onExport"
           >
@@ -397,7 +401,7 @@ onMounted(async () => {
           <div class="flex items-center gap-4">
             <div class="flex items-center gap-2 text-sm text-gray-600">
               <span class="whitespace-nowrap font-medium">Number of rows</span>
-              <select :value="meta.per_page" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500" @change="onPerPageChange">
+              <select :value="meta.per_page" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" @change="onPerPageChange">
                 <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
               </select>
             </div>

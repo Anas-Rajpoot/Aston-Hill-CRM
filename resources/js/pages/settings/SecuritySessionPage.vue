@@ -9,7 +9,6 @@
 import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import api from '@/lib/axios'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Toast from '@/components/Toast.vue'
 import SkeletonBox from '@/components/skeletons/SkeletonBox.vue'
 
@@ -169,9 +168,7 @@ const warningOptions = [
     <div>
       <div class="flex items-center justify-between gap-4">
         <div class="flex flex-wrap items-baseline gap-2">
-          <h1 class="text-2xl font-bold text-gray-900 leading-tight">Security, Session & Access Control</h1>
-          <Breadcrumbs />
-        </div>
+          <h1 class="text-2xl font-bold text-gray-900 leading-tight">Security, Session & Access Control</h1>        </div>
         <span class="inline-flex items-center gap-1.5 shrink-0 rounded-lg bg-amber-50 border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-700">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
           Super Admin Only
@@ -215,7 +212,7 @@ const warningOptions = [
         <!-- ═══ Section 1: Session Management ═══ -->
         <div class="bg-white rounded-xl border border-gray-200 p-6">
           <div class="flex items-center gap-3 mb-5">
-            <div class="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+            <div class="flex h-9 w-9 items-center justify-center rounded-full bg-brand-primary-light text-brand-primary">
               <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             </div>
             <div>
@@ -232,7 +229,7 @@ const warningOptions = [
                 <select
                   v-model.number="form.auto_logout_after_minutes"
                   :disabled="!canUpdate"
-                  class="w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2.5 pr-10 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500 transition"
+                  class="w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2.5 pr-10 text-sm text-gray-900 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary disabled:bg-gray-50 disabled:text-gray-500 transition"
                 >
                   <option v-for="o in autoLogoutOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
                 </select>
@@ -249,7 +246,7 @@ const warningOptions = [
                 <select
                   v-model.number="form.session_warning_minutes"
                   :disabled="!canUpdate"
-                  class="w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2.5 pr-10 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500 transition"
+                  class="w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2.5 pr-10 text-sm text-gray-900 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary disabled:bg-gray-50 disabled:text-gray-500 transition"
                 >
                   <option v-for="o in warningOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
                 </select>
@@ -268,8 +265,8 @@ const warningOptions = [
                   role="switch"
                   :aria-checked="form.force_logout_on_close"
                   :disabled="!canUpdate"
-                  class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  :class="form.force_logout_on_close ? 'bg-blue-600' : 'bg-gray-200'"
+                  class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  :class="form.force_logout_on_close ? 'bg-brand-primary' : 'bg-gray-200'"
                   @click="canUpdate && (form.force_logout_on_close = !form.force_logout_on_close)"
                 >
                   <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out" :class="form.force_logout_on_close ? 'translate-x-5' : 'translate-x-0'" />
@@ -288,13 +285,13 @@ const warningOptions = [
                   role="switch"
                   :aria-checked="form.prevent_multiple_sessions"
                   :disabled="!canUpdate"
-                  class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  :class="form.prevent_multiple_sessions ? 'bg-blue-600' : 'bg-gray-200'"
+                  class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  :class="form.prevent_multiple_sessions ? 'bg-brand-primary' : 'bg-gray-200'"
                   @click="canUpdate && (form.prevent_multiple_sessions = !form.prevent_multiple_sessions)"
                 >
                   <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out" :class="form.prevent_multiple_sessions ? 'translate-x-5' : 'translate-x-0'" />
                 </button>
-                <span class="text-sm" :class="form.prevent_multiple_sessions ? 'text-green-600' : 'text-red-600'">{{ form.prevent_multiple_sessions ? '\u2705 Users can login on multiple devices' : '\u274C Users can only login on one device' }}</span>
+                <span class="text-sm" :class="form.prevent_multiple_sessions ? 'text-brand-primary' : 'text-red-600'">{{ form.prevent_multiple_sessions ? '\u2705 Users can login on multiple devices' : '\u274C Users can only login on one device' }}</span>
               </div>
               <p class="text-xs text-gray-400 mt-1.5">When enabled: users can login on multiple devices simultaneously. When disabled: new login terminates all other active sessions.</p>
             </div>
@@ -323,7 +320,7 @@ const warningOptions = [
                 min="1"
                 max="20"
                 :disabled="!canUpdate"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500 transition"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary disabled:bg-gray-50 disabled:text-gray-500 transition"
               />
               <p class="text-xs text-gray-400 mt-1">Maximum failed login attempts before action</p>
               <p v-if="errors.max_login_attempts" class="mt-1 text-xs text-red-600">{{ errors.max_login_attempts }}</p>
@@ -338,8 +335,8 @@ const warningOptions = [
                   role="switch"
                   :aria-checked="form.lock_after_failed_attempts"
                   :disabled="!canUpdate"
-                  class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  :class="form.lock_after_failed_attempts ? 'bg-blue-600' : 'bg-gray-200'"
+                  class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  :class="form.lock_after_failed_attempts ? 'bg-brand-primary' : 'bg-gray-200'"
                   @click="canUpdate && (form.lock_after_failed_attempts = !form.lock_after_failed_attempts)"
                 >
                   <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out" :class="form.lock_after_failed_attempts ? 'translate-x-5' : 'translate-x-0'" />
@@ -358,7 +355,7 @@ const warningOptions = [
                 min="1"
                 max="1440"
                 :disabled="!canUpdate || !form.lock_after_failed_attempts"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500 transition"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary disabled:bg-gray-50 disabled:text-gray-500 transition"
               />
               <p class="text-xs text-gray-400 mt-1">How long to lock the account</p>
               <p v-if="errors.lock_duration_minutes" class="mt-1 text-xs text-red-600">{{ errors.lock_duration_minutes }}</p>
@@ -373,8 +370,8 @@ const warningOptions = [
                   role="switch"
                   :aria-checked="form.force_password_reset_on_first_login"
                   :disabled="!canUpdate"
-                  class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  :class="form.force_password_reset_on_first_login ? 'bg-blue-600' : 'bg-gray-200'"
+                  class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  :class="form.force_password_reset_on_first_login ? 'bg-brand-primary' : 'bg-gray-200'"
                   @click="canUpdate && (form.force_password_reset_on_first_login = !form.force_password_reset_on_first_login)"
                 >
                   <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out" :class="form.force_password_reset_on_first_login ? 'translate-x-5' : 'translate-x-0'" />
@@ -408,7 +405,7 @@ const warningOptions = [
                 min="6"
                 max="128"
                 :disabled="!canUpdate"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500 transition"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary disabled:bg-gray-50 disabled:text-gray-500 transition"
               />
               <p class="text-xs text-gray-400 mt-1">Minimum characters required</p>
               <p v-if="errors.min_length" class="mt-1 text-xs text-red-600">{{ errors.min_length }}</p>
@@ -423,8 +420,8 @@ const warningOptions = [
                   role="switch"
                   :aria-checked="form.require_uppercase"
                   :disabled="!canUpdate"
-                  class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  :class="form.require_uppercase ? 'bg-blue-600' : 'bg-gray-200'"
+                  class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  :class="form.require_uppercase ? 'bg-brand-primary' : 'bg-gray-200'"
                   @click="canUpdate && (form.require_uppercase = !form.require_uppercase)"
                 >
                   <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out" :class="form.require_uppercase ? 'translate-x-5' : 'translate-x-0'" />
@@ -443,8 +440,8 @@ const warningOptions = [
                   role="switch"
                   :aria-checked="form.require_number"
                   :disabled="!canUpdate"
-                  class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  :class="form.require_number ? 'bg-blue-600' : 'bg-gray-200'"
+                  class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  :class="form.require_number ? 'bg-brand-primary' : 'bg-gray-200'"
                   @click="canUpdate && (form.require_number = !form.require_number)"
                 >
                   <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out" :class="form.require_number ? 'translate-x-5' : 'translate-x-0'" />
@@ -463,8 +460,8 @@ const warningOptions = [
                   role="switch"
                   :aria-checked="form.require_special"
                   :disabled="!canUpdate"
-                  class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  :class="form.require_special ? 'bg-blue-600' : 'bg-gray-200'"
+                  class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  :class="form.require_special ? 'bg-brand-primary' : 'bg-gray-200'"
                   @click="canUpdate && (form.require_special = !form.require_special)"
                 >
                   <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out" :class="form.require_special ? 'translate-x-5' : 'translate-x-0'" />
@@ -512,7 +509,7 @@ const warningOptions = [
             v-if="canUpdate"
             type="button"
             :disabled="saving || !isDirty"
-            class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            class="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             @click="save"
           >
             <svg v-if="saving" class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

@@ -6,7 +6,6 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import fieldSubmissionsApi from '@/services/fieldSubmissionsApi'
 import { useAuthStore } from '@/stores/auth'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import TruncatedText from '@/components/TruncatedText.vue'
 import { formatUserDate, formatSystemDateTime } from '@/lib/dateFormat'
 
@@ -103,17 +102,17 @@ function slaStatus(s) {
 
 function slaTimerClass(timer, status) {
   if (!timer) return 'text-gray-500'
-  if (timer === 'Completed' || status === 'Completed') return 'text-green-600 font-medium'
+  if (timer === 'Completed' || status === 'Completed') return 'text-brand-primary font-medium'
   if (status === 'Breached') return 'text-red-600 font-medium'
   if (status === 'Approaching') return 'text-amber-600 font-medium'
-  return 'text-green-600'
+  return 'text-brand-primary'
 }
 
 const fieldStatusBadgeClass = {
-  'Meeting Scheduled': 'bg-blue-100 text-blue-700',
+  'Meeting Scheduled': 'bg-brand-primary-light text-brand-primary-hover',
   'CM Cancelled': 'bg-red-100 text-red-700',
-  'Meeting Done - Closed Documents Shared with Sales': 'bg-green-100 text-green-700',
-  'Meeting Done - Closed CM will Share Documents': 'bg-green-100 text-green-700',
+  'Meeting Done - Closed Documents Shared with Sales': 'bg-brand-primary-light text-brand-primary-hover',
+  'Meeting Done - Closed CM will Share Documents': 'bg-brand-primary-light text-brand-primary-hover',
   'Meeting Done - Sales In Follow Up': 'bg-amber-100 text-amber-800',
   'Meeting Done - CM Not Interested': 'bg-red-100 text-red-700',
   'Field Executive In Follow Up': 'bg-amber-100 text-amber-800',
@@ -266,15 +265,13 @@ onMounted(() => load())
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] p-0">
+  <div class="min-h-[calc(100vh-4rem)] bg-gray-100 p-0">
     <div class="w-full">
       <!-- Header card (separate from content, like Lead Submission) -->
       <div class="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div class="flex flex-wrap items-baseline gap-2">
-            <h1 class="text-xl font-semibold text-gray-900">Field Submission Details</h1>
-            <Breadcrumbs />
-          </div>
+            <h1 class="text-xl font-semibold text-gray-900">Field Submission Details</h1>          </div>
           <div class="flex items-center gap-2">
             <router-link
               to="/field-submissions"
@@ -284,7 +281,7 @@ onMounted(() => load())
             </router-link>
             <button
               type="button"
-              class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+              class="inline-flex items-center rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover"
               :disabled="!submission?.id"
               @click="goToEdit"
             >
@@ -295,7 +292,7 @@ onMounted(() => load())
       </div>
 
       <div v-if="loading" class="flex justify-center py-16">
-        <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+        <svg class="h-10 w-10 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
@@ -434,7 +431,7 @@ onMounted(() => load())
               <template v-else>
                 <div class="overflow-x-auto rounded-lg border border-gray-200">
                   <table class="min-w-full text-left text-sm">
-                    <thead class="border-b border-gray-200 bg-gray-100">
+                    <thead class="bg-brand-primary border-b-2 border-green-700">
                       <tr>
                         <th class="px-4 py-2 font-semibold text-gray-900">Field</th>
                         <th class="px-4 py-2 font-semibold text-gray-900">Old Value</th>
@@ -483,7 +480,7 @@ onMounted(() => load())
                   </div>
                   <button
                     type="button"
-                    class="shrink-0 rounded p-1.5 text-green-700 hover:bg-green-50 hover:text-green-800"
+                    class="shrink-0 rounded p-1.5 text-brand-primary-hover hover:bg-brand-primary-light hover:text-brand-primary-hover"
                     title="Download"
                     @click="downloadDoc(doc)"
                   >

@@ -184,7 +184,11 @@ class LeadSubmissionApiController extends Controller
     private function applyFilters($query, array $validated): void
     {
         if (!empty($validated['status'])) {
-            $query->where('status', $validated['status']);
+            if ($validated['status'] === 'unassigned') {
+                $query->whereIn('status', ['unassigned', 'submitted', 'draft']);
+            } else {
+                $query->where('status', $validated['status']);
+            }
         }
         if (!empty($validated['submission_type'])) {
             $query->where('submission_type', $validated['submission_type']);
@@ -373,6 +377,9 @@ class LeadSubmissionApiController extends Controller
                 };
             } elseif ($col === 'sla_timer') {
                 $row['sla_timer'] = $this->computeLeadSlaTimer($lead);
+            } elseif ($col === 'status') {
+                $status = (string) ($lead->status ?? '');
+                $row['status'] = in_array($status, ['submitted', 'draft'], true) ? 'unassigned' : $status;
             } elseif ($col === 'created_by') {
                 $row['created_by'] = $lead->created_by;
             } elseif (in_array($col, ['created_at', 'submitted_at', 'status_changed_at', 'updated_at'], true)) {
@@ -619,7 +626,7 @@ class LeadSubmissionApiController extends Controller
             'call_verification_options' => [['value' => 'Verified', 'label' => 'Verified'], ['value' => 'Not Verified', 'label' => 'Not Verified']],
             'pending_from_sales_options' => [['value' => 'UnAssigned', 'label' => 'UnAssigned'], ['value' => 'Assigned', 'label' => 'Assigned']],
             'documents_verification_options' => [['value' => 'Verified', 'label' => 'Verified'], ['value' => 'Not Verified', 'label' => 'Not Verified']],
-            'du_status_options' => [['value' => 'Submitted', 'label' => 'Submitted'], ['value' => 'In Progress', 'label' => 'In Progress'], ['value' => 'Completed', 'label' => 'Completed'], ['value' => 'Rejected', 'label' => 'Rejected']],
+            'du_status_options' => [['value' => 'In Progress', 'label' => 'In Progress'], ['value' => 'Rejected', 'label' => 'Rejected'], ['value' => 'Completed', 'label' => 'Completed']],
         ]);
     }
 
@@ -799,7 +806,7 @@ class LeadSubmissionApiController extends Controller
             'activity' => ['nullable', 'string', 'max:255'],
             'back_office_account' => ['nullable', 'string', 'max:100'],
             'work_order' => ['nullable', 'string', 'max:255'],
-            'du_status' => ['nullable', 'string', 'max:50'],
+            'du_status' => ['nullable', 'string', Rule::in(['In Progress', 'Rejected', 'Completed'])],
             'completion_date' => ['nullable', 'date'],
             'du_remarks' => ['nullable', 'string', 'max:5000'],
             'additional_note' => ['nullable', 'string', 'max:5000'],
@@ -955,7 +962,7 @@ class LeadSubmissionApiController extends Controller
                     'call_verification_options' => [['value' => 'Verified', 'label' => 'Verified'], ['value' => 'Not Verified', 'label' => 'Not Verified']],
                     'pending_from_sales_options' => [['value' => 'UnAssigned', 'label' => 'UnAssigned'], ['value' => 'Assigned', 'label' => 'Assigned']],
                     'documents_verification_options' => [['value' => 'Verified', 'label' => 'Verified'], ['value' => 'Not Verified', 'label' => 'Not Verified']],
-                    'du_status_options' => [['value' => 'Submitted', 'label' => 'Submitted'], ['value' => 'In Progress', 'label' => 'In Progress'], ['value' => 'Completed', 'label' => 'Completed'], ['value' => 'Rejected', 'label' => 'Rejected']],
+                    'du_status_options' => [['value' => 'In Progress', 'label' => 'In Progress'], ['value' => 'Rejected', 'label' => 'Rejected'], ['value' => 'Completed', 'label' => 'Completed']],
                 ];
             } catch (\Throwable $e) {
                 // silent

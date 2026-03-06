@@ -9,7 +9,7 @@ import FiltersBar from '@/components/email-followups/FiltersBar.vue'
 import AdvancedFilters from '@/components/email-followups/AdvancedFilters.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import EmailFollowUpTable from '@/components/email-followups/EmailFollowUpTable.vue'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import Toast from '@/components/Toast.vue'
 import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
 import api from '@/lib/axios'
 import { canModuleAction } from '@/lib/accessControl'
@@ -45,11 +45,17 @@ const addedByName = ref('')
 const loading = ref(true)
 const submitLoading = ref(false)
 const exportLoading = ref(false)
+
+/* ───── Toast ───── */
+const showToast = ref(false)
+const toastType = ref('success')
+const toastMsg  = ref('')
+function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
 const filterOptions = ref({ statuses: [], categories: [] })
 const submissions = ref([])
 const meta = ref({ current_page: 1, last_page: 1, per_page: auth.defaultTablePageSize || 25, total: 0 })
 const allColumns = ref([])
-const visibleColumns = ref(['id', 'email_date', 'subject', 'category', 'request_from', 'sent_to', 'creator', 'status', 'status_date'])
+const visibleColumns = ref(['id', 'email_date', 'subject', 'request_from', 'sent_to', 'creator', 'status', 'status_date'])
 const sort = ref('email_date')
 const order = ref('desc')
 const advancedVisible = ref(false)
@@ -66,7 +72,6 @@ const form = ref({
 const filters = ref({
   q: '',
   status: 'pending',
-  category: '',
   from: '',
   to: '',
 })
@@ -82,7 +87,6 @@ function buildParams() {
   }
   if (f.q) p.q = f.q
   if (f.status) p.status = f.status
-  if (f.category) p.category = f.category
   if (f.from) p.from = f.from
   if (f.to) p.to = f.to
   return p
@@ -109,9 +113,17 @@ async function loadFilters() {
   if (!canView.value) return
   try {
     const data = await emailFollowUpsApi.filters()
+    const statuses = (data.statuses ?? []).map((status) => {
+      if (String(status?.value || '').toLowerCase() === 'pending') {
+        return { ...status, label: 'Open' }
+      }
+      if (String(status?.value || '').toLowerCase() === 'approved') {
+        return { ...status, label: 'Closed' }
+      }
+      return status
+    })
     filterOptions.value = {
-      statuses: data.statuses ?? [],
-      categories: data.categories ?? [],
+      statuses,
     }
   } catch {
     //
@@ -122,8 +134,8 @@ async function loadColumns() {
   if (!canView.value) return
   try {
     const data = await emailFollowUpsApi.columns()
-    allColumns.value = data.all_columns ?? []
-    visibleColumns.value = data.visible_columns ?? visibleColumns.value
+    allColumns.value = (data.all_columns ?? []).filter((c) => c?.key !== 'category')
+    visibleColumns.value = (data.visible_columns ?? visibleColumns.value).filter((c) => c !== 'category')
   } catch {
     //
   }
@@ -149,8 +161,9 @@ function onSort({ sort: s, order: o }) {
 
 async function onSaveColumns(cols) {
   try {
-    await emailFollowUpsApi.saveColumns(cols)
-    visibleColumns.value = cols
+    const safeCols = cols.filter((c) => c !== 'category')
+    await emailFollowUpsApi.saveColumns(safeCols)
+    visibleColumns.value = safeCols
     meta.value.current_page = 1
     load()
   } catch {
@@ -221,7 +234,7 @@ async function submitForm() {
     load()
   } catch (e) {
     const msg = e.response?.data?.message || e.message || 'Failed to add entry.'
-    alert(msg)
+    toast('error', msg)
   } finally {
     submitLoading.value = false
   }
@@ -288,12 +301,6 @@ onMounted(async () => {
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-white py-6 px-4 sm:px-6">
     <div class="mx-auto max-w-7xl space-y-6">
-      <div class="flex flex-wrap items-baseline gap-2">
-        <h1 class="text-xl font-semibold text-gray-900 leading-tight">Email Follow-Up</h1>
-        <Breadcrumbs />
-      </div>
-      <p class="text-sm text-gray-600">Record outgoing follow-up emails and track communication history.</p>
-
       <!-- Add Email Follow-Up Entry -->
       <div v-if="canCreate" class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
         <h2 class="mb-4 text-sm font-semibold text-gray-900">Add Email Follow-Up Entry</h2>
@@ -315,10 +322,10 @@ onMounted(async () => {
             <label class="block text-sm font-medium text-gray-700">Status <span class="text-red-500">*</span></label>
             <select
               v-model="form.status"
-              class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             >
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
+              <option value="pending">Open</option>
+              <option value="approved">Closed</option>
             </select>
           </div>
           <div>
@@ -327,7 +334,7 @@ onMounted(async () => {
               v-model="form.request_from"
               type="text"
               placeholder="Company or person name"
-              class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             />
           </div>
           <div class="sm:col-span-2 lg:col-span-2">
@@ -336,7 +343,7 @@ onMounted(async () => {
               v-model="form.subject"
               type="text"
               placeholder="Enter email subject"
-              class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             />
           </div>
           <div>
@@ -345,44 +352,30 @@ onMounted(async () => {
               v-model="form.sent_to"
               type="text"
               placeholder="recipient@example.com"
-              class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              class="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             />
           </div>
+          <div class="flex items-end justify-start gap-2">
+            <button
+              type="button"
+              class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              @click="clearForm"
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              class="inline-flex items-center rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70"
+              :disabled="submitLoading || !form.email_date"
+              @click="submitForm"
+            >
+              <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              </svg>
+              {{ submitLoading ? 'Adding...' : 'Add Entry' }}
+            </button>
+          </div>
         </div>
-        <div class="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            @click="clearForm"
-          >
-            Clear
-          </button>
-          <button
-            type="button"
-            class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70"
-            :disabled="submitLoading || !form.email_date"
-            @click="submitForm"
-          >
-            <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-            </svg>
-            {{ submitLoading ? 'Adding...' : 'Add Entry' }}
-          </button>
-        </div>
-      </div>
-
-      <!-- Listing -->
-      <div v-if="canView" class="flex flex-wrap items-center justify-between gap-4">
-        <span class="text-sm text-gray-600">Listing</span>
-        <button
-          v-if="canExport"
-          type="button"
-          class="inline-flex items-center rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70"
-          :disabled="loading || exportLoading"
-          @click="onExport"
-        >
-          {{ exportLoading ? 'Exporting...' : 'Export Report' }}
-        </button>
       </div>
 
       <div v-if="!canView" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -412,6 +405,15 @@ onMounted(async () => {
             @click="columnModalVisible = true"
           >
             Customize Columns
+          </button>
+          <button
+            v-if="canExport"
+            type="button"
+            class="inline-flex items-center rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70"
+            :disabled="loading || exportLoading"
+            @click="onExport"
+          >
+            {{ exportLoading ? 'Exporting...' : 'Export Report' }}
           </button>
         </template>
       </FiltersBar>
@@ -451,7 +453,7 @@ onMounted(async () => {
               <span class="whitespace-nowrap font-medium">Number of rows</span>
               <select
                 :value="meta.per_page"
-                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                 @change="onPerPageChange"
               >
                 <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
@@ -474,5 +476,7 @@ onMounted(async () => {
       @update:visible="columnModalVisible = $event"
       @save="onSaveColumns"
     />
+
+    <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />
   </div>
 </template>

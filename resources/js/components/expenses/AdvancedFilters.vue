@@ -54,7 +54,7 @@ const emit = defineEmits(['apply', 'reset'])
           <select
             v-if="filterOptions.added_by_users?.length"
             v-model="filters.added_by_user_id"
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
             @change="filters.added_by = ''"
           >
@@ -66,7 +66,7 @@ const emit = defineEmits(['apply', 'reset'])
             v-model="filters.added_by"
             type="text"
             placeholder="Enter name"
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
             @input="filters.added_by_user_id = ''"
           />
@@ -79,7 +79,7 @@ const emit = defineEmits(['apply', 'reset'])
             step="0.01"
             min="0"
             placeholder="0.00"
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           />
         </div>
@@ -91,7 +91,7 @@ const emit = defineEmits(['apply', 'reset'])
             step="0.01"
             min="0"
             placeholder="0.00"
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           />
         </div>
@@ -99,7 +99,7 @@ const emit = defineEmits(['apply', 'reset'])
           <label class="mb-1 block text-xs font-medium text-gray-600">VAT Applicable</label>
           <select
             v-model="filters.vat_applicable"
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           >
             <option v-for="o in filterOptions.vat_options" :key="o.value" :value="o.value">{{ o.label }}</option>
@@ -111,7 +111,7 @@ const emit = defineEmits(['apply', 'reset'])
             v-model="filters.product_description"
             type="text"
             placeholder="Search description"
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           />
         </div>
@@ -121,7 +121,7 @@ const emit = defineEmits(['apply', 'reset'])
             v-model="filters.invoice_number"
             type="text"
             placeholder="Enter invoice number"
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           />
         </div>
@@ -130,7 +130,7 @@ const emit = defineEmits(['apply', 'reset'])
       <div class="flex gap-3 border-t border-gray-200 px-4 py-3">
         <button
           type="button"
-          class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+          class="inline-flex items-center rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50"
           :disabled="loading"
           @click="$emit('apply')"
         >

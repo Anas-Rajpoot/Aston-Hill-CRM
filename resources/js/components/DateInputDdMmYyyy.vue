@@ -5,7 +5,7 @@
       readonly
       :value="displayValue"
       :placeholder="placeholder"
-      class="block w-full rounded border border-gray-300 bg-white px-3 py-2 pr-10 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 cursor-pointer"
+      class="block w-full rounded border border-gray-300 bg-white px-3 py-2 pr-10 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary cursor-pointer"
       :class="inputClass"
       :disabled="disabled"
       :aria-label="`Select date (${placeholder})`"
@@ -14,7 +14,7 @@
     <!-- Calendar button: clear way to open picker -->
     <button
       type="button"
-      class="absolute right-0 top-0 bottom-0 flex w-10 items-center justify-center rounded-r border-0 border-l border-gray-300 bg-transparent text-gray-500 hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-inset"
+      class="absolute right-0 top-0 bottom-0 flex w-10 items-center justify-center rounded-r border-0 border-l border-gray-300 bg-transparent text-gray-500 hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-inset"
       aria-label="Open calendar"
       :disabled="disabled"
       @click.stop="openPicker"

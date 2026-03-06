@@ -294,7 +294,7 @@ async function uploadNewAttachments() {
           </div>
 
           <div v-if="loading" class="flex flex-1 items-center justify-center py-12">
-            <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+            <svg class="h-10 w-10 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
@@ -316,7 +316,7 @@ async function uploadNewAttachments() {
                     v-model="form.expense_date_display"
                     type="text"
                     placeholder="DD-MMM-YYYY"
-                    class="w-full rounded border border-gray-300 bg-white px-3 py-2 pr-9 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                    class="w-full rounded border border-gray-300 bg-white px-3 py-2 pr-9 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                     :class="fieldErrors.expense_date ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : ''"
                     :readonly="!canEdit"
                     @input="onExpenseDateInput"
@@ -342,7 +342,7 @@ async function uploadNewAttachments() {
                   v-if="categories?.length"
                   id="edit-modal-category"
                   v-model="form.product_category"
-                  class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   :class="fieldErrors.product_category ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : ''"
                   :disabled="!canEdit"
                 >
@@ -354,7 +354,7 @@ async function uploadNewAttachments() {
               </div>
               <div>
                 <label for="edit-modal-invoice" class="mb-1 block text-sm font-medium text-gray-700">Invoice Number</label>
-                <input id="edit-modal-invoice" v-model="form.invoice_number" type="text" class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" placeholder="INV-2024-XXXX" :readonly="!canEdit" />
+                <input id="edit-modal-invoice" v-model="form.invoice_number" type="text" class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" placeholder="INV-2024-XXXX" :readonly="!canEdit" />
               </div>
               <div>
                 <label for="edit-modal-added-by" class="mb-1 block text-sm font-medium text-gray-700">Added By</label>
@@ -363,7 +363,7 @@ async function uploadNewAttachments() {
                   :value="addedByDisplayName"
                   type="text"
                   readonly
-                  class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                 />
               </div>
             </div>
@@ -371,13 +371,13 @@ async function uploadNewAttachments() {
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <label for="edit-modal-vat" class="mb-1 block text-sm font-medium text-gray-700">VAT %</label>
-                <select id="edit-modal-vat" v-model="form.vat_percent" class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :disabled="!canEdit">
+                <select id="edit-modal-vat" v-model="form.vat_percent" class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" :disabled="!canEdit">
                   <option v-for="opt in vatOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                 </select>
               </div>
               <div>
                 <label for="edit-modal-amount" class="mb-1 block text-sm font-medium text-gray-700">Amount Without VAT (AED)</label>
-                <input id="edit-modal-amount" v-model="form.amount_without_vat" type="number" min="0" step="0.01" class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :readonly="!canEdit" />
+                <input id="edit-modal-amount" v-model="form.amount_without_vat" type="number" min="0" step="0.01" class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" :readonly="!canEdit" />
               </div>
               <div>
                 <label class="mb-1 block text-sm font-medium text-gray-700">VAT Amount (AED)</label>
@@ -391,12 +391,12 @@ async function uploadNewAttachments() {
 
             <div>
               <label for="edit-modal-desc" class="mb-1 block text-sm font-medium text-gray-700">Product Description <span class="text-red-500">*</span></label>
-              <input id="edit-modal-desc" v-model="form.product_description" type="text" class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="fieldErrors.product_description ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : ''" placeholder="Enter detailed description" :readonly="!canEdit" />
+              <input id="edit-modal-desc" v-model="form.product_description" type="text" class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" :class="fieldErrors.product_description ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : ''" placeholder="Enter detailed description" :readonly="!canEdit" />
               <p v-if="fieldErrors.product_description" class="mt-1 text-xs text-red-600">{{ fieldErrors.product_description }}</p>
             </div>
             <div>
               <label for="edit-modal-comment" class="mb-1 block text-sm font-medium text-gray-700">Comment / Remarks <span class="text-red-500">*</span></label>
-              <textarea id="edit-modal-comment" v-model="form.comment" rows="3" class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 resize-none" :class="fieldErrors.comment ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : ''" placeholder="Add notes or remarks" :readonly="!canEdit" />
+              <textarea id="edit-modal-comment" v-model="form.comment" rows="3" class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none" :class="fieldErrors.comment ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : ''" placeholder="Add notes or remarks" :readonly="!canEdit" />
               <p v-if="fieldErrors.comment" class="mt-1 text-xs text-red-600">{{ fieldErrors.comment }}</p>
             </div>
 
@@ -419,7 +419,7 @@ async function uploadNewAttachments() {
               <p v-else class="mb-3 text-sm text-gray-500">No attachments yet.</p>
               <div v-if="canEdit" class="flex flex-wrap items-center gap-4">
                 <input ref="invoiceInputRef" type="file" class="hidden" accept=".pdf,.doc,.docx,image/*" @change="onNewInvoiceChange" />
-                <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50" :disabled="uploadingAttachments" @click="triggerAddInvoice">
+                <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-brand-primary-muted bg-brand-primary-light px-3 py-2 text-sm font-medium text-brand-primary-hover hover:bg-brand-primary-light disabled:opacity-50" :disabled="uploadingAttachments" @click="triggerAddInvoice">
                   <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
                   Add invoice
                 </button>
@@ -429,7 +429,7 @@ async function uploadNewAttachments() {
 
             <div class="flex justify-end gap-3 border-t border-gray-200 pt-4">
               <button type="button" class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="close">Cancel</button>
-              <button v-if="canEdit" type="submit" class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50" :disabled="saving">
+              <button v-if="canEdit" type="submit" class="rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50" :disabled="saving">
                 {{ saving ? 'Updating...' : 'Update Expense' }}
               </button>
             </div>

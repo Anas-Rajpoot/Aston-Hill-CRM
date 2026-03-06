@@ -9,8 +9,8 @@ import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/lib/axios'
 import { useTablePageSize } from '@/composables/useTablePageSize'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Toast from '@/components/Toast.vue'
+import DeleteOtpModal from '@/components/DeleteOtpModal.vue'
 import SkeletonBox from '@/components/skeletons/SkeletonBox.vue'
 import AnnouncementFormModal from '@/components/announcements/AnnouncementFormModal.vue'
 import { formatUserDate } from '@/lib/dateFormat'
@@ -255,7 +255,7 @@ function fmtDate(iso) {
 }
 function statusBadge(s) {
   const map = {
-    active:    'bg-green-100 text-green-800',
+    active:    'bg-brand-primary-light text-brand-primary-hover',
     scheduled: 'bg-purple-100 text-purple-800',
     expired:   'bg-gray-100 text-gray-600',
     disabled:  'bg-red-100 text-red-800',
@@ -322,9 +322,7 @@ onMounted(() => fetchList(1))
     <div class="flex flex-wrap items-start justify-between gap-4">
       <div>
         <div class="flex items-center gap-3">
-          <h1 class="text-2xl font-bold text-gray-900">Announcement Center</h1>
-          <Breadcrumbs />
-        </div>
+          <h1 class="text-2xl font-bold text-gray-900">Announcement Center</h1>        </div>
         <p class="mt-1 text-sm text-gray-500">Create and manage system-wide announcements for operational updates and alerts.</p>
       </div>
       <div class="flex items-center gap-3">
@@ -336,7 +334,7 @@ onMounted(() => fetchList(1))
           <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7" /></svg>
           Customize Columns
         </button>
-        <button v-if="canUpdate" type="button" class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 transition-colors" @click="openCreate">
+        <button v-if="canUpdate" type="button" class="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-primary-hover transition-colors" @click="openCreate">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
           Add New Announcement
         </button>
@@ -353,7 +351,7 @@ onMounted(() => fetchList(1))
           v-for="c in counterCards" :key="c.label"
           class="rounded-xl border-2 bg-white p-5 flex items-center justify-between cursor-pointer transition-all hover:shadow-md"
           :class="activeCard === c.filter
-            ? (c.color === 'blue' ? 'border-blue-500 ring-2 ring-blue-100' : c.color === 'green' ? 'border-green-500 ring-2 ring-green-100' : c.color === 'purple' ? 'border-purple-500 ring-2 ring-purple-100' : c.color === 'red' ? 'border-red-500 ring-2 ring-red-100' : 'border-gray-400 ring-2 ring-gray-100')
+            ? (c.color === 'blue' ? 'border-brand-primary ring-2 ring-brand-primary-muted' : c.color === 'green' ? 'border-brand-primary ring-2 ring-brand-primary-muted' : c.color === 'purple' ? 'border-purple-500 ring-2 ring-purple-100' : c.color === 'red' ? 'border-red-500 ring-2 ring-red-100' : 'border-gray-400 ring-2 ring-gray-100')
             : 'border-gray-200 hover:border-gray-300'"
           @click="onCardClick(c)"
         >
@@ -362,8 +360,8 @@ onMounted(() => fetchList(1))
             <p class="text-2xl font-bold text-gray-900 mt-1">{{ c.value }}</p>
           </div>
           <div class="flex h-10 w-10 items-center justify-center rounded-full" :class="{
-            'bg-blue-100 text-blue-600': c.color==='blue',
-            'bg-green-100 text-green-600': c.color==='green',
+            'bg-brand-primary-light text-brand-primary': c.color==='blue',
+            'bg-brand-primary-light text-brand-primary': c.color==='green',
             'bg-purple-100 text-purple-600': c.color==='purple',
             'bg-gray-100 text-gray-500': c.color==='gray',
             'bg-red-100 text-red-500': c.color==='red',
@@ -430,7 +428,7 @@ onMounted(() => fetchList(1))
         </div>
         <div class="px-6 py-3 border-t border-gray-100 flex justify-end gap-3">
           <button type="button" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="clearFilters">Clear All</button>
-          <button type="button" class="rounded-lg bg-green-600 px-5 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors" @click="fetchList(1)">Apply Filters</button>
+          <button type="button" class="rounded-lg bg-brand-primary px-5 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover transition-colors" @click="fetchList(1)">Apply Filters</button>
         </div>
       </section>
     </Transition>
@@ -449,23 +447,23 @@ onMounted(() => fetchList(1))
       <div v-else class="overflow-x-auto">
         <table class="min-w-full text-sm">
           <thead class="border-b-2 border-black">
-            <tr class="bg-gray-50 text-left">
+            <tr class="bg-brand-primary text-left">
               <th
                 v-for="col in activeColumns"
                 :key="col.key"
-                class="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap select-none"
-                :class="{ 'cursor-pointer hover:text-gray-900': col.sortable, 'pl-6': col.key === 'title' }"
+                class="px-4 py-3 font-semibold text-white whitespace-nowrap select-none"
+                :class="{ 'cursor-pointer hover:text-white/80': col.sortable, 'pl-6': col.key === 'title' }"
                 @click="col.sortable && toggleSort(col.key)"
               >
                 <div class="inline-flex items-center gap-1">
                   {{ col.label }}
                   <template v-if="col.sortable">
-                    <svg v-if="sortKey === col.key" class="w-3.5 h-3.5 text-green-600" :class="{ 'rotate-180': sortDir === 'desc' }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
-                    <svg v-else class="w-3.5 h-3.5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
+                    <svg v-if="sortKey === col.key" class="w-3.5 h-3.5 text-white" :class="{ 'rotate-180': sortDir === 'desc' }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
+                    <svg v-else class="w-3.5 h-3.5 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
                   </template>
                 </div>
               </th>
-              <th class="px-4 py-3 font-semibold text-gray-600">Actions</th>
+              <th class="px-4 py-3 font-semibold text-white">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -506,7 +504,7 @@ onMounted(() => fetchList(1))
                 <div class="flex flex-wrap gap-1">
                   <template v-if="ann.audience_chips?.length">
                     <span v-for="(chip, ci) in ann.audience_chips.slice(0, 2)" :key="ci"
-                      class="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 whitespace-nowrap">{{ chip }}</span>
+                      class="rounded-full bg-brand-primary-light px-2 py-0.5 text-xs font-medium text-brand-primary-hover whitespace-nowrap">{{ chip }}</span>
                     <span v-if="ann.audience_chips.length > 2" class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
                       +{{ ann.audience_chips.length - 2 }}
                     </span>
@@ -534,7 +532,7 @@ onMounted(() => fetchList(1))
                 <div class="flex items-center gap-1.5">
                   <template v-if="editingAnnId === ann.id">
                     <!-- Save -->
-                    <button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-green-600 text-white text-xs font-medium hover:bg-green-700 transition-colors" @click="saveEditAnn(ann)">
+                    <button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-brand-primary text-white text-xs font-medium hover:bg-brand-primary-hover transition-colors" @click="saveEditAnn(ann)">
                       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
                       Save
                     </button>
@@ -545,11 +543,11 @@ onMounted(() => fetchList(1))
                   </template>
                   <template v-else>
                     <!-- View -->
-                    <button type="button" class="p-1.5 rounded text-green-600 hover:bg-green-50" title="View" @click="openView(ann)">
+                    <button type="button" class="p-1.5 rounded text-brand-primary hover:bg-brand-primary-light" title="View" @click="openView(ann)">
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                     </button>
                     <!-- Edit (full modal) -->
-                    <button v-if="canUpdate" type="button" class="p-1.5 rounded text-blue-600 hover:bg-blue-50" title="Edit" @click="openEdit(ann)">
+                    <button v-if="canUpdate" type="button" class="p-1.5 rounded text-brand-primary hover:bg-brand-primary-light" title="Edit" @click="openEdit(ann)">
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                     </button>
                     <!-- Duplicate -->
@@ -583,7 +581,7 @@ onMounted(() => fetchList(1))
             <span class="whitespace-nowrap font-medium">Number of rows</span>
             <select
               :value="perPage"
-              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
               @change="e => { setPerPage(e.target.value); fetchList(1) }"
             >
               <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
@@ -620,7 +618,7 @@ onMounted(() => fetchList(1))
                 class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
                 :class="{
                   'bg-red-100 text-red-700': viewAnn.priority === 'critical' || viewAnn.priority === 'high',
-                  'bg-blue-100 text-blue-700': viewAnn.priority === 'normal',
+                  'bg-brand-primary-light text-brand-primary-hover': viewAnn.priority === 'normal',
                   'bg-gray-100 text-gray-600': viewAnn.priority === 'low'
                 }"
               >{{ viewAnn.priority === 'critical' ? 'Critical' : viewAnn.priority === 'high' ? 'High Priority' : viewAnn.priority === 'normal' ? 'Normal Priority' : 'Low Priority' }}</span>
@@ -638,7 +636,7 @@ onMounted(() => fetchList(1))
               <p class="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{{ viewAnn.body }}</p>
             </div>
             <div v-if="viewAnn.link_url && !viewAnn.body" class="rounded-lg bg-gray-50 border border-gray-200 px-4 py-3">
-              <a :href="viewAnn.link_url" target="_blank" class="text-sm text-teal-600 hover:underline">{{ viewAnn.link_label || viewAnn.link_url }}</a>
+              <a :href="viewAnn.link_url" target="_blank" class="text-sm text-brand-primary hover:underline">{{ viewAnn.link_label || viewAnn.link_url }}</a>
             </div>
 
             <!-- Metadata grid -->
@@ -657,17 +655,17 @@ onMounted(() => fetchList(1))
               </div>
               <div class="px-4 py-3">
                 <p class="text-xs text-gray-400 mb-0.5">Visibility</p>
-                <p class="text-sm font-medium text-teal-600">{{ viewAnn.all_users ? 'All Users' : (viewAnn.audience_chips?.join(', ') || '—') }}</p>
+                <p class="text-sm font-medium text-brand-primary">{{ viewAnn.all_users ? 'All Users' : (viewAnn.audience_chips?.join(', ') || '—') }}</p>
               </div>
             </div>
 
             <!-- Acknowledgement section -->
-            <div v-if="viewAnn.require_ack" class="rounded-lg border border-teal-200 bg-teal-50 p-4 space-y-3">
+            <div v-if="viewAnn.require_ack" class="rounded-lg border border-brand-primary-muted bg-brand-primary-light p-4 space-y-3">
               <div class="flex items-center gap-2">
-                <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-5 h-5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span class="text-sm font-bold text-teal-900">Acknowledgement Required</span>
+                <span class="text-sm font-bold text-gray-900">Acknowledgement Required</span>
               </div>
 
               <!-- Progress -->
@@ -681,7 +679,7 @@ onMounted(() => fetchList(1))
                 </div>
                 <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                   <div
-                    class="bg-teal-500 h-2 rounded-full transition-all duration-300"
+                    class="bg-brand-primary h-2 rounded-full transition-all duration-300"
                     :style="{ width: viewAnn.total_users ? Math.round(((viewAnn.ack_count ?? 0) / viewAnn.total_users) * 100) + '%' : '0%' }"
                   />
                 </div>
@@ -702,10 +700,10 @@ onMounted(() => fetchList(1))
           </div>
 
           <!-- Footer -->
-          <div class="px-6 py-4 border-t border-gray-200 flex justify-end bg-white">
+          <div class="px-6 py-4 border-t border-gray-200 flex flex-wrap justify-end gap-3 bg-white">
             <button
               type="button"
-              class="rounded-lg bg-teal-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-teal-700 transition-colors"
+              class="w-full sm:w-auto rounded-lg bg-brand-primary px-6 py-2.5 text-sm font-medium text-white hover:bg-brand-primary-hover transition-colors"
               @click="showView = false"
             >Close</button>
           </div>
@@ -758,41 +756,15 @@ onMounted(() => fetchList(1))
       </div>
     </Teleport>
 
-    <!-- ═══ Delete Confirmation Modal ═══ -->
-    <Teleport to="body">
-      <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" @click.self="closeDeleteModal">
-        <div class="bg-white rounded-xl shadow-xl max-w-sm w-full overflow-hidden" @click.stop>
-          <div class="px-6 pt-6 pb-4">
-            <div class="flex items-start gap-3">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-500">
-                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </div>
-              <div>
-                <h3 class="text-base font-semibold text-gray-900">Delete Announcement</h3>
-                <p class="text-sm text-gray-500 mt-0.5">This action cannot be undone</p>
-              </div>
-            </div>
-            <p class="mt-4 text-sm text-gray-600">Are you sure you want to delete this announcement? All users will no longer be able to view it.</p>
-          </div>
-          <div class="px-6 pb-6 pt-2 flex justify-end gap-3">
-            <button
-              type="button"
-              :disabled="deletePending"
-              class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-              @click="closeDeleteModal"
-            >Cancel</button>
-            <button
-              type="button"
-              :disabled="deletePending"
-              class="rounded-lg bg-red-500 px-5 py-2 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
-              @click="confirmDelete"
-            >{{ deletePending ? 'Deleting…' : 'Delete Announcement' }}</button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <!-- ═══ Delete Confirmation Modal (OTP) ═══ -->
+    <DeleteOtpModal
+      :visible="showDeleteModal"
+      title="Delete Announcement"
+      :item-label="deleteTarget?.title || 'this announcement'"
+      :loading="deletePending"
+      @confirm="confirmDelete"
+      @close="closeDeleteModal"
+    />
 
     <!-- ═══ Customize Columns Modal ═══ -->
     <Teleport to="body">
@@ -808,21 +780,21 @@ onMounted(() => fetchList(1))
             </button>
           </div>
           <div class="flex items-center gap-2 border-b border-gray-100 px-5 py-2">
-            <button type="button" class="text-xs font-medium text-green-600 hover:text-green-700" @click="colCheckAll">Select All</button>
+            <button type="button" class="text-xs font-medium text-brand-primary hover:text-brand-primary-hover" @click="colCheckAll">Select All</button>
             <span class="text-gray-300">|</span>
             <button type="button" class="text-xs font-medium text-gray-500 hover:text-gray-700" @click="colUncheckAll">Deselect All</button>
             <span class="text-gray-300">|</span>
-            <button type="button" class="text-xs font-medium text-blue-500 hover:text-blue-700" @click="colByDefault">Default</button>
+            <button type="button" class="text-xs font-medium text-brand-primary hover:text-brand-primary-hover" @click="colByDefault">Default</button>
           </div>
           <div class="flex-1 overflow-y-auto px-5 py-3">
             <label v-for="col in ALL_COLUMNS" :key="col.key" class="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-gray-50 cursor-pointer">
-              <input type="checkbox" :checked="localSelectedCols.includes(col.key)" class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500" @change="toggleCol(col.key)" />
+              <input type="checkbox" :checked="localSelectedCols.includes(col.key)" class="h-4 w-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary" @change="toggleCol(col.key)" />
               <span class="text-sm text-gray-700">{{ col.label }}</span>
             </label>
           </div>
           <div class="flex justify-end gap-2 border-t border-gray-200 bg-gray-50 px-5 py-3">
             <button type="button" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="columnModalOpen = false">Cancel</button>
-            <button type="button" class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700" @click="saveColumns">Save</button>
+            <button type="button" class="rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover" @click="saveColumns">Save</button>
           </div>
         </div>
       </div>

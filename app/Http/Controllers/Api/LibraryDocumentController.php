@@ -353,7 +353,7 @@ class LibraryDocumentController extends Controller
 
         $request->validate([
             'files'   => ['required', 'array', 'min:1', 'max:20'],
-            'files.*' => ['required', 'file', 'max:20480'],
+            'files.*' => ['required', 'file', 'max:20480', 'mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,jpg,jpeg,png,txt,csv,eml,zip'],
         ]);
 
         $uploaded = [];

@@ -2,7 +2,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import specialRequestsApi from '@/services/specialRequestsApi'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import TruncatedText from '@/components/TruncatedText.vue'
 import { formatSystemDateTime } from '@/lib/dateFormat'
 
@@ -142,14 +141,12 @@ onMounted(() => loadData())
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] p-0">
+  <div class="min-h-[calc(100vh-4rem)] bg-gray-100 p-0">
     <div class="w-full">
       <div class="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div class="flex flex-wrap items-baseline gap-2">
-            <h1 class="text-xl font-semibold text-gray-900">Special Request Details</h1>
-            <Breadcrumbs />
-          </div>
+            <h1 class="text-xl font-semibold text-gray-900">Special Request Details</h1>          </div>
           <div class="flex items-center gap-2">
             <button
               type="button"
@@ -160,7 +157,7 @@ onMounted(() => loadData())
             </button>
             <button
               type="button"
-              class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+              class="inline-flex items-center rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover"
               @click="goToEdit"
             >
               Edit Special Request
@@ -170,7 +167,7 @@ onMounted(() => loadData())
         </div>
 
       <div v-if="loading" class="flex justify-center py-16">
-          <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+          <svg class="h-10 w-10 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
         </div>
 
       <div v-else-if="!request" class="rounded-lg border border-gray-200 bg-white p-8 text-center text-gray-500">
@@ -263,7 +260,7 @@ onMounted(() => loadData())
                   <p class="truncate text-sm font-medium text-gray-900">{{ docDisplayName(doc) }}</p>
                     <p v-if="doc.size" class="text-xs text-gray-500">{{ formatFileSize(doc.size) }}</p>
                 </div>
-                  <button type="button" class="shrink-0 rounded p-1.5 text-blue-600 hover:bg-blue-50 hover:text-blue-700" @click="downloadDocument(doc)">
+                  <button type="button" class="shrink-0 rounded p-1.5 text-brand-primary hover:bg-brand-primary-light hover:text-brand-primary-hover" @click="downloadDocument(doc)">
                   <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                 </button>
               </div>
@@ -279,13 +276,13 @@ onMounted(() => loadData())
               <template v-if="audits.length">
                 <div class="overflow-x-auto rounded-lg border border-gray-200">
                   <table class="min-w-full text-left text-sm">
-                    <thead class="border-b border-gray-200 bg-gray-100">
+                    <thead class="bg-brand-primary border-b-2 border-green-700">
                       <tr>
-                        <th class="px-4 py-2 font-semibold text-gray-900">Field</th>
-                        <th class="px-4 py-2 font-semibold text-gray-900">Old Value</th>
-                        <th class="px-4 py-2 font-semibold text-gray-900">New Value</th>
-                        <th class="px-4 py-2 font-semibold text-gray-900">Date/Time</th>
-                        <th class="px-4 py-2 font-semibold text-gray-900">Changed By</th>
+                        <th class="px-4 py-2 font-semibold text-white">Field</th>
+                        <th class="px-4 py-2 font-semibold text-white">Old Value</th>
+                        <th class="px-4 py-2 font-semibold text-white">New Value</th>
+                        <th class="px-4 py-2 font-semibold text-white">Date/Time</th>
+                        <th class="px-4 py-2 font-semibold text-white">Changed By</th>
                   </tr>
                 </thead>
                     <tbody class="divide-y divide-gray-100 bg-white">

@@ -20,7 +20,7 @@ const emit = defineEmits(['apply', 'reset'])
       <label class="sr-only">Request Type</label>
       <select
         v-model="filters.submission_type"
-        class="w-[170px] shrink-0 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+        class="w-[170px] shrink-0 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
         :disabled="loading"
       >
         <option value="">Request Type</option>
@@ -31,7 +31,7 @@ const emit = defineEmits(['apply', 'reset'])
       <label class="sr-only">Service Categories</label>
       <select
         v-model="filters.service_category_id"
-        class="w-[190px] shrink-0 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+        class="w-[190px] shrink-0 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
         :disabled="loading"
       >
         <option :value="null">Service Categories</option>
@@ -41,7 +41,7 @@ const emit = defineEmits(['apply', 'reset'])
       <label class="sr-only">Status</label>
       <select
         v-model="filters.status"
-        class="w-[140px] shrink-0 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+        class="w-[140px] shrink-0 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
         :disabled="loading"
       >
         <option value="">Status</option>
@@ -52,7 +52,7 @@ const emit = defineEmits(['apply', 'reset'])
         <slot name="before-apply" />
         <button
           type="button"
-          class="inline-flex shrink-0 items-center rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+          class="inline-flex shrink-0 items-center rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover focus:ring-2 focus:ring-brand-primary disabled:opacity-50"
           :disabled="loading"
           @click="$emit('apply')"
         >

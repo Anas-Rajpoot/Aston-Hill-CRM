@@ -139,7 +139,7 @@ function close() {
             </button>
             <button
               type="button"
-              class="rounded bg-green-600 px-3 py-1.5 text-sm text-white hover:bg-green-700"
+              class="rounded bg-brand-primary px-3 py-1.5 text-sm text-white hover:bg-brand-primary-hover"
               @click="save"
             >
               Save

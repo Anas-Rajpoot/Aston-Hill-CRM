@@ -458,8 +458,8 @@ function cellTitle(row, col) {
 
 const STATUS_BADGES = {
   draft: 'bg-gray-100 text-gray-700',
-  submitted: 'bg-blue-100 text-blue-700',
-  approved: 'bg-green-100 text-green-700',
+  submitted: 'bg-brand-primary-light text-brand-primary-hover',
+  approved: 'bg-brand-primary-light text-brand-primary-hover',
   rejected: 'bg-red-100 text-red-700',
 }
 
@@ -479,7 +479,7 @@ function statusBadgeClass(status) {
     >
       <div class="flex flex-col items-center gap-2">
         <svg
-          class="h-8 w-8 animate-spin text-green-600"
+          class="h-8 w-8 animate-spin text-brand-primary"
           xmlns="http://www.w3.org/2000/svg"
           fill="none"
           viewBox="0 0 24 24"
@@ -494,28 +494,22 @@ function statusBadgeClass(status) {
 
     <table class="min-w-full border-2 border-black border-collapse">
       <thead>
-        <tr class="border-b-2 border-black bg-green-600">
-          <th class="w-10 px-3 py-3 text-left">
-            <input
-              type="checkbox"
-              class="rounded border-gray-300"
-              aria-label="Select all"
-              :checked="isAllSelected"
-              :indeterminate="selectedSet.size > 0 && !isAllSelected"
-              @change="toggleSelectAll"
-            />
+        <tr class="bg-brand-primary border-b-2 border-green-700">
+          <th class="w-10 px-3 py-3">
+            <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll()" class="rounded border-gray-300 text-brand-primary focus:ring-brand-primary" />
           </th>
           <th
             v-for="col in effectiveColumns"
             :key="col"
             scope="col"
-            class="whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-white"
+            class="whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-black cursor-pointer select-none"
+            @click="sortable(col) ? toggleSort(col) : null"
           >
             <button
               v-if="sortable(col)"
               type="button"
-              class="inline-flex items-center gap-1 font-semibold text-white hover:text-white/90"
-              @click="toggleSort(col)"
+              class="inline-flex items-center gap-1 font-semibold text-white hover:text-white/70"
+              @click.stop="toggleSort(col)"
             >
               {{ label(col) }}
               <svg
@@ -529,7 +523,7 @@ function statusBadgeClass(status) {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
               </svg>
             </button>
-            <span v-else class="font-semibold text-white">{{ label(col) }}</span>
+            <span v-else class="font-semibold text-black">{{ label(col) }}</span>
           </th>
           <th v-if="hasAnyRowAction" scope="col" class="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold text-white">
             Actions
@@ -566,7 +560,7 @@ function statusBadgeClass(status) {
               <div class="flex flex-col gap-1.5">
                 <select
                   v-model="inlineEditValue"
-                  class="w-full min-w-[160px] max-w-[220px] rounded border border-gray-300 bg-white px-3 py-1.5 pr-8 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full min-w-[160px] max-w-[220px] rounded border border-gray-300 bg-white px-3 py-1.5 pr-8 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   @keydown.enter="saveInlineEdit"
                   @keydown.esc="cancelInlineEdit"
                 >
@@ -574,7 +568,7 @@ function statusBadgeClass(status) {
                 </select>
                 <div class="flex gap-1">
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
-                  <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
+                  <button type="button" class="rounded bg-brand-primary px-2 py-0.5 text-xs text-white hover:bg-brand-primary-hover" @click="saveInlineEdit">Save</button>
                 </div>
               </div>
             </template>
@@ -587,7 +581,7 @@ function statusBadgeClass(status) {
                   type="text"
                   maxlength="12"
                   placeholder="971XXXXXXXXX"
-                  class="w-full min-w-[160px] max-w-[220px] rounded border bg-white px-3 py-1.5 pr-8 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full min-w-[160px] max-w-[220px] rounded border bg-white px-3 py-1.5 pr-8 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   :class="inlineEditError ? 'border-red-500' : 'border-gray-300'"
                   @input="onPhoneInput($event)"
                   @keydown.enter="saveInlineEdit"
@@ -597,7 +591,7 @@ function statusBadgeClass(status) {
                   v-else
                   v-model="inlineEditValue"
                   :type="col === 'submission_date_from' || col === 'completion_date' ? 'date' : (col === 'email' ? 'email' : 'text')"
-                  class="w-full min-w-[160px] max-w-[220px] rounded border bg-white px-3 py-1.5 pr-8 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full min-w-[160px] max-w-[220px] rounded border bg-white px-3 py-1.5 pr-8 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   :class="inlineEditError ? 'border-red-500' : 'border-gray-300'"
                   @input="inlineEditError = ''"
                   @keydown.enter="saveInlineEdit"
@@ -606,7 +600,7 @@ function statusBadgeClass(status) {
                 <p v-if="inlineEditError" class="text-xs text-red-600">{{ inlineEditError }}</p>
                 <div class="flex gap-1">
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
-                  <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
+                  <button type="button" class="rounded bg-brand-primary px-2 py-0.5 text-xs text-white hover:bg-brand-primary-hover" @click="saveInlineEdit">Save</button>
                 </div>
               </div>
             </template>
@@ -617,7 +611,7 @@ function statusBadgeClass(status) {
               <div class="flex flex-col gap-1.5">
                 <select
                   v-model="editStatusValue"
-                  class="w-full min-w-[160px] rounded border border-gray-300 bg-white px-3 py-1.5 pr-8 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full min-w-[160px] rounded border border-gray-300 bg-white px-3 py-1.5 pr-8 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                 >
                   <option v-for="opt in STATUS_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                 </select>
@@ -631,7 +625,7 @@ function statusBadgeClass(status) {
                   </button>
                   <button
                     type="button"
-                    class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700"
+                    class="rounded bg-brand-primary px-2 py-0.5 text-xs text-white hover:bg-brand-primary-hover"
                     @click="saveStatus(row.id)"
                   >
                     Save
@@ -646,7 +640,7 @@ function statusBadgeClass(status) {
                 @click="openStatusEdit(row)"
               >
 <span
-                :class="['inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap cursor-pointer hover:ring-2 hover:ring-green-400', statusBadgeClass(row.status)]"
+                :class="['inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap cursor-pointer hover:ring-2 hover:ring-brand-primary', statusBadgeClass(row.status)]"
               >
                 {{ statusLabel(row.status) }}
               </span>
@@ -664,7 +658,7 @@ function statusBadgeClass(status) {
                 <input
                   v-model="editStatusChangedAtValue"
                   type="datetime-local"
-                  class="w-full min-w-0 max-w-[180px] rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full min-w-0 max-w-[180px] rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                 />
                 <div class="flex gap-1">
                   <button
@@ -676,7 +670,7 @@ function statusBadgeClass(status) {
                   </button>
                   <button
                     type="button"
-                    class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700"
+                    class="rounded bg-brand-primary px-2 py-0.5 text-xs text-white hover:bg-brand-primary-hover"
                     @click="saveStatusChangedAt(row.id)"
                   >
                     Save
@@ -687,7 +681,7 @@ function statusBadgeClass(status) {
             <template v-else-if="col === 'status_changed_at' && canEdit">
               <button
                 type="button"
-                class="text-left text-sm text-gray-900 hover:text-green-600 hover:underline"
+                class="text-left text-sm text-gray-900 hover:text-brand-primary hover:underline"
                 @click="openStatusChangedAtEdit(row)"
               >
                 {{ formatDateTime(row[col]) }}
@@ -720,7 +714,7 @@ function statusBadgeClass(status) {
               <button
                 v-if="row[col] === 'Unassigned' && canEditBackOffice"
                 type="button"
-                class="text-left text-sm text-blue-600 hover:underline"
+                class="text-left text-sm text-brand-primary hover:underline"
                 @click="$emit('openAssign', row)"
               >
                 Unassigned
@@ -736,8 +730,8 @@ function statusBadgeClass(status) {
               <span
                 :class="[
                   'inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap',
-                  row[col] === 'Resubmission' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800',
-                  canEditBackOffice ? 'cursor-pointer hover:ring-2 hover:ring-green-400' : '',
+                  row[col] === 'Resubmission' ? 'bg-purple-100 text-purple-800' : 'bg-brand-primary-light text-brand-primary-hover',
+                  canEditBackOffice ? 'cursor-pointer hover:ring-2 hover:ring-brand-primary' : '',
                 ]"
                 :title="cellTitle(row, col)"
                 @click="canEditBackOffice && openDropdownEdit(row, col)"
@@ -753,12 +747,12 @@ function statusBadgeClass(status) {
                   String(row[col]).startsWith('Overdue')
                     ? 'bg-red-100 text-red-800'
                     : String(row[col]).includes('passed of')
-                      ? 'bg-blue-100 text-blue-800'
+                      ? 'bg-brand-primary-light text-brand-primary-hover'
                     : String(row[col]).startsWith('Due in')
                       ? 'bg-orange-100 text-orange-800'
                       : String(row[col]).includes('h left')
                         ? 'bg-orange-100 text-orange-800'
-                        : 'bg-green-100 text-green-800',
+                        : 'bg-brand-primary-light text-brand-primary-hover',
                 ]"
                 :title="cellTitle(row, col)"
               >
@@ -801,7 +795,7 @@ function statusBadgeClass(status) {
                 <button
                   v-if="canViewAction"
                   type="button"
-                  class="rounded-full p-1.5 text-blue-600 hover:bg-blue-50"
+                  class="rounded-full p-1.5 text-brand-primary hover:bg-brand-primary-light"
                   title="View details"
                   @click="goToDetail(row.id)"
                 >
@@ -813,7 +807,7 @@ function statusBadgeClass(status) {
                 <button
                   v-if="canEditBackOffice"
                   type="button"
-                  class="rounded-full p-1.5 text-green-600 hover:bg-green-50"
+                  class="rounded-full p-1.5 text-brand-primary hover:bg-brand-primary-light"
                   title="Edit Submission"
                   @click="$emit('openEdit', row.id)"
                 >
@@ -848,7 +842,7 @@ function statusBadgeClass(status) {
                 <router-link
                   v-if="canEditAction && canResubmit(row)"
                   :to="{ path: `/lead-submissions/${row.id}/resubmit` }"
-                  class="rounded bg-blue-800 px-2 py-1 text-xs font-medium text-white hover:bg-blue-900"
+                  class="rounded bg-brand-primary-hover px-2 py-1 text-xs font-medium text-white hover:bg-brand-primary-dark"
                 >
                   Resubmit
                 </router-link>

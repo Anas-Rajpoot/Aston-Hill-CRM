@@ -7,7 +7,6 @@ import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import customerSupportApi from '@/services/customerSupportApi'
 import api from '@/lib/axios'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import { useFormErrors } from '@/composables/useFormErrors'
 
 const route = useRoute()
@@ -470,9 +469,7 @@ onMounted(() => {
         <div class="px-4 py-4 sm:px-5">
           <div class="flex flex-wrap items-center justify-between gap-4">
             <div class="flex flex-wrap items-baseline gap-2">
-              <h1 class="text-xl font-semibold text-gray-900">Edit Customer Support Request</h1>
-              <Breadcrumbs />
-            </div>
+              <h1 class="text-xl font-semibold text-gray-900">Edit Customer Support Request</h1>            </div>
             <router-link
               to="/customer-support"
               class="rounded border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -484,7 +481,7 @@ onMounted(() => {
         <div class="border-t border-gray-200" />
 
         <div v-if="loading" class="flex justify-center px-4 py-16 sm:px-5">
-          <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+          <svg class="h-10 w-10 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
@@ -512,22 +509,22 @@ onMounted(() => {
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div>
                 <label class="block text-sm font-medium text-gray-700">Company Name <span class="text-red-500">*</span></label>
-                <input v-model="form.company_name" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="{ 'border-red-500': getError('company_name') }" />
+                <input v-model="form.company_name" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" :class="{ 'border-red-500': getError('company_name') }" />
                 <p v-if="getError('company_name')" class="mt-1 text-sm text-red-600">{{ getError('company_name') }}</p>
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">Account Number</label>
-                <input v-model="form.account_number" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="{ 'border-red-500': getError('account_number') }" />
+                <input v-model="form.account_number" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" :class="{ 'border-red-500': getError('account_number') }" />
                 <p v-if="getError('account_number')" class="mt-1 text-sm text-red-600">{{ getError('account_number') }}</p>
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">Contact Number <span class="text-red-500">*</span></label>
-                <input v-model="form.contact_number" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="{ 'border-red-500': getError('contact_number') }" />
+                <input v-model="form.contact_number" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" :class="{ 'border-red-500': getError('contact_number') }" />
                 <p v-if="getError('contact_number')" class="mt-1 text-sm text-red-600">{{ getError('contact_number') }}</p>
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">Alternate Contact Number</label>
-                <input v-model="form.alternate_contact_number" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="{ 'border-red-500': getError('alternate_contact_number') }" />
+                <input v-model="form.alternate_contact_number" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" :class="{ 'border-red-500': getError('alternate_contact_number') }" />
                 <p v-if="getError('alternate_contact_number')" class="mt-1 text-sm text-red-600">{{ getError('alternate_contact_number') }}</p>
               </div>
               <div class="sm:col-span-3">
@@ -538,14 +535,14 @@ onMounted(() => {
                     :key="cat"
                     class="flex cursor-pointer items-center rounded-lg border px-3 py-2.5 shadow-sm transition hover:border-gray-400"
                     :class="form.issue_category === cat
-                      ? 'border-green-500 bg-green-50 ring-1 ring-green-500'
+                      ? 'border-brand-primary bg-brand-primary-light ring-1 ring-brand-primary'
                       : 'border-gray-300 bg-white'"
                   >
                     <input
                       v-model="form.issue_category"
                       type="radio"
                       :value="cat"
-                      class="h-4 w-4 border-gray-300 text-green-600 focus:ring-green-500"
+                      class="h-4 w-4 border-gray-300 text-brand-primary focus:ring-brand-primary"
                     />
                     <span
                       class="ml-2 text-sm"
@@ -573,7 +570,7 @@ onMounted(() => {
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">{{ teamLabels.manager || 'Manager' }} <span class="text-red-500">*</span></label>
-                <select v-model="form.manager_id" class="mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="getError('manager_id') ? 'border-red-500' : 'border-gray-300'">
+                <select v-model="form.manager_id" class="mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" :class="getError('manager_id') ? 'border-red-500' : 'border-gray-300'">
                   <option value="">Select {{ teamLabels.manager || 'Manager' }}</option>
                   <option v-for="u in teamOptions.managers" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
                 </select>
@@ -581,7 +578,7 @@ onMounted(() => {
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">{{ teamLabels.team_leader }}</label>
-                <select v-model="form.team_leader_id" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+                <select v-model="form.team_leader_id" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
                   <option value="">Select {{ teamLabels.team_leader }}</option>
                   <option v-for="u in filteredTeamLeaders" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
                 </select>
@@ -589,7 +586,7 @@ onMounted(() => {
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">{{ teamLabels.sales_agent || 'Sales Agent' }}</label>
-                <select v-model="form.sales_agent_id" class="mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="getError('sales_agent_id') ? 'border-red-500' : 'border-gray-300'">
+                <select v-model="form.sales_agent_id" class="mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" :class="getError('sales_agent_id') ? 'border-red-500' : 'border-gray-300'">
                   <option value="">Select {{ teamLabels.sales_agent || 'Sales Agent' }}</option>
                   <option v-for="u in filteredSalesAgents" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
                 </select>
@@ -603,7 +600,7 @@ onMounted(() => {
             <h2 class="mb-3 border-b border-gray-200 pb-2 text-base font-semibold text-gray-900">Issue Details</h2>
             <div>
               <label class="block text-sm font-medium text-gray-700">Issue Description <span class="text-red-500">*</span></label>
-              <textarea v-model="form.issue_description" rows="4" placeholder="Provide detailed description of the issue..." class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" :class="{ 'border-red-500': getError('issue_description') }" />
+              <textarea v-model="form.issue_description" rows="4" placeholder="Provide detailed description of the issue..." class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" :class="{ 'border-red-500': getError('issue_description') }" />
               <p v-if="getError('issue_description')" class="mt-1 text-sm text-red-600">{{ getError('issue_description') }}</p>
             </div>
           </section>
@@ -618,14 +615,14 @@ onMounted(() => {
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">Status</label>
-                <select v-model="form.status" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+                <select v-model="form.status" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
                   <option value="">Select Status</option>
                   <option v-for="opt in editOptions.statuses" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                 </select>
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">CSR Name</label>
-                <select v-model="form.csr_id" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+                <select v-model="form.csr_id" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
                   <option value="">Select CSR</option>
                   <optgroup v-if="accountCsrs.length" label="Assigned to this Account">
                     <option v-for="csr in accountCsrs" :key="'acc-'+csr.id" :value="String(csr.id)">{{ csr.name }}</option>
@@ -640,11 +637,11 @@ onMounted(() => {
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">Trouble Ticket</label>
-                <input v-model="form.trouble_ticket" type="text" placeholder="Enter the Ticket" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+                <input v-model="form.trouble_ticket" type="text" placeholder="Enter the Ticket" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">Activity</label>
-                <input v-model="form.activity" type="text" placeholder="Enter Activity" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+                <input v-model="form.activity" type="text" placeholder="Enter Activity" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">Completion Date</label>
@@ -654,7 +651,7 @@ onMounted(() => {
                     readonly
                     :value="formatDateDisplay(form.completion_date)"
                     placeholder="DD-MMM-YYYY"
-                    class="block w-full cursor-pointer rounded border border-gray-300 bg-white px-3 py-2 pr-9 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                    class="block w-full cursor-pointer rounded border border-gray-300 bg-white px-3 py-2 pr-9 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   />
                   <svg class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                   <input ref="completionDateRef" v-model="form.completion_date" type="date" class="sr-only" tabindex="-1" />
@@ -664,11 +661,11 @@ onMounted(() => {
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label class="block text-sm font-medium text-gray-700">Resolution Remarks</label>
-                    <textarea v-model="form.resolution_remarks" rows="3" placeholder="Provide detailed description of the issue..." class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+                    <textarea v-model="form.resolution_remarks" rows="3" placeholder="Provide detailed description of the issue..." class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
                   </div>
                   <div>
                     <label class="block text-sm font-medium text-gray-700">Internal Remarks</label>
-                    <textarea v-model="form.internal_remarks" rows="3" placeholder="Provide detailed description of the issue..." class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+                    <textarea v-model="form.internal_remarks" rows="3" placeholder="Provide detailed description of the issue..." class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
                   </div>
                 </div>
               </div>
@@ -694,7 +691,7 @@ onMounted(() => {
                   <p class="truncate text-sm font-medium text-gray-900">{{ attachmentDisplayName(att) }}</p>
                   <p v-if="att.file_size" class="mt-0.5 text-xs text-gray-500">{{ att.file_size }}</p>
                 </div>
-                <button type="button" class="shrink-0 rounded p-2 text-blue-600 hover:bg-blue-50" :title="'Download ' + attachmentDisplayName(att)" @click="downloadAttachment(idx)">
+                <button type="button" class="shrink-0 rounded p-2 text-brand-primary hover:bg-brand-primary-light" :title="'Download ' + attachmentDisplayName(att)" @click="downloadAttachment(idx)">
                   <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
@@ -705,14 +702,14 @@ onMounted(() => {
               <input ref="fileInput" type="file" multiple accept="image/*,.pdf,.doc,.docx,.csv" class="hidden" @change="onFileChange" />
               <button
                 type="button"
-                class="inline-flex items-center gap-1.5 text-sm font-medium text-green-600 hover:text-green-700 hover:underline focus:outline-none"
+                class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-primary hover:text-brand-primary-hover hover:underline focus:outline-none"
                 @click="triggerFileSelect"
               >
                 <span class="text-base leading-none">+</span>
                 Add Another Document
               </button>
               <div v-if="newFiles.length" class="mt-3 flex flex-wrap gap-2">
-                <div v-for="(f, idx) in newFiles" :key="'new-' + idx" class="flex items-center gap-2 rounded border border-green-200 bg-green-50 px-2 py-1 text-xs">
+                <div v-for="(f, idx) in newFiles" :key="'new-' + idx" class="flex items-center gap-2 rounded border border-brand-primary-muted bg-brand-primary-light px-2 py-1 text-xs">
                   <span class="max-w-[160px] truncate">{{ f.name }}</span>
                   <button type="button" class="text-red-600 hover:underline" @click="removeNewFile(idx)">Remove</button>
                 </div>
@@ -725,10 +722,10 @@ onMounted(() => {
             <button type="button" class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50" @click="goBack">
               Cancel
             </button>
-            <button type="submit" class="rounded border border-green-600 bg-green-50 px-4 py-2 text-sm font-medium text-green-700 shadow-sm hover:bg-green-100" :disabled="saving">
+            <button type="submit" class="rounded border border-brand-primary bg-brand-primary-light px-4 py-2 text-sm font-medium text-brand-primary-hover shadow-sm hover:bg-brand-primary-light" :disabled="saving">
               {{ saving ? 'Saving...' : 'Save Draft' }}
             </button>
-            <button type="button" class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700" :disabled="saving" @click="submit">
+            <button type="button" class="rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-primary-hover" :disabled="saving" @click="submit">
               {{ saving ? 'Submitting...' : 'Submit' }}
             </button>
           </div>

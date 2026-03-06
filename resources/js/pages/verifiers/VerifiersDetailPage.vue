@@ -7,7 +7,6 @@ import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useTablePageSize } from '@/composables/useTablePageSize'
 import api from '@/lib/axios'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Toast from '@/components/Toast.vue'
 import { formatSystemDateTime } from '@/lib/dateFormat'
 import { canModuleAction } from '@/lib/accessControl'
@@ -248,8 +247,9 @@ function csvEscape(val) {
 function downloadCsvSample() {
   if (!canSample.value) return
   const headers = ['no.', 'Verifier Name', 'Verifier Number', 'Remarks']
-  const sampleRow = ['1', 'Ahmed Khan', '971501234567', 'Primary verifier']
-  const csv = [headers.map(csvEscape).join(','), sampleRow.map(csvEscape).join(',')].join('\r\n')
+  const sampleRow1 = ['1', 'Ahmed Khan', '971501234567', 'Primary verifier']
+  const sampleRow2 = ['2', 'Sara Ali', '971509876543', 'Backup verifier']
+  const csv = [headers.map(csvEscape).join(','), sampleRow1.map(csvEscape).join(','), sampleRow2.map(csvEscape).join(',')].join('\r\n')
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -512,15 +512,13 @@ onMounted(() => load())
       @dismiss="dismissToast"
     />
 
-    <div class="flex items-center justify-between gap-4 overflow-x-auto">
-      <div class="shrink-0">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div>
         <div class="flex flex-wrap items-baseline gap-2">
-          <h1 class="text-2xl font-bold text-gray-900 leading-tight">Verifiers Detail</h1>
-          <Breadcrumbs />
-        </div>
+          <h1 class="text-2xl font-bold text-gray-900 leading-tight">Verifiers Detail</h1>        </div>
         <p class="mt-1 text-sm text-gray-500">Manage verifier directory for DSP Tracker integration.</p>
       </div>
-      <div class="flex items-center gap-2 shrink-0">
+      <div class="flex flex-wrap items-center gap-2">
         <input
           ref="csvInputRef"
           type="file"
@@ -565,7 +563,7 @@ onMounted(() => load())
           v-if="canAdd"
           type="button"
           @click="openAddModal"
-          class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+          class="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -575,15 +573,15 @@ onMounted(() => load())
       </div>
     </div>
 
-    <div v-if="successMessage" class="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700 flex items-center justify-between">
+    <div v-if="successMessage" class="rounded-xl bg-brand-primary-light border border-brand-primary-muted px-4 py-3 text-sm text-brand-primary-hover flex items-center justify-between">
       <span>{{ successMessage }}</span>
-      <button type="button" @click="successMessage = ''" class="text-green-600 hover:text-green-800">×</button>
+      <button type="button" @click="successMessage = ''" class="text-brand-primary hover:text-brand-primary-hover">×</button>
     </div>
     <div v-if="errorMessage" class="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 flex items-center justify-between">
       <span>{{ errorMessage }}</span>
       <button type="button" @click="errorMessage = ''" class="text-red-600 hover:text-red-800">×</button>
     </div>
-    <div v-if="importSuccess" class="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700">{{ importSuccess }}</div>
+    <div v-if="importSuccess" class="rounded-xl bg-brand-primary-light border border-brand-primary-muted px-4 py-3 text-sm text-brand-primary-hover">{{ importSuccess }}</div>
     <div v-if="importError" class="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{{ importError }}</div>
 
     <!-- Search -->
@@ -597,7 +595,7 @@ onMounted(() => load())
         v-model="searchQ"
         type="search"
         placeholder="Search by verifier name, number, or ID..."
-        class="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+        class="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 text-sm focus:border-brand-primary focus:ring-brand-primary"
         @keydown.enter="load(1)"
       />
       <button
@@ -613,31 +611,31 @@ onMounted(() => load())
     <div class="rounded-xl border-2 border-black bg-white shadow-sm overflow-hidden">
       <div class="overflow-x-auto">
         <table class="min-w-full">
-          <thead class="bg-gray-50 border-b-2 border-black">
+          <thead class="bg-brand-primary border-b-2 border-green-700">
             <tr>
-              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 tracking-wider w-14">no.</th>
+              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-white tracking-wider w-14">no.</th>
               <th
                 scope="col"
-                class="px-4 py-3 text-left text-xs font-medium text-gray-500 tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                class="px-4 py-3 text-left text-xs font-medium text-white tracking-wider cursor-pointer hover:bg-white/10 select-none"
                 @click="setSort('verifier_name')"
               >
                 <span class="inline-flex items-center gap-1">Verifier Name {{ sortIcon('verifier_name') }}</span>
               </th>
               <th
                 scope="col"
-                class="px-4 py-3 text-left text-xs font-medium text-gray-500 tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                class="px-4 py-3 text-left text-xs font-medium text-white tracking-wider cursor-pointer hover:bg-white/10 select-none"
                 @click="setSort('verifier_number')"
               >
                 <span class="inline-flex items-center gap-1">Verifier Number {{ sortIcon('verifier_number') }}</span>
               </th>
               <th
                 scope="col"
-                class="px-4 py-3 text-left text-xs font-medium text-gray-500 tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                class="px-4 py-3 text-left text-xs font-medium text-white tracking-wider cursor-pointer hover:bg-white/10 select-none"
                 @click="setSort('remarks')"
               >
                 <span class="inline-flex items-center gap-1">Remarks {{ sortIcon('remarks') }}</span>
               </th>
-              <th v-if="hasAnyRowAction" scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 tracking-wider w-24">Actions</th>
+              <th v-if="hasAnyRowAction" scope="col" class="px-4 py-3 text-right text-xs font-medium text-white tracking-wider w-24">Actions</th>
             </tr>
           </thead>
           <tbody class="bg-white">
@@ -664,7 +662,7 @@ onMounted(() => load())
                       @keydown.enter="saveEdit"
                       @keydown.escape="cancelEdit"
                     />
-                    <button type="button" class="rounded bg-green-600 px-2 py-1 text-xs text-white hover:bg-green-700 disabled:opacity-50" :disabled="savingCell" @click="saveEdit">Save</button>
+                    <button type="button" class="rounded bg-brand-primary px-2 py-1 text-xs text-white hover:bg-brand-primary-hover disabled:opacity-50" :disabled="savingCell" @click="saveEdit">Save</button>
                     <button type="button" class="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50" :disabled="savingCell" @click="cancelEdit">Cancel</button>
                   </div>
                 </template>
@@ -685,7 +683,7 @@ onMounted(() => load())
                       @keydown.enter="saveEdit"
                       @keydown.escape="cancelEdit"
                     />
-                    <button type="button" class="rounded bg-green-600 px-2 py-1 text-xs text-white hover:bg-green-700 disabled:opacity-50" :disabled="savingCell" @click="saveEdit">Save</button>
+                    <button type="button" class="rounded bg-brand-primary px-2 py-1 text-xs text-white hover:bg-brand-primary-hover disabled:opacity-50" :disabled="savingCell" @click="saveEdit">Save</button>
                     <button type="button" class="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50" :disabled="savingCell" @click="cancelEdit">Cancel</button>
                   </div>
                 </template>
@@ -706,7 +704,7 @@ onMounted(() => load())
                       @keydown.enter="saveEdit"
                       @keydown.escape="cancelEdit"
                     />
-                    <button type="button" class="rounded bg-green-600 px-2 py-1 text-xs text-white hover:bg-green-700 disabled:opacity-50" :disabled="savingCell" @click="saveEdit">Save</button>
+                    <button type="button" class="rounded bg-brand-primary px-2 py-1 text-xs text-white hover:bg-brand-primary-hover disabled:opacity-50" :disabled="savingCell" @click="saveEdit">Save</button>
                     <button type="button" class="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50" :disabled="savingCell" @click="cancelEdit">Cancel</button>
                   </div>
                 </template>
@@ -746,7 +744,7 @@ onMounted(() => load())
             <span class="whitespace-nowrap font-medium">Number of rows</span>
             <select
               :value="perPage"
-              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
               @change="(e) => { setPerPage(Number(e.target.value)); load(1) }"
             >
               <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
@@ -787,7 +785,7 @@ onMounted(() => load())
                 <input
                   v-model="addForm.verifier_name"
                   type="text"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:ring-teal-500"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-brand-primary"
                   placeholder="Enter verifier full name"
                 />
               </div>
@@ -797,7 +795,7 @@ onMounted(() => load())
                   v-model="addForm.verifier_number"
                   type="text"
                   maxlength="12"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:ring-teal-500"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-brand-primary"
                   placeholder="971XXXXXXXXX"
                   @input="onVerifierNumberInput('add', $event)"
                 />
@@ -807,7 +805,7 @@ onMounted(() => load())
                 <textarea
                   v-model="addForm.remarks"
                   rows="3"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:ring-teal-500"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-brand-primary"
                   placeholder="Add any additional notes or comments..."
                 />
               </div>
@@ -824,7 +822,7 @@ onMounted(() => load())
             </button>
             <button
               type="button"
-              class="rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
+              class="rounded-lg bg-brand-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50 transition-colors"
               :disabled="addSaving"
               @click="submitAdd"
             >
@@ -864,7 +862,7 @@ onMounted(() => load())
                   {{ selectedVerifier.verifier_number || '—' }}
                 </p>
               </div>
-              <span class="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-800 shrink-0">Active</span>
+              <span class="inline-flex items-center rounded-full bg-brand-primary-light px-3 py-1 text-xs font-medium text-brand-primary-hover shrink-0">Active</span>
             </div>
 
             <!-- Verifier Information -->
@@ -877,7 +875,7 @@ onMounted(() => load())
                 </div>
                 <div>
                   <dt class="text-gray-500 font-medium">Status</dt>
-                  <dd class="mt-0.5"><span class="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">Active</span></dd>
+                  <dd class="mt-0.5"><span class="inline-flex rounded-full bg-brand-primary-light px-2 py-0.5 text-xs font-medium text-brand-primary-hover">Active</span></dd>
                 </div>
                 <div>
                   <dt class="text-gray-500 font-medium">Full Name</dt>
@@ -916,12 +914,12 @@ onMounted(() => load())
             </div>
 
             <!-- DSP Tracker Integration -->
-            <div class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 flex gap-3">
-              <svg class="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <div class="rounded-lg border border-brand-primary-muted bg-brand-primary-light px-4 py-3 flex gap-3">
+              <svg class="w-5 h-5 text-brand-primary flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
               </svg>
-              <div class="text-sm text-blue-800">
-                <p class="font-medium text-blue-900 mb-1">DSP Tracker Integration</p>
+              <div class="text-sm text-brand-primary-hover">
+                <p class="font-medium text-brand-primary-dark mb-1">DSP Tracker Integration</p>
                 <p>This verifier's information is automatically linked to DSP Tracker records. When a CSV upload contains this verifier's name, their contact number will be automatically populated in the DSP Tracker results.</p>
               </div>
             </div>
@@ -937,7 +935,7 @@ onMounted(() => load())
             <button
               v-if="canEdit"
               type="button"
-              class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 transition-colors"
+              class="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-primary-hover transition-colors"
               @click="openEditModal(selectedVerifier)"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -976,7 +974,7 @@ onMounted(() => load())
                 <input
                   v-model="editForm.verifier_name"
                   type="text"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:ring-teal-500"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-brand-primary"
                   placeholder="Enter verifier full name"
                 />
               </div>
@@ -986,7 +984,7 @@ onMounted(() => load())
                   v-model="editForm.verifier_number"
                   type="text"
                   maxlength="12"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:ring-teal-500"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-brand-primary"
                   placeholder="971XXXXXXXXX"
                   @input="onVerifierNumberInput('edit', $event)"
                 />
@@ -996,7 +994,7 @@ onMounted(() => load())
                 <textarea
                   v-model="editForm.remarks"
                   rows="3"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:ring-teal-500"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-brand-primary"
                   placeholder="Add any additional notes or comments..."
                 />
               </div>
@@ -1013,7 +1011,7 @@ onMounted(() => load())
             </button>
             <button
               type="button"
-              class="rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
+              class="rounded-lg bg-brand-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50 transition-colors"
               :disabled="editSaving"
               @click="submitEdit"
             >

@@ -80,7 +80,7 @@ function formatDisplay(ymd) {
             v-model="filters.q"
             type="text"
             placeholder="Company, account, email..."
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           />
         </div>
@@ -90,7 +90,7 @@ function formatDisplay(ymd) {
             v-model="filters.account_number"
             type="text"
             placeholder="Account Number..."
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           />
         </div>
@@ -100,7 +100,7 @@ function formatDisplay(ymd) {
             v-model="filters.company_name"
             type="text"
             placeholder="Company Name..."
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           />
         </div>
@@ -110,14 +110,14 @@ function formatDisplay(ymd) {
             v-model="filters.contact_number"
             type="text"
             placeholder="Contact Number..."
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           />
         </div>
         <div>
           <label class="mb-0.5 block text-xs font-medium text-gray-600">Created From</label>
           <div class="relative" @click="openPicker(fromRef)">
-            <input type="text" readonly :value="formatDisplay(filters.from)" placeholder="DD-MMM-YYYY" class="w-full cursor-pointer rounded border border-gray-300 bg-white px-2 py-1.5 pr-7 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500" :disabled="loading" />
+            <input type="text" readonly :value="formatDisplay(filters.from)" placeholder="DD-MMM-YYYY" class="w-full cursor-pointer rounded border border-gray-300 bg-white px-2 py-1.5 pr-7 text-xs focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" :disabled="loading" />
             <svg class="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
             <input ref="fromRef" v-model="filters.from" type="date" class="sr-only" tabindex="-1" :disabled="loading" />
           </div>
@@ -125,7 +125,7 @@ function formatDisplay(ymd) {
         <div>
           <label class="mb-0.5 block text-xs font-medium text-gray-600">Created To</label>
           <div class="relative" @click="openPicker(toRef)">
-            <input type="text" readonly :value="formatDisplay(filters.to)" placeholder="DD-MMM-YYYY" class="w-full cursor-pointer rounded border border-gray-300 bg-white px-2 py-1.5 pr-7 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500" :disabled="loading" />
+            <input type="text" readonly :value="formatDisplay(filters.to)" placeholder="DD-MMM-YYYY" class="w-full cursor-pointer rounded border border-gray-300 bg-white px-2 py-1.5 pr-7 text-xs focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" :disabled="loading" />
             <svg class="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
             <input ref="toRef" v-model="filters.to" type="date" class="sr-only" tabindex="-1" :disabled="loading" />
           </div>
@@ -133,7 +133,7 @@ function formatDisplay(ymd) {
         <div>
           <label class="mb-0.5 block text-xs font-medium text-gray-600">Submitted From</label>
           <div class="relative" @click="openPicker(submittedFromRef)">
-            <input type="text" readonly :value="formatDisplay(filters.submitted_from)" placeholder="DD-MMM-YYYY" class="w-full cursor-pointer rounded border border-gray-300 bg-white px-2 py-1.5 pr-7 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500" :disabled="loading" />
+            <input type="text" readonly :value="formatDisplay(filters.submitted_from)" placeholder="DD-MMM-YYYY" class="w-full cursor-pointer rounded border border-gray-300 bg-white px-2 py-1.5 pr-7 text-xs focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" :disabled="loading" />
             <svg class="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
             <input ref="submittedFromRef" v-model="filters.submitted_from" type="date" class="sr-only" tabindex="-1" :disabled="loading" />
           </div>
@@ -141,7 +141,7 @@ function formatDisplay(ymd) {
         <div>
           <label class="mb-0.5 block text-xs font-medium text-gray-600">Submitted To</label>
           <div class="relative" @click="openPicker(submittedToRef)">
-            <input type="text" readonly :value="formatDisplay(filters.submitted_to)" placeholder="DD-MMM-YYYY" class="w-full cursor-pointer rounded border border-gray-300 bg-white px-2 py-1.5 pr-7 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500" :disabled="loading" />
+            <input type="text" readonly :value="formatDisplay(filters.submitted_to)" placeholder="DD-MMM-YYYY" class="w-full cursor-pointer rounded border border-gray-300 bg-white px-2 py-1.5 pr-7 text-xs focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" :disabled="loading" />
             <svg class="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
             <input ref="submittedToRef" v-model="filters.submitted_to" type="date" class="sr-only" tabindex="-1" :disabled="loading" />
           </div>
@@ -150,7 +150,7 @@ function formatDisplay(ymd) {
           <label class="mb-0.5 block text-xs font-medium text-gray-600">Manager</label>
           <select
             v-model="filters.manager_id"
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           >
             <option :value="null">All</option>
@@ -161,7 +161,7 @@ function formatDisplay(ymd) {
           <label class="mb-0.5 block text-xs font-medium text-gray-600">Team Leader</label>
           <select
             v-model="filters.team_leader_id"
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           >
             <option :value="null">All</option>
@@ -172,7 +172,7 @@ function formatDisplay(ymd) {
           <label class="mb-0.5 block text-xs font-medium text-gray-600">Sales Agent</label>
           <select
             v-model="filters.sales_agent_id"
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           >
             <option :value="null">All</option>
@@ -184,7 +184,7 @@ function formatDisplay(ymd) {
       <div class="flex flex-wrap items-center gap-2 border-t border-gray-200 bg-gray-50/50 px-3 py-2">
         <button
           type="button"
-          class="inline-flex items-center rounded bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"
+          class="inline-flex items-center rounded bg-brand-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50"
           :disabled="loading"
           @click="$emit('apply')"
         >

@@ -72,7 +72,7 @@ onMounted(() => loadNote())
 <template>
   <div class="flex h-[calc(100vh-4rem)] flex-col bg-white">
     <!-- Dark teal header: Personal Notes + Cancel / Save -->
-    <header class="flex shrink-0 items-center justify-between bg-[#0D7377] px-4 py-3 text-white">
+    <header class="flex shrink-0 items-center justify-between bg-brand-primary-hover px-4 py-3 text-white">
       <div class="flex items-center gap-3">
         <span class="flex h-9 w-9 items-center justify-center rounded bg-white/20">
           <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -84,7 +84,7 @@ onMounted(() => loadNote())
       <div class="flex items-center gap-2">
         <button
           type="button"
-          class="rounded border-2 border-white bg-[#5BC0C0] px-4 py-2 text-sm font-medium text-white hover:bg-[#4db8b8] disabled:opacity-70"
+          class="rounded border-2 border-white bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70"
           :disabled="saving"
           @click="cancel"
         >
@@ -93,7 +93,7 @@ onMounted(() => loadNote())
         <button
           v-if="canSave"
           type="button"
-          class="rounded bg-[#0D7377] px-4 py-2 text-sm font-medium text-white shadow hover:bg-[#0a5c5f] disabled:opacity-70"
+          class="rounded bg-brand-primary-hover px-4 py-2 text-sm font-medium text-white shadow hover:bg-brand-primary-dark disabled:opacity-70"
           :disabled="saving"
           @click="save"
         >
@@ -104,7 +104,7 @@ onMounted(() => loadNote())
 
     <div class="flex min-h-0 flex-1">
       <!-- Left sidebar: stacked placeholders -->
-      <aside class="flex w-14 shrink-0 flex-col items-center gap-2 border-r border-gray-300 bg-[#E8E8E8] py-4">
+      <aside class="flex w-14 shrink-0 flex-col items-center gap-2 border-r border-gray-300 bg-gray-100 py-4">
         <div
           v-for="i in 8"
           :key="i"
@@ -114,12 +114,12 @@ onMounted(() => loadNote())
       </aside>
 
       <!-- Right panel: title + body -->
-      <main class="min-w-0 flex-1 overflow-y-auto bg-[#E8E8E8] p-6">
+      <main class="min-w-0 flex-1 overflow-y-auto bg-gray-100 p-6">
         <div v-if="!canView" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           You do not have permission to view personal notes.
         </div>
         <div v-if="loading" class="flex items-center justify-center py-16">
-          <svg class="h-8 w-8 animate-spin text-[#0D7377]" fill="none" viewBox="0 0 24 24">
+          <svg class="h-8 w-8 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>

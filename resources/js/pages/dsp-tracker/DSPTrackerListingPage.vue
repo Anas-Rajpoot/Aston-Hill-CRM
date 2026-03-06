@@ -5,7 +5,6 @@
  */
 import { ref, computed, onMounted } from 'vue'
 import { fromDdMmYyyy } from '@/lib/dateFormat'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import AdvancedFilters from '@/components/dsp-tracker/AdvancedFilters.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import DSPTrackerDetailModal from '@/components/dsp-tracker/DSPTrackerDetailModal.vue'
@@ -270,7 +269,7 @@ function onHistory(row) {
 function triggerImport() {
   if (!canImport.value) return
   if (lastUploadedBatchId.value) {
-    alert('Before uploading, delete the previous record.')
+    toast('error', 'Before uploading, delete the previous record.')
     return
   }
   csvInputRef.value?.click()
@@ -318,7 +317,7 @@ function downloadCsvSample() {
     if (c === 'uploaded_at') return 'Uploaded At'
     return COLUMN_LABELS[c] || c
   })
-  const sampleRow = [
+  const sampleRow1 = [
     'ACT-1001',
     'ABC Trading LLC',
     'ACC-0001',
@@ -335,7 +334,24 @@ function downloadCsvSample() {
     'operations.user',
     '24-Feb-2026 10:30',
   ]
-  const csv = [headers.map(csvEscape).join(','), sampleRow.map(csvEscape).join(',')].join('\r\n')
+  const sampleRow2 = [
+    'ACT-1002',
+    'XYZ Services LLC',
+    'ACC-0002',
+    'Upgrade',
+    '25-Feb-2026',
+    '14:00',
+    'Fiber 200Mbps',
+    'SO-1002',
+    'In Progress',
+    '',
+    'Sara',
+    '971509876543',
+    'OM-1023',
+    'field.user',
+    '25-Feb-2026 14:00',
+  ]
+  const csv = [headers.map(csvEscape).join(','), sampleRow1.map(csvEscape).join(','), sampleRow2.map(csvEscape).join(',')].join('\r\n')
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -460,22 +476,20 @@ onMounted(() => load())
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-white py-6 px-4 sm:px-6">
     <div class="mx-auto max-w-7xl space-y-4">
-      <div class="flex items-start justify-between gap-4 overflow-x-auto">
-        <div class="flex items-start gap-3 shrink-0">
-          <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-[#6BC100] text-white">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div class="flex items-start gap-3">
+          <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-brand-primary text-white">
             <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
             </svg>
           </div>
           <div>
             <div class="flex items-baseline gap-4">
-              <h1 class="text-xl font-bold text-gray-900 leading-tight">DSP Tracker - Status Check</h1>
-              <Breadcrumbs class="text-sm text-gray-500" />
-            </div>
+              <h1 class="text-xl font-bold text-gray-900 leading-tight">DSP Tracker - Status Check</h1>            </div>
             <p class="mt-0.5 text-sm text-gray-500">Search and track DSP-related activities and requests.</p>
           </div>
         </div>
-        <div class="flex items-center gap-2 shrink-0">
+        <div class="flex flex-wrap items-center gap-2">
           <input
             ref="csvInputRef"
             type="file"
@@ -506,7 +520,7 @@ onMounted(() => load())
           <button
             v-if="canImport"
             type="button"
-            class="inline-flex items-center gap-2 rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+            class="inline-flex items-center gap-2 rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover"
             @click="triggerImport"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -526,42 +540,42 @@ onMounted(() => load())
 
       <!-- Filters: Request Status, Company Name, Apply/Reset, Advanced Filters, Customize Columns (Activity Number only in Advanced) -->
       <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-        <div class="flex items-end gap-4 overflow-x-auto">
-          <div class="min-w-[140px] max-w-[180px]">
+        <div class="flex flex-wrap items-end gap-3">
+          <div class="w-full sm:min-w-[140px] sm:max-w-[180px] sm:w-auto">
             <label class="mb-1 block text-xs font-medium text-gray-600">Request Status</label>
             <select
               v-model="filters.request_status"
-              class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
               :disabled="loading"
             >
               <option value="">All</option>
               <option v-for="o in filterOptions.request_status_options" :key="o.value" :value="o.value">{{ o.label }}</option>
             </select>
           </div>
-          <div class="min-w-[140px] max-w-[200px]">
+          <div class="w-full sm:min-w-[140px] sm:max-w-[200px] sm:w-auto">
             <label class="mb-1 block text-xs font-medium text-gray-600">Company Name</label>
             <input
               v-model="filters.company_name"
               type="text"
               placeholder="Search company..."
-              class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
               :disabled="loading"
             />
           </div>
-          <div class="min-w-[140px] max-w-[200px]">
+          <div class="w-full sm:min-w-[140px] sm:max-w-[200px] sm:w-auto">
             <label class="mb-1 block text-xs font-medium text-gray-600">Activity</label>
             <input
               v-model="filters.activity_number"
               type="text"
               placeholder="Search activity..."
-              class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
               :disabled="loading"
             />
           </div>
           <div class="flex gap-2">
             <button
               type="button"
-              class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+              class="rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50"
               :disabled="loading"
               @click="applyFilters"
             >
@@ -576,7 +590,7 @@ onMounted(() => load())
               Reset
             </button>
           </div>
-          <div class="flex gap-2 ml-auto shrink-0">
+          <div class="flex flex-wrap gap-2 sm:ml-auto">
             <button
               type="button"
               class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -610,16 +624,16 @@ onMounted(() => load())
       <div class="overflow-x-auto rounded-xl border-2 border-black bg-white shadow-sm">
         <table class="dsp-tracker-table border-collapse">
           <thead>
-            <tr class="border-b-2 border-black bg-sky-50">
+            <tr class="bg-brand-primary border-b-2 border-green-700">
               <th
                 v-for="col in displayedColumns"
                 :key="col"
                 scope="col"
-                class="whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-gray-800"
+                class="whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-white"
               >
                 <button
                   type="button"
-                  class="inline-flex items-center gap-1 font-semibold text-gray-800 hover:text-gray-600"
+                  class="inline-flex items-center gap-1 font-semibold text-white hover:text-white/70"
                   @click="toggleSort(col)"
                 >
                   {{ COLUMN_LABELS[col] }}
@@ -628,7 +642,7 @@ onMounted(() => load())
                   </svg>
                 </button>
               </th>
-              <th v-if="hasAnyRowAction" scope="col" class="whitespace-nowrap px-4 py-3 text-center text-sm font-semibold text-gray-800 bg-sky-50">
+              <th v-if="hasAnyRowAction" scope="col" class="whitespace-nowrap px-4 py-3 text-center text-sm font-semibold text-white bg-brand-primary">
                 Action
               </th>
             </tr>
@@ -665,7 +679,7 @@ onMounted(() => load())
                   <button
                     v-if="canViewAction"
                     type="button"
-                    class="rounded p-1.5 text-blue-600 hover:bg-blue-50"
+                    class="rounded p-1.5 text-brand-primary hover:bg-brand-primary-light"
                     title="View"
                     @click="onView(row)"
                   >

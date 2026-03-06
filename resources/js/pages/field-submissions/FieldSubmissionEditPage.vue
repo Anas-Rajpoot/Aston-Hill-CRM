@@ -7,7 +7,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { useFormDraft } from '@/composables/useFormDraft'
 import fieldSubmissionsApi from '@/services/fieldSubmissionsApi'
 import { useAuthStore } from '@/stores/auth'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Toast from '@/components/Toast.vue'
 import { formatSystemDateTime } from '@/lib/dateFormat'
 
@@ -449,9 +448,7 @@ onMounted(() => {
         <div class="px-4 py-4 sm:px-5">
           <div class="flex flex-wrap items-center justify-between gap-4">
             <div class="flex flex-wrap items-baseline gap-2">
-              <h1 class="text-xl font-semibold text-gray-900">Edit Field Submission</h1>
-              <Breadcrumbs />
-            </div>
+              <h1 class="text-xl font-semibold text-gray-900">Edit Field Submission</h1>            </div>
             <router-link
               to="/field-submissions"
               class="rounded border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -463,7 +460,7 @@ onMounted(() => {
         <div class="border-t border-gray-200" />
 
         <div v-if="loading" class="flex justify-center px-4 py-16 sm:px-5">
-          <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+          <svg class="h-10 w-10 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
@@ -482,7 +479,7 @@ onMounted(() => {
               <input
                 v-model="form.account_number"
                 type="text"
-                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.account_number ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.account_number ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-brand-primary focus:ring-brand-primary']"
               />
               <p v-if="serverErrors.account_number" class="mt-1 text-xs text-red-600">{{ serverErrors.account_number[0] }}</p>
             </div>
@@ -492,7 +489,7 @@ onMounted(() => {
                 v-model="form.company_name"
                 type="text"
                 required
-                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.company_name ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.company_name ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-brand-primary focus:ring-brand-primary']"
               />
               <p v-if="serverErrors.company_name" class="mt-1 text-xs text-red-600">{{ serverErrors.company_name[0] }}</p>
             </div>
@@ -502,7 +499,7 @@ onMounted(() => {
                 v-model="form.product"
                 type="text"
                 required
-                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.product ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.product ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-brand-primary focus:ring-brand-primary']"
               />
               <p v-if="serverErrors.product" class="mt-1 text-xs text-red-600">{{ serverErrors.product[0] }}</p>
             </div>
@@ -511,7 +508,7 @@ onMounted(() => {
               <input
                 v-model="form.authorized_signatory_name"
                 type="text"
-                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.authorized_signatory_name ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.authorized_signatory_name ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-brand-primary focus:ring-brand-primary']"
               />
               <p v-if="serverErrors.authorized_signatory_name" class="mt-1 text-xs text-red-600">{{ serverErrors.authorized_signatory_name[0] }}</p>
             </div>
@@ -524,7 +521,7 @@ onMounted(() => {
                 maxlength="12"
                 placeholder="971XXXXXXXXX"
                 autocomplete="off"
-                :class="['contact-number-input mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', fieldErrors.contact_number || serverErrors.contact_number ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+                :class="['contact-number-input mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', fieldErrors.contact_number || serverErrors.contact_number ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-brand-primary focus:ring-brand-primary']"
                 @input="onPhoneInput('contact_number', $event)"
               />
               <p v-if="fieldErrors.contact_number" class="mt-1 text-xs text-red-600">{{ fieldErrors.contact_number }}</p>
@@ -538,7 +535,7 @@ onMounted(() => {
                 maxlength="12"
                 placeholder="971XXXXXXXXX"
                 autocomplete="off"
-                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', fieldErrors.alternate_number || serverErrors.alternate_number ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', fieldErrors.alternate_number || serverErrors.alternate_number ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-brand-primary focus:ring-brand-primary']"
                 @input="onPhoneInput('alternate_number', $event)"
               />
               <p v-if="fieldErrors.alternate_number" class="mt-1 text-xs text-red-600">{{ fieldErrors.alternate_number }}</p>
@@ -552,7 +549,7 @@ onMounted(() => {
                 v-model="form.complete_address"
                 type="text"
                 required
-                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.complete_address ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.complete_address ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-brand-primary focus:ring-brand-primary']"
               />
               <p v-if="serverErrors.complete_address" class="mt-1 text-xs text-red-600">{{ serverErrors.complete_address[0] }}</p>
             </div>
@@ -561,7 +558,7 @@ onMounted(() => {
               <select
                 v-model="form.emirates"
                 required
-                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.emirates ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.emirates ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-brand-primary focus:ring-brand-primary']"
               >
                 <option value="">Select Emirates</option>
                 <option v-for="e in emiratesList" :key="e" :value="e">{{ e }}</option>
@@ -574,7 +571,7 @@ onMounted(() => {
                 v-model="form.location_coordinates"
                 type="text"
                 placeholder="e.g. 25.2048, 55.2708"
-                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', fieldErrors.location_coordinates ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+                :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', fieldErrors.location_coordinates ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-brand-primary focus:ring-brand-primary']"
                 @input="fieldErrors.location_coordinates = null"
               />
               <p v-if="fieldErrors.location_coordinates" class="mt-1 text-xs text-red-600">{{ fieldErrors.location_coordinates }}</p>
@@ -587,7 +584,7 @@ onMounted(() => {
                 v-model="form.additional_notes"
                 rows="3"
                 placeholder="Enter Additional Notes"
-                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
               />
             </div>
             <div>
@@ -596,7 +593,7 @@ onMounted(() => {
                 v-model="form.special_instruction"
                 rows="3"
                 placeholder="Enter Special Instruction"
-                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
               />
             </div>
         </div>
@@ -618,7 +615,7 @@ onMounted(() => {
             <select
               v-model="form.manager_id"
               required
-              :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.manager_id ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+              :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.manager_id ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-brand-primary focus:ring-brand-primary']"
             >
               <option :value="null">Select</option>
               <option v-for="u in teamOptions.managers" :key="u.id" :value="u.id">{{ u.name }}</option>
@@ -629,7 +626,7 @@ onMounted(() => {
             <label class="block text-sm font-medium text-gray-700">Team Leader Name</label>
             <select
               v-model="form.team_leader_id"
-              :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.team_leader_id ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+              :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.team_leader_id ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-brand-primary focus:ring-brand-primary']"
             >
               <option :value="null">Select</option>
               <option v-for="u in filteredTeamLeaders" :key="u.id" :value="u.id">{{ u.name }}</option>
@@ -640,7 +637,7 @@ onMounted(() => {
             <label class="block text-sm font-medium text-gray-700">Sales Agent Name</label>
             <select
               v-model="form.sales_agent_id"
-              :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.sales_agent_id ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+              :class="['mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:ring-1', serverErrors.sales_agent_id ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-brand-primary focus:ring-brand-primary']"
             >
               <option :value="null">Select</option>
               <option v-for="u in filteredSalesAgents" :key="u.id" :value="u.id">{{ u.name }}</option>
@@ -654,7 +651,7 @@ onMounted(() => {
             <label class="block text-sm font-medium text-gray-700">Field Executive Name <span class="text-red-500">*</span></label>
             <select
               v-model="form.field_executive_id"
-              class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             >
               <option :value="null">Select</option>
               <option v-for="u in teamOptions.field_executives" :key="u.id" :value="u.id">{{ u.name }}</option>
@@ -664,7 +661,7 @@ onMounted(() => {
             <label class="block text-sm font-medium text-gray-700">Status <span class="text-red-500">*</span></label>
             <select
               v-model="form.field_status"
-              class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             >
               <option value="">UnAssigned</option>
               <option v-for="s in editOptions.field_statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
@@ -678,7 +675,7 @@ onMounted(() => {
                 readonly
                 :value="formatDateDisplay(form.meeting_date)"
                 placeholder="DD-MMM-YYYY HH:mm:ss"
-                class="block w-full cursor-pointer rounded border border-gray-300 bg-white px-3 py-2 pr-9 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="block w-full cursor-pointer rounded border border-gray-300 bg-white px-3 py-2 pr-9 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
               />
               <svg class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
               <input ref="meetingDateRef" v-model="form.meeting_date" type="datetime-local" step="1" class="sr-only" tabindex="-1" />
@@ -699,7 +696,7 @@ onMounted(() => {
               <span class="min-w-0 flex-1 text-sm text-gray-600">Upload Required Document</span>
               <button
                 type="button"
-                class="flex-shrink-0 rounded bg-green-50 px-3 py-1.5 text-sm font-medium text-green-700 hover:bg-green-100"
+                class="flex-shrink-0 rounded bg-brand-primary-light px-3 py-1.5 text-sm font-medium text-brand-primary-hover hover:bg-brand-primary-light"
                 @click.stop="triggerFileSelect"
               >
                 <span class="inline-flex items-center gap-1">
@@ -714,11 +711,11 @@ onMounted(() => {
               <template v-for="doc in existingDocuments" :key="doc.id">
                 <div class="flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-2 py-1 text-xs">
                   <span class="max-w-[140px] truncate">{{ docDisplayName(doc) }}</span>
-                  <button type="button" class="text-green-700 hover:underline" @click="downloadDoc(doc)">Download</button>
+                  <button type="button" class="text-brand-primary-hover hover:underline" @click="downloadDoc(doc)">Download</button>
                 </div>
               </template>
               <template v-for="(f, idx) in newFiles" :key="'new-' + idx">
-                <div class="flex items-center gap-2 rounded border border-green-200 bg-green-50 px-2 py-1 text-xs">
+                <div class="flex items-center gap-2 rounded border border-brand-primary-muted bg-brand-primary-light px-2 py-1 text-xs">
                   <span class="max-w-[140px] truncate">{{ f.name }}</span>
                   <button type="button" class="text-red-600 hover:underline" @click="removeNewFile(idx)">Remove</button>
                 </div>
@@ -731,7 +728,7 @@ onMounted(() => {
               v-model="form.remarks_by_field_agent"
               rows="5"
               placeholder="Remarks by Field Agent"
-              class="mt-1 min-h-[120px] w-full flex-1 resize-y rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              class="mt-1 min-h-[120px] w-full flex-1 resize-y rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             />
           </div>
         </div>
@@ -748,7 +745,7 @@ onMounted(() => {
           <button
             type="submit"
             :disabled="saving"
-            class="inline-flex items-center gap-2 rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70"
+            class="inline-flex items-center gap-2 rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70"
           >
             <svg v-if="!saving" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />

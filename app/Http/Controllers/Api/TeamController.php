@@ -73,10 +73,16 @@ class TeamController extends Controller
 
         $lastPage = $total > 0 ? (int) ceil($total / $perPage) : 1;
 
+        $statsRaw = Team::selectRaw("
+                COUNT(*) as total,
+                SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
+                SUM(CASE WHEN status = 'inactive' THEN 1 ELSE 0 END) as inactive
+            ")->first();
+
         $stats = [
-            'total' => Team::count(),
-            'active' => Team::where('status', 'active')->count(),
-            'inactive' => Team::where('status', 'inactive')->count(),
+            'total' => (int) ($statsRaw->total ?? 0),
+            'active' => (int) ($statsRaw->active ?? 0),
+            'inactive' => (int) ($statsRaw->inactive ?? 0),
         ];
 
         return response()->json([
@@ -213,6 +219,9 @@ class TeamController extends Controller
 
         $team->delete();
 
+        TeamHierarchyService::flushAllCaches();
+        $this->flushTeamOptionsCache();
+
         return response()->json(['message' => 'Team deleted successfully.']);
     }
 
@@ -243,6 +252,9 @@ class TeamController extends Controller
             report($e);
         }
 
+        TeamHierarchyService::flushAllCaches();
+        $this->flushTeamOptionsCache();
+
         return response()->json(['message' => "{$count} team(s) deleted.", 'count' => $count]);
     }
 
@@ -268,6 +280,9 @@ class TeamController extends Controller
         } catch (\Throwable $e) {
             report($e);
         }
+
+        TeamHierarchyService::flushAllCaches();
+        $this->flushTeamOptionsCache();
 
         return response()->json(['message' => "{$count} team(s) updated to {$data['status']}.", 'count' => $count]);
     }
@@ -305,6 +320,18 @@ class TeamController extends Controller
                     'message' => "Cannot add {$newCount} member(s). Team limit is {$team->max_members} and currently has {$currentCount} member(s).",
                 ], 422);
             }
+        }
+
+        // Prevent silently stealing users already assigned to another team.
+        $alreadyAssigned = User::whereIn('id', $data['user_ids'])
+            ->whereNotNull('team_id')
+            ->where('team_id', '!=', $team->id)
+            ->pluck('name', 'id');
+
+        if ($alreadyAssigned->isNotEmpty()) {
+            return response()->json([
+                'message' => 'The following users are already assigned to another team: ' . $alreadyAssigned->values()->implode(', '),
+            ], 422);
         }
 
         $updated = User::whereIn('id', $data['user_ids'])->update(['team_id' => $team->id]);

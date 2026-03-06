@@ -69,7 +69,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onClickOutside))
             v-model="filters.company_name"
             type="text"
             placeholder="Search by company name..."
-            class="w-full rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-700 placeholder-gray-400 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-700 placeholder-gray-400 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
             @keyup.enter="$emit('search')"
           />
@@ -78,7 +78,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onClickOutside))
           <label class="block text-xs text-gray-700 mb-0.5">Account Number</label>
           <button
             type="button"
-            class="flex w-full items-center justify-between rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500 disabled:opacity-50"
+            class="flex w-full items-center justify-between rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary disabled:opacity-50"
             :disabled="loading"
             @click="toggleAccDropdown"
           >
@@ -98,15 +98,15 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onClickOutside))
                 v-model="accSearch"
                 type="text"
                 placeholder="Search..."
-                class="w-full rounded border border-gray-300 px-2 py-1 text-xs text-gray-700 placeholder-gray-400 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                class="w-full rounded border border-gray-300 px-2 py-1 text-xs text-gray-700 placeholder-gray-400 focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
               />
             </div>
             <ul class="max-h-[200px] overflow-y-auto py-1">
               <li>
                 <button
                   type="button"
-                  class="w-full px-2.5 py-1.5 text-left text-xs text-gray-500 hover:bg-green-50"
-                  :class="{ 'bg-green-50 font-medium text-green-700': !filters.account_number }"
+                  class="w-full px-2.5 py-1.5 text-left text-xs text-gray-500 hover:bg-brand-primary-light"
+                  :class="{ 'bg-brand-primary-light font-medium text-brand-primary-hover': !filters.account_number }"
                   @click="clearAccount"
                 >
                   All Account Numbers
@@ -115,8 +115,8 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onClickOutside))
               <li v-for="acc in filteredAccountNumbers" :key="acc">
                 <button
                   type="button"
-                  class="w-full px-2.5 py-1.5 text-left text-xs text-gray-700 hover:bg-green-50"
-                  :class="{ 'bg-green-50 font-medium text-green-700': filters.account_number === acc }"
+                  class="w-full px-2.5 py-1.5 text-left text-xs text-gray-700 hover:bg-brand-primary-light"
+                  :class="{ 'bg-brand-primary-light font-medium text-brand-primary-hover': filters.account_number === acc }"
                   @click="selectAccount(acc)"
                 >
                   {{ acc }}
@@ -133,7 +133,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onClickOutside))
           <select
             id="client-alert-type"
             v-model="filters.alert_type"
-            class="w-full rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           >
             <option value="">Select</option>
@@ -146,7 +146,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onClickOutside))
         >
           <button
             type="button"
-            class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+            class="inline-flex items-center rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover focus:ring-2 focus:ring-brand-primary disabled:opacity-50"
             :disabled="loading"
             @click="$emit('search')"
           >

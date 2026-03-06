@@ -21,7 +21,16 @@ class LeadSubmission extends Model
         'back_office_notes','activity','back_office_account','work_order','du_status','completion_date','du_remarks','additional_note',
     ];
 
-    const STATUSES = ['draft', 'submitted', 'approved', 'rejected'];
+    const STATUSES = [
+        'draft',
+        'unassigned',
+        'submitted',
+        'approved',
+        'rejected',
+        'pending_from_sales',
+        'pending_for_finance',
+        'pending_for_ata',
+    ];
 
     protected $casts = [
         'payload' => 'array',

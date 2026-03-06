@@ -51,7 +51,7 @@ const strength = computed(() => {
   if (pct === 0) return { level: 'none', label: '', color: 'bg-gray-200', text: 'text-gray-400' }
   if (pct < 50) return { level: 'weak', label: 'Weak', color: 'bg-red-500', text: 'text-red-600' }
   if (pct < 100) return { level: 'medium', label: 'Medium', color: 'bg-yellow-500', text: 'text-yellow-600' }
-  return { level: 'strong', label: 'Strong', color: 'bg-green-500', text: 'text-green-600' }
+  return { level: 'strong', label: 'Strong', color: 'bg-brand-primary', text: 'text-brand-primary' }
 })
 
 const allMet = computed(() => metCount.value === totalCount.value)
@@ -81,13 +81,13 @@ defineExpose({ allMet, checks })
       <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Password Requirements</p>
       <ul class="space-y-1.5">
         <li v-for="check in checks" :key="check.key" class="flex items-center gap-2 text-sm">
-          <svg v-if="check.met" class="h-4 w-4 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg v-if="check.met" class="h-4 w-4 text-brand-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
           </svg>
           <svg v-else class="h-4 w-4 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="10" stroke-width="2" />
           </svg>
-          <span :class="check.met ? 'text-green-700' : 'text-gray-500'">{{ check.label }}</span>
+          <span :class="check.met ? 'text-brand-primary-hover' : 'text-gray-500'">{{ check.label }}</span>
         </li>
       </ul>
     </div>

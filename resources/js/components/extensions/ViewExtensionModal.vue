@@ -55,7 +55,7 @@ function statusLabel(status) {
 }
 
 function statusClass(status) {
-  if (status === 'active') return 'bg-emerald-100 text-emerald-800'
+  if (status === 'active') return 'bg-brand-primary-light text-brand-primary'
   if (status === 'inactive') return 'bg-gray-100 text-gray-700'
   if (status === 'not_created') return 'bg-amber-100 text-amber-800'
   return 'bg-gray-100 text-gray-700'
@@ -68,7 +68,7 @@ function usageLabel(usage) {
 }
 
 function usageClass(usage) {
-  if (usage === 'assigned') return 'bg-teal-100 text-teal-800'
+  if (usage === 'assigned') return 'bg-brand-primary-light text-brand-primary'
   return 'bg-gray-100 text-gray-600'
 }
 
@@ -157,7 +157,7 @@ function onPasswordDoubleClick() {
           <div class="flex-1 min-h-0 overflow-y-auto">
             <!-- Loading -->
             <div v-if="loading" class="flex flex-col items-center justify-center py-12">
-              <svg class="h-8 w-8 animate-spin text-teal-600 mb-3" fill="none" viewBox="0 0 24 24">
+              <svg class="h-8 w-8 animate-spin text-brand-primary mb-3" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
@@ -177,7 +177,7 @@ function onPasswordDoubleClick() {
                   <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 mt-3">
                     <div>
                       <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Extension</dt>
-                      <dd class="mt-0.5 text-base font-medium text-green-600">{{ extension.extension || '—' }}</dd>
+                      <dd class="mt-0.5 text-base font-medium text-brand-primary">{{ extension.extension || '—' }}</dd>
                     </div>
                     <div>
                       <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Gateway</dt>
@@ -202,7 +202,7 @@ function onPasswordDoubleClick() {
                       <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Password</dt>
                       <dd
                         class="mt-0.5 text-sm font-mono"
-                        :class="canEdit && extension.password_view ? 'cursor-pointer text-blue-600 hover:underline' : 'text-gray-600'"
+                        :class="canEdit && extension.password_view ? 'cursor-pointer text-brand-primary hover:underline' : 'text-gray-600'"
                         :title="canEdit && extension.password_view ? 'Double-click to view/hide password' : undefined"
                         @dblclick="onPasswordDoubleClick"
                       >
@@ -287,7 +287,7 @@ function onPasswordDoubleClick() {
                 <button
                   v-if="canEdit"
                   type="button"
-                  class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+                  class="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover"
                   @click="openEditModal"
                 >
                   <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>

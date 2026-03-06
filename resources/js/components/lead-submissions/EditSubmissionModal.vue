@@ -51,6 +51,18 @@ const STATUS_OPTIONS = [
   { value: 'unassigned', label: 'UnAssigned' },
 ]
 
+function normalizeLeadStatus(status) {
+  const value = String(status || '').trim().toLowerCase()
+  if (!value || value === 'submitted') return 'unassigned'
+  return value
+}
+
+function normalizeDuStatus(status) {
+  const value = String(status || '').trim().toLowerCase()
+  if (value === 'submitted') return 'In Progress'
+  return status ?? ''
+}
+
 watch(
   () => [props.visible, props.leadId],
   async ([visible, leadId]) => {
@@ -63,7 +75,7 @@ watch(
     try {
       const [leadRes, optionsRes] = await Promise.all([
         leadSubmissionsApi.getLead(id),
-        leadSubmissionsApi.getBackOfficeOptions().catch(() => ({})),
+        leadSubmissionsApi.getBackOfficeOptions(true).catch(() => ({})),
       ])
       const data = leadRes?.data ?? leadRes
       lead.value = data
@@ -76,7 +88,7 @@ watch(
       }
       form.value = {
         executive_id: data.executive_id ?? null,
-        status: data.status ?? '',
+        status: normalizeLeadStatus(data.status),
         call_verification: data.call_verification ?? '',
         pending_from_sales: data.pending_from_sales ?? '',
         documents_verification: data.documents_verification ?? '',
@@ -85,7 +97,7 @@ watch(
         activity: data.activity ?? '',
         back_office_account: data.back_office_account ?? '',
         work_order: data.work_order ?? '',
-        du_status: data.du_status ?? '',
+        du_status: normalizeDuStatus(data.du_status),
         completion_date: data.completion_date ?? '',
         du_remarks: data.du_remarks ?? '',
         additional_note: data.additional_note ?? '',
@@ -217,7 +229,7 @@ async function save() {
 
           <div class="max-h-[calc(100vh-8rem)] overflow-y-auto px-6 py-4">
             <div v-if="loading" class="flex items-center justify-center py-12">
-              <svg class="h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+              <svg class="h-8 w-8 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
@@ -225,13 +237,13 @@ async function save() {
 
             <template v-else-if="lead">
               <!-- Back Office Verification -->
-              <div class="mb-4 flex gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
-                <svg class="h-5 w-5 shrink-0 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+              <div class="mb-4 flex gap-2 rounded-lg border border-brand-primary-muted bg-brand-primary-light px-4 py-3">
+                <svg class="h-5 w-5 shrink-0 text-brand-primary" fill="currentColor" viewBox="0 0 20 20">
                   <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
                 </svg>
                 <div>
-                  <p class="font-medium text-blue-800">Back Office Verification</p>
-                  <p class="text-sm text-blue-700">Review all information and documents carefully. Make necessary corrections before updating the status.</p>
+                  <p class="font-medium text-brand-primary-hover">Back Office Verification</p>
+                  <p class="text-sm text-brand-primary-hover">Review all information and documents carefully. Make necessary corrections before updating the status.</p>
                 </div>
               </div>
 
@@ -334,7 +346,7 @@ async function save() {
                     </div>
                     <button
                       type="button"
-                      class="shrink-0 rounded p-1.5 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                      class="shrink-0 rounded p-1.5 text-brand-primary hover:bg-brand-primary-light hover:text-brand-primary-hover"
                       title="Download"
                       @click="downloadDoc(doc)"
                     >
@@ -410,8 +422,8 @@ async function save() {
           <!-- Footer -->
           <div class="sticky bottom-0 flex justify-end gap-2 border-t border-gray-200 bg-gray-50 px-6 py-4">
             <button type="button" class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="close">Cancel</button>
-            <button type="button" class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50" :disabled="saving || !lead" @click="save">
-              <svg v-if="saving" class="mr-2 h-4 w-4 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+            <button type="button" class="inline-flex items-center rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50" :disabled="saving || !lead" @click="save">
+              <svg v-if="saving" class="mr-2 h-4 w-4 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>

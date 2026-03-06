@@ -8,9 +8,9 @@ import clientsApi from '@/services/clientsApi'
 import ClientsFiltersBar from '@/components/clients/ClientsFiltersBar.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import ClientTable from '@/components/clients/ClientTable.vue'
+import Toast from '@/components/Toast.vue'
 import RenewalAlertsModal from '@/components/clients/RenewalAlertsModal.vue'
 import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import RecordHistoryModal from '@/components/RecordHistoryModal.vue'
 import api from '@/lib/axios'
 import { useAuthStore } from '@/stores/auth'
@@ -41,6 +41,13 @@ const canCreate = computed(() => canModuleAction(authStore.user, 'clients', 'cre
 const canExport = computed(() => canModuleAction(authStore.user, 'clients', 'export'))
 const canImport = computed(() => canModuleAction(authStore.user, 'clients', 'import'))
 const loading = ref(true)
+
+/* ───── Toast ───── */
+const showToast = ref(false)
+const toastType = ref('success')
+const toastMsg  = ref('')
+function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
+
 const clients = ref([])
 const TABLE_MODULE = 'clients'
 const perPageOptions = ref([10, 20, 25, 50])
@@ -240,7 +247,7 @@ async function onImportFileSelect(event) {
     load()
   } catch (err) {
     const msg = err?.response?.data?.message ?? err?.message ?? 'Import failed.'
-    alert(msg)
+    toast('error', msg)
   } finally {
     importLoading.value = false
   }
@@ -507,9 +514,7 @@ onMounted(() => {
     <div class="w-full space-y-4">
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div class="flex flex-wrap items-baseline gap-2">
-          <h1 class="text-xl font-semibold text-gray-900 leading-tight">Clients</h1>
-          <Breadcrumbs />
-        </div>
+          <h1 class="text-xl font-semibold text-gray-900 leading-tight">Clients</h1>        </div>
         <div class="flex items-center gap-2">
           <input
             ref="importFileInputRef"
@@ -553,7 +558,7 @@ onMounted(() => {
           <button
             v-if="canCreate"
             type="button"
-            class="inline-flex items-center rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70 disabled:cursor-wait"
+            class="inline-flex items-center rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70 disabled:cursor-wait"
             :disabled="loading"
             @click="goToAddClient"
           >
@@ -601,78 +606,78 @@ onMounted(() => {
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
           <div>
             <label class="mb-1 block text-xs text-gray-600">Manager</label>
-            <select v-model="filters.manager_id" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            <select v-model="filters.manager_id" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Managers</option>
               <option v-for="u in filterOptions.managers" :key="u.id" :value="u.id">{{ u.name }}</option>
             </select>
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Team Leader</label>
-            <select v-model="filters.team_leader_id" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            <select v-model="filters.team_leader_id" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Team Leaders</option>
               <option v-for="u in filterOptions.team_leaders" :key="u.id" :value="u.id">{{ u.name }}</option>
             </select>
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Sales Agent</label>
-            <select v-model="filters.sales_agent_id" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            <select v-model="filters.sales_agent_id" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Sales Agents</option>
               <option v-for="u in filterOptions.sales_agents" :key="u.id" :value="u.id">{{ u.name }}</option>
             </select>
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Submission Type</label>
-            <select v-model="filters.submission_type" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            <select v-model="filters.submission_type" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Submission Types</option>
               <option v-for="v in filterOptions.submission_types" :key="v" :value="v">{{ v }}</option>
             </select>
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Service Category</label>
-            <select v-model="filters.service_category" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            <select v-model="filters.service_category" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Service Categories</option>
               <option v-for="v in filterOptions.service_categories" :key="v" :value="v">{{ v }}</option>
             </select>
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Service Type</label>
-            <select v-model="filters.service_type" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            <select v-model="filters.service_type" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Service Types</option>
               <option v-for="v in filterOptions.service_types" :key="v" :value="v">{{ v }}</option>
             </select>
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Product Type</label>
-            <select v-model="filters.product_type" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            <select v-model="filters.product_type" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Product Types</option>
               <option v-for="v in filterOptions.product_types" :key="v" :value="v">{{ v }}</option>
             </select>
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Product Name</label>
-            <input v-model="filters.product_name" type="text" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" placeholder="Product name" />
+            <input v-model="filters.product_name" type="text" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" placeholder="Product name" />
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Work Order</label>
-            <input v-model="filters.wo_number" type="text" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" placeholder="WO number" />
+            <input v-model="filters.wo_number" type="text" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" placeholder="WO number" />
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Work Order Status</label>
-            <select v-model="filters.work_order_status" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            <select v-model="filters.work_order_status" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Work Order Statuses</option>
               <option v-for="v in filterOptions.work_order_statuses" :key="v" :value="v">{{ v }}</option>
             </select>
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Contract Type</label>
-            <select v-model="filters.contract_type" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            <select v-model="filters.contract_type" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Contract Types</option>
               <option v-for="v in filterOptions.contract_types" :key="v" :value="v">{{ v }}</option>
             </select>
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Clawback / Chum</label>
-            <select v-model="filters.clawback_chum" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            <select v-model="filters.clawback_chum" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All</option>
               <option v-for="v in filterOptions.clawback_chum_options" :key="v" :value="v">{{ v }}</option>
             </select>
@@ -703,7 +708,7 @@ onMounted(() => {
           </div>
         </div>
         <div class="mt-3 flex items-center gap-2">
-          <button type="button" class="rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700" @click="applyFilters">Apply</button>
+          <button type="button" class="rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover" @click="applyFilters">Apply</button>
           <button type="button" class="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50" @click="resetFilters">Reset</button>
         </div>
       </div>
@@ -735,7 +740,7 @@ onMounted(() => {
               <span class="whitespace-nowrap font-medium">Number of rows</span>
               <select
                 :value="meta.per_page"
-                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                 @change="onPerPageChange"
               >
                 <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
@@ -775,5 +780,7 @@ onMounted(() => {
       :alerts="renewalAlertsModalItems"
       @close="closeRenewalAlertsModal"
     />
+
+    <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />
   </div>
 </template>

@@ -55,7 +55,7 @@ function resetFieldErrors() {
 
 function inputClass(field) {
   return [
-    'w-full rounded-lg border px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500',
+    'w-full rounded-lg border px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary',
     fieldErrors.value[field] ? 'border-red-500' : 'border-gray-300',
   ]
 }
@@ -318,7 +318,7 @@ async function submit() {
                 v-model="form.password"
                 type="password"
                 autocomplete="new-password"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                 placeholder="Leave blank to keep current"
               />
             </div>
@@ -347,7 +347,7 @@ async function submit() {
               <select
                 id="edit-ext-assigned"
                 v-model="form.assigned_to"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
               >
                 <option :value="null">Not Assigned</option>
                 <option v-for="emp in assignableEmployees" :key="emp.id" :value="emp.id">
@@ -365,7 +365,7 @@ async function submit() {
                 id="edit-ext-comment"
                 v-model="form.comment"
                 rows="3"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                 placeholder="Add any notes or comments..."
               />
             </div>
@@ -380,7 +380,7 @@ async function submit() {
               </button>
               <button
                 type="submit"
-                class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                class="rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50"
                 :disabled="submitting"
               >
                 {{ submitting ? 'Updating...' : 'Update Extension' }}
@@ -389,7 +389,7 @@ async function submit() {
           </form>
 
           <div v-else class="flex items-center justify-center px-6 py-12">
-            <svg class="h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+            <svg class="h-8 w-8 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>

@@ -7,7 +7,7 @@ import { useRoute, useRouter } from 'vue-router'
 import vasRequestsApi from '@/services/vasRequestsApi'
 import { useAuthStore } from '@/stores/auth'
 import { useFormErrors } from '@/composables/useFormErrors'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import Toast from '@/components/Toast.vue'
 import { formatUserDate } from '@/lib/dateFormat'
 
 const MAX_FILE_MB = 3
@@ -21,6 +21,12 @@ const auth = useAuthStore()
 const loading = ref(true)
 const saving = ref(false)
 const request = ref(null)
+
+/* ───── Toast ───── */
+const showToast = ref(false)
+const toastType = ref('success')
+const toastMsg  = ref('')
+function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
 const teamOptions = ref({
   managers: [],
   team_leaders: [],
@@ -344,7 +350,7 @@ async function confirmRemoveDoc() {
     }
     closeRemoveConfirm()
   } catch (e) {
-    alert(e?.response?.data?.message || 'Failed to remove document.')
+    toast('error', e?.response?.data?.message || 'Failed to remove document.')
   } finally {
     removingDocId.value = null
   }
@@ -449,9 +455,9 @@ async function uploadNewDocuments() {
 const { errors, generalMessage, setErrors, clearErrors, clearFieldError, getError } = useFormErrors()
 
 const inputClass = (field) =>
-  `mt-1 block w-full rounded border bg-white px-3 py-2 shadow-sm focus:ring-1 ${getError(field) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500'}`
+  `mt-1 block w-full rounded border bg-white px-3 py-2 shadow-sm focus:ring-1 ${getError(field) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-brand-primary focus:ring-brand-primary'}`
 const selectClass = (field) =>
-  `mt-1 block w-full rounded border bg-white px-3 py-2 shadow-sm focus:ring-1 ${getError(field) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500'}`
+  `mt-1 block w-full rounded border bg-white px-3 py-2 shadow-sm focus:ring-1 ${getError(field) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-brand-primary focus:ring-brand-primary'}`
 
 function validatePhone(value) {
   if (!value) return 'Contact number is required.'
@@ -527,7 +533,7 @@ async function submitForm() {
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } else {
       const msg = err.response?.data?.message || err.message || 'Failed to save.'
-      alert(msg)
+      toast('error', msg)
     }
   } finally {
     saving.value = false
@@ -544,9 +550,7 @@ onMounted(() => load())
         <div class="px-4 py-4 sm:px-5">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="flex flex-wrap items-baseline gap-2">
-              <h1 class="text-xl font-semibold text-gray-900">Edit VAS Request</h1>
-              <Breadcrumbs />
-            </div>
+              <h1 class="text-xl font-semibold text-gray-900">Edit VAS Request</h1>            </div>
             <router-link
               to="/vas-requests"
               class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -558,7 +562,7 @@ onMounted(() => load())
         <div class="border-t border-gray-200" />
 
         <div v-if="loading" class="flex justify-center px-4 py-16 sm:px-5">
-          <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+          <svg class="h-10 w-10 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
@@ -575,9 +579,9 @@ onMounted(() => load())
           </div>
 
           <!-- Back Office Verification banner -->
-          <div class="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
-            <h3 class="text-sm font-semibold text-blue-900">Back Office Verification</h3>
-            <p class="mt-1 text-sm text-blue-800">Review all information and documents carefully. Make necessary corrections before updating the status.</p>
+          <div class="mb-4 rounded-lg border border-brand-primary-muted bg-brand-primary-light px-4 py-3">
+            <h3 class="text-sm font-semibold text-brand-primary-dark">Back Office Verification</h3>
+            <p class="mt-1 text-sm text-brand-primary-hover">Review all information and documents carefully. Make necessary corrections before updating the status.</p>
           </div>
 
           <!-- Primary Information: 2 columns, labels above inputs -->
@@ -799,7 +803,7 @@ onMounted(() => load())
                 </div>
                 <button
                   type="button"
-                  class="shrink-0 rounded p-1.5 text-blue-600 hover:bg-blue-50"
+                  class="shrink-0 rounded p-1.5 text-brand-primary hover:bg-brand-primary-light"
                   :title="'Download ' + docDisplayName(doc)"
                   @click="downloadDoc(doc)"
                 >
@@ -829,7 +833,7 @@ onMounted(() => load())
               <h2 class="text-base font-semibold text-gray-900">Add Document</h2>
               <button
                 type="button"
-                class="text-sm font-medium text-green-600 hover:text-green-700"
+                class="text-sm font-medium text-brand-primary hover:text-brand-primary-hover"
                 @click="addDocTrigger"
               >
                 + Add Document
@@ -850,11 +854,11 @@ onMounted(() => load())
                   </div>
                   <div class="min-w-0 flex-1">
                     <p class="text-sm font-medium text-gray-900">{{ doc.label }}</p>
-                    <p v-if="newDocFiles[doc.key]" class="mt-0.5 truncate text-xs text-green-600">{{ newDocFiles[doc.key].name }}</p>
+                    <p v-if="newDocFiles[doc.key]" class="mt-0.5 truncate text-xs text-brand-primary">{{ newDocFiles[doc.key].name }}</p>
                   </div>
                   <label class="shrink-0 cursor-pointer">
                     <input type="file" class="hidden" :accept="ALLOWED_EXT.join(',')" @change="onNewSchemaFileChange(doc.key, $event)" />
-                    <span class="inline-flex items-center gap-1.5 rounded-lg border border-green-600 bg-white px-3 py-1.5 text-xs font-medium text-green-600 hover:bg-green-50">
+                    <span class="inline-flex items-center gap-1.5 rounded-lg border border-brand-primary bg-white px-3 py-1.5 text-xs font-medium text-brand-primary hover:bg-brand-primary-light">
                       <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
                       Upload
                     </span>
@@ -864,7 +868,7 @@ onMounted(() => load())
               <div class="mt-3">
                 <button
                   type="button"
-                  class="text-sm font-medium text-green-600 hover:text-green-700 disabled:opacity-50"
+                  class="text-sm font-medium text-brand-primary hover:text-brand-primary-hover disabled:opacity-50"
                   :disabled="newAdditionalDocs.length >= 3"
                   @click="addAdditionalDocSlot"
                 >
@@ -894,7 +898,7 @@ onMounted(() => load())
               <div v-if="docUploadError" class="mt-2 text-sm text-red-600">{{ docUploadError }}</div>
               <button
                 type="button"
-                class="mt-3 inline-flex items-center gap-1 rounded bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                class="mt-3 inline-flex items-center gap-1 rounded bg-brand-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50"
                 :disabled="!hasNewFilesToUpload || uploadSaving"
                 @click.prevent="uploadNewDocuments"
               >
@@ -915,7 +919,7 @@ onMounted(() => load())
             <button
               type="submit"
               :disabled="saving"
-              class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70"
+              class="rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70"
             >
               <span v-if="saving">Saving...</span>
               <span v-else>Save Changes</span>
@@ -981,4 +985,6 @@ onMounted(() => load())
       </div>
     </div>
   </Teleport>
+
+  <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />
 </template>

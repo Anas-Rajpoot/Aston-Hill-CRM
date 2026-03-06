@@ -186,7 +186,7 @@ function onDelete(row) {
       aria-busy="true"
     >
       <div class="flex flex-col items-center gap-2">
-        <svg class="h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+        <svg class="h-8 w-8 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
@@ -196,25 +196,26 @@ function onDelete(row) {
 
     <table class="min-w-full border-2 border-black border-collapse bg-white">
       <thead>
-        <tr class="border-b-2 border-black bg-green-600">
+        <tr class="bg-brand-primary border-b-2 border-green-700">
           <th
             v-for="col in orderedColumns"
             :key="col"
             scope="col"
-            class="whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-white"
+            class="whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-black cursor-pointer select-none"
+            @click="sortable(col) ? toggleSort(col) : null"
           >
             <button
               v-if="sortable(col)"
               type="button"
-              class="inline-flex items-center gap-1 font-semibold text-white hover:text-white/90"
-              @click="toggleSort(col)"
+              class="inline-flex items-center gap-1 font-semibold text-white hover:text-white/70"
+              @click.stop="toggleSort(col)"
             >
               {{ label(col) }}
               <svg v-if="sort === col" class="h-4 w-4" :class="order === 'asc' ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
               </svg>
             </button>
-            <span v-else class="font-semibold text-white">{{ label(col) }}</span>
+            <span v-else class="font-semibold text-black">{{ label(col) }}</span>
           </th>
           <th v-if="hasAnyRowAction" scope="col" class="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold text-white">Actions</th>
         </tr>
@@ -234,7 +235,7 @@ function onDelete(row) {
             class="px-4 py-3 text-sm text-gray-900"
             :class="[
               col === 'product_description' ? '' : 'whitespace-nowrap',
-              effectiveCanEdit && isEditable(col) ? 'cursor-pointer hover:bg-green-50/50' : '',
+              effectiveCanEdit && isEditable(col) ? 'cursor-pointer hover:bg-brand-primary-light/50' : '',
             ]"
             @dblclick="effectiveCanEdit && isEditable(col) && startCellEdit(row, col)"
           >
@@ -246,7 +247,7 @@ function onDelete(row) {
                     v-if="col === 'expense_date'"
                     v-model="editValue"
                     type="date"
-                    class="w-full min-w-[120px] rounded border border-green-500 px-2 py-1 text-sm"
+                    class="w-full min-w-[120px] rounded border border-brand-primary px-2 py-1 text-sm"
                     :disabled="isCellSaving(row, col)"
                     @keydown.enter.prevent="saveCellEdit(row)"
                     @keydown.escape="cancelCellEdit"
@@ -254,7 +255,7 @@ function onDelete(row) {
                   <select
                     v-else-if="col === 'product_category'"
                     v-model="editValue"
-                    class="w-full min-w-[140px] rounded border border-green-500 px-2 py-1 text-sm"
+                    class="w-full min-w-[140px] rounded border border-brand-primary px-2 py-1 text-sm"
                     :disabled="isCellSaving(row, col)"
                     @keydown.escape="cancelCellEdit"
                   >
@@ -264,7 +265,7 @@ function onDelete(row) {
                   <select
                     v-else-if="col === 'vat_amount'"
                     v-model.number="editValue"
-                    class="w-full min-w-[100px] rounded border border-green-500 px-2 py-1 text-sm"
+                    class="w-full min-w-[100px] rounded border border-brand-primary px-2 py-1 text-sm"
                     :disabled="isCellSaving(row, col)"
                     @keydown.escape="cancelCellEdit"
                   >
@@ -273,7 +274,7 @@ function onDelete(row) {
                   <select
                     v-else-if="col === 'status'"
                     v-model="editValue"
-                    class="w-full min-w-[120px] rounded border border-green-500 px-2 py-1 text-sm"
+                    class="w-full min-w-[120px] rounded border border-brand-primary px-2 py-1 text-sm"
                     :disabled="isCellSaving(row, col)"
                     @keydown.escape="cancelCellEdit"
                   >
@@ -285,7 +286,7 @@ function onDelete(row) {
                     type="number"
                     step="0.01"
                     min="0"
-                    class="w-full min-w-[90px] rounded border border-green-500 px-2 py-1 text-sm"
+                    class="w-full min-w-[90px] rounded border border-brand-primary px-2 py-1 text-sm"
                     :disabled="isCellSaving(row, col)"
                     @keydown.enter.prevent="saveCellEdit(row)"
                     @keydown.escape="cancelCellEdit"
@@ -294,7 +295,7 @@ function onDelete(row) {
                     v-else-if="col === 'product_description'"
                     v-model="editValue"
                     rows="2"
-                    class="w-full min-w-[180px] max-w-[220px] rounded border border-green-500 px-2 py-1 text-sm"
+                    class="w-full min-w-[180px] max-w-[220px] rounded border border-brand-primary px-2 py-1 text-sm"
                     :disabled="isCellSaving(row, col)"
                     @keydown.escape="cancelCellEdit"
                   />
@@ -302,12 +303,12 @@ function onDelete(row) {
                     v-else
                     v-model="editValue"
                     type="text"
-                    class="w-full min-w-[100px] rounded border border-green-500 px-2 py-1 text-sm"
+                    class="w-full min-w-[100px] rounded border border-brand-primary px-2 py-1 text-sm"
                     :disabled="isCellSaving(row, col)"
                     @keydown.enter.prevent="saveCellEdit(row)"
                     @keydown.escape="cancelCellEdit"
                   />
-                  <span v-if="isCellSaving(row, col)" class="inline-flex items-center gap-1 text-green-600" aria-busy="true">
+                  <span v-if="isCellSaving(row, col)" class="inline-flex items-center gap-1 text-brand-primary" aria-busy="true">
                     <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                       <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -318,7 +319,7 @@ function onDelete(row) {
                 <div class="flex items-center gap-2">
                   <button
                     type="button"
-                    class="rounded bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                    class="rounded bg-brand-primary px-2 py-1 text-xs font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50"
                     :disabled="isCellSaving(row, col)"
                     @click="saveCellEdit(row)"
                   >
@@ -346,7 +347,7 @@ function onDelete(row) {
               >
                 <span
                   class="relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent transition-colors"
-                  :class="row.status === 'approved' ? 'bg-green-500' : 'bg-red-400'"
+                  :class="row.status === 'approved' ? 'bg-brand-primary' : 'bg-red-400'"
                   aria-hidden="true"
                 >
                   <span
@@ -354,10 +355,10 @@ function onDelete(row) {
                     :class="row.status === 'approved' ? 'translate-x-5' : 'translate-x-0.5'"
                   />
                 </span>
-                <span class="text-xs font-medium" :class="row.status === 'approved' ? 'text-green-700' : 'text-red-600'">
+                <span class="text-xs font-medium" :class="row.status === 'approved' ? 'text-brand-primary-hover' : 'text-red-600'">
                   {{ row.status === 'approved' ? 'On' : 'off' }}
                 </span>
-                <span v-if="isStatusSaving(row)" class="absolute -right-1 -top-0.5 flex items-center gap-0.5 text-green-600" aria-busy="true">
+                <span v-if="isStatusSaving(row)" class="absolute -right-1 -top-0.5 flex items-center gap-0.5 text-brand-primary" aria-busy="true">
                   <svg class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -368,7 +369,7 @@ function onDelete(row) {
               <div v-else class="flex flex-col items-center gap-0.5">
                 <span
                   class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-default rounded-full border-2 border-transparent transition-colors"
-                  :class="row.status === 'approved' ? 'bg-green-500' : 'bg-red-400'"
+                  :class="row.status === 'approved' ? 'bg-brand-primary' : 'bg-red-400'"
                   aria-hidden="true"
                 >
                   <span
@@ -376,7 +377,7 @@ function onDelete(row) {
                     :class="row.status === 'approved' ? 'translate-x-5' : 'translate-x-0.5'"
                   />
                 </span>
-                <span class="text-xs font-medium" :class="row.status === 'approved' ? 'text-green-700' : 'text-red-600'">
+                <span class="text-xs font-medium" :class="row.status === 'approved' ? 'text-brand-primary-hover' : 'text-red-600'">
                   {{ row.status === 'approved' ? 'On' : 'off' }}
                 </span>
               </div>
@@ -402,7 +403,7 @@ function onDelete(row) {
               <button
                 v-if="effectiveCanView"
                 type="button"
-                class="rounded-full p-1.5 text-blue-600 hover:bg-blue-50"
+                class="rounded-full p-1.5 text-brand-primary hover:bg-brand-primary-light"
                 title="View details"
                 @click.stop="goToView(row)"
               >
@@ -414,7 +415,7 @@ function onDelete(row) {
               <button
                 v-if="effectiveCanEdit"
                 type="button"
-                class="rounded-full p-1.5 text-green-600 hover:bg-green-50"
+                class="rounded-full p-1.5 text-brand-primary hover:bg-brand-primary-light"
                 title="Edit Submission"
                 @click.stop="openEditModal(row)"
               >

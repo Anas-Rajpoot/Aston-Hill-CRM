@@ -168,10 +168,21 @@ export const useAuthStore = defineStore('auth', {
       this.loading = true
       try {
         if (!options.token) {
-          await ensureCsrfCookie()
+          await ensureCsrfCookie(true)
         }
         const headers = options.token ? { 'X-Request-Token': 'true' } : {}
-        const { data } = await api.post('/auth/login', credentials, { headers })
+        let response
+        try {
+          response = await api.post('/auth/login', credentials, { headers })
+        } catch (error) {
+          if (!options.token && error?.response?.status === 419) {
+            await ensureCsrfCookie(true)
+            response = await api.post('/auth/login', credentials, { headers })
+          } else {
+            throw error
+          }
+        }
+        const { data } = response
         // Capture password_action from login response
         this.passwordAction = data.password_action ?? null
         if (data.token) {

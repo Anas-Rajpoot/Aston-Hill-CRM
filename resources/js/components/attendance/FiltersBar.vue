@@ -61,7 +61,7 @@ onBeforeUnmount(() => {
     <div class="relative">
       <button
         type="button"
-        class="absolute left-1 top-1/2 z-10 -translate-y-1/2 rounded border border-gray-300 bg-white p-1 text-gray-600 shadow-sm hover:bg-gray-50 disabled:opacity-40"
+        class="absolute left-1 top-1/2 z-10 -translate-y-1/2 rounded border border-gray-300 bg-white p-1 text-gray-600 shadow-sm hover:bg-gray-50 disabled:opacity-40 hidden sm:block"
         :disabled="!canScrollLeft"
         @click="scrollLeft"
       >
@@ -71,35 +71,35 @@ onBeforeUnmount(() => {
       </button>
       <div
         ref="scroller"
-        class="overflow-x-auto overflow-y-hidden px-8 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+        class="px-2 sm:px-8"
       >
-      <div class="inline-flex min-w-max items-end gap-3 whitespace-nowrap">
-        <div class="w-52 shrink-0">
+      <div class="flex flex-wrap items-end gap-3">
+        <div class="w-full sm:w-52">
           <label class="block text-xs font-medium text-gray-600">Employee</label>
           <select
             v-model="filters.user_id"
-            class="mt-0.5 w-full rounded border border-gray-300 bg-white px-2.5 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="mt-0.5 w-full rounded border border-gray-300 bg-white px-2.5 py-2 text-sm text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           >
             <option value="">All</option>
             <option v-for="u in filterOptions.users" :key="u.id" :value="u.id">{{ u.name }}</option>
           </select>
         </div>
-        <div class="w-52 shrink-0">
+        <div class="w-full sm:w-52">
           <label class="block text-xs font-medium text-gray-600">Role</label>
           <select
             v-model="filters.role"
-            class="mt-0.5 w-full rounded border border-gray-300 bg-white px-2.5 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="mt-0.5 w-full rounded border border-gray-300 bg-white px-2.5 py-2 text-sm text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           >
             <option value="">All</option>
             <option v-for="r in filterOptions.roles" :key="r.value" :value="r.value">{{ r.label }}</option>
           </select>
         </div>
-        <div class="flex shrink-0 items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            class="inline-flex items-center whitespace-nowrap rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+            class="inline-flex items-center whitespace-nowrap rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover focus:ring-2 focus:ring-brand-primary disabled:opacity-50"
             :disabled="loading"
             @click="$emit('apply')"
           >
@@ -122,7 +122,7 @@ onBeforeUnmount(() => {
       </div>
       <button
         type="button"
-        class="absolute right-1 top-1/2 z-10 -translate-y-1/2 rounded border border-gray-300 bg-white p-1 text-gray-600 shadow-sm hover:bg-gray-50 disabled:opacity-40"
+        class="absolute right-1 top-1/2 z-10 -translate-y-1/2 rounded border border-gray-300 bg-white p-1 text-gray-600 shadow-sm hover:bg-gray-50 disabled:opacity-40 hidden sm:block"
         :disabled="!canScrollRight"
         @click="scrollRight"
       >

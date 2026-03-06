@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+
 import { useAuthStore } from '@/stores/auth'
 import { canModuleAction } from '@/lib/accessControl'
 import { formatSystemDateTime } from '@/lib/dateFormat'
@@ -42,9 +43,13 @@ const props = defineProps({
   parentClientId: { type: [Number, String], default: null },
   returnTo: { type: String, default: '' },
   permissionModule: { type: String, default: 'clients' },
+  selectable: { type: Boolean, default: false },
+  selectedIds: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['sort', 'updateCell', 'viewHistory', 'show-renewal-alerts'])
+const emit = defineEmits(['sort', 'updateCell', 'viewHistory', 'show-renewal-alerts', 'toggle-select', 'toggle-select-all'])
+
+const isAllSelected = computed(() => props.data.length > 0 && props.selectedIds.length === props.data.length)
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -103,7 +108,7 @@ const columnLabels = {
   contract_end_date: 'Contract End Date',
   clawback_chum: 'Clawback / Chum',
   remarks: 'Remarks',
-  renewal_alert: 'Renewal Alert',
+  renewal_alert: 'Alert',
   additional_notes: 'Additional Notes',
   creator: 'Created By',
 }
@@ -240,8 +245,8 @@ function showRenewalAlerts(row) {
 
 const STATUS_BADGES = {
   pending: 'bg-gray-100 text-gray-700',
-  in_progress: 'bg-blue-100 text-blue-700',
-  completed: 'bg-green-100 text-green-700',
+  in_progress: 'bg-brand-primary-light text-brand-primary-hover',
+  completed: 'bg-brand-primary-light text-brand-primary-hover',
   cancelled: 'bg-red-100 text-red-700',
 }
 
@@ -450,7 +455,7 @@ function onCellDblClick(e, row, col) {
       aria-busy="true"
     >
       <div class="flex flex-col items-center gap-2">
-        <svg class="h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+        <svg class="h-8 w-8 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
         </svg>
@@ -460,7 +465,10 @@ function onCellDblClick(e, row, col) {
 
     <table class="min-w-full border-2 border-black border-collapse">
       <thead>
-        <tr class="border-b-2 border-black bg-green-600">
+        <tr class="bg-brand-primary border-b-2 border-green-700">
+          <th class="w-10 px-3 py-3">
+            <input type="checkbox" :checked="isAllSelected" @change="emit('toggle-select-all')" class="rounded border-gray-300 text-brand-primary focus:ring-brand-primary" />
+          </th>
           <th
             scope="col"
             class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold text-white"
@@ -476,7 +484,7 @@ function onCellDblClick(e, row, col) {
             <button
               v-if="sortable(col)"
               type="button"
-              class="inline-flex items-center gap-1 font-bold text-white hover:text-white/90"
+              class="inline-flex items-center gap-1 font-bold text-white hover:text-white/70"
               @click="toggleSort(col)"
             >
               {{ label(col) }}
@@ -500,7 +508,7 @@ function onCellDblClick(e, row, col) {
       </thead>
       <tbody class="bg-white">
         <tr v-if="!loading && !data.length" class="border-b border-black bg-white">
-          <td :colspan="columns.length + (hasAnyRowAction ? 2 : 1)" class="px-4 py-12 text-center text-gray-500">
+          <td :colspan="columns.length + (hasAnyRowAction ? 2 : 1) + (selectable ? 1 : 0)" class="px-4 py-12 text-center text-gray-500">
             No clients found.
           </td>
         </tr>
@@ -509,6 +517,9 @@ function onCellDblClick(e, row, col) {
           :key="row.id"
           class="border-b border-black bg-white hover:bg-gray-50/50"
         >
+          <td v-if="selectable" class="whitespace-nowrap px-3 py-3 text-center text-sm" @click.stop>
+            <input type="checkbox" :checked="selectedIds.includes(row.id)" @change="emit('toggle-select', row.id)" class="rounded border-gray-300 text-brand-primary focus:ring-brand-primary" />
+          </td>
           <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-900">
             {{ ((currentPage - 1) * perPage) + rowIndex + 1 }}
           </td>
@@ -525,7 +536,7 @@ function onCellDblClick(e, row, col) {
               <div class="flex flex-col gap-1.5" @click.stop>
                 <select
                   v-model="inlineEditValue"
-                  class="w-full min-w-[160px] max-w-[220px] rounded border border-gray-300 bg-white px-3 py-1.5 pr-8 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full min-w-[160px] max-w-[220px] rounded border border-gray-300 bg-white px-3 py-1.5 pr-8 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   @keydown.enter="saveInlineEdit"
                   @keydown.esc="cancelInlineEdit"
                 >
@@ -534,7 +545,7 @@ function onCellDblClick(e, row, col) {
                 </select>
                 <div class="flex gap-1">
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
-                  <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
+                  <button type="button" class="rounded bg-brand-primary px-2 py-0.5 text-xs text-white hover:bg-brand-primary-hover" @click="saveInlineEdit">Save</button>
                 </div>
               </div>
             </template>
@@ -545,7 +556,7 @@ function onCellDblClick(e, row, col) {
                 <input
                   v-model="inlineEditValue"
                   type="date"
-                  class="w-full min-w-[160px] max-w-[220px] rounded border bg-white px-3 py-1.5 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full min-w-[160px] max-w-[220px] rounded border bg-white px-3 py-1.5 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   :class="inlineEditError ? 'border-red-500' : 'border-gray-300'"
                   @keydown.enter="saveInlineEdit"
                   @keydown.esc="cancelInlineEdit"
@@ -553,7 +564,7 @@ function onCellDblClick(e, row, col) {
                 <p v-if="inlineEditError" class="text-xs text-red-600">{{ inlineEditError }}</p>
                 <div class="flex gap-1">
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
-                  <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
+                  <button type="button" class="rounded bg-brand-primary px-2 py-0.5 text-xs text-white hover:bg-brand-primary-hover" @click="saveInlineEdit">Save</button>
                 </div>
               </div>
             </template>
@@ -564,7 +575,7 @@ function onCellDblClick(e, row, col) {
                 <input
                   v-model="inlineEditValue"
                   :type="col === 'quantity' || col === 'renewal_alert' ? 'number' : 'text'"
-                  class="w-full min-w-[160px] max-w-[220px] rounded border bg-white px-3 py-1.5 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full min-w-[160px] max-w-[220px] rounded border bg-white px-3 py-1.5 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   :class="inlineEditError ? 'border-red-500' : 'border-gray-300'"
                   @input="inlineEditError = ''"
                   @keydown.enter="saveInlineEdit"
@@ -573,7 +584,7 @@ function onCellDblClick(e, row, col) {
                 <p v-if="inlineEditError" class="text-xs text-red-600">{{ inlineEditError }}</p>
                 <div class="flex gap-1">
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
-                  <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
+                  <button type="button" class="rounded bg-brand-primary px-2 py-0.5 text-xs text-white hover:bg-brand-primary-hover" @click="saveInlineEdit">Save</button>
                 </div>
               </div>
             </template>
@@ -607,7 +618,7 @@ function onCellDblClick(e, row, col) {
               <router-link
                 v-if="canViewAction"
                 :to="viewRoute(row)"
-                class="text-green-600 hover:text-green-800 font-medium"
+                class="text-brand-primary hover:text-brand-primary-hover font-medium"
               >
                 View
               </router-link>

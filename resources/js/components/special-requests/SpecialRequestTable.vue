@@ -147,9 +147,9 @@ function getOptionsForColumn(col) {
 
 function statusClass(s) {
   const status = (s || '').toLowerCase()
-  if (status === 'approved') return 'bg-green-100 text-green-800'
+  if (status === 'approved') return 'bg-brand-primary-light text-brand-primary-hover'
   if (status === 'rejected') return 'bg-red-100 text-red-800'
-  if (status === 'submitted') return 'bg-blue-100 text-blue-800'
+  if (status === 'submitted') return 'bg-brand-primary-light text-brand-primary-hover'
   return 'bg-gray-100 text-gray-700'
 }
 
@@ -186,34 +186,34 @@ function toggleRow(id) {
 <template>
   <div class="overflow-x-auto">
     <table class="w-full border-collapse text-left text-sm">
-      <thead class="bg-green-600">
+      <thead class="bg-brand-primary border-b-2 border-green-700">
         <tr>
-          <th class="w-10 border-b border-black px-3 py-2.5 text-center">
-            <input type="checkbox" v-model="allSelected" class="rounded border-gray-300 text-green-600 focus:ring-green-500" />
+          <th class="w-10 px-3 py-2.5 text-center">
+            <input type="checkbox" v-model="allSelected" class="rounded border-gray-300 text-brand-primary focus:ring-brand-primary" />
           </th>
           <th
             v-for="col in columns"
             :key="col"
-            class="whitespace-nowrap border-b border-black px-3 py-2.5 text-xs font-semibold uppercase text-white"
-            :class="{ 'cursor-pointer select-none hover:text-white/90': SORTABLE.has(col) }"
+            class="whitespace-nowrap px-3 py-2.5 text-xs font-semibold uppercase text-black"
+            :class="{ 'cursor-pointer select-none hover:text-gray-700': SORTABLE.has(col) }"
             @click="toggleSort(col)"
           >
             <span class="inline-flex items-center gap-1">
               {{ COLUMN_LABELS[col] ?? col }}
               <template v-if="SORTABLE.has(col)">
-                <svg v-if="sort === col && order === 'asc'" class="h-3.5 w-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
-                <svg v-else-if="sort === col && order === 'desc'" class="h-3.5 w-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-                <svg v-else class="h-3.5 w-3.5 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
+                <svg v-if="sort === col && order === 'asc'" class="h-3.5 w-3.5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
+                <svg v-else-if="sort === col && order === 'desc'" class="h-3.5 w-3.5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                <svg v-else class="h-3.5 w-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
               </template>
             </span>
           </th>
-          <th v-if="hasAnyRowAction" class="whitespace-nowrap border-b border-black px-3 py-2.5 text-xs font-semibold uppercase text-white">Actions</th>
+          <th v-if="hasAnyRowAction" class="whitespace-nowrap px-3 py-2.5 text-xs font-semibold uppercase text-white">Actions</th>
         </tr>
       </thead>
       <tbody>
         <tr v-if="loading">
           <td :colspan="columns.length + 1 + (hasAnyRowAction ? 1 : 0)" class="px-4 py-12 text-center">
-            <svg class="mx-auto h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+            <svg class="mx-auto h-8 w-8 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
@@ -227,10 +227,10 @@ function toggleRow(id) {
           v-for="row in data"
           :key="row.id"
           class="group transition-colors hover:bg-gray-50"
-          :class="{ 'bg-green-50/40': selectedIds.includes(row.id) }"
+          :class="{ 'bg-brand-primary-light/40': selectedIds.includes(row.id) }"
         >
           <td class="border-b border-gray-200 px-3 py-2 text-center">
-            <input type="checkbox" :checked="selectedIds.includes(row.id)" @change="toggleRow(row.id)" class="rounded border-gray-300 text-green-600 focus:ring-green-500" />
+            <input type="checkbox" :checked="selectedIds.includes(row.id)" @change="toggleRow(row.id)" class="rounded border-gray-300 text-brand-primary focus:ring-brand-primary" />
           </td>
           <td
             v-for="col in columns"
@@ -242,7 +242,7 @@ function toggleRow(id) {
               <div class="flex flex-col gap-1.5">
                 <select
                   v-model="editingValue"
-                  class="w-full min-w-[160px] max-w-[220px] rounded border border-gray-300 bg-white px-3 py-1.5 pr-8 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full min-w-[160px] max-w-[220px] rounded border border-gray-300 bg-white px-3 py-1.5 pr-8 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   @keydown.enter="saveEdit(row.id, col)"
                   @keydown.esc="cancelEdit"
                 >
@@ -251,7 +251,7 @@ function toggleRow(id) {
                 <p v-if="inlineEditError" class="text-xs text-red-600">{{ inlineEditError }}</p>
                 <div class="flex gap-1">
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelEdit">Cancel</button>
-                  <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveEdit(row.id, col)">Save</button>
+                  <button type="button" class="rounded bg-brand-primary px-2 py-0.5 text-xs text-white hover:bg-brand-primary-hover" @click="saveEdit(row.id, col)">Save</button>
                 </div>
               </div>
             </template>
@@ -259,7 +259,7 @@ function toggleRow(id) {
               <div class="flex flex-col gap-1.5">
                 <input
                   v-model="editingValue"
-                  class="w-full min-w-[160px] max-w-[220px] rounded border bg-white px-3 py-1.5 pr-8 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full min-w-[160px] max-w-[220px] rounded border bg-white px-3 py-1.5 pr-8 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   :class="inlineEditError ? 'border-red-500' : 'border-gray-300'"
                   @input="inlineEditError = ''"
                   @keydown.enter="saveEdit(row.id, col)"
@@ -268,14 +268,14 @@ function toggleRow(id) {
                 <p v-if="inlineEditError" class="text-xs text-red-600">{{ inlineEditError }}</p>
                 <div class="flex gap-1">
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelEdit">Cancel</button>
-                  <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveEdit(row.id, col)">Save</button>
+                  <button type="button" class="rounded bg-brand-primary px-2 py-0.5 text-xs text-white hover:bg-brand-primary-hover" @click="saveEdit(row.id, col)">Save</button>
                 </div>
               </div>
             </template>
             <template v-else-if="col === 'status'">
               <span
                 class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
-                :class="[statusClass(row.status), canInlineEdit ? 'cursor-pointer hover:ring-2 hover:ring-green-400' : '']"
+                :class="[statusClass(row.status), canInlineEdit ? 'cursor-pointer hover:ring-2 hover:ring-brand-primary' : '']"
                 @click="canInlineEdit && startEdit(row, col)"
               >
                 {{ row.status ? row.status.charAt(0).toUpperCase() + row.status.slice(1) : '—' }}
@@ -295,10 +295,10 @@ function toggleRow(id) {
           </td>
           <td v-if="hasAnyRowAction" class="border-b border-gray-200 px-3 py-2">
             <div class="flex items-center gap-1">
-              <button v-if="canViewAction" type="button" class="rounded p-1 text-blue-600 hover:bg-blue-50" title="View" @click="goToView(row)">
+              <button v-if="canViewAction" type="button" class="rounded p-1 text-brand-primary hover:bg-brand-primary-light" title="View" @click="goToView(row)">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
               </button>
-              <button v-if="canEditAction" type="button" class="rounded p-1 text-green-600 hover:bg-green-50" title="Edit" @click="goToEdit(row)">
+              <button v-if="canEditAction" type="button" class="rounded p-1 text-brand-primary hover:bg-brand-primary-light" title="Edit" @click="goToEdit(row)">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
               </button>
               <button v-if="canHistoryAction" type="button" class="rounded p-1 text-purple-600 hover:bg-purple-50" title="History" @click="$emit('viewHistory', row)">

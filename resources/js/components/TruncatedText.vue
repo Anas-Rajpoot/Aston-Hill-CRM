@@ -41,7 +41,7 @@ function toggle() {
   <span class="whitespace-pre-wrap break-words">{{ truncated.text }}<button
       v-if="truncated.needed"
       type="button"
-      class="ml-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
+      class="ml-1 text-xs font-medium text-brand-primary hover:text-brand-primary-hover hover:underline"
       @click.stop="toggle"
     >{{ expanded ? 'Show less' : 'More' }}</button></span>
 </template>

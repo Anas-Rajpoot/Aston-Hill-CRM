@@ -29,6 +29,6 @@ class CiscoExtensionPolicy
 
     public function delete(User $user, CiscoExtension $ciscoExtension): bool
     {
-        return $user->hasRole('superadmin') || $user->can('extensions.edit');
+        return $user->hasRole('superadmin') || $user->can('extensions.delete');
     }
 }

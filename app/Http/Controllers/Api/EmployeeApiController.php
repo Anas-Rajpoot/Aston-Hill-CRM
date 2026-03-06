@@ -22,8 +22,19 @@ class EmployeeApiController extends Controller
         'email', 'phone', 'cnic_number', 'extension', 'status', 'joining_date', 'terminate_date',
     ];
 
+    /**
+     * Authorize employee module access via RBAC.
+     */
+    private function authorizeEmployeeAccess(Request $request, string $action = 'read'): void
+    {
+        if (! \App\Support\RbacPermission::can($request->user(), ['employees', 'users'], $action)) {
+            abort(403, 'Unauthorized');
+        }
+    }
+
     public function index(Request $request): JsonResponse
     {
+        $this->authorizeEmployeeAccess($request, 'read');
         $validated = $request->validate([
             'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
@@ -247,6 +258,8 @@ class EmployeeApiController extends Controller
 
     public function bulkImport(Request $request): JsonResponse
     {
+        $this->authorizeEmployeeAccess($request, 'create');
+
         $request->validate([
             'file' => ['required', 'file', 'mimes:csv,txt', 'max:2048'],
         ]);

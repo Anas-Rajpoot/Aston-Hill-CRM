@@ -78,7 +78,7 @@ const terminateToDisplay = computed({
             v-model="filters.q"
             type="text"
             placeholder="Name, email, ID..."
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           />
         </div>
@@ -88,7 +88,7 @@ const terminateToDisplay = computed({
             v-model="filters.name"
             type="text"
             placeholder="Employee name..."
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           />
         </div>
@@ -98,7 +98,7 @@ const terminateToDisplay = computed({
             v-model="filters.email"
             type="text"
             placeholder="Email..."
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           />
         </div>
@@ -106,7 +106,7 @@ const terminateToDisplay = computed({
           <label class="mb-0.5 block text-xs font-medium text-gray-600">Role</label>
           <select
             v-model="filters.role"
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           >
             <option value="">All Roles</option>
@@ -117,7 +117,7 @@ const terminateToDisplay = computed({
           <label class="mb-0.5 block text-xs font-medium text-gray-600">Manager</label>
           <select
             v-model="filters.manager_id"
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           >
             <option :value="null">All</option>
@@ -128,7 +128,7 @@ const terminateToDisplay = computed({
           <label class="mb-0.5 block text-xs font-medium text-gray-600">Team Leader</label>
           <select
             v-model="filters.team_leader_id"
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           >
             <option :value="null">All</option>
@@ -141,7 +141,7 @@ const terminateToDisplay = computed({
             v-model="joiningFromDisplay"
             type="text"
             placeholder="dd-mm-yyyy"
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           />
         </div>
@@ -151,7 +151,7 @@ const terminateToDisplay = computed({
             v-model="joiningToDisplay"
             type="text"
             placeholder="dd-mm-yyyy"
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           />
         </div>
@@ -161,7 +161,7 @@ const terminateToDisplay = computed({
             v-model="terminateFromDisplay"
             type="text"
             placeholder="dd-mm-yyyy"
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           />
         </div>
@@ -171,7 +171,7 @@ const terminateToDisplay = computed({
             v-model="terminateToDisplay"
             type="text"
             placeholder="dd-mm-yyyy"
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           />
         </div>
@@ -180,7 +180,7 @@ const terminateToDisplay = computed({
       <div class="flex flex-wrap items-center gap-2 border-t border-gray-200 bg-gray-50/50 px-3 py-2">
         <button
           type="button"
-          class="inline-flex items-center rounded bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"
+          class="inline-flex items-center rounded bg-brand-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50"
           :disabled="loading"
           @click="$emit('apply')"
         >

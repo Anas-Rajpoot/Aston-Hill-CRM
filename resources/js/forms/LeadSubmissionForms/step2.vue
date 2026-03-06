@@ -113,7 +113,7 @@ const selectCategory = (id) => {
 
 const inputClass = (field) => {
   const hasError = errors.value && errors.value[field]
-  return `w-full rounded-lg border px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 ${hasError ? 'border-red-500' : 'border-gray-300'}`
+  return `w-full rounded-lg border px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary ${hasError ? 'border-red-500' : 'border-gray-300'}`
 }
 
 const saveDraft = async () => {
@@ -161,7 +161,7 @@ const cancel = () => router.push('/submissions')
 
 <template>
   <div v-if="loading" class="flex items-center justify-center py-12">
-    <svg class="animate-spin h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24">
+    <svg class="animate-spin h-8 w-8 text-brand-primary" fill="none" viewBox="0 0 24 24">
       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
       <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
     </svg>
@@ -189,34 +189,34 @@ const cancel = () => router.push('/submissions')
           @click="selectCategory(cat.id)"
           class="flex items-start gap-4 p-4 rounded-xl border-2 text-left transition"
           :class="selectedCategoryId === cat.id
-            ? 'border-blue-500 bg-blue-50'
+            ? 'border-brand-primary bg-brand-primary-light'
             : 'border-gray-200 bg-white hover:border-gray-300'"
         >
           <div
             class="w-12 h-12 rounded-lg flex items-center justify-center shrink-0"
-            :class="String(selectedCategoryId) === String(cat.id) ? 'bg-blue-100' : 'bg-gray-100'"
+            :class="String(selectedCategoryId) === String(cat.id) ? 'bg-brand-primary-light' : 'bg-gray-100'"
           >
             <!-- Fixed: wifi -->
-            <svg v-if="getCategoryIcon(cat) === 'wifi'" class="w-6 h-6" :class="selectedCategoryId === cat.id ? 'text-blue-600' : 'text-gray-500'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg v-if="getCategoryIcon(cat) === 'wifi'" class="w-6 h-6" :class="selectedCategoryId === cat.id ? 'text-brand-primary' : 'text-gray-500'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
             </svg>
             <!-- FMS: building -->
-            <svg v-else-if="getCategoryIcon(cat) === 'building'" class="w-6 h-6" :class="selectedCategoryId === cat.id ? 'text-blue-600' : 'text-gray-500'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg v-else-if="getCategoryIcon(cat) === 'building'" class="w-6 h-6" :class="selectedCategoryId === cat.id ? 'text-brand-primary' : 'text-gray-500'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
             </svg>
             <!-- GSM: mobile -->
-            <svg v-else-if="getCategoryIcon(cat) === 'mobile'" class="w-6 h-6" :class="selectedCategoryId === cat.id ? 'text-blue-600' : 'text-gray-500'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg v-else-if="getCategoryIcon(cat) === 'mobile'" class="w-6 h-6" :class="selectedCategoryId === cat.id ? 'text-brand-primary' : 'text-gray-500'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
             </svg>
             <!-- Other: dots -->
-            <svg v-else class="w-6 h-6" :class="selectedCategoryId === cat.id ? 'text-blue-600' : 'text-gray-500'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg v-else class="w-6 h-6" :class="selectedCategoryId === cat.id ? 'text-brand-primary' : 'text-gray-500'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
             </svg>
           </div>
           <div class="min-w-0 flex-1">
-            <p class="font-medium" :class="selectedCategoryId === cat.id ? 'text-blue-700' : 'text-gray-800'">
+            <p class="font-medium" :class="selectedCategoryId === cat.id ? 'text-brand-primary-hover' : 'text-gray-800'">
               {{ cat.name }}
-              <svg v-if="selectedCategoryId === cat.id" class="inline w-5 h-5 ml-1 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+              <svg v-if="selectedCategoryId === cat.id" class="inline w-5 h-5 ml-1 text-brand-primary" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
               </svg>
             </p>
@@ -228,12 +228,12 @@ const cancel = () => router.push('/submissions')
       <!-- Confirmation banner when category selected -->
       <div
         v-if="selectedCategoryId"
-        class="mt-4 rounded-lg bg-green-50 border border-green-200 p-4 flex items-center gap-3"
+        class="mt-4 rounded-lg bg-brand-primary-light border border-brand-primary-muted p-4 flex items-center gap-3"
       >
-        <svg class="w-5 h-5 text-green-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+        <svg class="w-5 h-5 text-brand-primary shrink-0" fill="currentColor" viewBox="0 0 20 20">
           <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
         </svg>
-        <p class="text-sm font-medium text-green-800">
+        <p class="text-sm font-medium text-brand-primary-hover">
           {{ selectedCategory?.name }} category selected. {{ loadingServiceTypes ? 'Loading types...' : (serviceTypes.length ? 'Select Service Type.' : 'No service types available.') }}
         </p>
       </div>
@@ -248,14 +248,14 @@ const cancel = () => router.push('/submissions')
         <label
           v-for="type in serviceTypes"
           :key="type.id"
-          class="flex items-center gap-3 p-4 rounded-xl border border-gray-200 bg-white cursor-pointer hover:border-green-300 transition"
-          :class="{ 'border-green-500 bg-green-50': String(selectedTypeId) === String(type.id) }"
+          class="flex items-center gap-3 p-4 rounded-xl border border-gray-200 bg-white cursor-pointer hover:border-brand-primary-muted transition"
+          :class="{ 'border-brand-primary bg-brand-primary-light': String(selectedTypeId) === String(type.id) }"
         >
           <input
             v-model="selectedTypeId"
             type="radio"
             :value="String(type.id)"
-            class="w-5 h-5 text-green-600 border-gray-300 focus:ring-green-500"
+            class="w-5 h-5 text-brand-primary border-gray-300 focus:ring-brand-primary"
             @change="clearFieldError('service_type_id')"
           />
           <span class="font-medium text-gray-800">{{ type.name }}</span>
@@ -273,7 +273,7 @@ const cancel = () => router.push('/submissions')
         <button
           type="button"
           @click="goBack"
-          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium bg-green-600 hover:bg-green-700"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium bg-brand-primary hover:bg-brand-primary-hover"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -307,7 +307,7 @@ const cancel = () => router.push('/submissions')
           type="button"
           :disabled="saving || !selectedCategoryId || !selectedTypeId"
           @click="submit"
-          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-50 bg-green-600 hover:bg-green-700"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-50 bg-brand-primary hover:bg-brand-primary-hover"
         >
           Next
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

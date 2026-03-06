@@ -155,7 +155,7 @@ function isActive(row) {
 }
 
 const STATUS_BADGES = {
-  approved: 'bg-green-100 text-green-700',
+  approved: 'bg-brand-primary-light text-brand-primary-hover',
   rejected: 'bg-red-100 text-red-700',
   pending: 'bg-gray-100 text-gray-700',
 }
@@ -208,7 +208,7 @@ const hasAnyRowAction = computed(() =>
       aria-busy="true"
     >
       <div class="flex flex-col items-center gap-2">
-        <svg class="h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+        <svg class="h-8 w-8 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
         </svg>
@@ -218,35 +218,29 @@ const hasAnyRowAction = computed(() =>
 
     <table class="min-w-full border-2 border-black border-collapse">
       <thead>
-        <tr class="border-b-2 border-black bg-green-600">
-          <th class="w-10 px-3 py-3 text-left">
-            <input
-              type="checkbox"
-              class="rounded border-gray-300"
-              aria-label="Select all"
-              :checked="isAllSelected"
-              :indeterminate="selectedSet.size > 0 && !isAllSelected"
-              @change="toggleSelectAll"
-            />
+        <tr class="bg-brand-primary border-b-2 border-green-700">
+          <th class="w-10 px-3 py-3">
+            <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll()" class="rounded border-gray-300 text-brand-primary focus:ring-brand-primary" />
           </th>
           <th
             v-for="col in columns"
             :key="col"
             scope="col"
-            class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold uppercase tracking-wider text-white"
+            class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold text-black cursor-pointer select-none"
+            @click="sortable(col) ? toggleSort(col) : null"
           >
             <button
               v-if="sortable(col)"
               type="button"
-              class="inline-flex items-center gap-1 font-bold text-white hover:text-white/90"
-              @click="toggleSort(col)"
+              class="inline-flex items-center gap-1 font-bold text-white hover:text-white/70"
+              @click.stop="toggleSort(col)"
             >
               {{ label(col) }}
               <svg v-if="sort === col" class="h-4 w-4" :class="order === 'asc' ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
               </svg>
             </button>
-            <span v-else class="font-bold text-white">{{ label(col) }}</span>
+            <span v-else class="font-bold text-black">{{ label(col) }}</span>
           </th>
           <th v-if="hasAnyRowAction" scope="col" class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold uppercase tracking-wider text-white">Actions</th>
         </tr>
@@ -287,7 +281,7 @@ const hasAnyRowAction = computed(() =>
                 <span
                   v-for="r in (row.roles || [])"
                   :key="r"
-                  class="inline-flex rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800"
+                  class="inline-flex rounded-full bg-brand-primary-light px-2 py-0.5 text-xs font-medium text-brand-primary-hover"
                 >
                   {{ formatRoleName(r) }}
                 </span>
@@ -327,7 +321,7 @@ const hasAnyRowAction = computed(() =>
               <button
                 v-if="canViewAction"
                 type="button"
-                class="rounded-full p-1.5 text-blue-600 hover:bg-blue-50"
+                class="rounded-full p-1.5 text-brand-primary hover:bg-brand-primary-light"
                 title="View"
                 @click="goToView(row)"
               >
@@ -339,7 +333,7 @@ const hasAnyRowAction = computed(() =>
               <button
                 v-if="canEditRow(row)"
                 type="button"
-                class="rounded-full p-1.5 text-green-600 hover:bg-green-50"
+                class="rounded-full p-1.5 text-brand-primary hover:bg-brand-primary-light"
                 title="Edit"
                 @click="goToEdit(row)"
               >
@@ -375,11 +369,11 @@ const hasAnyRowAction = computed(() =>
               <button
                 v-if="canToggleActiveRow(row) && !isActive(row)"
                 type="button"
-                class="inline-flex items-center gap-1.5 rounded-full border border-green-600 bg-green-50 px-2.5 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-100"
+                class="inline-flex items-center gap-1.5 rounded-full border border-brand-primary bg-brand-primary-light px-2.5 py-1.5 text-xs font-semibold text-brand-primary-hover hover:bg-brand-primary-light"
                 title="Activate"
                 @click="onActivate(row)"
               >
-                <span class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-green-600 text-white">
+                <span class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand-primary text-white">
                   <svg class="h-2.5 w-2.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                   </svg>

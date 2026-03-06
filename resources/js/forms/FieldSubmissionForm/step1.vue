@@ -298,7 +298,7 @@ async function submit() {
   try {
     const payload = buildPayload()
     await api.store(payload, true) // submit = true to mark as submitted in DB
-    successMessage.value = 'Your field submission has been submitted successfully. Back Office will review and process.'
+    successMessage.value = 'Your field submission has been submitted successfully. Back Office will review and process accordingly.'
     nextTick(() => {
       window.scrollTo(0, 0)
       document.documentElement.scrollTop = 0
@@ -375,9 +375,9 @@ function startNewSubmission() {
 }
 
 const inputClass = (field) =>
-  `w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-green-500 focus:ring-1 focus:ring-green-500 ${getError(field) ? 'border-red-500' : 'border-gray-300'}`
+  `w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary ${getError(field) ? 'border-red-500' : 'border-gray-300'}`
 const selectClass = (field) =>
-  `w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 focus:border-green-500 focus:ring-1 focus:ring-green-500 ${getError(field) ? 'border-red-500' : 'border-gray-300'}`
+  `w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary ${getError(field) ? 'border-red-500' : 'border-gray-300'}`
 </script>
 
 <template>
@@ -385,18 +385,18 @@ const selectClass = (field) =>
     <!-- Success message at top so it's visible after scroll -->
     <div
       v-if="successMessage"
-      class="rounded-lg border border-green-200 bg-green-50 p-6 text-center"
+      class="rounded-lg border border-brand-primary-muted bg-brand-primary-light p-6 text-center"
     >
-      <svg class="mx-auto mb-3 h-12 w-12 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg class="mx-auto mb-3 h-12 w-12 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
-      <h3 class="text-lg font-semibold text-green-800">Field Request Submitted</h3>
-      <p class="mt-1 text-sm text-green-600">{{ successMessage }}</p>
+      <h3 class="text-lg font-semibold text-brand-primary-hover">Field Request Submitted</h3>
+      <p class="mt-1 text-sm text-brand-primary">{{ successMessage }}</p>
       <p class="mt-3 text-sm text-gray-600">Click the button below to start a new field submission.</p>
       <button
         type="button"
         @click="startNewSubmission"
-        class="mt-4 inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-green-700"
+        class="mt-4 inline-flex items-center gap-2 rounded-lg bg-brand-primary px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-brand-primary-hover"
       >
         New Field Submission
       </button>
@@ -507,7 +507,7 @@ const selectClass = (field) =>
                 v-model="form.complete_address"
                 rows="1"
                 placeholder="Enter complete address"
-                class="h-10 resize-none w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="h-10 resize-none w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                 :class="getError('complete_address') ? 'border-red-500' : 'border-gray-300'"
                 @input="clearFieldError('complete_address')"
               />
@@ -617,7 +617,7 @@ const selectClass = (field) =>
           <button
             type="button"
             @click="cancel"
-            class="rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-green-700"
+            class="rounded-lg bg-brand-primary px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-brand-primary-hover"
           >
             Cancel
           </button>
@@ -637,7 +637,7 @@ const selectClass = (field) =>
           <button
             type="submit"
             :disabled="submitting"
-            class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-green-700 disabled:opacity-50"
+            class="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-brand-primary-hover disabled:opacity-50"
           >
             {{ submitting ? 'Submitting...' : 'Submit' }}
             <svg v-if="!submitting" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

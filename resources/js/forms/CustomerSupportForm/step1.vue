@@ -300,7 +300,7 @@ async function submit() {
       return
     }
     await api.store(payload, true)
-    successMessage.value = 'Your customer support request has been submitted successfully. Back Office will review and process.'
+    successMessage.value = 'Your customer support request has been submitted successfully. Back Office will review and process accordingly.'
     nextTick(() => {
       window.scrollTo(0, 0)
       document.documentElement.scrollTop = 0
@@ -388,16 +388,16 @@ function onFileChange(slot, event) {
 }
 
 const inputClass = (field) =>
-  `w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-green-500 focus:ring-1 focus:ring-green-500 ${getError(field) ? 'border-red-500' : 'border-gray-300'}`
+  `w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary ${getError(field) ? 'border-red-500' : 'border-gray-300'}`
 const selectClass = (field) =>
-  `w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 focus:border-green-500 focus:ring-1 focus:ring-green-500 ${getError(field) ? 'border-red-500' : 'border-gray-300'}`
+  `w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary ${getError(field) ? 'border-red-500' : 'border-gray-300'}`
 </script>
 
 <template>
   <div class="space-y-6">
     <!-- Loading state (same as Lead Submissions) -->
     <div v-if="loading" class="flex items-center justify-center py-12">
-      <svg class="h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+      <svg class="h-8 w-8 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
       </svg>
@@ -408,18 +408,18 @@ const selectClass = (field) =>
     <!-- Success message at top -->
     <div
       v-if="successMessage"
-      class="rounded-lg border border-green-200 bg-green-50 p-6 text-center"
+      class="rounded-lg border border-brand-primary-muted bg-brand-primary-light p-6 text-center"
     >
-      <svg class="mx-auto mb-3 h-12 w-12 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg class="mx-auto mb-3 h-12 w-12 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
-      <h3 class="text-lg font-semibold text-green-800">Customer support submission completed</h3>
-      <p class="mt-1 text-sm text-green-600">{{ successMessage }}</p>
+      <h3 class="text-lg font-semibold text-brand-primary-hover">Customer support submission completed</h3>
+      <p class="mt-1 text-sm text-brand-primary">{{ successMessage }}</p>
       <p class="mt-3 text-sm text-gray-600">Click the button below to start a new customer support request.</p>
       <button
         type="button"
         @click="startNewSubmission"
-        class="mt-4 inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-green-700"
+        class="mt-4 inline-flex items-center gap-2 rounded-lg bg-brand-primary px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-brand-primary-hover"
       >
         New Customer Support
       </button>
@@ -507,14 +507,14 @@ const selectClass = (field) =>
             <label
               v-for="cat in ISSUE_CATEGORIES"
               :key="cat"
-              class="flex cursor-pointer items-center rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-700 transition hover:border-green-400 hover:bg-gray-50 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 has-[:checked]:ring-1 has-[:checked]:ring-green-500"
+              class="flex cursor-pointer items-center rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-700 transition hover:border-brand-primary hover:bg-gray-50 has-[:checked]:border-brand-primary has-[:checked]:bg-brand-primary-light has-[:checked]:ring-1 has-[:checked]:ring-brand-primary"
               :class="{ 'border-red-500': getError('issue_category') }"
             >
               <input
                 v-model="form.issue_category"
                 type="radio"
                 :value="cat"
-                class="h-4 w-4 border-gray-300 text-green-600 focus:ring-green-500"
+                class="h-4 w-4 border-gray-300 text-brand-primary focus:ring-brand-primary"
                 @change="clearFieldError('issue_category')"
               />
               <span class="ml-2">{{ cat }}</span>
@@ -612,7 +612,7 @@ const selectClass = (field) =>
                       class="hidden"
                       @change="onFileChange(1, $event)"
                     />
-                    <span class="inline-flex items-center gap-1 rounded-lg bg-green-600 px-2 py-1 text-xs font-medium text-white shadow-sm hover:bg-green-700">
+                    <span class="inline-flex items-center gap-1 rounded-lg bg-brand-primary px-2 py-1 text-xs font-medium text-white shadow-sm hover:bg-brand-primary-hover">
                       <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                       </svg>
@@ -637,7 +637,7 @@ const selectClass = (field) =>
                       class="hidden"
                       @change="onFileChange(2, $event)"
                     />
-                    <span class="inline-flex items-center gap-1 rounded-lg bg-green-600 px-2 py-1 text-xs font-medium text-white shadow-sm hover:bg-green-700">
+                    <span class="inline-flex items-center gap-1 rounded-lg bg-brand-primary px-2 py-1 text-xs font-medium text-white shadow-sm hover:bg-brand-primary-hover">
                       <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                       </svg>
@@ -656,7 +656,7 @@ const selectClass = (field) =>
           <button
             type="button"
             @click="cancel"
-            class="rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-green-700"
+            class="rounded-lg bg-brand-primary px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-brand-primary-hover"
           >
             Cancel
           </button>
@@ -676,7 +676,7 @@ const selectClass = (field) =>
           <button
             type="submit"
             :disabled="submitting"
-            class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-green-700 disabled:opacity-50"
+            class="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-brand-primary-hover disabled:opacity-50"
           >
             <span class="text-white">{{ submitting ? 'Submitting...' : 'Submit' }}</span>
             <svg v-if="!submitting" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

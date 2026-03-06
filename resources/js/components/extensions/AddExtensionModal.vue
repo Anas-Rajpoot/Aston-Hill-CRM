@@ -72,7 +72,7 @@ function resetFieldErrors() {
 
 function inputClass(field) {
   return [
-    'w-full rounded-lg border px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500',
+    'w-full rounded-lg border px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary',
     fieldErrors.value[field] ? 'border-red-500' : 'border-gray-300',
   ]
 }
@@ -332,7 +332,7 @@ async function submit() {
               <select
                 id="add-ext-assigned"
                 v-model="form.assigned_to"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
               >
                 <option value="">Not Assigned</option>
                 <option v-for="emp in assignableEmployees" :key="emp.id" :value="emp.id">
@@ -350,7 +350,7 @@ async function submit() {
                 id="add-ext-comment"
                 v-model="form.comment"
                 rows="3"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                 placeholder="Add any notes or comments..."
               />
             </div>
@@ -365,7 +365,7 @@ async function submit() {
               </button>
               <button
                 type="submit"
-                class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                class="rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50"
                 :disabled="submitting"
               >
                 {{ submitting ? 'Creating...' : 'Add Extension' }}

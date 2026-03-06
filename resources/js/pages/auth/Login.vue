@@ -80,7 +80,7 @@ const submit = async () => {
         <button
           type="submit"
           :disabled="loading"
-          class="w-full py-2.5 px-4 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 focus:ring-green-500 disabled:opacity-50"
+          class="w-full py-2.5 px-4 rounded-lg bg-brand-primary text-white font-medium hover:bg-brand-primary-hover focus:ring-brand-primary disabled:opacity-50"
         >
           {{ loading ? 'Signing in...' : 'Sign in' }}
         </button>

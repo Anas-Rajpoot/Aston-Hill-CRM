@@ -339,7 +339,7 @@ const filteredSalesAgents = computed(() => {
 })
 
 const inputClass = (field) =>
-  `w-full rounded-lg border px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 ${fieldErrors.value[field] ? 'border-red-500' : 'border-gray-300'}`
+  `w-full rounded-lg border px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary ${fieldErrors.value[field] ? 'border-red-500' : 'border-gray-300'}`
 
 function onPhoneInput(field, event) {
   form.value[field] = event.target.value.replace(/\D/g, '')
@@ -513,7 +513,7 @@ onMounted(() => {
   <div class="min-h-[calc(100vh-4rem)] bg-white py-6">
     <div class="w-full space-y-6 px-4">
       <div v-if="loading" class="flex items-center justify-center py-12">
-        <svg class="h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+        <svg class="h-8 w-8 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
@@ -583,7 +583,7 @@ onMounted(() => {
                 <label class="block text-sm font-medium text-gray-700 mb-1">.ae Domain</label>
                 <input v-model="form.ae_domain" type="text" placeholder="Enter Domain (e.g. example.ae)" :class="inputClass('ae_domain')" @input="fieldErrors.ae_domain = null" />
                 <p v-if="fieldErrors.ae_domain" class="mt-1 text-sm text-red-600">{{ fieldErrors.ae_domain }}</p>
-                <p v-else-if="form.ae_domain?.trim() && aeDomainValidation.valid" class="mt-1 text-sm text-green-600">{{ aeDomainValidation.message }}</p>
+                <p v-else-if="form.ae_domain?.trim() && aeDomainValidation.valid" class="mt-1 text-sm text-brand-primary">{{ aeDomainValidation.message }}</p>
                 <p v-else-if="form.ae_domain?.trim() && !aeDomainValidation.valid" class="mt-1 text-sm text-red-600">{{ aeDomainValidation.message }}</p>
               </div>
               <div>
@@ -656,7 +656,7 @@ onMounted(() => {
               <label class="block text-sm font-medium text-gray-700 mb-1">Service Categories <span class="text-red-500">*</span></label>
               <select
                 v-model="form.service_category_id"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                 @change="onCategorySelect(form.service_category_id)"
               >
                 <option :value="null">Select Service Category</option>
@@ -667,7 +667,7 @@ onMounted(() => {
               <label class="block text-sm font-medium text-gray-700 mb-1">Service Types <span class="text-red-500">*</span></label>
               <select
                 v-model="form.service_type_id"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                 :disabled="!form.service_category_id || loadingTypes"
               >
                 <option :value="null">{{ loadingTypes ? 'Loading Service Types...' : 'Select Service Type' }}</option>
@@ -756,7 +756,7 @@ onMounted(() => {
               v-model="form.remarks"
               rows="2"
               placeholder="Enter any additional comments or remarks"
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             />
           </div>
         </div>
@@ -809,7 +809,7 @@ onMounted(() => {
                     multiple
                     @change="onFileChange(doc.key, $event)"
                   />
-                  <span class="inline-flex items-center gap-1 rounded-lg bg-green-600 px-2 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-green-700">
+                  <span class="inline-flex items-center gap-1 rounded-lg bg-brand-primary px-2 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-brand-primary-hover">
                     <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                     </svg>
@@ -824,13 +824,13 @@ onMounted(() => {
               <div
                 v-for="doc in existingAdditionalDocs"
                 :key="doc.id"
-                class="flex items-center gap-2 rounded-md bg-green-50 border border-green-200 px-3 py-2"
+                class="flex items-center gap-2 rounded-md bg-brand-primary-light border border-brand-primary-muted px-3 py-2"
               >
-                <svg class="w-4 h-4 text-green-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-4 h-4 text-brand-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span class="text-sm text-gray-700 truncate min-w-0 flex-1" :title="doc.original_name">{{ doc.original_name || 'Document' }}</span>
-                <a href="#" class="text-sm text-green-700 hover:underline shrink-0" @click.prevent="downloadDoc(doc)">Download</a>
+                <a href="#" class="text-sm text-brand-primary-hover hover:underline shrink-0" @click.prevent="downloadDoc(doc)">Download</a>
               </div>
             </div>
 
@@ -839,7 +839,7 @@ onMounted(() => {
                 <h4 class="text-sm font-semibold text-gray-900">Additional Documents</h4>
                 <button
                   type="button"
-                  class="inline-flex items-center gap-1.5 text-sm font-medium text-green-600 hover:text-green-700"
+                  class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-primary hover:text-brand-primary-hover"
                   @click="addDocumentSlot"
                 >
                   <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -860,7 +860,7 @@ onMounted(() => {
                       <p class="text-sm font-medium text-gray-900">Additional Document</p>
                       <p class="text-xs text-gray-500">PDF, DOC, DOCX, EML</p>
                     </div>
-                    <label class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-green-500 bg-white px-3 py-2 text-sm font-medium text-green-700 hover:bg-green-50">
+                    <label class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-brand-primary bg-white px-3 py-2 text-sm font-medium text-brand-primary-hover hover:bg-brand-primary-light">
                       <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                       </svg>
@@ -874,7 +874,7 @@ onMounted(() => {
                       :key="fi"
                       class="flex items-center gap-2 rounded-md bg-gray-50 px-3 py-1.5"
                     >
-                      <svg class="w-4 h-4 text-green-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg class="w-4 h-4 text-brand-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       <span class="text-sm text-gray-700 truncate min-w-0 flex-1" :title="file.name">{{ file.name }}</span>
@@ -920,7 +920,7 @@ onMounted(() => {
           </div>
           <button
             type="submit"
-            class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-green-700 disabled:opacity-50"
+            class="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-brand-primary-hover disabled:opacity-50"
             :disabled="saving || !canSubmit"
           >
             <span>{{ saving ? 'Submitting...' : 'Submit' }}</span>

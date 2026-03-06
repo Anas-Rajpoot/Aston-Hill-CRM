@@ -134,13 +134,13 @@ class VasRequestController extends Controller
         $rules = [];
         $messages = [];
         foreach ($schema as $key => $doc) {
-            $rules[$key] = ['nullable', 'file', 'max:' . self::MAX_FILE_KB];
+            $rules[$key] = ['nullable', 'file', 'max:' . self::MAX_FILE_KB, 'mimes:pdf,doc,docx,jpg,jpeg,png,eml,xls,xlsx'];
             $messages[$key . '.max'] = 'The file must not be greater than 3 MB.';
         }
         $rules['additional_document_label'] = ['nullable', 'array'];
         $rules['additional_document_label.*'] = ['nullable', 'string', 'max:255'];
         $rules['additional_documents'] = ['nullable', 'array'];
-        $rules['additional_documents.*'] = ['nullable', 'file', 'max:' . self::MAX_FILE_KB];
+        $rules['additional_documents.*'] = ['nullable', 'file', 'max:' . self::MAX_FILE_KB, 'mimes:pdf,doc,docx,jpg,jpeg,png,eml,xls,xlsx'];
         $messages['additional_documents.*.max'] = 'Each file must not be greater than 3 MB.';
 
         $request->validate($rules, $messages);

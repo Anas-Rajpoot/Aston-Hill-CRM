@@ -3,7 +3,6 @@ import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import customerSupportApi from '@/services/customerSupportApi'
 import api from '@/lib/axios'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import { useFormErrors } from '@/composables/useFormErrors'
 import { formatTeamLabel } from '@/composables/useTeamLabel'
 
@@ -298,9 +297,9 @@ onMounted(() => {
 })
 
 const inputClass = (field) =>
-  `w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-green-500 focus:ring-1 focus:ring-green-500 ${getError(field) ? 'border-red-500' : 'border-gray-300'}`
+  `w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary ${getError(field) ? 'border-red-500' : 'border-gray-300'}`
 const selectClass = (field) =>
-  `w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 focus:border-green-500 focus:ring-1 focus:ring-green-500 ${getError(field) ? 'border-red-500' : 'border-gray-300'}`
+  `w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary ${getError(field) ? 'border-red-500' : 'border-gray-300'}`
 </script>
 
 <template>
@@ -309,9 +308,7 @@ const selectClass = (field) =>
       <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
         <div class="px-4 py-4 sm:px-5">
           <div class="flex flex-wrap items-center gap-3">
-            <h1 class="text-xl font-semibold text-gray-900">Resubmit Customer Support Request</h1>
-            <Breadcrumbs />
-            <div class="ml-auto">
+            <h1 class="text-xl font-semibold text-gray-900">Resubmit Customer Support Request</h1>            <div class="ml-auto">
               <button
                 type="button"
                 class="inline-flex items-center gap-1.5 rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
@@ -326,7 +323,7 @@ const selectClass = (field) =>
         <div class="border-t border-gray-200" />
 
         <div v-if="loading" class="flex items-center justify-center px-4 py-16 sm:px-5">
-          <svg class="h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+          <svg class="h-8 w-8 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
@@ -361,14 +358,14 @@ const selectClass = (field) =>
                 <label
                   v-for="cat in ISSUE_CATEGORIES"
                   :key="cat"
-                  class="flex cursor-pointer items-center rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-700 transition hover:border-green-400 hover:bg-gray-50 has-[:checked]:border-green-500 has-[:checked]:bg-green-50 has-[:checked]:ring-1 has-[:checked]:ring-green-500"
+                  class="flex cursor-pointer items-center rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-700 transition hover:border-brand-primary hover:bg-gray-50 has-[:checked]:border-brand-primary has-[:checked]:bg-brand-primary-light has-[:checked]:ring-1 has-[:checked]:ring-brand-primary"
                   :class="{ 'border-red-500': getError('issue_category') }"
                 >
                   <input
                     v-model="form.issue_category"
                     type="radio"
                     :value="cat"
-                    class="h-4 w-4 border-gray-300 text-green-600 focus:ring-green-500"
+                    class="h-4 w-4 border-gray-300 text-brand-primary focus:ring-brand-primary"
                     @change="clearFieldError('issue_category')"
                   />
                   <span class="ml-2">{{ cat }}</span>
@@ -450,14 +447,14 @@ const selectClass = (field) =>
                     <p class="truncate text-xs font-medium text-gray-900">{{ attachmentDisplayName(att) }}</p>
                     <p v-if="att.file_size" class="mt-0.5 text-xs text-gray-500">{{ att.file_size }}</p>
                   </div>
-                  <button type="button" class="shrink-0 rounded p-1 text-blue-600 hover:bg-blue-50" @click="downloadAttachment(idx)">
+                  <button type="button" class="shrink-0 rounded p-1 text-brand-primary hover:bg-brand-primary-light" @click="downloadAttachment(idx)">
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
                   </button>
                 </div>
                 <!-- New files -->
-                <div v-for="(f, idx) in newFiles" :key="'new-' + idx" class="flex min-w-0 items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2">
+                <div v-for="(f, idx) in newFiles" :key="'new-' + idx" class="flex min-w-0 items-center gap-2 rounded-lg border border-brand-primary-muted bg-brand-primary-light px-3 py-2">
                   <span class="min-w-0 flex-1 truncate text-xs text-gray-900">{{ f.name }}</span>
                   <button type="button" class="shrink-0 text-xs text-red-600 hover:underline" @click="removeNewFile(idx)">Remove</button>
                 </div>
@@ -465,7 +462,7 @@ const selectClass = (field) =>
                 <input ref="fileInput" type="file" multiple accept="image/*,.pdf,.doc,.docx,.csv" class="hidden" @change="onFileChange" />
                 <button
                   type="button"
-                  class="inline-flex items-center gap-1.5 text-sm font-medium text-green-600 hover:text-green-700 hover:underline"
+                  class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-primary hover:text-brand-primary-hover hover:underline"
                   @click="triggerFileSelect"
                 >
                   <span class="text-base leading-none">+</span>
@@ -535,7 +532,7 @@ const selectClass = (field) =>
             </button>
             <button
               type="submit"
-              class="rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-green-700 disabled:opacity-50"
+              class="rounded-lg bg-brand-primary px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-brand-primary-hover disabled:opacity-50"
               :disabled="saving"
             >
               {{ saving ? 'Resubmitting...' : 'Resubmit' }}

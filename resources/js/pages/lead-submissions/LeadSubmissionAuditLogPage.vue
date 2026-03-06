@@ -7,7 +7,6 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import leadSubmissionsApi from '@/services/leadSubmissionsApi'
 import api from '@/lib/axios'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import TruncatedText from '@/components/TruncatedText.vue'
 import { formatSystemDateTime } from '@/lib/dateFormat'
 
@@ -209,8 +208,6 @@ onMounted(() => {
       </p>
 
       <template v-else>
-        <Breadcrumbs />
-
         <div class="flex flex-wrap items-center gap-2">
           <label class="text-sm font-medium text-gray-700">Submission ID</label>
           <input
@@ -222,7 +219,7 @@ onMounted(() => {
           />
           <button
             type="button"
-            class="rounded bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700"
+            class="rounded bg-brand-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-primary-hover"
             @click="applyFilter"
           >
             Apply
@@ -234,7 +231,7 @@ onMounted(() => {
             v-if="loading"
             class="flex justify-center py-16"
           >
-            <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+            <svg class="h-10 w-10 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
@@ -244,7 +241,7 @@ onMounted(() => {
             <div class="overflow-x-auto">
               <table class="min-w-full">
                 <thead>
-                  <tr class="border-b border-black bg-green-600">
+                  <tr class="bg-brand-primary border-b-2 border-green-700">
                     <th class="px-4 py-3 text-left text-sm font-bold uppercase tracking-wider text-white">Submission ID</th>
                     <th class="px-4 py-3 text-left text-sm font-bold uppercase tracking-wider text-white">Company</th>
                     <th class="px-4 py-3 text-left text-sm font-bold uppercase tracking-wider text-white">Field</th>
@@ -266,7 +263,7 @@ onMounted(() => {
                     <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-900">
                       <router-link
                         :to="`/lead-submissions/${row.lead_submission_id}`"
-                        class="text-green-600 hover:underline"
+                        class="text-brand-primary hover:underline"
                       >
                         {{ row.lead_submission_id }}
                       </router-link>
@@ -280,7 +277,7 @@ onMounted(() => {
                     <td class="max-w-[300px] px-4 py-3 text-sm text-red-500">
                       <TruncatedText :text="row.old_value != null && row.old_value !== '' ? formatAuditValue(row.old_value) : ''" empty-label="empty" />
                     </td>
-                    <td class="max-w-[300px] px-4 py-3 text-sm text-green-600">
+                    <td class="max-w-[300px] px-4 py-3 text-sm text-brand-primary">
                       <TruncatedText :text="row.new_value != null && row.new_value !== '' ? formatAuditValue(row.new_value) : ''" empty-label="—" />
                     </td>
                     <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-900">{{ row.changed_by_name || row.changed_by || '—' }}</td>
@@ -299,7 +296,7 @@ onMounted(() => {
                   <span class="whitespace-nowrap font-medium">Number of rows</span>
                   <select
                     :value="meta.per_page"
-                    class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                    class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                     @change="onPerPageChange"
                   >
                     <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>

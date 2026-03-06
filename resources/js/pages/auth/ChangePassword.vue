@@ -109,8 +109,8 @@ onMounted(fetchPolicy)
 
       <!-- Success State -->
       <div v-if="success" class="bg-white rounded-xl shadow-lg p-8 text-center">
-        <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100 mb-4">
-          <svg class="h-7 w-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand-primary-light mb-4">
+          <svg class="h-7 w-7 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
           </svg>
         </div>
@@ -122,8 +122,8 @@ onMounted(fetchPolicy)
       <div v-else class="bg-white rounded-xl shadow-lg p-8">
         <!-- Header -->
         <div class="flex items-center gap-3 mb-2">
-          <div class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
-            <svg class="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div class="flex h-10 w-10 items-center justify-center rounded-full bg-brand-primary-light">
+            <svg class="h-5 w-5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
             </svg>
           </div>
@@ -165,7 +165,7 @@ onMounted(fetchPolicy)
               type="password"
               required
               autocomplete="current-password"
-              class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              class="w-full rounded-lg border-gray-300 shadow-sm focus:border-brand-primary focus:ring-brand-primary"
               placeholder="Enter current password"
             />
             <p v-if="errors.current_password" class="mt-1 text-xs text-red-600">{{ errors.current_password }}</p>
@@ -179,7 +179,7 @@ onMounted(fetchPolicy)
               type="password"
               required
               autocomplete="new-password"
-              class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              class="w-full rounded-lg border-gray-300 shadow-sm focus:border-brand-primary focus:ring-brand-primary"
               placeholder="Enter new password"
             />
             <p v-if="errors.password" class="mt-1 text-xs text-red-600">{{ errors.password }}</p>
@@ -193,7 +193,7 @@ onMounted(fetchPolicy)
               type="password"
               required
               autocomplete="new-password"
-              class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              class="w-full rounded-lg border-gray-300 shadow-sm focus:border-brand-primary focus:ring-brand-primary"
               placeholder="Confirm new password"
             />
           </div>
@@ -203,13 +203,13 @@ onMounted(fetchPolicy)
 
           <!-- Passwords match indicator -->
           <div v-if="form.password.length > 0" class="flex items-center gap-2 text-sm">
-            <svg v-if="passwordsMatch" class="h-4 w-4 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg v-if="passwordsMatch" class="h-4 w-4 text-brand-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
             </svg>
             <svg v-else class="h-4 w-4 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <circle cx="12" cy="12" r="10" stroke-width="2" />
             </svg>
-            <span :class="passwordsMatch ? 'text-green-700' : 'text-gray-500'">Passwords match</span>
+            <span :class="passwordsMatch ? 'text-brand-primary-hover' : 'text-gray-500'">Passwords match</span>
           </div>
 
           <!-- Actions -->
@@ -217,7 +217,7 @@ onMounted(fetchPolicy)
             <button
               type="submit"
               :disabled="submitting || !allChecksMet"
-              class="flex-1 py-2.5 px-4 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              class="flex-1 py-2.5 px-4 rounded-lg bg-brand-primary text-white font-medium hover:bg-brand-primary-hover focus:ring-brand-primary disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
               {{ submitting ? 'Changing...' : 'Change Password' }}
             </button>

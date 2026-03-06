@@ -2,7 +2,6 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import usersApi from '@/services/usersApi'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 
 const router = useRouter()
 const form = ref({
@@ -101,46 +100,44 @@ const save = async () => {
 
 <template>
   <div class="space-y-6">
-    <router-link to="/users" class="text-sm text-blue-600 hover:text-blue-700">← Back to Users</router-link>
+    <router-link to="/users" class="text-sm text-brand-primary hover:text-brand-primary-hover">← Back to Users</router-link>
 
     <div>
       <h1 class="text-2xl font-bold text-gray-900">Add New User</h1>
       <p class="mt-1 text-sm text-gray-500">Create a new user account and assign roles.</p>
     </div>
-    <Breadcrumbs />
-
     <form autocomplete="off" @submit.prevent="save" class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-4 max-w-2xl">
       <div v-if="error" class="rounded-lg bg-red-50 border border-red-200 p-4 text-sm text-red-700">{{ error }}</div>
-      <div v-if="successMessage" class="rounded-lg bg-green-50 border border-green-200 p-4 text-sm text-green-700">{{ successMessage }}</div>
+      <div v-if="successMessage" class="rounded-lg bg-brand-primary-light border border-brand-primary-muted p-4 text-sm text-brand-primary-hover">{{ successMessage }}</div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-          <input v-model="form.name" type="text" required class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500" placeholder="Full name" />
+          <input v-model="form.name" type="text" required class="w-full rounded-lg border-gray-300 focus:border-brand-primary focus:ring-brand-primary" placeholder="Full name" />
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-          <input v-model="form.email" type="email" name="new_user_email" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" required class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500" placeholder="email@example.com" />
+          <input v-model="form.email" type="email" name="new_user_email" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" required class="w-full rounded-lg border-gray-300 focus:border-brand-primary focus:ring-brand-primary" placeholder="email@example.com" />
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Password *</label>
-          <input v-model="form.password" type="password" name="new_user_password" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" required class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500" placeholder="Enter password" />
+          <input v-model="form.password" type="password" name="new_user_password" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" required class="w-full rounded-lg border-gray-300 focus:border-brand-primary focus:ring-brand-primary" placeholder="Enter password" />
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Confirm Password *</label>
-          <input v-model="form.password_confirmation" type="password" name="new_user_password_confirmation" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" required class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500" placeholder="Confirm password" />
+          <input v-model="form.password_confirmation" type="password" name="new_user_password_confirmation" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" required class="w-full rounded-lg border-gray-300 focus:border-brand-primary focus:ring-brand-primary" placeholder="Confirm password" />
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-          <input v-model="form.phone" type="text" class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500" placeholder="+971..." />
+          <input v-model="form.phone" type="text" class="w-full rounded-lg border-gray-300 focus:border-brand-primary focus:ring-brand-primary" placeholder="+971..." />
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Country</label>
-          <input v-model="form.country" type="text" class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500" placeholder="Country" />
+          <input v-model="form.country" type="text" class="w-full rounded-lg border-gray-300 focus:border-brand-primary focus:ring-brand-primary" placeholder="Country" />
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Initial Status</label>
-          <select v-model="form.status" class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+          <select v-model="form.status" class="w-full rounded-lg border-gray-300 focus:border-brand-primary focus:ring-brand-primary">
             <option value="pending">Pending Approval</option>
             <option value="approved">Approved</option>
             <option value="rejected">Rejected</option>
@@ -161,7 +158,7 @@ const save = async () => {
 
       <div class="flex items-center justify-end gap-3 pt-4">
         <router-link to="/users" class="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">Cancel</router-link>
-        <button type="submit" :disabled="loading" class="px-5 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-50">
+        <button type="submit" :disabled="loading" class="px-5 py-2 rounded-lg bg-brand-primary text-white text-sm font-medium hover:bg-brand-primary-hover disabled:opacity-50">
           {{ loading ? 'Creating...' : 'Create User' }}
         </button>
       </div>

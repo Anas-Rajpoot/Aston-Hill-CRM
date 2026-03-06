@@ -1,7 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import clientsApi from '@/services/clientsApi'
 import { toDdMonYyyyDash } from '@/lib/dateFormat'
 import { useAuthStore } from '@/stores/auth'
@@ -81,19 +80,17 @@ onMounted(loadProduct)
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] p-0">
+  <div class="min-h-[calc(100vh-4rem)] bg-gray-100 p-0">
     <div class="w-full">
       <div class="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="flex items-baseline gap-2">
-            <h1 class="text-xl font-semibold text-gray-900">Product & Service Details</h1>
-            <Breadcrumbs />
-          </div>
+            <h1 class="text-xl font-semibold text-gray-900">Product & Service Details</h1>          </div>
           <div class="flex items-center gap-2">
             <button type="button" class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="goClose">
               Close
             </button>
-            <button v-if="canEdit" type="button" class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700" @click="goEdit">
+            <button v-if="canEdit" type="button" class="rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover" @click="goEdit">
               Edit Product & Service
             </button>
           </div>
@@ -101,7 +98,7 @@ onMounted(loadProduct)
       </div>
 
       <div v-if="loading" class="flex justify-center py-16">
-        <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+        <svg class="h-10 w-10 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>

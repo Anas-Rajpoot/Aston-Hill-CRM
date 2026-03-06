@@ -116,4 +116,19 @@ export default {
     const { data } = await api.post('/clients/renewal-alerts/generate', params)
     return data
   },
+
+  async bulkAssignCsr(ids, csrName) {
+    const { data } = await api.post('/clients/bulk-assign-csr', { ids, csr_name: csrName })
+    return data
+  },
+
+  async bulkAssignAccountManager(ids, accountManagerName) {
+    const { data } = await api.post('/clients/bulk-assign-account-manager', { ids, account_manager_name: accountManagerName })
+    return data
+  },
+
+  async bulkDelete(ids) {
+    const { data } = await api.post('/clients/bulk-delete', { ids })
+    return data
+  },
 }

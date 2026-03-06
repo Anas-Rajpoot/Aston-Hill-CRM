@@ -102,8 +102,8 @@ function truncate(str, max = TRUNCATE_LENGTH) {
 const STATUS_BADGES = {
   pending: 'bg-amber-100 text-amber-800',
   on_hold: 'bg-gray-100 text-gray-700',
-  in_progress: 'bg-blue-100 text-blue-700',
-  completed: 'bg-green-100 text-green-700',
+  in_progress: 'bg-brand-primary-light text-brand-primary-hover',
+  completed: 'bg-brand-primary-light text-brand-primary-hover',
   cancelled: 'bg-red-100 text-red-700',
   failed: 'bg-red-100 text-red-700',
 }
@@ -133,7 +133,7 @@ function goToClient(row) {
       aria-busy="true"
     >
       <div class="flex flex-col items-center gap-2">
-        <svg class="h-8 w-8 animate-spin text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <svg class="h-8 w-8 animate-spin text-brand-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
         </svg>
@@ -143,18 +143,19 @@ function goToClient(row) {
 
     <table class="min-w-full border-2 border-black border-collapse">
       <thead>
-        <tr class="border-b-2 border-black bg-green-600">
+        <tr class="bg-brand-primary border-b-2 border-green-700">
           <th
             v-for="col in columns"
             :key="col"
             scope="col"
-            class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold uppercase tracking-wider text-white"
+            class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold text-white cursor-pointer select-none"
+            @click="sortable(col) ? toggleSort(col) : null"
           >
             <button
               v-if="sortable(col)"
               type="button"
-              class="inline-flex items-center gap-1 font-bold text-white hover:text-white/90"
-              @click="toggleSort(col)"
+              class="inline-flex items-center gap-1 font-bold text-white hover:text-white/70"
+              @click.stop="toggleSort(col)"
             >
               {{ label(col) }}
               <svg
@@ -192,7 +193,7 @@ function goToClient(row) {
               <router-link
                 v-if="canViewAction"
                 :to="`/clients/${row.id}`"
-                class="font-medium text-green-600 hover:text-green-800 hover:underline"
+                class="font-medium text-brand-primary hover:text-brand-primary-hover hover:underline"
                 @click.stop
               >
                 {{ activityDisplay(row) }}

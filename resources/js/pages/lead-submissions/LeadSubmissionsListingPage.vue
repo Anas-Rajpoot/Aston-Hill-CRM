@@ -285,7 +285,7 @@ async function loadFilters() {
     const [filtersRes, teamRes, backOfficeRes] = await Promise.all([
       leadSubmissionsApi.filters(),
       leadSubmissionsApi.getTeamOptions().catch(() => ({ data: {} })),
-      leadSubmissionsApi.getBackOfficeOptions().catch(() => ({})),
+      leadSubmissionsApi.getBackOfficeOptions(true).catch(() => ({})),
     ])
     const data = filtersRes
     const team = teamRes?.data ?? teamRes ?? {}
@@ -664,11 +664,11 @@ onMounted(async () => {
       <!-- Export in progress message -->
       <div
         v-if="exportLoading"
-        class="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 text-sm text-green-800"
+        class="flex items-center gap-2 rounded-lg border border-brand-primary-muted bg-brand-primary-light px-4 py-2.5 text-sm text-brand-primary-hover"
         role="status"
         aria-live="polite"
       >
-        <svg class="h-5 w-5 shrink-0 animate-spin text-green-600" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+        <svg class="h-5 w-5 shrink-0 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24" aria-hidden="true">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
         </svg>
@@ -698,7 +698,7 @@ onMounted(async () => {
           <button
             v-if="canExport()"
             type="button"
-            class="inline-flex items-center rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70 disabled:cursor-wait"
+            class="inline-flex items-center rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70 disabled:cursor-wait"
             :disabled="loading || exportLoading"
             @click="onExport"
           >
@@ -786,7 +786,7 @@ onMounted(async () => {
               <span class="whitespace-nowrap font-medium">Number of rows</span>
               <select
                 :value="meta.per_page"
-                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                 @change="onPerPageChange"
               >
                 <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>

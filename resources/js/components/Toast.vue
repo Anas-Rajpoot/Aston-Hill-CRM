@@ -7,7 +7,7 @@
         :aria-live="type === 'error' ? 'assertive' : 'polite'"
         :class="[
           'fixed left-1/2 top-4 z-[200] w-full max-w-md -translate-x-1/2 rounded-xl px-4 py-4 shadow-lg',
-          type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white',
+          type === 'success' ? 'bg-brand-primary text-white' : 'bg-red-600 text-white',
         ]"
       >
         <div class="flex items-start gap-3">

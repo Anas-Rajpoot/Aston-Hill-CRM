@@ -56,7 +56,7 @@ const createdToDisplay = computed({
             v-model="filters.extension"
             type="text"
             placeholder="Search extension..."
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           />
         </div>
@@ -64,7 +64,7 @@ const createdToDisplay = computed({
           <label class="mb-1 block text-xs font-medium text-gray-600">Gateway</label>
           <select
             v-model="filters.gateway"
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           >
             <option value="">All Gateways</option>
@@ -77,7 +77,7 @@ const createdToDisplay = computed({
             v-model="filters.username"
             type="text"
             placeholder="Search user name..."
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           />
         </div>
@@ -87,7 +87,7 @@ const createdToDisplay = computed({
             v-model="filters.assigned_to_q"
             type="text"
             placeholder="Search employee..."
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           />
         </div>
@@ -95,7 +95,7 @@ const createdToDisplay = computed({
           <label class="mb-1 block text-xs font-medium text-gray-600">Manager</label>
           <select
             v-model="filters.manager_id"
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           >
             <option value="">All Managers</option>
@@ -106,7 +106,7 @@ const createdToDisplay = computed({
           <label class="mb-1 block text-xs font-medium text-gray-600">Team Leader</label>
           <select
             v-model="filters.team_leader_id"
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           >
             <option value="">All Team Leaders</option>
@@ -117,7 +117,7 @@ const createdToDisplay = computed({
           <label class="mb-1 block text-xs font-medium text-gray-600">Usage</label>
           <select
             v-model="filters.usage"
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           >
             <option value="">All</option>
@@ -138,7 +138,7 @@ const createdToDisplay = computed({
         <div class="flex w-full flex-wrap items-center justify-end gap-3">
         <button
           type="button"
-          class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+          class="inline-flex items-center rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50"
           :disabled="loading"
           @click="$emit('apply')"
         >

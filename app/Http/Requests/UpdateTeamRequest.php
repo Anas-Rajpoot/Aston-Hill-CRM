@@ -51,6 +51,14 @@ class UpdateTeamRequest extends FormRequest
             if ($leaderIds->intersect($memberIds)->isNotEmpty()) {
                 $validator->errors()->add('member_ids', 'A selected team leader cannot also be selected as team member.');
             }
+
+            $maxMembers = (int) $this->input('max_members', 0);
+            if ($maxMembers > 0) {
+                $totalAssigned = $managerIds->count() + $leaderIds->count() + $memberIds->count();
+                if ($totalAssigned > $maxMembers) {
+                    $validator->errors()->add('max_members', "Total assigned users ({$totalAssigned}) exceeds the max members limit ({$maxMembers}).");
+                }
+            }
         });
     }
 

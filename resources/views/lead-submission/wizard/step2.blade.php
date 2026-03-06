@@ -8,9 +8,9 @@
             <p class="text-sm text-gray-500">Step 2 — Service Category</p>
         </div>
 
-        @include('Lead-submissios.partials._wizard_steps', ['step' => 2])
+        @include('lead-submissions.partials._wizard_steps', ['step' => 2])
 
-        <form method="POST" action="{{ route('Lead-submissios.wizard.step2.store', $leadSubmission) }}" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <form method="POST" action="{{ route('lead-submissions.wizard.step2.store', $leadSubmission) }}" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
             @csrf
 
             <x-ui/select
@@ -22,7 +22,7 @@
             />
 
             <div class="md:col-span-2 flex justify-between gap-2 mt-2">
-                <a href="{{ route('Lead-submissios.wizard.step1') }}" class="px-4 py-2 rounded bg-gray-200 text-gray-900">Back</a>
+                <a href="{{ route('lead-submissions.wizard.step1') }}" class="px-4 py-2 rounded bg-gray-200 text-gray-900">Back</a>
                 <button class="px-4 py-2 rounded bg-brand-primary text-white">Continue</button>
             </div>
         </form>

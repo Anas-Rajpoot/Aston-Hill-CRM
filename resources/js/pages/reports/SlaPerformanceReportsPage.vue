@@ -6,7 +6,6 @@
  */
 import { ref, computed, watch, onMounted } from 'vue'
 import api from '@/lib/axios'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import { useAuthStore } from '@/stores/auth'
 import { canModuleAction } from '@/lib/accessControl'
@@ -161,17 +160,17 @@ function formatDate(d) {
 function priorityBadgeClass(p) {
   if (p === 'High') return 'bg-red-100 text-red-800'
   if (p === 'Medium') return 'bg-amber-100 text-amber-800'
-  return 'bg-green-100 text-green-800'
+  return 'bg-brand-primary-light text-brand-primary-hover'
 }
 
 function priorityDotClass(p) {
   if (p === 'High') return 'bg-red-500'
   if (p === 'Medium') return 'bg-amber-500'
-  return 'bg-green-500'
+  return 'bg-brand-primary'
 }
 
 function complianceBarColor(pct) {
-  if (pct >= 90) return 'bg-emerald-500'
+  if (pct >= 90) return 'bg-brand-primary'
   if (pct >= 80) return 'bg-amber-500'
   return 'bg-red-500'
 }
@@ -181,11 +180,11 @@ function insightIcon(type) {
 }
 
 function insightBg(type) {
-  return type === 'positive' ? 'bg-emerald-50 border-emerald-200' : type === 'warning' ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'
+  return type === 'positive' ? 'bg-brand-primary-light border-brand-primary-muted' : type === 'warning' ? 'bg-red-50 border-red-200' : 'bg-brand-primary-light border-brand-primary-muted'
 }
 
 function insightIconColor(type) {
-  return type === 'positive' ? 'text-emerald-600' : type === 'warning' ? 'text-red-600' : 'text-blue-600'
+  return type === 'positive' ? 'text-brand-primary' : type === 'warning' ? 'text-red-600' : 'text-brand-primary'
 }
 
 function cellValue(row, key) {
@@ -246,14 +245,12 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="space-y-6 bg-gray-50 -mx-4 -my-5 min-h-full px-6 py-6">
+  <div class="space-y-6 bg-brand-bg -mx-4 -my-5 min-h-full px-6 py-6">
     <!-- Header -->
     <div class="flex flex-wrap items-start justify-between gap-4">
       <div>
         <div class="flex flex-wrap items-baseline gap-2">
-          <h1 class="text-2xl font-bold text-gray-900">SLA Performance Report</h1>
-          <Breadcrumbs />
-        </div>
+          <h1 class="text-2xl font-bold text-gray-900">SLA Performance Report</h1>        </div>
         <p class="text-sm text-gray-500 mt-1">Monitor and analyze Service Level Agreement compliance across all operations.</p>
       </div>
     </div>
@@ -279,7 +276,7 @@ onMounted(async () => {
             <span class="text-gray-400">to</span>
             <input v-model="filters.to" type="date" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-40" />
           </div>
-          <button type="button" class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700" @click="applyFilters">Apply</button>
+          <button type="button" class="rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover" @click="applyFilters">Apply</button>
           <button type="button" class="text-sm text-gray-500 hover:text-gray-700" @click="resetFilters">Reset</button>
         </template>
       </div>
@@ -291,7 +288,7 @@ onMounted(async () => {
         <button
           v-if="canExport"
           type="button"
-          class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-70"
+          class="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70"
           :disabled="exportLoading"
           @click="exportReport"
         >
@@ -306,8 +303,8 @@ onMounted(async () => {
       <!-- Total Requests -->
       <div class="rounded-xl bg-white border border-gray-200 p-5 shadow-sm">
         <div class="flex items-center gap-3">
-          <div class="rounded-lg bg-emerald-100 p-2.5">
-            <svg class="h-6 w-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+          <div class="rounded-lg bg-brand-primary-light p-2.5">
+            <svg class="h-6 w-6 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
           </div>
           <div>
             <p class="text-xs text-gray-500">Total Requests</p>
@@ -319,8 +316,8 @@ onMounted(async () => {
       <!-- On Time -->
       <div class="rounded-xl bg-white border border-gray-200 p-5 shadow-sm">
         <div class="flex items-center gap-3">
-          <div class="rounded-lg bg-green-100 p-2.5">
-            <svg class="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          <div class="rounded-lg bg-brand-primary-light p-2.5">
+            <svg class="h-6 w-6 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           </div>
           <div>
             <p class="text-xs text-gray-500">On Time</p>
@@ -365,15 +362,15 @@ onMounted(async () => {
       </div>
       <div class="overflow-x-auto">
         <table class="min-w-full">
-          <thead class="bg-gray-50 border-b-2 border-black">
+          <thead class="bg-brand-primary border-b-2 border-green-700">
             <tr>
-              <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
-              <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Total Requests</th>
-              <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">On Time</th>
-              <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">At Risk</th>
-              <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Breached</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">Compliance Rate</th>
-              <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Response Time</th>
+              <th class="px-5 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Department</th>
+              <th class="px-4 py-3 text-center text-xs font-medium text-white uppercase tracking-wider">Total Requests</th>
+              <th class="px-4 py-3 text-center text-xs font-medium text-white uppercase tracking-wider">On Time</th>
+              <th class="px-4 py-3 text-center text-xs font-medium text-white uppercase tracking-wider">At Risk</th>
+              <th class="px-4 py-3 text-center text-xs font-medium text-white uppercase tracking-wider">Breached</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider w-40">Compliance Rate</th>
+              <th class="px-4 py-3 text-center text-xs font-medium text-white uppercase tracking-wider">Avg Response Time</th>
             </tr>
           </thead>
           <tbody class="bg-white">
@@ -397,7 +394,7 @@ onMounted(async () => {
               </td>
               <td class="px-4 py-3 text-center text-sm font-medium text-gray-900">{{ dept.total_requests }}</td>
               <td class="px-4 py-3 text-center">
-                <span class="inline-flex items-center justify-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800">{{ dept.on_time }}</span>
+                <span class="inline-flex items-center justify-center rounded-full bg-brand-primary-light px-2.5 py-0.5 text-xs font-semibold text-brand-primary-hover">{{ dept.on_time }}</span>
               </td>
               <td class="px-4 py-3 text-center">
                 <span class="inline-flex items-center justify-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">{{ dept.at_risk }}</span>
@@ -450,7 +447,7 @@ onMounted(async () => {
             <div class="flex items-center justify-between mb-3">
               <div class="flex items-center gap-2">
                 <span class="inline-block h-2.5 w-2.5 rounded-full" :class="priorityDotClass(p.level)" />
-                <span class="text-sm font-semibold" :class="p.level === 'High' ? 'text-red-700' : p.level === 'Medium' ? 'text-amber-700' : 'text-green-700'">{{ p.level }}</span>
+                <span class="text-sm font-semibold" :class="p.level === 'High' ? 'text-red-700' : p.level === 'Medium' ? 'text-amber-700' : 'text-brand-primary-hover'">{{ p.level }}</span>
                 <span class="text-xs text-gray-500">{{ p.total }} requests</span>
               </div>
               <span class="text-sm font-bold text-gray-900">{{ p.compliance_pct }}%</span>
@@ -458,7 +455,7 @@ onMounted(async () => {
             <div class="grid grid-cols-3 gap-3 text-center">
               <div>
                 <p class="text-xs text-gray-500">On Time</p>
-                <p class="text-lg font-bold text-green-600">{{ p.on_time }}</p>
+                <p class="text-lg font-bold text-brand-primary">{{ p.on_time }}</p>
               </div>
               <div>
                 <p class="text-xs text-gray-500">At Risk</p>
@@ -493,21 +490,21 @@ onMounted(async () => {
       </div>
       <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
-          <thead class="bg-gray-50">
+          <thead class="bg-brand-primary border-b-2 border-green-700">
             <tr>
               <th
                 v-for="col in activeBreachColumns"
                 :key="col.key"
-                class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 transition-colors"
+                class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider cursor-pointer select-none hover:bg-white/10 transition-colors"
                 @click="onBreachSort(col.key)"
               >
                 <div class="flex items-center gap-1">
                   <span>{{ col.label }}</span>
-                  <span v-if="breachSort === col.key" class="text-green-600">
+                  <span v-if="breachSort === col.key" class="text-white">
                     <svg v-if="breachOrder === 'asc'" class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
                     <svg v-else class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                   </span>
-                  <span v-else class="text-gray-300">
+                  <span v-else class="text-white/40">
                     <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
                   </span>
                 </div>
@@ -555,7 +552,7 @@ onMounted(async () => {
             <span class="whitespace-nowrap font-medium">Number of rows</span>
             <select
               :value="breachPerPage"
-              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
               @change="onBreachPerPageChange"
             >
               <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>

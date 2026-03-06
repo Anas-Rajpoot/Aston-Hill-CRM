@@ -51,7 +51,7 @@ const submit = async () => {
         <button
           type="submit"
           :disabled="loading || code.length !== 6"
-          class="w-full py-2.5 px-4 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="w-full py-2.5 px-4 rounded-lg bg-brand-primary text-white font-medium hover:bg-brand-primary-hover focus:ring-brand-primary disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {{ loading ? 'Verifying...' : 'Verify' }}
         </button>

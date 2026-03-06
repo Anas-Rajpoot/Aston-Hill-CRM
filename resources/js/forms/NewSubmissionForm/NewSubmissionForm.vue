@@ -146,7 +146,7 @@ async function submit() {
     if (form.value.sales_agent_id) fd.append('sales_agent_id', form.value.sales_agent_id)
     documentFiles.value.forEach((file) => { if (file) fd.append('documents[]', file) })
     await specialRequestsApi.store(fd)
-    successMessage.value = 'Your special request has been submitted successfully. Back Office will review and process.'
+    successMessage.value = 'Your special request has been submitted successfully. Back Office will review and process accordingly.'
     clearState()
     nextTick(() => { window.scrollTo(0, 0) })
   } catch (e) {
@@ -212,20 +212,20 @@ function startNewSubmission() {
 }
 
 const inputClass = (field) =>
-  `mt-1 block w-full rounded border bg-white px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 ${getError(field) ? 'border-red-500' : 'border-gray-300'}`
+  `mt-1 block w-full rounded border bg-white px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary ${getError(field) ? 'border-red-500' : 'border-gray-300'}`
 const selectClass = (field) =>
-  `mt-1 block w-full rounded border bg-white px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 ${getError(field) ? 'border-red-500' : 'border-gray-300'}`
+  `mt-1 block w-full rounded border bg-white px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary ${getError(field) ? 'border-red-500' : 'border-gray-300'}`
 </script>
 
 <template>
   <div class="space-y-6">
     <!-- Success message -->
-    <div v-if="successMessage" class="rounded-lg border border-green-200 bg-green-50 p-6 text-center">
-      <svg class="mx-auto mb-3 h-12 w-12 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-      <h3 class="text-lg font-semibold text-green-800">Special request submission completed</h3>
-      <p class="mt-1 text-sm text-green-600">{{ successMessage }}</p>
+    <div v-if="successMessage" class="rounded-lg border border-brand-primary-muted bg-brand-primary-light p-6 text-center">
+      <svg class="mx-auto mb-3 h-12 w-12 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+      <h3 class="text-lg font-semibold text-brand-primary-hover">Special request submission completed</h3>
+      <p class="mt-1 text-sm text-brand-primary">{{ successMessage }}</p>
       <p class="mt-3 text-sm text-gray-600">Click the button below to start a new special request.</p>
-      <button type="button" @click="startNewSubmission" class="mt-4 inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-green-700">New Special Request</button>
+      <button type="button" @click="startNewSubmission" class="mt-4 inline-flex items-center gap-2 rounded-lg bg-brand-primary px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-brand-primary-hover">New Special Request</button>
     </div>
 
     <div v-else class="!mt-0">
@@ -293,7 +293,7 @@ const selectClass = (field) =>
             v-model="form.complete_address"
             rows="3"
             placeholder="Enter complete address"
-            class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
           />
         </div>
         <div>
@@ -302,7 +302,7 @@ const selectClass = (field) =>
             v-model="form.special_instruction"
             rows="3"
             placeholder="Enter Special Instruction"
-            class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
           />
         </div>
       </div>
@@ -312,7 +312,7 @@ const selectClass = (field) =>
           <h3 class="text-sm font-semibold text-gray-900">Add Document</h3>
           <button
             type="button"
-            class="inline-flex items-center gap-1 text-sm font-medium text-green-600 hover:text-green-700"
+            class="inline-flex items-center gap-1 text-sm font-medium text-brand-primary hover:text-brand-primary-hover"
             @click="addDocument"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -326,9 +326,9 @@ const selectClass = (field) =>
             v-for="(file, index) in documentFiles"
             :key="index"
             class="flex min-w-0 items-center gap-3 rounded-lg border px-4 py-3 shadow-sm"
-            :class="file ? 'border-green-300 bg-green-50' : 'border-gray-300 bg-white'"
+            :class="file ? 'border-brand-primary-muted bg-brand-primary-light' : 'border-gray-300 bg-white'"
           >
-            <div class="shrink-0" :class="file ? 'text-green-600' : 'text-gray-400'">
+            <div class="shrink-0" :class="file ? 'text-brand-primary' : 'text-gray-400'">
               <svg v-if="file" class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
@@ -337,10 +337,10 @@ const selectClass = (field) =>
               </svg>
             </div>
             <div class="min-w-0 flex-1">
-              <p class="text-sm font-medium truncate" :class="file ? 'text-green-800' : 'text-gray-900'">
+              <p class="text-sm font-medium truncate" :class="file ? 'text-brand-primary-hover' : 'text-gray-900'">
                 {{ file ? file.name : 'Additional Document' }}
               </p>
-              <p v-if="file" class="text-xs text-green-600 mt-0.5">{{ (file.size / 1024).toFixed(1) }} KB — File selected</p>
+              <p v-if="file" class="text-xs text-brand-primary mt-0.5">{{ (file.size / 1024).toFixed(1) }} KB — File selected</p>
               <p v-else class="text-xs text-gray-500">PDF, DOC, DOCX, EML. You can select multiple files.</p>
             </div>
             <div class="flex shrink-0 items-center gap-2">
@@ -351,7 +351,7 @@ const selectClass = (field) =>
                   accept=".pdf,.doc,.docx,.eml"
                   @change="onFileChange(index, $event)"
                 />
-                <span class="inline-flex items-center gap-1 rounded-lg border border-green-600 px-4 py-1.5 text-sm font-medium text-green-600 hover:bg-green-50">
+                <span class="inline-flex items-center gap-1 rounded-lg border border-brand-primary px-4 py-1.5 text-sm font-medium text-brand-primary hover:bg-brand-primary-light">
                   <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                   </svg>
@@ -377,7 +377,7 @@ const selectClass = (field) =>
         <div class="flex items-center gap-3">
           <button
             type="button"
-            class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+            class="rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover focus:ring-2 focus:ring-brand-primary focus:ring-offset-2"
             @click="reset"
           >
             Cancel
@@ -387,7 +387,7 @@ const selectClass = (field) =>
           <button
             type="button"
             :disabled="savingDraft"
-            class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-70"
+            class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 disabled:opacity-70"
             @click="saveDraft"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -398,7 +398,7 @@ const selectClass = (field) =>
         <button
           type="button"
           :disabled="submitting"
-          class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-70"
+          class="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-brand-primary-hover focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 disabled:opacity-70"
           @click="submit"
         >
           <span v-if="submitting" class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />

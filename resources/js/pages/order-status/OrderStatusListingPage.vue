@@ -4,7 +4,6 @@
  */
 import { ref, computed, onMounted } from 'vue'
 import clientsApi from '@/services/clientsApi'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import OrderStatusTable from '@/components/order-status/OrderStatusTable.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
@@ -363,51 +362,49 @@ onMounted(async () => {
     <div class="mx-auto max-w-[1600px] space-y-4">
       <!-- Heading first, then breadcrumb -->
       <div class="flex items-center gap-3">
-        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#B8E6D5]">
-          <svg class="h-6 w-6 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-primary-light">
+          <svg class="h-6 w-6 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
           </svg>
         </span>
         <div>
           <div class="flex items-center gap-2">
-            <h1 class="text-2xl font-bold text-gray-900 leading-tight">Order Status</h1>
-            <Breadcrumbs />
-          </div>
+            <h1 class="text-2xl font-bold text-gray-900 leading-tight">Order Status</h1>          </div>
           <p class="text-sm text-gray-500">Track and monitor order status by Activity, Account Number, or Work Order.</p>
         </div>
       </div>
 
       <!-- Filters card: Activity, Account Number, Work Order + Search, Clear, Advanced Filters, Customize Columns -->
       <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-        <div class="flex items-end gap-4 overflow-x-auto">
-          <div class="min-w-[140px] max-w-[200px] flex-1">
+        <div class="flex flex-wrap items-end gap-3">
+          <div class="w-full sm:min-w-[140px] sm:max-w-[200px] sm:flex-1">
             <label for="os-activity" class="mb-0.5 block text-xs text-gray-700">Activity</label>
             <input
               id="os-activity"
               v-model="filters.activity"
               type="text"
               placeholder="Activity..."
-              class="w-full rounded border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-700 placeholder-gray-400 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              class="w-full rounded border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
               :disabled="loading"
               @keyup.enter="applyFilters"
             />
           </div>
-          <div class="min-w-[140px] max-w-[200px] flex-1">
+          <div class="w-full sm:min-w-[140px] sm:max-w-[200px] sm:flex-1">
             <label for="os-account" class="mb-0.5 block text-xs text-gray-700">Account Number</label>
             <input
               id="os-account"
               v-model="filters.account_number"
               type="text"
               placeholder="Account number..."
-              class="w-full rounded border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-700 placeholder-gray-400 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              class="w-full rounded border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
               :disabled="loading"
               @keyup.enter="applyFilters"
             />
           </div>
-          <div class="ml-auto flex items-center gap-2 shrink-0">
+          <div class="flex flex-wrap items-center gap-2 sm:ml-auto">
             <button
               type="button"
-              class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+              class="inline-flex items-center rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover focus:ring-2 focus:ring-brand-primary disabled:opacity-50"
               :disabled="loading"
               @click="applyFilters"
             >
@@ -424,7 +421,7 @@ onMounted(async () => {
             >
               Clear
             </button>
-            <div class="flex items-center gap-2 shrink-0">
+            <div class="flex flex-wrap items-center gap-2">
             <button
               type="button"
               class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -457,7 +454,7 @@ onMounted(async () => {
                 v-model="filters[f.key]"
                 type="text"
                 :placeholder="f.placeholder"
-                class="w-full rounded border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-700 placeholder-gray-400 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="w-full rounded border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                 :disabled="loading"
                 @keyup.enter="applyFilters"
               />
@@ -512,7 +509,7 @@ onMounted(async () => {
               <span class="whitespace-nowrap font-medium">Number of rows</span>
               <select
                 :value="meta.per_page"
-                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                 @change="onPerPageChange"
               >
                 <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>

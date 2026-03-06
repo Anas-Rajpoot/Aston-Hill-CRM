@@ -85,12 +85,17 @@ class AttendanceLogApiController extends Controller
             }
         }
 
-        $total = $query->count();
+        // Cache count for 30s to avoid expensive COUNT(*) on every paginated request
+        $countCacheKey = 'attendance_count_' . md5(json_encode($validated));
+        $total = Cache::remember($countCacheKey, 30, function () use ($query) {
+            return (clone $query)->count();
+        });
         $items = $query->skip(($page - 1) * $perPage)->take($perPage)->get();
         $sessionIds = DB::table('sessions')->whereIn('id', $items->pluck('session_id')->filter()->values()->all())->pluck('id')->flip();
+        $dayAggregates = $this->computeDayAggregates($items);
 
-        $rows = $items->map(function (UserLoginLog $log) use ($sessionIds) {
-            return $this->formatRow($log, $sessionIds);
+        $rows = $items->map(function (UserLoginLog $log) use ($sessionIds, $dayAggregates) {
+            return $this->formatRow($log, $sessionIds, $dayAggregates);
         });
 
         $lastPage = $total > 0 ? (int) ceil($total / $perPage) : 1;
@@ -236,7 +241,7 @@ class AttendanceLogApiController extends Controller
         }
     }
 
-    private function formatRow(UserLoginLog $log, $sessionIds): array
+    private function formatRow(UserLoginLog $log, $sessionIds, array $dayAggregates = []): array
     {
         $user = $log->user;
         $loginAt = $log->login_at;
@@ -278,6 +283,12 @@ class AttendanceLogApiController extends Controller
             }
         }
 
+        // Day-level aggregates: first login & last logout for this user on this date
+        $dateKey = $log->user_id . '_' . ($loginAt ? $loginAt->toDateString() : '');
+        $agg = $dayAggregates[$dateKey] ?? null;
+        $firstLoginTime = $agg && $agg->first_login ? \Carbon\Carbon::parse($agg->first_login)->format('H:i:s') : '—';
+        $lastLogoutTime = $agg && $agg->last_logout ? \Carbon\Carbon::parse($agg->last_logout)->format('H:i:s') : null;
+
         return [
             'id' => $log->id,
             'user_id' => $log->user_id,
@@ -288,10 +299,41 @@ class AttendanceLogApiController extends Controller
             'login_date' => $loginDate,
             'login_time' => $loginTime,
             'logout_time' => $logoutTime,
+            'first_login_time' => $firstLoginTime,
+            'last_logout_time' => $lastLogoutTime,
             'duration_text' => $durationText,
             'duration_state' => $durationState ?? 'normal',
             'status' => $status,
         ];
+    }
+
+    /**
+     * Compute first login and last logout per user per day for items on the current page.
+     * Returns associative array keyed by "{user_id}_{date}".
+     */
+    private function computeDayAggregates($items): array
+    {
+        $userIds = $items->pluck('user_id')->unique()->values()->all();
+        $dates = $items->map(fn ($l) => $l->login_at ? $l->login_at->toDateString() : null)
+                       ->filter()->unique()->values()->all();
+
+        if (empty($userIds) || empty($dates)) {
+            return [];
+        }
+
+        $rows = DB::table('user_login_logs')
+            ->selectRaw('user_id, DATE(login_at) as login_date, MIN(login_at) as first_login, MAX(logout_at) as last_logout')
+            ->whereIn('user_id', $userIds)
+            ->whereIn(DB::raw('DATE(login_at)'), $dates)
+            ->groupByRaw('user_id, DATE(login_at)')
+            ->get();
+
+        $map = [];
+        foreach ($rows as $row) {
+            $map[$row->user_id . '_' . $row->login_date] = $row;
+        }
+
+        return $map;
     }
 
     private function durationBetween($start, $end): string

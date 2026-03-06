@@ -2,6 +2,8 @@
 
 namespace App\Repositories;
 
+use App\Models\User;
+use App\Services\TeamHierarchyService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
@@ -12,8 +14,9 @@ class ClientRepository
      *
      * @param  array<string,mixed>  $params
      * @param  array<int,string>  $columns
+     * @param  User|null  $user  When provided, applies role-based visibility
      */
-    public function list(array $params, array $columns = []): LengthAwarePaginator
+    public function list(array $params, array $columns = [], ?User $user = null): LengthAwarePaginator
     {
         $this->applyQueryTimeoutGuard();
 
@@ -29,6 +32,11 @@ class ClientRepository
             ->leftJoin('users as sa', 'sa.id', '=', 'c.sales_agent_id')
             ->leftJoin('users as cr', 'cr.id', '=', 'c.created_by')
             ->leftJoin('client_company_details as cd', 'cd.client_id', '=', 'c.id');
+
+        // Apply user-based visibility scope
+        if ($user) {
+            $this->applyUserVisibility($query, $user);
+        }
 
         $selects = $this->resolveSelectColumns($columns);
         $query->select($selects);
@@ -222,6 +230,49 @@ class ClientRepository
         } catch (\Throwable $e) {
             // Not all DB engines support this statement.
         }
+    }
+
+    /**
+     * Apply role-based visibility filtering:
+     * - superadmin / admin: see all
+     * - manager: see clients where they are manager, or team members are assigned
+     * - team_leader: see clients assigned to their team members or themselves
+     * - CSR / sales_agent: see only clients assigned to them (sales_agent, created_by, csr_name columns)
+     */
+    private function applyUserVisibility($query, User $user): void
+    {
+        // Superadmin and admin see everything
+        if ($user->hasRole('superadmin') || $user->hasRole('admin')) {
+            return;
+        }
+
+        // Get visible user IDs through team hierarchy
+        $visibleUserIds = TeamHierarchyService::getVisibleUserIds($user);
+        if (! in_array((int) $user->id, $visibleUserIds, true)) {
+            $visibleUserIds[] = (int) $user->id;
+        }
+        $visibleUserIds = array_values(array_unique(array_map('intval', $visibleUserIds)));
+
+        if (empty($visibleUserIds)) {
+            $query->whereRaw('1 = 0');
+            return;
+        }
+
+        $query->where(function ($q) use ($visibleUserIds, $user) {
+            $q->whereIn('c.created_by', $visibleUserIds)
+              ->orWhereIn('c.sales_agent_id', $visibleUserIds)
+              ->orWhereIn('c.team_leader_id', $visibleUserIds)
+              ->orWhereIn('c.manager_id', $visibleUserIds)
+              ->orWhereIn('c.account_manager_id', $visibleUserIds);
+
+            // Also match by CSR name columns
+            $userName = $user->name;
+            if ($userName) {
+                $q->orWhere('c.csr_name_1', $userName)
+                  ->orWhere('c.csr_name_2', $userName)
+                  ->orWhere('c.csr_name_3', $userName);
+            }
+        });
     }
 }
 

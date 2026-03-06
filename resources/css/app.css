@@ -3,8 +3,92 @@
 @tailwind utilities;
 
 :root{
-  --brand-primary: 34 197 94;
-  --brand-dark: 15 23 42;
-  --brand-bg: 248 250 252;
-  --brand-text: 15 23 42;
+  /* ── Brand palette (RGB triplets for Tailwind alpha support) ── */
+  --brand-primary:    34 197 94;     /* green-500: sidebar active, buttons, icons */
+  --brand-primary-hover: 22 163 74;  /* green-600: button hover, strong accents */
+  --brand-primary-dark:  21 128 61;  /* green-700: pressed state */
+  --brand-primary-light: 240 253 244; /* green-50: tinted backgrounds, card accents */
+  --brand-primary-muted: 187 247 208; /* green-200: subtle borders, highlights */
+
+  /* ── Sidebar / chrome ── */
+  --sidebar-bg:       17 24 39;      /* gray-900: sidebar background */
+  --sidebar-hover:    31 41 55;      /* gray-800: sidebar hover state */
+  --sidebar-border:   55 65 81;      /* gray-700: sidebar dividers */
+  --sidebar-text:     156 163 175;   /* gray-400: inactive nav text */
+  --sidebar-active-bg: 34 197 94;    /* green-500 at 15% opacity via Tailwind */
+
+  /* ── Content area ── */
+  --brand-dark:       15 23 42;      /* slate-900: headings, text */
+  --brand-bg:         249 250 251;   /* gray-50: page background */
+  --brand-text:       15 23 42;      /* slate-900: body text */
+  --brand-surface:    255 255 255;   /* white: card surfaces */
+  --brand-border:     229 231 235;   /* gray-200: card borders */
+  --brand-muted-text: 107 114 128;   /* gray-500: secondary text */
+
+  /* ── Table header (neon green) ── */
+  --neon-green: #22C55E;             /* matches brand-primary for unified look */
+
+  /* ── Status semantic colors ── */
+  --status-success: 34 197 94;
+  --status-warning: 245 158 11;
+  --status-danger:  239 68 68;
+  --status-info:    59 130 246;
 }
+
+/* ── Utility classes for the theme ── */
+@layer components {
+  /* Primary action button */
+  .btn-primary {
+    @apply inline-flex items-center gap-2 rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white shadow-sm
+           hover:bg-brand-primary-hover active:bg-brand-primary-dark
+           disabled:opacity-50 disabled:cursor-not-allowed transition-colors;
+  }
+
+  /* Secondary / outline button */
+  .btn-secondary {
+    @apply inline-flex items-center gap-2 rounded-lg border border-brand-border bg-white px-4 py-2 text-sm font-medium text-gray-700
+           hover:bg-gray-50 active:bg-gray-100
+           disabled:opacity-50 disabled:cursor-not-allowed transition-colors;
+  }
+
+  /* Danger button */
+  .btn-danger {
+    @apply inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm
+           hover:bg-red-700 active:bg-red-800
+           disabled:opacity-50 disabled:cursor-not-allowed transition-colors;
+  }
+
+  /* Standard card container */
+  .theme-card {
+    @apply rounded-xl border border-brand-border bg-white shadow-sm;
+  }
+
+  /* Brand green table header row (white text) */
+  .table-header-green {
+    @apply bg-brand-primary border-b-2 border-green-700 text-white;
+  }
+
+  /* Brand green solid table header (for summary tables) */
+  .table-header-solid {
+    @apply bg-brand-primary text-white;
+  }
+
+  /* Standard form input focus ring */
+  .input-focus {
+    @apply focus:border-brand-primary focus:ring-brand-primary;
+  }
+
+  /* Toggle switch - on state */
+  .toggle-on {
+    @apply bg-brand-primary;
+  }
+
+  /* KPI stat card with green top border */
+  .stat-card {
+    @apply rounded-xl border border-brand-border bg-white p-4 shadow-sm border-t-4 border-t-brand-primary;
+  }
+
+  /* Page container */
+  .page-container {
+    @apply bg-brand-bg -mx-4 -my-5 min-h-full px-4 sm:px-6 py-6 space-y-6;
+  }}

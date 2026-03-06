@@ -147,7 +147,7 @@ onBeforeUnmount(() => {
           <!-- Body -->
           <div class="flex-1 min-h-0 overflow-y-auto bg-gray-50/30 px-6 py-5 space-y-5">
             <div v-if="loading" class="flex items-center justify-center py-12">
-              <svg class="h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+              <svg class="h-8 w-8 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
@@ -172,7 +172,7 @@ onBeforeUnmount(() => {
                     <dd class="mt-0.5">
                       <span
                         class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                        :class="expense.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'"
+                        :class="expense.status === 'approved' ? 'bg-brand-primary-light text-brand-primary-hover' : 'bg-amber-100 text-amber-800'"
                       >
                         {{ statusLabel(expense.status) }}
                       </span>
@@ -232,7 +232,7 @@ onBeforeUnmount(() => {
                   <div class="border-t border-gray-200 my-2" />
                   <div class="flex items-center justify-between py-2">
                     <span class="text-sm font-bold text-gray-900">Total Amount</span>
-                    <span class="text-base font-bold text-green-600">
+                    <span class="text-base font-bold text-brand-primary">
                       {{ expense.full_amount != null ? 'AED ' + Number(expense.full_amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—' }}
                     </span>
                   </div>
@@ -253,7 +253,7 @@ onBeforeUnmount(() => {
                         :href="attachmentUrl(att)"
                         target="_blank"
                         rel="noopener noreferrer"
-                        class="block overflow-hidden rounded-lg border border-gray-200 bg-gray-50 hover:border-green-400 transition-colors"
+                        class="block overflow-hidden rounded-lg border border-gray-200 bg-gray-50 hover:border-brand-primary transition-colors"
                       >
                         <img
                           :src="imageSrc(att)"
@@ -275,7 +275,7 @@ onBeforeUnmount(() => {
                         :key="'doc-' + idx"
                         class="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3"
                       >
-                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-50 text-green-600">
+                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-primary-light text-brand-primary">
                           <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                           </svg>

@@ -7,7 +7,6 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import api from '@/lib/axios'
 import fieldSubmissionsApi from '@/services/fieldSubmissionsApi'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import { toDdMonYyyyLower } from '@/lib/dateFormat'
 import { useAuthStore } from '@/stores/auth'
@@ -283,9 +282,9 @@ function formatDate(d) {
 
 function statusBadgeClass(status) {
   const s = (status || '').toLowerCase()
-  if (s.includes('completed') || s === 'visited') return 'bg-green-100 text-green-800'
+  if (s.includes('completed') || s === 'visited') return 'bg-brand-primary-light text-brand-primary-hover'
   if (s === 'cancelled') return 'bg-red-100 text-red-800'
-  if (s === 'scheduled' || s.includes('scheduled')) return 'bg-blue-100 text-blue-800'
+  if (s === 'scheduled' || s.includes('scheduled')) return 'bg-brand-primary-light text-brand-primary-hover'
   if (s === 'rescheduled' || s.includes('follow')) return 'bg-amber-100 text-amber-800'
   return 'bg-gray-100 text-gray-700'
 }
@@ -294,7 +293,7 @@ function slaBadgeClass(slaStatus) {
   const s = (slaStatus || '').toLowerCase()
   if (s.includes('breach')) return 'bg-red-100 text-red-800'
   if (s.includes('approach')) return 'bg-amber-100 text-amber-800'
-  return 'bg-green-100 text-green-800'
+  return 'bg-brand-primary-light text-brand-primary-hover'
 }
 
 function cellValue(row, key) {
@@ -307,8 +306,8 @@ function cellValue(row, key) {
 }
 
 /* ───── Chart computed ───── */
-const statusBarColors = ['bg-emerald-500', 'bg-blue-500', 'bg-amber-500', 'bg-red-500', 'bg-purple-500', 'bg-cyan-500']
-const agentBarColors = ['bg-emerald-500', 'bg-blue-500', 'bg-amber-500', 'bg-indigo-500', 'bg-rose-500']
+const statusBarColors = ['bg-brand-primary', 'bg-sky-500', 'bg-amber-500', 'bg-red-500', 'bg-purple-500', 'bg-cyan-500']
+const agentBarColors = ['bg-brand-primary', 'bg-sky-500', 'bg-amber-500', 'bg-indigo-500', 'bg-rose-500']
 
 const maxStatusCount = computed(() => Math.max(1, ...(stats.value.by_status || []).map((s) => s.count)))
 const maxAgentCount = computed(() => Math.max(1, ...(stats.value.by_agent_workload || []).map((a) => a.count)))
@@ -376,16 +375,14 @@ onMounted(async () => {
     <div class="flex flex-wrap items-start justify-between gap-4">
       <div>
         <div class="flex flex-wrap items-baseline gap-2">
-          <h1 class="text-2xl font-bold text-gray-900">Field Operations Reports</h1>
-          <Breadcrumbs />
-        </div>
+          <h1 class="text-2xl font-bold text-gray-900">Field Operations Reports</h1>        </div>
         <p class="text-sm text-gray-500 mt-1">Track field meetings, agent workload, and completion rates.</p>
       </div>
       <div class="flex gap-2">
         <button
           v-if="canExport"
           type="button"
-          class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-70 disabled:cursor-wait"
+          class="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70 disabled:cursor-wait"
           :disabled="exportLoading"
           @click="exportExcel"
         >
@@ -408,7 +405,7 @@ onMounted(async () => {
             <p class="text-sm text-gray-300">Total Field Requests</p>
             <p class="text-2xl font-bold mt-1">{{ statsLoading ? '…' : stats.total_requests.toLocaleString() }}</p>
           </div>
-          <div class="rounded-full bg-emerald-500/20 p-2">
+          <div class="rounded-full bg-brand-primary/20 p-2">
             <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
           </div>
         </div>
@@ -419,7 +416,7 @@ onMounted(async () => {
             <p class="text-sm text-gray-300">Meetings Completed</p>
             <p class="text-2xl font-bold mt-1">{{ statsLoading ? '…' : stats.meetings_completed.toLocaleString() }}</p>
           </div>
-          <div class="rounded-full bg-emerald-500/20 p-2">
+          <div class="rounded-full bg-brand-primary/20 p-2">
             <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           </div>
         </div>
@@ -441,7 +438,7 @@ onMounted(async () => {
             <p class="text-sm text-gray-300">Follow-ups</p>
             <p class="text-2xl font-bold mt-1">{{ statsLoading ? '…' : stats.follow_ups.toLocaleString() }}</p>
           </div>
-          <div class="rounded-full bg-blue-500/20 p-2">
+          <div class="rounded-full bg-brand-primary/20 p-2">
             <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
           </div>
         </div>
@@ -501,7 +498,7 @@ onMounted(async () => {
           <div v-for="m in (stats.completion_rate_by_month || []).slice(-6)" :key="m.label" class="flex items-center gap-3">
             <span class="w-20 text-sm text-gray-600">{{ m.label }}</span>
             <div class="flex-1 h-6 bg-gray-100 rounded-full overflow-hidden">
-              <div class="h-full bg-emerald-500 rounded-full transition-all duration-500" :style="{ width: (m.pct || 0) + '%' }" />
+              <div class="h-full bg-brand-primary rounded-full transition-all duration-500" :style="{ width: (m.pct || 0) + '%' }" />
             </div>
             <span class="text-sm font-semibold text-gray-900 w-12 text-right">{{ m.pct }}%</span>
           </div>
@@ -515,19 +512,19 @@ onMounted(async () => {
       <div class="flex flex-wrap items-end gap-4">
         <div>
           <label class="block text-xs font-medium text-gray-500 mb-1">Status</label>
-          <select v-model="filters.status" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-44 focus:ring-green-500 focus:border-green-500">
+          <select v-model="filters.status" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-44 focus:ring-brand-primary focus:border-brand-primary">
             <option value="">All Status</option>
             <option v-for="s in filterOptions.statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
           </select>
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-500 mb-1">Emirates</label>
-          <select v-model="filters.emirates" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-44 focus:ring-green-500 focus:border-green-500">
+          <select v-model="filters.emirates" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-44 focus:ring-brand-primary focus:border-brand-primary">
             <option value="">All Emirates</option>
             <option v-for="e in filterOptions.emirates" :key="e.value" :value="e.value">{{ e.label }}</option>
           </select>
         </div>
-        <button type="button" class="ml-auto rounded-lg bg-green-600 px-5 py-2 text-sm font-medium text-white hover:bg-green-700" @click="applyFilters">Apply</button>
+        <button type="button" class="ml-auto rounded-lg bg-brand-primary px-5 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover" @click="applyFilters">Apply</button>
         <button type="button" class="rounded-lg border border-gray-300 bg-white px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="resetFilters">Reset</button>
         <div class="flex items-center gap-2">
           <button
@@ -537,7 +534,7 @@ onMounted(async () => {
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
             Advanced Filters
-            <span v-if="activeFilterCount > 0" class="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-600 text-[10px] font-bold text-white">{{ activeFilterCount }}</span>
+            <span v-if="activeFilterCount > 0" class="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-brand-primary text-[10px] font-bold text-white">{{ activeFilterCount }}</span>
           </button>
           <button
             type="button"
@@ -555,23 +552,23 @@ onMounted(async () => {
         <div class="flex flex-wrap items-end gap-4">
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Date From</label>
-            <input v-model="filters.from" type="date" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-40 focus:ring-green-500 focus:border-green-500" />
+            <input v-model="filters.from" type="date" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-40 focus:ring-brand-primary focus:border-brand-primary" />
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Date To</label>
-            <input v-model="filters.to" type="date" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-40 focus:ring-green-500 focus:border-green-500" />
+            <input v-model="filters.to" type="date" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-40 focus:ring-brand-primary focus:border-brand-primary" />
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Submitted From</label>
-            <input v-model="filters.submitted_from" type="date" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-40 focus:ring-green-500 focus:border-green-500" />
+            <input v-model="filters.submitted_from" type="date" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-40 focus:ring-brand-primary focus:border-brand-primary" />
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Submitted To</label>
-            <input v-model="filters.submitted_to" type="date" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-40 focus:ring-green-500 focus:border-green-500" />
+            <input v-model="filters.submitted_to" type="date" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-40 focus:ring-brand-primary focus:border-brand-primary" />
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Field Agent ID</label>
-            <input v-model="filters.field_executive_id" type="text" placeholder="Agent ID" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-36 focus:ring-green-500 focus:border-green-500" />
+            <input v-model="filters.field_executive_id" type="text" placeholder="Agent ID" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-36 focus:ring-brand-primary focus:border-brand-primary" />
           </div>
         </div>
       </div>
@@ -588,22 +585,22 @@ onMounted(async () => {
       <!-- Table -->
       <div class="overflow-x-auto">
         <table class="min-w-full">
-          <thead class="bg-white">
+          <thead class="bg-brand-primary border-b-2 border-green-700">
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b-2 border-black">#</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider border-b-2 border-black">#</th>
               <th
                 v-for="col in activeColumns"
                 :key="col.key"
-                class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-50 transition-colors border-b-2 border-black"
+                class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider cursor-pointer select-none hover:bg-white/10 transition-colors border-b-2 border-black"
                 @click="onSort(col.key)"
               >
                 <div class="flex items-center gap-1">
                   <span>{{ col.label }}</span>
-                  <span v-if="sort === col.key" class="text-green-600">
+                  <span v-if="sort === col.key" class="text-white">
                     <svg v-if="order === 'asc'" class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
                     <svg v-else class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                   </span>
-                  <span v-else class="text-gray-300">
+                  <span v-else class="text-white/40">
                     <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
                   </span>
                 </div>
@@ -667,7 +664,7 @@ onMounted(async () => {
             <span class="whitespace-nowrap font-medium">Number of rows</span>
             <select
               :value="tableMeta.per_page"
-              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
               @change="onPerPageChange"
             >
               <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>

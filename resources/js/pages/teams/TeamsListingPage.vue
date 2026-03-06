@@ -9,9 +9,9 @@ import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/lib/axios'
 import teamsApi from '@/services/teamsApi'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import Toast from '@/components/Toast.vue'
+import DeleteOtpModal from '@/components/DeleteOtpModal.vue'
 import { canModuleAction } from '@/lib/accessControl'
 import { formatUserDate } from '@/lib/dateFormat'
 
@@ -34,6 +34,8 @@ const canCreate = computed(() => canModuleAction(auth.user, 'teams', 'create'))
 const canEdit = computed(() => canModuleAction(auth.user, 'teams', 'edit'))
 const canDelete = computed(() => canModuleAction(auth.user, 'teams', 'delete'))
 const canViewAction = computed(() => canModuleAction(auth.user, 'teams', 'view'))
+const canImport = computed(() => canModuleAction(auth.user, 'teams', 'create'))
+const canExport = computed(() => canModuleAction(auth.user, 'teams', 'view'))
 const hasSelectionColumn = computed(() => canDelete.value || canEdit.value)
 const hasAnyRowAction = computed(() => canViewAction.value || canEdit.value || canDelete.value)
 
@@ -262,7 +264,7 @@ async function executeDelete() {
 
 /* ───── Format helpers ───── */
 function statusBadgeClass(status) {
-  return status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+  return status === 'active' ? 'bg-brand-primary-light text-brand-primary-hover' : 'bg-red-100 text-red-800'
 }
 
 function formatDate(d) {
@@ -278,6 +280,91 @@ function cellValue(row, key) {
 function initials(name) {
   if (!name) return '?'
   return name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2)
+}
+
+/* ───── Export / Import / Template ───── */
+const exportLoading = ref(false)
+const importLoading = ref(false)
+const csvFileInput = ref(null)
+
+const EXPORT_HEADERS = ['Team Name', 'Description', 'Manager', 'Team Leader', 'Department', 'Status', 'Max Members', 'Members', 'Created']
+const IMPORT_HEADERS = ['Team Name', 'Description', 'Department', 'Status', 'Max Members']
+
+function csvEscape(v) {
+  if (v == null) return ''
+  const s = String(v)
+  return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s
+}
+
+async function onExport() {
+  if (!canExport.value || exportLoading.value) return
+  exportLoading.value = true
+  try {
+    const data = await teamsApi.index({ ...params.value, page: 1, per_page: 5000 })
+    const rows = data.data ?? []
+    const lines = [EXPORT_HEADERS.map(csvEscape).join(',')]
+    for (const r of rows) {
+      lines.push([
+        r.name, r.description || '', r.manager || '', r.team_leader || '',
+        r.department || '', r.status || '', r.max_members ?? '', r.members_count ?? '', formatDate(r.created_at),
+      ].map(csvEscape).join(','))
+    }
+    const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = 'teams-export.csv'; a.click()
+    URL.revokeObjectURL(url)
+  } catch { toast('error', 'Export failed.') } finally { exportLoading.value = false }
+}
+
+function downloadTemplate() {
+  if (!canImport.value) return
+  const sample1 = ['Sales Team A', 'Handles inbound sales', 'Sales', 'active', '10']
+  const sample2 = ['Support Team B', 'Customer support unit', 'Support', 'active', '15']
+  const csv = [IMPORT_HEADERS, sample1, sample2].map((r) => r.map(csvEscape).join(',')).join('\r\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = 'teams-import-template.csv'; a.click()
+  URL.revokeObjectURL(url)
+}
+
+function triggerImport() {
+  if (!canImport.value) return
+  csvFileInput.value?.click()
+}
+
+async function onCsvChange(e) {
+  const file = e.target?.files?.[0]
+  if (!file) return
+  importLoading.value = true
+  try {
+    const text = await file.text()
+    const lines = text.split(/\r?\n/).filter((l) => l.trim())
+    if (lines.length < 2) { toast('error', 'CSV must have a header row and at least one data row.'); return }
+    const headerLine = lines[0].toLowerCase()
+    if (!headerLine.includes('team name')) { toast('error', 'Invalid CSV format. First column must be "Team Name".'); return }
+    let created = 0; let skipped = 0
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',').map((c) => c.replace(/^"|"$/g, '').trim())
+      if (!cols[0]) { skipped++; continue }
+      try {
+        await teamsApi.store({
+          name: cols[0],
+          description: cols[1] || null,
+          department: cols[2] || null,
+          status: ['active', 'inactive'].includes(cols[3]?.toLowerCase()) ? cols[3].toLowerCase() : 'active',
+          max_members: cols[4] ? parseInt(cols[4], 10) || null : null,
+        })
+        created++
+      } catch { skipped++ }
+    }
+    toast('success', `Import complete: ${created} created, ${skipped} skipped.`)
+    loadTable()
+  } catch { toast('error', 'Failed to read CSV file.') } finally {
+    importLoading.value = false
+    if (csvFileInput.value) csvFileInput.value.value = ''
+  }
 }
 
 /* ───── Load user table preference ───── */
@@ -309,20 +396,51 @@ onMounted(async () => {
     <div class="flex flex-wrap items-start justify-between gap-4">
       <div>
         <div class="flex items-center gap-2">
-          <h1 class="text-2xl font-bold text-gray-900">Teams Management</h1>
-          <Breadcrumbs />
-        </div>
+          <h1 class="text-2xl font-bold text-gray-900">Teams Management</h1>        </div>
         <p class="text-sm text-gray-500 mt-1">Manage teams, assign members, and organize your workforce.</p>
       </div>
-      <button
-        v-if="canCreate"
-        type="button"
-        class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-green-700 transition-colors"
-        @click="router.push('/teams/create')"
-      >
-        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-        Create Team
-      </button>
+      <div class="flex flex-nowrap items-center gap-2 overflow-x-auto">
+        <input ref="csvFileInput" type="file" accept=".csv" class="hidden" @change="onCsvChange" />
+        <button
+          v-if="canExport"
+          type="button"
+          class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          :disabled="exportLoading"
+          @click="onExport"
+        >
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+          {{ exportLoading ? 'Exporting…' : 'Export CSV' }}
+        </button>
+        <button
+          v-if="canImport"
+          type="button"
+          class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          :disabled="importLoading"
+          @click="downloadTemplate"
+        >
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+          Download Template
+        </button>
+        <button
+          v-if="canImport"
+          type="button"
+          class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          :disabled="importLoading"
+          @click="triggerImport"
+        >
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+          {{ importLoading ? 'Importing…' : 'Import CSV' }}
+        </button>
+        <button
+          v-if="canCreate"
+          type="button"
+          class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg bg-brand-primary px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-brand-primary-hover transition-colors"
+          @click="router.push('/teams/create')"
+        >
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+          Create Team
+        </button>
+      </div>
     </div>
 
     <!-- Stats Cards -->
@@ -333,7 +451,7 @@ onMounted(async () => {
             <p class="text-sm text-gray-300">Total Teams</p>
             <p class="text-2xl font-bold mt-1">{{ stats.total }}</p>
           </div>
-          <div class="rounded-full bg-emerald-500/20 p-3">
+          <div class="rounded-full bg-brand-primary/20 p-3">
             <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
           </div>
         </div>
@@ -344,7 +462,7 @@ onMounted(async () => {
             <p class="text-sm text-gray-300">Active</p>
             <p class="text-2xl font-bold mt-1">{{ stats.active }}</p>
           </div>
-          <div class="rounded-full bg-green-500/20 p-3">
+          <div class="rounded-full bg-brand-primary/20 p-3">
             <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           </div>
         </div>
@@ -368,13 +486,13 @@ onMounted(async () => {
         <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
         </span>
-        <input v-model="searchQ" type="text" placeholder="Search by name, description, department…" class="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-4 text-sm focus:border-green-500 focus:ring-green-500" @keydown.enter="applySearch" />
+        <input v-model="searchQ" type="text" placeholder="Search by name, description, department…" class="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-4 text-sm focus:border-brand-primary focus:ring-brand-primary" @keydown.enter="applySearch" />
       </div>
 
       <button type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50" @click="filtersVisible = !filtersVisible">
         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
         Advanced Filters
-        <span v-if="activeFilterCount" class="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-600 text-[10px] font-bold text-white">{{ activeFilterCount }}</span>
+        <span v-if="activeFilterCount" class="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-brand-primary text-[10px] font-bold text-white">{{ activeFilterCount }}</span>
       </button>
 
       <button type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50" @click="columnModalVisible = true">
@@ -386,7 +504,7 @@ onMounted(async () => {
       <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0 translate-x-2" enter-to-class="opacity-100 translate-x-0" leave-active-class="transition ease-in duration-100" leave-from-class="opacity-100" leave-to-class="opacity-0">
         <div v-if="selectedIds.length" class="flex items-center gap-2 ml-auto">
           <span class="text-sm text-gray-600 font-medium">{{ selectedIds.length }} selected</span>
-          <button v-if="canEdit" type="button" class="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700" :disabled="bulkLoading" @click="bulkSetStatus('active')">Activate</button>
+          <button v-if="canEdit" type="button" class="rounded-lg bg-brand-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-primary-hover" :disabled="bulkLoading" @click="bulkSetStatus('active')">Activate</button>
           <button v-if="canEdit" type="button" class="rounded-lg bg-yellow-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-yellow-600" :disabled="bulkLoading" @click="bulkSetStatus('inactive')">Deactivate</button>
           <button v-if="canDelete" type="button" class="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700" :disabled="bulkLoading" @click="bulkDeleteSelected">Delete</button>
         </div>
@@ -398,40 +516,40 @@ onMounted(async () => {
       <div v-if="filtersVisible" class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <div class="flex items-center justify-between mb-3">
           <h3 class="text-sm font-semibold text-gray-900">Advanced Filters</h3>
-          <button type="button" class="text-sm text-green-600 hover:text-green-700 font-medium" @click="resetFilters">Reset All</button>
+          <button type="button" class="text-sm text-brand-primary hover:text-brand-primary-hover font-medium" @click="resetFilters">Reset All</button>
         </div>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Status</label>
-            <select v-model="filters.status" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-green-500 focus:border-green-500">
+            <select v-model="filters.status" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-brand-primary focus:border-brand-primary">
               <option value="">All Statuses</option>
               <option v-for="s in filterOptions.statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
             </select>
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Department</label>
-            <select v-model="filters.department" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-green-500 focus:border-green-500">
+            <select v-model="filters.department" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-brand-primary focus:border-brand-primary">
               <option value="">All Departments</option>
               <option v-for="d in filterOptions.departments" :key="d.value" :value="d.value">{{ d.label }}</option>
             </select>
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Manager</label>
-            <select v-model="filters.manager_id" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-green-500 focus:border-green-500">
+            <select v-model="filters.manager_id" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-brand-primary focus:border-brand-primary">
               <option value="">All Managers</option>
               <option v-for="m in filterOptions.managers" :key="m.id" :value="m.id">{{ m.name }}</option>
             </select>
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Team Leader</label>
-            <select v-model="filters.team_leader_id" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-green-500 focus:border-green-500">
+            <select v-model="filters.team_leader_id" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-brand-primary focus:border-brand-primary">
               <option value="">All Team Leaders</option>
               <option v-for="tl in filterOptions.team_leaders" :key="tl.id" :value="tl.id">{{ tl.name }}</option>
             </select>
           </div>
         </div>
         <div class="flex justify-end mt-3">
-          <button type="button" class="rounded-lg bg-green-600 px-5 py-2 text-sm font-medium text-white hover:bg-green-700" @click="applyFilters">Apply Filters</button>
+          <button type="button" class="rounded-lg bg-brand-primary px-5 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover" @click="applyFilters">Apply Filters</button>
         </div>
       </div>
     </Transition>
@@ -446,7 +564,7 @@ onMounted(async () => {
           aria-busy="true"
         >
           <div class="flex flex-col items-center gap-2">
-            <svg class="h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+            <svg class="h-8 w-8 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
@@ -455,9 +573,9 @@ onMounted(async () => {
         </div>
         <table class="min-w-full border-2 border-black border-collapse">
           <thead>
-            <tr class="border-b-2 border-black bg-green-600">
-              <th v-if="hasSelectionColumn" class="w-10 px-3 py-3 text-left">
-                <input type="checkbox" v-model="allSelected" class="rounded border-gray-300 text-green-600 focus:ring-green-500" />
+            <tr class="bg-brand-primary border-b-2 border-green-700">
+              <th v-if="hasSelectionColumn" class="w-10 px-3 py-3">
+                <input type="checkbox" v-model="allSelected" class="rounded border-gray-300 text-brand-primary focus:ring-brand-primary" />
               </th>
               <th
                 v-for="col in activeColumns"
@@ -485,7 +603,7 @@ onMounted(async () => {
             </tr>
             <tr v-for="(row, rowIndex) in tableData" :key="row.id" class="border-b border-black bg-white hover:bg-gray-50/50">
               <td v-if="hasSelectionColumn" class="w-10 px-3 py-3">
-                <input type="checkbox" :value="row.id" v-model="selectedIds" class="rounded border-gray-300 text-green-600 focus:ring-green-500" />
+                <input type="checkbox" :value="row.id" v-model="selectedIds" class="rounded border-gray-300 text-brand-primary focus:ring-brand-primary" />
               </td>
               <td v-for="col in activeColumns" :key="col.key" class="whitespace-nowrap px-4 py-3 text-sm text-gray-900">
                 <template v-if="col.key === 'sr'">
@@ -493,7 +611,7 @@ onMounted(async () => {
                 </template>
                 <!-- Team Name: clickable link -->
                 <template v-else-if="col.key === 'name'">
-                  <router-link :to="`/teams/${row.id}`" class="font-medium text-green-600 hover:text-green-700 hover:underline">{{ row.name || '—' }}</router-link>
+                  <router-link :to="`/teams/${row.id}`" class="font-medium text-brand-primary hover:text-brand-primary-hover hover:underline">{{ row.name || '—' }}</router-link>
                 </template>
 
                 <!-- Status badge -->
@@ -514,7 +632,7 @@ onMounted(async () => {
 
                 <!-- Department badge -->
                 <template v-else-if="col.key === 'department'">
-                  <span v-if="row.department" class="inline-flex rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-xs font-medium text-blue-700">{{ row.department }}</span>
+                  <span v-if="row.department" class="inline-flex rounded-full bg-brand-primary-light border border-brand-primary-muted px-2.5 py-0.5 text-xs font-medium text-brand-primary-hover">{{ row.department }}</span>
                   <span v-else class="text-gray-400">—</span>
                 </template>
 
@@ -538,7 +656,7 @@ onMounted(async () => {
                   <router-link
                     v-if="canViewAction"
                     :to="`/teams/${row.id}`"
-                    class="rounded-full p-1.5 text-blue-600 hover:bg-blue-50"
+                    class="rounded-full p-1.5 text-brand-primary hover:bg-brand-primary-light"
                     title="View details"
                   >
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -549,7 +667,7 @@ onMounted(async () => {
                   <router-link
                     v-if="canEdit"
                     :to="`/teams/${row.id}/edit`"
-                    class="rounded-full p-1.5 text-green-600 hover:bg-green-50"
+                    class="rounded-full p-1.5 text-brand-primary hover:bg-brand-primary-light"
                     title="Edit team"
                   >
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -587,7 +705,7 @@ onMounted(async () => {
             <span class="whitespace-nowrap font-medium">Number of rows</span>
             <select
               :value="tableMeta.per_page"
-              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
               @change="onPerPageChange"
             >
               <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
@@ -625,26 +743,15 @@ onMounted(async () => {
       @save="onSaveColumns"
     />
 
-    <!-- Delete Confirmation Modal -->
-    <Teleport to="body">
-      <Transition name="modal">
-        <div v-if="deleteModal.visible" class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50" @click.self="deleteModal.visible = false">
-          <div class="rounded-xl bg-white shadow-xl max-w-sm w-full p-6" @click.stop>
-            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 mb-4">
-              <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-            </div>
-            <h3 class="text-lg font-semibold text-gray-900 text-center">Delete Team</h3>
-            <p class="mt-2 text-sm text-gray-600 text-center">Are you sure you want to delete <strong>{{ deleteModal.team?.name }}</strong>? This cannot be undone.</p>
-            <div class="flex justify-end gap-3 mt-6">
-              <button type="button" class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" @click="deleteModal.visible = false">Cancel</button>
-              <button type="button" class="rounded-lg bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700 disabled:opacity-50" :disabled="deleteModal.loading" @click="executeDelete">
-                {{ deleteModal.loading ? 'Deleting…' : 'Delete Team' }}
-              </button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+    <!-- Delete Confirmation Modal (OTP) -->
+    <DeleteOtpModal
+      :visible="deleteModal.visible"
+      title="Delete Team"
+      :item-label="deleteModal.team?.name || 'this team'"
+      :loading="deleteModal.loading"
+      @confirm="executeDelete"
+      @close="deleteModal.visible = false"
+    />
   </div>
 </template>
 

@@ -54,7 +54,14 @@ class EmailFollowUpController extends Controller
 
         $baseQuery = EmailFollowUp::query()->visibleTo($user);
         $this->applyFilters($baseQuery, $validated);
-        $total = $baseQuery->count();
+
+        // Cache count for 30s to avoid expensive COUNT(*) on every request
+        $countCacheKey = 'email_followup_count_' . $user->id . '_' . md5(json_encode($validated));
+        $total = Cache::remember($countCacheKey, 30, function () use ($user, $validated) {
+            $cq = EmailFollowUp::query()->visibleTo($user);
+            $this->applyFilters($cq, $validated);
+            return $cq->count();
+        });
 
         $dataQuery = EmailFollowUp::query()->visibleTo($user);
         $this->applyFilters($dataQuery, $validated);
@@ -287,6 +294,7 @@ class EmailFollowUpController extends Controller
 
         $data['created_by'] = $request->user()->id;
         $data['status'] = $data['status'] ?? 'pending';
+        $data['subject'] = (string) ($data['subject'] ?? '');
 
         $entry = EmailFollowUp::create($data);
 
@@ -322,6 +330,10 @@ class EmailFollowUpController extends Controller
             'comment' => ['sometimes', 'nullable', 'string'],
             'status' => ['sometimes', 'string', Rule::in(EmailFollowUp::STATUSES)],
         ]);
+
+        if (array_key_exists('subject', $data)) {
+            $data['subject'] = (string) ($data['subject'] ?? '');
+        }
 
         if (! empty($data)) {
             $old = $emailFollowUp->getOriginal();

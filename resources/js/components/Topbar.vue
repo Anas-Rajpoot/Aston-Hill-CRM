@@ -75,11 +75,11 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <header class="h-16 flex items-center justify-between px-6 bg-white border-b border-gray-200 shadow-sm">
+  <header class="h-14 sm:h-16 flex items-center justify-between px-3 sm:px-6 bg-white border-b border-gray-200 shadow-sm flex-shrink-0">
     <div class="flex items-center gap-3">
       <button
         type="button"
-        class="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+        class="p-2.5 -ml-1 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors lg:hidden"
         :title="collapsed ? 'Open sidebar' : 'Close sidebar'"
         @click="toggleSidebar"
       >
@@ -89,7 +89,7 @@ onUnmounted(() => {
       </button>
     </div>
 
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-2 sm:gap-3">
       <!-- Notification bell (only visible when web notifications enabled) -->
       <div v-if="webEnabled" class="relative">
         <button
@@ -110,7 +110,7 @@ onUnmounted(() => {
         <!-- Dropdown panel -->
         <div
           v-if="bellOpen"
-          class="absolute right-0 mt-1 w-80 bg-white rounded-xl shadow-xl border border-gray-200 z-50 overflow-hidden"
+          class="absolute right-0 mt-1 w-[calc(100vw-2rem)] sm:w-80 bg-white rounded-xl shadow-xl border border-gray-200 z-50 overflow-hidden"
         >
           <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
             <p class="text-sm font-semibold text-gray-900">Notifications</p>
@@ -121,7 +121,7 @@ onUnmounted(() => {
               v-for="n in notifications"
               :key="n.id"
               class="px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors"
-              :class="n.is_unread ? 'bg-blue-50/40' : ''"
+              :class="n.is_unread ? 'bg-brand-primary-light/40' : ''"
               @click="markRead(n.id)"
             >
               <div class="flex items-start gap-2">
@@ -133,7 +133,7 @@ onUnmounted(() => {
                 </span>
                 <span
                   v-else
-                  class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600"
+                  class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-primary-light text-brand-primary"
                 >
                   <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6z" /></svg>
                 </span>
@@ -142,7 +142,7 @@ onUnmounted(() => {
                   <p class="text-xs text-gray-500 truncate">{{ n.message }}</p>
                   <p class="text-[10px] text-gray-400 mt-0.5">{{ n.created_at }}</p>
                 </div>
-                <span v-if="n.is_unread" class="mt-1.5 h-2 w-2 rounded-full bg-blue-500 shrink-0" />
+                <span v-if="n.is_unread" class="mt-1.5 h-2 w-2 rounded-full bg-brand-primary shrink-0" />
               </div>
             </div>
             <div v-if="!notifications.length" class="px-4 py-6 text-center text-sm text-gray-400">
@@ -152,7 +152,7 @@ onUnmounted(() => {
           <div class="px-4 py-2 border-t border-gray-100 text-center">
             <button
               type="button"
-              class="text-xs font-medium text-blue-600 hover:text-blue-700"
+              class="text-xs font-medium text-brand-primary hover:text-brand-primary-hover"
               @click="bellOpen = false; router.push('/notifications')"
             >View all notifications</button>
           </div>
@@ -162,12 +162,12 @@ onUnmounted(() => {
       <div class="relative">
         <button
           type="button"
-          class="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100"
+          class="flex items-center gap-2 px-2 sm:px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100"
           @click="userMenuOpen = !userMenuOpen"
         >
-          <span class="text-sm font-medium">{{ auth.user?.name ?? 'User' }}</span>
-          <span class="text-xs text-gray-500">{{ primaryRole }}</span>
-          <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <span class="text-sm font-medium truncate max-w-[100px] sm:max-w-[160px]">{{ auth.user?.name ?? 'User' }}</span>
+          <span class="text-xs text-gray-500 hidden sm:inline">{{ primaryRole }}</span>
+          <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
           </svg>
         </button>

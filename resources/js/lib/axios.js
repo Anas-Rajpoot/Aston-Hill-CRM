@@ -65,10 +65,12 @@ export const web = axios.create({
 
 let csrfCookiePromise = null
 
-export async function ensureCsrfCookie() {
-  // If cookie already exists, do not call endpoint again.
-  const existing = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=/)
-  if (existing) return
+export async function ensureCsrfCookie(force = false) {
+  // Require both XSRF and session cookies for a valid CSRF/session pair.
+  // A stale XSRF cookie without a matching session often causes 419.
+  const hasXsrfCookie = /(?:^|;\s*)XSRF-TOKEN=/.test(document.cookie)
+  const hasSessionCookie = /(?:^|;\s*)(?:laravel_session|[A-Za-z0-9_-]+-session)=/.test(document.cookie)
+  if (!force && hasXsrfCookie && hasSessionCookie) return
 
   if (csrfCookiePromise) {
     await csrfCookiePromise

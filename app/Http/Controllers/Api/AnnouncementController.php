@@ -22,7 +22,7 @@ class AnnouncementController extends Controller
     public function index(Request $request): JsonResponse
     {
         // Show ALL announcements by default (including disabled/archived)
-        $query = Announcement::with('creator');
+        $query = Announcement::with('creator')->withCount('acknowledgements');
 
         if ($q = $request->input('q')) {
             $query->where(fn ($w) => $w->where('title', 'like', "%{$q}%")->orWhere('body', 'like', "%{$q}%"));

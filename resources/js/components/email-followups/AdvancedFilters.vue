@@ -19,7 +19,6 @@ const activeCount = computed(() => {
   let n = 0
   if (f.q) n++
   if (f.from || f.to) n++
-  if (f.category) n++
   if (f.status) n++
   return n
 })
@@ -48,7 +47,7 @@ const activeCount = computed(() => {
             v-model="filters.q"
             type="text"
             placeholder="Subject, request from, sent to..."
-            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           />
         </div>
@@ -71,7 +70,7 @@ const activeCount = computed(() => {
         <div class="flex items-end gap-2">
           <button
             type="button"
-            class="rounded bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700"
+            class="rounded bg-brand-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-primary-hover"
             :disabled="loading"
             @click="$emit('apply')"
           >

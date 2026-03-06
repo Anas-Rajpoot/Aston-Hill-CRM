@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Traits\ResolvesClientLink;
 
 class FieldSubmission extends Model
 {
+    use ResolvesClientLink;
     protected $fillable = [
         'client_id',
         'created_by',
@@ -85,10 +87,7 @@ class FieldSubmission extends Model
         return $this->belongsTo(\App\Models\Team::class, 'team_id');
     }
 
-    public function client()
-    {
-        return $this->belongsTo(\App\Models\Client::class);
-    }
+    // client() relationship provided by ResolvesClientLink trait
 
     public function fieldExecutive()
     {

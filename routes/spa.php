@@ -105,6 +105,8 @@ Route::get('/reports/lead', $spa);
 Route::get('/reports/field-operations', $spa);
 Route::get('/reports/vas', $spa);
 Route::get('/reports/sla', $spa);
+Route::get('/reports/customer-support', $spa);
+Route::get('/reports/clients', $spa);
 Route::get('/settings', $spa);
 Route::get('/settings/team-hierarchy', $spa);
 Route::get('/settings/system-preferences', $spa);
@@ -113,6 +115,7 @@ Route::get('/settings/notifications-email', $spa);
 Route::get('/settings/announcement-center', $spa);
 Route::get('/settings/library', $spa);
 Route::get('/settings/data-import-export', $spa);
+Route::get('/settings/dropdown-seeder', $spa);
 Route::get('/settings/security-session', $spa);
 Route::get('/settings/audit-logs', $spa);
 

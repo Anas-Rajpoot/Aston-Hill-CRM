@@ -5,7 +5,7 @@
     <div class="flex items-start justify-between gap-4">
         <div>
             <h2 class="text-xl font-semibold text-brand-dark">Lead Submission #{{ $leadSubmission->id }}</h2>
-            <p class="text-sm text-gray-500">View lead Submission details & documents</p>
+            <p class="text-sm text-gray-500">View Lead Submission details & documents</p>
         </div>
 
         <div class="flex gap-2">

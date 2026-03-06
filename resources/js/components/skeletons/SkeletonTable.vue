@@ -12,7 +12,7 @@ defineProps({
       <div class="h-5 w-32 animate-pulse rounded bg-gray-200" />
     </div>
     <table class="min-w-full">
-      <thead class="bg-gray-50">
+      <thead class="bg-brand-primary">
         <tr>
           <th v-for="c in cols" :key="c" class="px-4 py-3 text-left">
             <div class="h-4 w-24 animate-pulse rounded bg-gray-200" />

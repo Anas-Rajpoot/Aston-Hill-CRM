@@ -62,6 +62,11 @@ class RoleController extends Controller
      */
     public function update(Request $request, Role $role)
     {
+        if ($role->name === 'superadmin') {
+            return redirect()->route('super-admin.roles.index')
+                ->with('error', 'The superadmin role cannot be modified.');
+        }
+
         $data = $request->validate([
             'name' => ['required','string','max:190','unique:roles,name,'.$role->id],
         ]);
@@ -105,6 +110,11 @@ class RoleController extends Controller
     
     public function updatePermissions(Request $request, Role $role)
     {
+        $request->validate([
+            'permissions' => ['nullable', 'array'],
+            'permissions.*' => ['string', 'max:190'],
+        ]);
+
         $selected = $request->input('permissions', []);
 
         // Prevent accidental removal of superadmin powers (optional)
@@ -112,7 +122,9 @@ class RoleController extends Controller
             return back()->with('error', 'Superadmin permissions are handled by Gate::before');
         }
 
-        $role->syncPermissions($selected);
+        // Only sync permissions that actually exist in the database
+        $validNames = Permission::whereIn('name', $selected)->where('guard_name', 'web')->pluck('name')->toArray();
+        $role->syncPermissions($validNames);
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 

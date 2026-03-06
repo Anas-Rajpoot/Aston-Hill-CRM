@@ -37,7 +37,7 @@ const emit = defineEmits(['apply', 'reset'])
             v-model="filters.activity_number"
             type="text"
             placeholder="Search activity number..."
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           />
         </div>
@@ -47,7 +47,7 @@ const emit = defineEmits(['apply', 'reset'])
             v-model="filters.account_number"
             type="text"
             placeholder="Search account..."
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           />
         </div>
@@ -57,7 +57,7 @@ const emit = defineEmits(['apply', 'reset'])
             v-model="filters.request_type"
             type="text"
             placeholder="Search request type..."
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           />
         </div>
@@ -75,7 +75,7 @@ const emit = defineEmits(['apply', 'reset'])
             v-model="filters.product"
             type="text"
             placeholder="Search product..."
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           />
         </div>
@@ -85,7 +85,7 @@ const emit = defineEmits(['apply', 'reset'])
             v-model="filters.so_number"
             type="text"
             placeholder="Search SO number..."
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           />
         </div>
@@ -95,7 +95,7 @@ const emit = defineEmits(['apply', 'reset'])
             v-model="filters.rejection_reason"
             type="text"
             placeholder="Search rejection reason..."
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           />
         </div>
@@ -105,7 +105,7 @@ const emit = defineEmits(['apply', 'reset'])
             v-model="filters.verifier_name"
             type="text"
             placeholder="Search verifier..."
-            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           />
         </div>
@@ -114,7 +114,7 @@ const emit = defineEmits(['apply', 'reset'])
           <div class="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap">
             <button
               type="button"
-              class="inline-flex w-full items-center justify-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 sm:w-auto sm:flex-1"
+              class="inline-flex w-full items-center justify-center rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50 sm:w-auto sm:flex-1"
               :disabled="loading"
               @click="$emit('apply')"
             >

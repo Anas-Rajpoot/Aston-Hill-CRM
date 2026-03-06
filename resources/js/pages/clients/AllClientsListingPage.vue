@@ -10,8 +10,9 @@ import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomize
 import ClientTable from '@/components/clients/ClientTable.vue'
 import RenewalAlertsModal from '@/components/clients/RenewalAlertsModal.vue'
 import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import RecordHistoryModal from '@/components/RecordHistoryModal.vue'
+import Toast from '@/components/Toast.vue'
+import DeleteOtpModal from '@/components/DeleteOtpModal.vue'
 import api from '@/lib/axios'
 import { useAuthStore } from '@/stores/auth'
 import { canModuleAction } from '@/lib/accessControl'
@@ -40,7 +41,130 @@ const authStore = useAuthStore()
 const canCreate = computed(() => canModuleAction(authStore.user, 'all-clients', 'create'))
 const canExport = computed(() => canModuleAction(authStore.user, 'all-clients', 'export'))
 const canImport = computed(() => canModuleAction(authStore.user, 'all-clients', 'import'))
+const canEdit = computed(() => canModuleAction(authStore.user, 'all-clients', 'edit'))
+const canDelete = computed(() => canModuleAction(authStore.user, 'all-clients', 'delete'))
 const loading = ref(true)
+
+/* ───── Toast ───── */
+const showToast = ref(false)
+const toastType = ref('success')
+const toastMsg  = ref('')
+function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
+
+/* ───── Row selection & Bulk actions ───── */
+const selectedIds = ref([])
+const allSelected = computed({
+  get: () => selectedIds.value.length > 0 && selectedIds.value.length === clients.value.length,
+  set: (v) => { selectedIds.value = v ? clients.value.map((r) => r.id) : [] },
+})
+const bulkLoading = ref(false)
+const bulkCsrName = ref('')
+const bulkAccountManagerName = ref('')
+const csrOptions = ref([])
+const accountManagerOptions = ref([])
+
+async function loadBulkDropdownOptions() {
+  try {
+    const [csrRes, amRes] = await Promise.all([
+      api.get('/customer-support/csr-options').then(r => r.data).catch(() => ({ csrs: [] })),
+      api.get('/users', { params: { status: 'active', per_page: 200, columns: 'id,name' } }).then(r => r.data).catch(() => ({ data: [] })),
+    ])
+    csrOptions.value = Array.isArray(csrRes?.csrs)
+      ? csrRes.csrs.map(c => (typeof c?.name === 'string' ? c.name.trim() : '')).filter(Boolean)
+      : []
+    const users = amRes?.data ?? amRes ?? []
+    accountManagerOptions.value = (Array.isArray(users) ? users : []).map(u => u.name).filter(Boolean)
+  } catch { /* silent */ }
+}
+
+function toggleSelect(id) {
+  const idx = selectedIds.value.indexOf(id)
+  if (idx >= 0) selectedIds.value.splice(idx, 1)
+  else selectedIds.value.push(id)
+}
+
+async function bulkAssignCsr() {
+  if (!selectedIds.value.length) return
+  if (!bulkCsrName.value || !String(bulkCsrName.value).trim()) {
+    toast('error', 'Please select a CSR.')
+    return
+  }
+  bulkLoading.value = true
+  try {
+    await clientsApi.bulkAssignCsr(selectedIds.value, String(bulkCsrName.value).trim())
+    selectedIds.value = []
+    bulkCsrName.value = ''
+    load()
+  } catch (e) {
+    toast('error', e?.response?.data?.message || 'Bulk CSR assignment failed.')
+  } finally {
+    bulkLoading.value = false
+  }
+}
+
+async function bulkAssignAccountManager() {
+  if (!selectedIds.value.length) return
+  if (!bulkAccountManagerName.value || !String(bulkAccountManagerName.value).trim()) {
+    toast('error', 'Please select an Account Manager.')
+    return
+  }
+  bulkLoading.value = true
+  try {
+    await clientsApi.bulkAssignAccountManager(selectedIds.value, String(bulkAccountManagerName.value).trim())
+    selectedIds.value = []
+    bulkAccountManagerName.value = ''
+    load()
+  } catch (e) {
+    toast('error', e?.response?.data?.message || 'Bulk Account Manager assignment failed.')
+  } finally {
+    bulkLoading.value = false
+  }
+}
+
+const showBulkDeleteModal = ref(false)
+
+async function bulkDelete() {
+  if (!selectedIds.value.length) return
+  showBulkDeleteModal.value = true
+}
+
+async function confirmBulkDelete() {
+  bulkLoading.value = true
+  try {
+    await clientsApi.bulkDelete(selectedIds.value)
+    showBulkDeleteModal.value = false
+    selectedIds.value = []
+    toast('success', 'Client(s) deleted successfully.')
+    load()
+  } catch (e) {
+    toast('error', e?.response?.data?.message || 'Bulk delete failed.')
+  } finally {
+    bulkLoading.value = false
+  }
+}
+
+async function bulkExport() {
+  if (!selectedIds.value.length) return
+  exportLoading.value = true
+  try {
+    const rows = clients.value.filter((r) => selectedIds.value.includes(r.id))
+    const cols = visibleColumns.value
+    const headers = cols.map((c) => COLUMN_LABELS[c] ?? c)
+    const csvRows = [headers.map(escapeCsv).join(',')]
+    for (const row of rows) {
+      csvRows.push(cols.map((col) => escapeCsv(row[col] ?? '')).join(','))
+    }
+    const blob = new Blob([csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `all-clients-export-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  } finally {
+    exportLoading.value = false
+  }
+}
 const clients = ref([])
 const TABLE_MODULE = 'all-clients'
 const perPageOptions = ref([10, 20, 25, 50])
@@ -240,7 +364,7 @@ const COLUMN_LABELS = {
   contract_end_date: 'Contract End Date',
   clawback_chum: 'Clawback / Chum',
   remarks: 'Remarks',
-  renewal_alert: 'Renewal Alert',
+  renewal_alert: 'Alert',
   additional_notes: 'Additional Notes',
   creator: 'Created By',
 }
@@ -457,6 +581,73 @@ function downloadSampleCsv() {
       '1205',
       'Dubai',
     ],
+    [
+      'Al Noor Enterprises',
+      'ACCT-10002',
+      'VIP',
+      '2026-04-15',
+      '',
+      '',
+      '',
+      'Active',
+      'Internet',
+      'Copper',
+      'Enterprise',
+      'Abu Dhabi, UAE',
+      'Enterprise Plan 50Mbps',
+      '1500',
+      '2',
+      '',
+      'N/A',
+      'MN-002',
+      'No',
+      'ORD-1002',
+      'Upgrade',
+      'WO-12346',
+      'In Progress',
+      '2026-04-15',
+      '',
+      'Pending',
+      '24 Months',
+      '2028-04-15',
+      'No',
+      '',
+      '0',
+      '',
+      'DED',
+      'FZE',
+      'TL-12346',
+      '2028-04-15',
+      'EC-7789',
+      '2028-04-15',
+      'Walk-in',
+      '2026-04-15',
+      'Support Team',
+      '2026-04-16',
+      'Sara Ahmed',
+      'paid',
+      'unpaid',
+      'paid',
+      'paid',
+      '',
+      '',
+      'CSR C',
+      '',
+      '',
+      'Ali Hassan',
+      'Manager',
+      '971502223344',
+      '',
+      'ali.hassan@example.com',
+      'no',
+      '',
+      '',
+      '403, Al Salam Tower, Corniche, Abu Dhabi',
+      'Corniche',
+      'Al Salam Tower',
+      '403',
+      'Abu Dhabi',
+    ],
   ]
 
   const csvRows = [
@@ -510,7 +701,7 @@ async function onImportFileSelect(event) {
     load()
   } catch (err) {
     const msg = err?.response?.data?.message ?? err?.message ?? 'Import failed.'
-    alert(msg)
+    toast('error', msg)
   } finally {
     importLoading.value = false
   }
@@ -798,6 +989,7 @@ function updateTableColumns() {
 
 onMounted(() => {
   loadFilters()
+  loadBulkDropdownOptions()
   loadTablePreference().then(() => {
     loadColumns().then(() => {
       updateTableColumns()
@@ -811,9 +1003,35 @@ onMounted(() => {
   <div class="min-h-[calc(100vh-4rem)] bg-white p-4">
     <div class="w-full space-y-4">
       <div class="flex flex-wrap items-center justify-between gap-4">
-        <div class="flex flex-wrap items-baseline gap-2">
-          <h1 class="text-xl font-semibold text-gray-900 leading-tight">All Clients</h1>
-          <Breadcrumbs />
+        <div class="flex items-center gap-2">
+          <!-- Bulk actions (visible when items selected) -->
+          <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0 translate-x-2" enter-to-class="opacity-100 translate-x-0" leave-active-class="transition ease-in duration-100" leave-from-class="opacity-100" leave-to-class="opacity-0">
+            <div v-if="selectedIds.length" class="flex flex-wrap items-center gap-2">
+              <span class="text-sm text-gray-600 font-medium">{{ selectedIds.length }} selected</span>
+              <select
+                v-if="canEdit"
+                v-model="bulkCsrName"
+                class="rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+              >
+                <option value="">Select CSR</option>
+                <option v-for="name in csrOptions" :key="name" :value="name">{{ name }}</option>
+              </select>
+              <button v-if="canEdit" type="button" class="rounded bg-brand-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-primary-hover" :disabled="bulkLoading" @click="bulkAssignCsr">Assign CSR</button>
+
+              <select
+                v-if="canEdit"
+                v-model="bulkAccountManagerName"
+                class="rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+              >
+                <option value="">Select Account Manager</option>
+                <option v-for="name in accountManagerOptions" :key="name" :value="name">{{ name }}</option>
+              </select>
+              <button v-if="canEdit" type="button" class="rounded bg-brand-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-primary-hover" :disabled="bulkLoading" @click="bulkAssignAccountManager">Assign Account Manager</button>
+
+              <button v-if="canExport" type="button" class="rounded bg-brand-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-primary-hover" :disabled="bulkLoading || exportLoading" @click="bulkExport">Export Selected</button>
+              <button v-if="canDelete" type="button" class="rounded bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700" :disabled="bulkLoading" @click="bulkDelete">Delete Selected</button>
+            </div>
+          </Transition>
         </div>
         <div class="flex items-center gap-2">
           <input
@@ -870,7 +1088,7 @@ onMounted(() => {
           <button
             v-if="canCreate"
             type="button"
-            class="inline-flex items-center rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70 disabled:cursor-wait"
+            class="inline-flex items-center rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70 disabled:cursor-wait"
             :disabled="loading"
             @click="goToAddClient"
           >
@@ -882,7 +1100,7 @@ onMounted(() => {
         </div>
       </div>
 
-      <p class="text-sm text-gray-500">Search for a client to view their profile.</p>
+
 
       <ClientsFiltersBar
         :filters="filters"
@@ -919,121 +1137,121 @@ onMounted(() => {
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
           <div>
             <label class="mb-1 block text-xs text-gray-600">Status</label>
-            <select v-model="filters.status" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            <select v-model="filters.status" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Statuses</option>
               <option v-for="s in filterOptions.statuses" :key="s.value || s" :value="s.value || s">{{ s.label || s }}</option>
             </select>
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Submission Type</label>
-            <select v-model="filters.submission_type" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            <select v-model="filters.submission_type" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Submission Types</option>
               <option v-for="v in filterOptions.submission_types" :key="v" :value="v">{{ v }}</option>
             </select>
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Service Category</label>
-            <select v-model="filters.service_category" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            <select v-model="filters.service_category" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Service Categories</option>
               <option v-for="v in filterOptions.service_categories" :key="v" :value="v">{{ v }}</option>
             </select>
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Service Type</label>
-            <select v-model="filters.service_type" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            <select v-model="filters.service_type" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Service Types</option>
               <option v-for="v in filterOptions.service_types" :key="v" :value="v">{{ v }}</option>
             </select>
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Product Type</label>
-            <select v-model="filters.product_type" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            <select v-model="filters.product_type" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Product Types</option>
               <option v-for="v in filterOptions.product_types" :key="v" :value="v">{{ v }}</option>
             </select>
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Product Name</label>
-            <input v-model="filters.product_name" type="text" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" placeholder="Product name" />
+            <input v-model="filters.product_name" type="text" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" placeholder="Product name" />
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Manager</label>
-            <select v-model="filters.manager_id" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            <select v-model="filters.manager_id" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Managers</option>
               <option v-for="u in filterOptions.managers" :key="u.id" :value="u.id">{{ u.name }}</option>
             </select>
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Team Leader</label>
-            <select v-model="filters.team_leader_id" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            <select v-model="filters.team_leader_id" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Team Leaders</option>
               <option v-for="u in filterOptions.team_leaders" :key="u.id" :value="u.id">{{ u.name }}</option>
             </select>
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Sales Agent</label>
-            <select v-model="filters.sales_agent_id" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            <select v-model="filters.sales_agent_id" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Sales Agents</option>
               <option v-for="u in filterOptions.sales_agents" :key="u.id" :value="u.id">{{ u.name }}</option>
             </select>
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Work Order</label>
-            <input v-model="filters.wo_number" type="text" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" placeholder="WO number" />
+            <input v-model="filters.wo_number" type="text" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" placeholder="WO number" />
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Work Order Status</label>
-            <select v-model="filters.work_order_status" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            <select v-model="filters.work_order_status" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Work Order Statuses</option>
               <option v-for="v in filterOptions.work_order_statuses" :key="v" :value="v">{{ v }}</option>
             </select>
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Payment Connection</label>
-            <select v-model="filters.payment_connection" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            <select v-model="filters.payment_connection" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Payment Connection</option>
               <option v-for="v in filterOptions.payment_connections" :key="v" :value="v">{{ v }}</option>
             </select>
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Contract Type</label>
-            <select v-model="filters.contract_type" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            <select v-model="filters.contract_type" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Contract Types</option>
               <option v-for="v in filterOptions.contract_types" :key="v" :value="v">{{ v }}</option>
             </select>
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Clawback / Chum</label>
-            <select v-model="filters.clawback_chum" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            <select v-model="filters.clawback_chum" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All</option>
               <option v-for="v in filterOptions.clawback_chum_options" :key="v" :value="v">{{ v }}</option>
             </select>
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Company Category</label>
-            <select v-model="filters.company_category" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            <select v-model="filters.company_category" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Company Categories</option>
               <option v-for="v in filterOptions.company_categories" :key="v" :value="v">{{ v }}</option>
             </select>
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Trade License Number</label>
-            <input v-model="filters.trade_license_number" type="text" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" placeholder="Trade license number" />
+            <input v-model="filters.trade_license_number" type="text" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" placeholder="Trade license number" />
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Establishment Card Number</label>
-            <input v-model="filters.establishment_card_number" type="text" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" placeholder="Establishment card number" />
+            <input v-model="filters.establishment_card_number" type="text" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" placeholder="Establishment card number" />
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Account Manager Name</label>
-            <select v-model="filters.account_manager_name" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            <select v-model="filters.account_manager_name" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Account Managers</option>
               <option v-for="v in filterOptions.account_manager_names" :key="v" :value="v">{{ v }}</option>
             </select>
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">CSR Name</label>
-            <input v-model="filters.csr_name_1" type="text" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" placeholder="CSR Name" />
+            <input v-model="filters.csr_name_1" type="text" class="w-full rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" placeholder="CSR Name" />
           </div>
           <div>
             <label class="mb-1 block text-xs text-gray-600">Submitted From</label>
@@ -1085,7 +1303,7 @@ onMounted(() => {
           </div>
         </div>
         <div class="mt-3 flex items-center gap-2">
-          <button type="button" class="rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700" @click="applyFilters">Apply</button>
+          <button type="button" class="rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover" @click="applyFilters">Apply</button>
           <button type="button" class="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50" @click="resetFilters">Reset</button>
         </div>
       </div>
@@ -1100,11 +1318,15 @@ onMounted(() => {
           :current-page="meta.current_page"
           :per-page="meta.per_page"
           :edit-options="filterOptions"
+          :selected-ids="selectedIds"
+          :selectable="true"
           permission-module="all-clients"
           @sort="onSort"
           @update-cell="onUpdateCell"
           @view-history="openHistoryModal"
           @show-renewal-alerts="openRenewalAlertsModal"
+          @toggle-select="toggleSelect"
+          @toggle-select-all="allSelected = !allSelected"
         />
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
           <p class="text-sm text-gray-600">
@@ -1117,7 +1339,7 @@ onMounted(() => {
               <span class="whitespace-nowrap font-medium">Number of rows</span>
               <select
                 :value="meta.per_page"
-                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                 @change="onPerPageChange"
               >
                 <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
@@ -1156,6 +1378,18 @@ onMounted(() => {
       :company-name="renewalAlertsModalCompany"
       :alerts="renewalAlertsModalItems"
       @close="closeRenewalAlertsModal"
+    />
+
+    <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />
+
+    <!-- Bulk Delete OTP Confirmation -->
+    <DeleteOtpModal
+      :visible="showBulkDeleteModal"
+      title="Bulk Delete Clients"
+      :item-label="`${selectedIds.length} client(s)`"
+      :loading="bulkLoading"
+      @confirm="confirmBulkDelete"
+      @close="showBulkDeleteModal = false"
     />
   </div>
 </template>

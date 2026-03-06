@@ -4,7 +4,6 @@
  */
 import { useRouter } from 'vue-router'
 import { computed } from 'vue'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import { useAuthStore } from '@/stores/auth'
 import { canModuleAction } from '@/lib/accessControl'
 
@@ -20,7 +19,7 @@ const cards = [
     title: 'Lead Reports',
     description: 'Analyze Lead Submissions, Resubmissions, and conversion metrics by service category and sales team.',
     icon: 'document',
-    iconBg: 'bg-emerald-500',
+    iconBg: 'bg-brand-primary',
     route: '/reports/lead',
   },
   {
@@ -28,7 +27,7 @@ const cards = [
     title: 'Field Operations Reports',
     description: 'Track field meetings, agent workload, completion rates, and SLA compliance.',
     icon: 'map-pin',
-    iconBg: 'bg-amber-500',
+    iconBg: 'bg-brand-primary',
     route: '/reports/field-operations',
   },
   {
@@ -36,7 +35,7 @@ const cards = [
     title: 'VAS Reports',
     description: 'Analyze VAS request types, DU status distribution, and completion metrics.',
     icon: 'heart',
-    iconBg: 'bg-violet-500',
+    iconBg: 'bg-brand-primary',
     route: '/reports/vas',
   },
   {
@@ -44,8 +43,24 @@ const cards = [
     title: 'SLA & Performance Reports',
     description: 'Track SLA compliance, breach analysis, and average processing times across all modules.',
     icon: 'clock',
-    iconBg: 'bg-rose-500',
+    iconBg: 'bg-brand-primary',
     route: '/reports/sla',
+  },
+  {
+    id: 'support',
+    title: 'Customer Support Reports',
+    description: 'Ticket volume, resolution rates, CSR workload distribution, and monthly trend analysis.',
+    icon: 'support',
+    iconBg: 'bg-brand-primary',
+    route: '/reports/customer-support',
+  },
+  {
+    id: 'clients',
+    title: 'Client & Company Reports',
+    description: 'Client growth, status distribution, top accounts by submissions, and MRC revenue insights.',
+    icon: 'building',
+    iconBg: 'bg-brand-primary',
+    route: '/reports/clients',
   },
 ]
 
@@ -104,6 +119,24 @@ function viewReport(route) {
               <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
             </svg>
             <svg
+              v-else-if="card.icon === 'support'"
+              class="h-6 w-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+            <svg
+              v-else-if="card.icon === 'building'"
+              class="h-6 w-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+            <svg
               v-else
               class="h-6 w-6"
               fill="none"
@@ -118,7 +151,7 @@ function viewReport(route) {
             <p class="mt-1 text-sm text-gray-600">{{ card.description }}</p>
             <button
               type="button"
-              class="mt-3 text-sm font-medium text-emerald-600 hover:text-emerald-700"
+              class="mt-3 text-sm font-medium text-brand-primary hover:text-brand-primary"
               @click="viewReport(card.route)"
             >
               View Report →

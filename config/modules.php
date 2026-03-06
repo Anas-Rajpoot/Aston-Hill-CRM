@@ -22,9 +22,10 @@ return [
             'terminate_date' => ['label' => 'Terminate Date', 'filter' => 'date', 'sortable' => true],
             'manager' => ['label' => 'Manager', 'filter' => null, 'sortable' => true],
             'team_leader' => ['label' => 'Team Leader', 'filter' => null, 'sortable' => true],
+            'monthly_target' => ['label' => 'Monthly Target', 'filter' => null, 'sortable' => true],
         ],
 
-        'default_columns' => ['id', 'name', 'email', 'phone', 'country', 'roles', 'status', 'last_login_at', 'created_at'],
+        'default_columns' => ['id', 'name', 'email', 'phone', 'country', 'roles', 'status', 'monthly_target', 'last_login_at', 'created_at'],
         'default_sort' => ['name', 'asc'],
     ],
 
@@ -211,14 +212,13 @@ return [
             'id' => ['label' => 'ID', 'filter' => null, 'sortable' => true],
             'email_date' => ['label' => 'Email Date', 'filter' => 'date', 'sortable' => true],
             'subject' => ['label' => 'Subject', 'filter' => 'text', 'sortable' => true],
-            'category' => ['label' => 'Category', 'filter' => 'select', 'sortable' => true],
             'request_from' => ['label' => 'Request From', 'filter' => 'text', 'sortable' => true],
             'sent_to' => ['label' => 'Sent To', 'filter' => 'text', 'sortable' => true],
             'creator' => ['label' => 'Added By', 'filter' => null, 'sortable' => true],
             'status' => ['label' => 'Status', 'filter' => 'select', 'sortable' => true],
             'status_date' => ['label' => 'Status Date', 'filter' => null, 'sortable' => true],
         ],
-        'default_columns' => ['id', 'email_date', 'subject', 'category', 'request_from', 'sent_to', 'creator', 'status', 'status_date'],
+        'default_columns' => ['id', 'email_date', 'subject', 'request_from', 'sent_to', 'creator', 'status', 'status_date'],
         'default_sort' => ['email_date', 'desc'],
     ],
 

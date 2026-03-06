@@ -67,7 +67,9 @@ return [
     'action_aliases' => [
         'create' => ['create', 'add'],
         'read' => ['read', 'list', 'view'],
+        'view' => ['view', 'list', 'read'],
         'update' => ['update', 'edit'],
+        'edit' => ['edit', 'update'],
         'delete' => ['delete'],
         'assign_permissions' => ['assign_permissions', 'manage_permissions'],
     ],

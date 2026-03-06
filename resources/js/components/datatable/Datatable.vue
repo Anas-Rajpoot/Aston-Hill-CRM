@@ -23,7 +23,7 @@ watch(() => props.visibleColumns, load, { immediate: true })
 
 <template>
   <table class="w-full text-sm">
-    <thead>
+    <thead class="bg-brand-primary border-b-2 border-green-700">
       <th v-for="c in visibleColumns" :key="c">
         {{ columns[c].label }}
       </th>

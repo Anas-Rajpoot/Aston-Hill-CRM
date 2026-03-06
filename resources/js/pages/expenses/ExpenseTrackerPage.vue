@@ -14,8 +14,8 @@ import ExpenseDetailModal from '@/components/expenses/ExpenseDetailModal.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import ExpenseTable from '@/components/expenses/ExpenseTable.vue'
 import ExpenseEditHistoryModal from '@/components/expenses/ExpenseEditHistoryModal.vue'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Toast from '@/components/Toast.vue'
+import DeleteOtpModal from '@/components/DeleteOtpModal.vue'
 import { canModuleAction } from '@/lib/accessControl'
 
 const auth = useAuthStore()
@@ -420,12 +420,10 @@ onMounted(() => {
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div class="flex flex-wrap items-center gap-2">
-            <h1 class="text-xl font-semibold text-gray-900 leading-tight">Expense Tracker</h1>
-            <Breadcrumbs />
-          </div>
+            <h1 class="text-xl font-semibold text-gray-900 leading-tight">Expense Tracker</h1>          </div>
           <p class="mt-0.5 text-sm text-gray-500">Track and manage operational expenses with detailed financial records.</p>
         </div>
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="flex flex-nowrap items-center gap-2 overflow-x-auto">
           <button
             v-if="canExport"
             type="button"
@@ -445,7 +443,7 @@ onMounted(() => {
           <button
             v-if="canCreate"
             type="button"
-            class="inline-flex items-center rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+            class="inline-flex items-center rounded-lg bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover"
             @click="addModalVisible = true"
           >
             <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -468,7 +466,7 @@ onMounted(() => {
         <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <div class="flex items-center justify-between">
             <span class="text-sm font-medium text-gray-600">Total Expenses</span>
-            <span class="rounded bg-green-100 p-1.5 text-green-600">
+            <span class="rounded bg-brand-primary-light p-1.5 text-brand-primary">
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
               </svg>
@@ -479,7 +477,7 @@ onMounted(() => {
         <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <div class="flex items-center justify-between">
             <span class="text-sm font-medium text-gray-600">Total Amount</span>
-            <span class="rounded bg-green-100 p-1.5 text-green-600">
+            <span class="rounded bg-brand-primary-light p-1.5 text-brand-primary">
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
               </svg>
@@ -501,7 +499,7 @@ onMounted(() => {
         <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <div class="flex items-center justify-between">
             <span class="text-sm font-medium text-gray-600">Approved</span>
-            <span class="rounded bg-green-100 p-1.5 text-green-600">
+            <span class="rounded bg-brand-primary-light p-1.5 text-brand-primary">
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
               </svg>
@@ -518,7 +516,7 @@ onMounted(() => {
             <label class="mb-1 block text-xs font-medium text-gray-600">Status</label>
             <select
               v-model="filters.status"
-              class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
               :disabled="loading"
             >
               <option value="">All</option>
@@ -529,7 +527,7 @@ onMounted(() => {
             <label class="mb-1 block text-xs font-medium text-gray-600">Product Category</label>
             <select
               v-model="filters.product_category"
-              class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
               :disabled="loading"
             >
               <option value="">All Categories</option>
@@ -539,7 +537,7 @@ onMounted(() => {
           <div class="flex gap-2">
             <button
               type="button"
-              class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+              class="rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50"
               :disabled="loading"
               @click="applyFilters"
             >
@@ -623,7 +621,7 @@ onMounted(() => {
               <select
                 id="expense-per-page"
                 :value="perPage"
-                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                 @change="onPerPageChange"
               >
                 <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
@@ -694,33 +692,14 @@ onMounted(() => {
       @save="onSaveColumns"
     />
 
-    <Teleport to="body">
-      <div
-        v-if="expenseToDelete"
-        class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-gray-500/50 p-4"
-        role="dialog"
-        aria-modal="true"
-        @click.self="closeDeleteConfirm"
-      >
-        <div class="w-full max-w-md rounded-lg bg-white shadow-xl">
-          <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-            <h2 class="text-lg font-semibold text-gray-900">Confirm Delete</h2>
-            <button type="button" class="rounded p-1 text-gray-400 hover:bg-gray-100" aria-label="Close" @click="closeDeleteConfirm">
-              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-          </div>
-          <div class="px-6 py-4">
-            <p class="text-sm text-gray-600">Are you sure you want to delete this expense? This action cannot be undone.</p>
-          </div>
-          <div class="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
-            <button type="button" class="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50" :disabled="deleting" @click="confirmDelete">
-              {{ deleting ? 'Deleting...' : 'Delete' }}
-            </button>
-            <button type="button" class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="closeDeleteConfirm">Cancel</button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <DeleteOtpModal
+      :visible="!!expenseToDelete"
+      title="Delete Expense"
+      :item-label="expenseToDelete ? `Expense #${expenseToDelete.id}` : 'this expense'"
+      :loading="deleting"
+      @confirm="confirmDelete"
+      @close="closeDeleteConfirm"
+    />
 
     <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />
   </div>

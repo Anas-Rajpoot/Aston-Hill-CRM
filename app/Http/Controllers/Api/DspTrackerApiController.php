@@ -9,6 +9,7 @@ use App\Models\Verifier;
 use App\Support\RbacPermission;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -37,6 +38,8 @@ class DspTrackerApiController extends Controller
         $this->authorizeAction($request, 'read', ['dsp_tracker.list', 'dsp_tracker.search_dsp_status', 'dsp_tracker_status.list']);
 
         $validated = $request->validate([
+            'page' => ['sometimes', 'integer', 'min:1'],
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:5000'],
             'sort' => ['sometimes', 'string', Rule::in(array_merge(self::ALLOWED_COLUMNS, ['id', 'created_at']))],
             'order' => ['sometimes', 'string', Rule::in(['asc', 'desc'])],
             'activity_number' => ['sometimes', 'nullable', 'string', 'max:200'],
@@ -56,7 +59,7 @@ class DspTrackerApiController extends Controller
 
         foreach (['activity_number', 'company_name', 'account_number', 'request_type', 'request_status', 'product', 'so_number', 'rejection_reason', 'verifier_name'] as $key) {
             if (! empty($validated[$key] ?? null)) {
-                $query->where($key, 'like', '%' . $validated[$key] . '%');
+                $query->where($key, 'like', '%' . addcslashes($validated[$key], '%_\\') . '%');
             }
         }
         if (! empty($validated['appointment_date_from'] ?? null)) {
@@ -70,11 +73,22 @@ class DspTrackerApiController extends Controller
         $order = $validated['order'] ?? 'asc';
         $query->orderBy($sort, $order);
 
-        $rows = $query->get(array_merge(['id'], self::ALLOWED_COLUMNS));
+        $perPage = (int) ($validated['per_page'] ?? 5000);
+        $page = (int) ($validated['page'] ?? 1);
+
+        // Cache count for 30s
+        $countCacheKey = 'dsp_tracker_count_' . md5(json_encode($validated));
+        $total = Cache::remember($countCacheKey, 30, function () use ($query) {
+            return (clone $query)->count();
+        });
+
+        $rows = $query->skip(($page - 1) * $perPage)->take($perPage)->get(array_merge(['id'], self::ALLOWED_COLUMNS));
         $verifierNumberByName = $this->buildVerifierNumberMap(
             $rows->pluck('verifier_name')->all()
         );
         $items = $rows->map(fn ($row) => $this->formatRow($row, $verifierNumberByName));
+
+        $lastPage = $total > 0 ? (int) ceil($total / $perPage) : 1;
 
         $lastImportBatchId = DspTrackerEntry::query()
             ->where('user_id', $request->user()?->id)
@@ -84,6 +98,10 @@ class DspTrackerApiController extends Controller
         return response()->json([
             'data' => $items,
             'meta' => [
+                'current_page' => $page,
+                'last_page' => $lastPage,
+                'per_page' => $perPage,
+                'total' => $total,
                 'last_import_batch_id' => $lastImportBatchId,
             ],
         ]);

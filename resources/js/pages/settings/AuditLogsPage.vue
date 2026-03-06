@@ -8,7 +8,6 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import api from '@/lib/axios'
 import { useTablePageSize } from '@/composables/useTablePageSize'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Toast from '@/components/Toast.vue'
 import SkeletonBox from '@/components/skeletons/SkeletonBox.vue'
 import { formatSystemDateTime } from '@/lib/dateFormat'
@@ -208,9 +207,9 @@ function fmtDate(iso) {
 
 function actionChipClass(color) {
   const map = {
-    green: 'bg-green-100 text-green-700', blue: 'bg-blue-100 text-blue-700',
+    green: 'bg-brand-primary-light text-brand-primary-hover', blue: 'bg-brand-primary-light text-brand-primary-hover',
     red: 'bg-red-100 text-red-700', purple: 'bg-purple-100 text-purple-700',
-    teal: 'bg-teal-100 text-teal-700', gray: 'bg-gray-100 text-gray-600',
+    teal: 'bg-brand-primary-light text-brand-primary', gray: 'bg-gray-100 text-gray-600',
     orange: 'bg-orange-100 text-orange-700', indigo: 'bg-indigo-100 text-indigo-700',
     yellow: 'bg-yellow-100 text-yellow-800',
   }
@@ -243,14 +242,12 @@ onMounted(() => {
       <div class="flex items-center justify-between gap-4">
         <div>
           <div class="flex items-center gap-2.5">
-            <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+            <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-primary-light text-brand-primary">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
             </div>
             <div>
               <div class="flex flex-wrap items-baseline gap-2">
-                <h1 class="text-2xl font-bold text-gray-900 leading-tight">Audit Logs</h1>
-                <Breadcrumbs />
-              </div>
+                <h1 class="text-2xl font-bold text-gray-900 leading-tight">Audit Logs</h1>              </div>
               <p class="text-sm text-gray-500 mt-0.5">Track all system changes and user actions for accountability</p>
             </div>
           </div>
@@ -278,7 +275,7 @@ onMounted(() => {
       <div class="bg-white rounded-xl border border-gray-200 p-5">
         <div class="flex items-center justify-between mb-2">
           <span class="text-sm text-gray-500">Total Logs</span>
-          <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+          <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-primary-light text-brand-primary">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
           </div>
         </div>
@@ -289,12 +286,12 @@ onMounted(() => {
       <div class="bg-white rounded-xl border border-gray-200 p-5">
         <div class="flex items-center justify-between mb-2">
           <span class="text-sm text-gray-500">Success Rate</span>
-          <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-green-50 text-green-600">
+          <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-primary-light text-brand-primary">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           </div>
         </div>
         <template v-if="statsLoading"><SkeletonBox class="h-8 w-16" /></template>
-        <p v-else class="text-2xl font-bold text-green-600">{{ stats.success_rate }}%</p>
+        <p v-else class="text-2xl font-bold text-brand-primary">{{ stats.success_rate }}%</p>
         <p class="text-xs text-gray-400 mt-0.5">successful actions</p>
       </div>
       <div class="bg-white rounded-xl border border-gray-200 p-5">
@@ -331,7 +328,7 @@ onMounted(() => {
         >
           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
           Advanced Filters
-          <span v-if="activeFilterCount && !filtersOpen" class="ml-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-xs text-white font-bold">{{ activeFilterCount }}</span>
+          <span v-if="activeFilterCount && !filtersOpen" class="ml-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-brand-primary text-xs text-white font-bold">{{ activeFilterCount }}</span>
         </button>
         <button
           type="button"
@@ -354,46 +351,46 @@ onMounted(() => {
         <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 mb-3">
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Date From</label>
-            <input v-model="filters.date_from" type="date" class="w-full rounded-lg border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
+            <input v-model="filters.date_from" type="date" class="w-full rounded-lg border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Date To</label>
-            <input v-model="filters.date_to" type="date" class="w-full rounded-lg border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
+            <input v-model="filters.date_to" type="date" class="w-full rounded-lg border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">User Name</label>
-            <input v-model="filters.user_name" type="text" placeholder="Search by name..." class="w-full rounded-lg border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
+            <input v-model="filters.user_name" type="text" placeholder="Search by name..." class="w-full rounded-lg border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">User Role</label>
-            <select v-model="filters.user_role" class="w-full rounded-lg border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+            <select v-model="filters.user_role" class="w-full rounded-lg border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Roles</option>
               <option v-for="r in metaRoles" :key="r" :value="r">{{ r }}</option>
             </select>
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">IP Address</label>
-            <input v-model="filters.ip" type="text" placeholder="e.g. 192.168.1.0" class="w-full rounded-lg border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
+            <input v-model="filters.ip" type="text" placeholder="e.g. 192.168.1.0" class="w-full rounded-lg border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
           </div>
         </div>
         <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Action Type</label>
-            <select v-model="filters.action" class="w-full rounded-lg border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+            <select v-model="filters.action" class="w-full rounded-lg border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Actions</option>
               <option v-for="a in metaActions" :key="a" :value="a">{{ a.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) }}</option>
             </select>
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Module</label>
-            <select v-model="filters.module" class="w-full rounded-lg border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+            <select v-model="filters.module" class="w-full rounded-lg border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Modules</option>
               <option v-for="m in metaModules" :key="m" :value="m">{{ m }}</option>
             </select>
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Status</label>
-            <select v-model="filters.result" class="w-full rounded-lg border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+            <select v-model="filters.result" class="w-full rounded-lg border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Statuses</option>
               <option value="success">Success</option>
               <option value="failure">Failure</option>
@@ -401,10 +398,10 @@ onMounted(() => {
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Session ID</label>
-            <input v-model="filters.session_id" type="text" placeholder="Session..." class="w-full rounded-lg border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
+            <input v-model="filters.session_id" type="text" placeholder="Session..." class="w-full rounded-lg border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
           </div>
           <div class="flex items-end gap-2">
-            <button type="button" class="flex-1 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors" @click="applyFilters">Apply</button>
+            <button type="button" class="flex-1 rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover transition-colors" @click="applyFilters">Apply</button>
             <button type="button" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors" @click="resetFilters">Reset</button>
           </div>
         </div>
@@ -416,7 +413,7 @@ onMounted(() => {
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead class="border-b-2 border-black">
-            <tr class="bg-gray-50/80">
+            <tr class="bg-brand-primary">
               <th
                 v-for="col in activeColumns"
                 :key="col.key"
@@ -427,7 +424,7 @@ onMounted(() => {
                 <span class="inline-flex items-center gap-1">
                   {{ col.label }}
                   <template v-if="col.sortable">
-                    <svg v-if="sortKey === col.key" class="w-3.5 h-3.5 text-blue-600" :class="{ 'rotate-180': sortDir === 'asc' }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    <svg v-if="sortKey === col.key" class="w-3.5 h-3.5 text-brand-primary" :class="{ 'rotate-180': sortDir === 'asc' }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                     <svg v-else class="w-3.5 h-3.5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
                   </template>
                 </span>
@@ -464,7 +461,7 @@ onMounted(() => {
                   </template>
                   <!-- Status chip -->
                   <template v-else-if="col.key === 'result'">
-                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize" :class="log.result === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'">
+                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize" :class="log.result === 'success' ? 'bg-brand-primary-light text-brand-primary-hover' : 'bg-red-100 text-red-700'">
                       {{ log.result }}
                     </span>
                   </template>
@@ -490,7 +487,7 @@ onMounted(() => {
             <span class="whitespace-nowrap font-medium">Number of rows</span>
             <select
               :value="perPage"
-              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
               @change="e => { setPerPage(e.target.value); fetchList(1) }"
             >
               <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
@@ -506,30 +503,30 @@ onMounted(() => {
     </div>
 
     <!-- ═══ Audit Retention Info ═══ -->
-    <div class="rounded-xl bg-blue-50 border border-blue-100 px-5 py-4">
+    <div class="rounded-xl bg-brand-primary-light border border-brand-primary-muted px-5 py-4">
       <div class="flex items-center gap-2 mb-2.5">
-        <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-        <h3 class="text-sm font-bold text-blue-800">Audit Log Retention Policy</h3>
+        <svg class="w-5 h-5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        <h3 class="text-sm font-bold text-brand-primary-hover">Audit Log Retention Policy</h3>
       </div>
       <ul class="space-y-1.5 ml-1">
-        <li class="flex items-center gap-2 text-xs text-blue-700">
-          <svg class="w-4 h-4 shrink-0 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        <li class="flex items-center gap-2 text-xs text-brand-primary-hover">
+          <svg class="w-4 h-4 shrink-0 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           All system actions are automatically logged with timestamp, user, and IP address
         </li>
-        <li class="flex items-center gap-2 text-xs text-blue-700">
-          <svg class="w-4 h-4 shrink-0 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        <li class="flex items-center gap-2 text-xs text-brand-primary-hover">
+          <svg class="w-4 h-4 shrink-0 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           Logs include before/after values for all data modifications
         </li>
-        <li class="flex items-center gap-2 text-xs text-blue-700">
-          <svg class="w-4 h-4 shrink-0 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        <li class="flex items-center gap-2 text-xs text-brand-primary-hover">
+          <svg class="w-4 h-4 shrink-0 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           Failed login attempts and security events are flagged for investigation
         </li>
-        <li class="flex items-center gap-2 text-xs text-blue-700">
-          <svg class="w-4 h-4 shrink-0 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        <li class="flex items-center gap-2 text-xs text-brand-primary-hover">
+          <svg class="w-4 h-4 shrink-0 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           Data is retained permanently for compliance and cannot be deleted
         </li>
-        <li class="flex items-center gap-2 text-xs text-blue-700">
-          <svg class="w-4 h-4 shrink-0 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        <li class="flex items-center gap-2 text-xs text-brand-primary-hover">
+          <svg class="w-4 h-4 shrink-0 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           Regular quarterly reviews recommended for security audits
         </li>
       </ul>
@@ -569,7 +566,7 @@ onMounted(() => {
                   <input
                     type="checkbox"
                     :checked="localSelectedCols.includes(col.key)"
-                    class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    class="rounded border-gray-300 text-brand-primary focus:ring-brand-primary"
                     @change="toggleCol(col.key)"
                   />
                   <span class="text-sm text-gray-700">{{ col.label }}</span>
@@ -578,9 +575,9 @@ onMounted(() => {
             </div>
 
             <!-- Footer -->
-            <div class="flex justify-end gap-2 border-t border-gray-200 bg-gray-50 px-5 py-3">
-              <button type="button" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="columnModalVisible = false">Cancel</button>
-              <button type="button" class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700" @click="saveColumns">Save</button>
+            <div class="flex flex-wrap justify-end gap-2 border-t border-gray-200 bg-gray-50 px-5 py-3">
+              <button type="button" class="w-full sm:w-auto rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="columnModalVisible = false">Cancel</button>
+              <button type="button" class="w-full sm:w-auto rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover" @click="saveColumns">Save</button>
             </div>
           </div>
         </div>
@@ -591,22 +588,22 @@ onMounted(() => {
     <Teleport to="body">
       <div v-if="showDetail && detailLog" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" @click.self="showDetail = false">
         <div class="bg-white rounded-xl shadow-xl w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden" @click.stop>
-          <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div class="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-200">
             <h3 class="text-base font-bold text-gray-900">Log Details</h3>
             <button class="p-1 rounded hover:bg-gray-100 text-gray-400" @click="showDetail = false">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           </div>
-          <div class="border-b border-gray-200 px-6">
-            <div class="flex gap-4">
+          <div class="border-b border-gray-200 px-4 sm:px-6 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <div class="flex w-max min-w-full gap-2 sm:gap-4">
               <button v-for="tab in ['summary', 'old_values', 'new_values']" :key="tab"
-                class="py-2.5 text-sm font-medium border-b-2 transition-colors capitalize"
-                :class="detailTab === tab ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                class="py-2.5 px-1 text-xs sm:text-sm font-medium border-b-2 transition-colors capitalize whitespace-nowrap"
+                :class="detailTab === tab ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700'"
                 @click="detailTab = tab"
               >{{ tab.replace(/_/g, ' ') }}</button>
             </div>
           </div>
-          <div class="flex-1 overflow-y-auto px-6 py-4">
+          <div class="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
             <div v-if="detailTab === 'summary'" class="space-y-3">
               <div class="grid grid-cols-2 gap-3 text-sm">
                 <div><span class="text-gray-400 text-xs block">Date/Time</span><span class="font-medium text-gray-900">{{ fmtDate(detailLog.occurred_at) }}</span></div>
@@ -620,7 +617,7 @@ onMounted(() => {
                 <div><span class="text-gray-400 text-xs block">Record</span><span class="font-medium text-gray-900 font-mono">{{ detailLog.record_ref || detailLog.record_id || '—' }}</span></div>
                 <div>
                   <span class="text-gray-400 text-xs block">Status</span>
-                  <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold capitalize" :class="detailLog.result === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'">{{ detailLog.result }}</span>
+                  <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold capitalize" :class="detailLog.result === 'success' ? 'bg-brand-primary-light text-brand-primary-hover' : 'bg-red-100 text-red-700'">{{ detailLog.result }}</span>
                 </div>
                 <div><span class="text-gray-400 text-xs block">IP Address</span><span class="font-medium text-gray-900 font-mono">{{ detailLog.ip || '—' }}</span></div>
                 <div><span class="text-gray-400 text-xs block">Device</span><span class="font-medium text-gray-900">{{ detailLog.device || '—' }}</span></div>
@@ -638,7 +635,7 @@ onMounted(() => {
               <p v-else class="text-sm text-gray-400 text-center py-8">No new values recorded.</p>
             </div>
           </div>
-          <div class="px-6 py-3 border-t border-gray-200 flex justify-end bg-white">
+          <div class="px-4 sm:px-6 py-3 border-t border-gray-200 flex justify-end bg-white">
             <button type="button" class="rounded-lg bg-gray-600 px-5 py-2 text-sm font-medium text-white hover:bg-gray-700 transition" @click="showDetail = false">Close</button>
           </div>
         </div>

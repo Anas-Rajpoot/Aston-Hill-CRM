@@ -2,7 +2,6 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import api from '@/lib/axios'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -60,8 +59,6 @@ onMounted(load)
       <h1 class="text-2xl font-bold text-gray-900">Edit Role</h1>
       <p class="mt-1 text-sm text-gray-500">Change the role name. Use Permissions to control access.</p>
     </div>
-    <Breadcrumbs />
-
     <div v-if="errorMessage" class="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
       {{ errorMessage }}
     </div>
@@ -106,7 +103,7 @@ onMounted(load)
             type="button"
             :disabled="saving"
             @click="save"
-            class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+            class="rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50"
           >
             {{ saving ? 'Saving…' : 'Save' }}
           </button>

@@ -607,7 +607,7 @@ onMounted(async () => {
 
 const inputClass = (field) => {
   const hasError = errors.value && errors.value[field]
-  return `w-full rounded-lg border px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 ${hasError ? 'border-red-500' : 'border-gray-300'}`
+  return `w-full rounded-lg border px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary ${hasError ? 'border-red-500' : 'border-gray-300'}`
 }
 
 // Discard draft and start fresh
@@ -842,7 +842,7 @@ const cancel = () => {
 <template>
   <!-- Loading state -->
   <div v-if="loadingDraft" class="flex items-center justify-center py-12">
-    <svg class="animate-spin h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24">
+    <svg class="animate-spin h-8 w-8 text-brand-primary" fill="none" viewBox="0 0 24 24">
       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
       <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
     </svg>
@@ -851,21 +851,21 @@ const cancel = () => {
 
   <div v-else class="space-y-6">
     <!-- Resume Draft Banner -->
-    <div v-if="isResumingDraft" class="rounded-lg bg-blue-50 border border-blue-200 p-4 flex items-center justify-between">
+    <div v-if="isResumingDraft" class="rounded-lg bg-brand-primary-light border border-brand-primary-muted p-4 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-5 h-5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         <div>
-          <p class="text-sm font-medium text-blue-800">Resuming your draft</p>
-          <p class="text-xs text-blue-600">Last saved: {{ formatDate(draftDate) }}</p>
+          <p class="text-sm font-medium text-brand-primary-hover">Resuming your draft</p>
+          <p class="text-xs text-brand-primary">Last saved: {{ formatDate(draftDate) }}</p>
         </div>
       </div>
       <button
         type="button"
         @click="discardAndStartFresh"
         :disabled="discarding"
-        class="text-sm text-blue-600 hover:text-blue-800 underline disabled:opacity-50"
+        class="text-sm text-brand-primary hover:text-brand-primary-hover underline disabled:opacity-50"
       >
         {{ discarding ? 'Discarding...' : 'Start Fresh' }}
       </button>
@@ -935,7 +935,7 @@ const cancel = () => {
               <label class="block text-sm font-medium text-gray-700 mb-1">.ae Domain</label>
               <input v-model="form.ae_domain" type="text" placeholder="Enter Domain (e.g. example.ae)" :class="inputClass('ae_domain')" @input="clearFieldError('ae_domain')" />
               <p v-if="getError('ae_domain')" class="mt-1 text-sm text-red-600">{{ getError('ae_domain') }}</p>
-              <p v-else-if="form.ae_domain?.trim() && aeDomainValidation.valid" class="mt-1 text-sm text-green-600">{{ aeDomainValidation.message }}</p>
+              <p v-else-if="form.ae_domain?.trim() && aeDomainValidation.valid" class="mt-1 text-sm text-brand-primary">{{ aeDomainValidation.message }}</p>
               <p v-else-if="form.ae_domain?.trim() && !aeDomainValidation.valid" class="mt-1 text-sm text-red-600">{{ aeDomainValidation.message }}</p>
             </div>
             <div>
@@ -954,7 +954,7 @@ const cancel = () => {
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">MRC (AED)</label>
               <div class="flex w-full rounded-lg border overflow-hidden bg-white items-stretch" :class="getError('mrc_aed') ? 'border-red-500' : 'border-gray-300'">
-                <input :value="form.mrc_aed" type="text" inputmode="numeric" placeholder="0" :class="['min-w-0 flex-1 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-500 border-0', getError('mrc_aed') ? 'border-red-500' : '']" @input="onMrcInput" />
+                <input :value="form.mrc_aed" type="text" inputmode="numeric" placeholder="0" :class="['min-w-0 flex-1 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary border-0', getError('mrc_aed') ? 'border-red-500' : '']" @input="onMrcInput" />
                 <div class="flex border-l border-gray-300 shrink-0 bg-gray-50">
                   <button type="button" @click="mrcUp" class="px-2 py-1 text-gray-600 hover:bg-gray-100 border-r border-gray-200 focus:outline-none flex items-center justify-center" aria-label="Increase MRC">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
@@ -1088,7 +1088,7 @@ const cancel = () => {
 
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Comment / Remarks</label>
-            <textarea v-model="form.remarks" rows="2" placeholder="Enter any additional comments or remarks" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" @input="clearFieldError('remarks')" />
+            <textarea v-model="form.remarks" rows="2" placeholder="Enter any additional comments or remarks" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" @input="clearFieldError('remarks')" />
             <p v-if="getError('remarks')" class="mt-1 text-sm text-red-600">{{ getError('remarks') }}</p>
           </div>
         </div>
@@ -1152,7 +1152,7 @@ const cancel = () => {
                     multiple
                     @change="onFileChange(doc.key, $event)"
                   />
-                  <span class="inline-flex items-center gap-1 rounded-lg bg-green-600 px-2 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-green-700">
+                  <span class="inline-flex items-center gap-1 rounded-lg bg-brand-primary px-2 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-brand-primary-hover">
                     <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                     </svg>
@@ -1170,7 +1170,7 @@ const cancel = () => {
                 type="button"
                 @click="addAdditionalDoc"
                 :disabled="!canAddMoreAdditional"
-                class="inline-flex items-center gap-1.5 text-sm font-medium text-green-600 hover:text-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-primary hover:text-brand-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -1196,7 +1196,7 @@ const cancel = () => {
                     v-model="ad.label"
                     type="text"
                     :placeholder="'Additional Document ' + (idx + 1)"
-                    class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm placeholder:text-gray-400 focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
                     @input="clearFieldError(`additional_docs.${ad.key}`)"
                   />
                   <p v-if="getError(`additional_docs.${ad.key}`)" class="mt-0.5 text-xs text-red-600">{{ getError(`additional_docs.${ad.key}`) }}</p>
@@ -1215,7 +1215,7 @@ const cancel = () => {
                     multiple
                     @change="onAdditionalFileChange(idx, $event)"
                   />
-                  <span class="inline-flex items-center gap-1.5 rounded-lg border border-blue-500 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-100">
+                  <span class="inline-flex items-center gap-1.5 rounded-lg border border-brand-primary bg-brand-primary-light px-3 py-1.5 text-sm font-medium text-brand-primary hover:bg-brand-primary-light">
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                     </svg>
@@ -1243,7 +1243,7 @@ const cancel = () => {
           <button
             type="button"
             @click="cancel"
-            class="px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700"
+            class="px-4 py-2 rounded-lg bg-brand-primary text-white text-sm font-medium hover:bg-brand-primary-hover"
           >
             Cancel
           </button>
@@ -1263,7 +1263,7 @@ const cancel = () => {
           <button
             type="submit"
             :disabled="saving"
-            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-50 bg-green-600 hover:bg-green-700"
+            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-50 bg-brand-primary hover:bg-brand-primary-hover"
           >
             Next
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

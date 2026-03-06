@@ -46,11 +46,11 @@ class SpecialRequestApiController extends Controller
         $validated = $request->validate([
             'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
-            'sort' => ['sometimes', 'string'],
+            'sort' => ['sometimes', 'string', Rule::in(array_merge(self::ALLOWED_COLUMNS, ['creator', 'sales_agent', 'team_leader', 'manager']))],
             'order' => ['sometimes', 'string', Rule::in(['asc', 'desc'])],
             'columns' => ['sometimes', 'array'],
-            'columns.*' => ['string'],
-            'status' => ['sometimes', 'nullable', 'string'],
+            'columns.*' => ['string', Rule::in(array_merge(self::ALLOWED_COLUMNS, self::COMPUTED_COLUMNS, ['creator', 'sales_agent', 'team_leader', 'manager']))],
+            'status' => ['sometimes', 'nullable', 'string', Rule::in(SpecialRequest::STATUSES)],
             'q' => ['sometimes', 'nullable', 'string', 'max:200'],
             'company_name' => ['sometimes', 'nullable', 'string', 'max:200'],
             'account_number' => ['sometimes', 'nullable', 'string', 'max:200'],
@@ -167,7 +167,7 @@ class SpecialRequestApiController extends Controller
     private function applySort($query, string $sort, string $order): void
     {
         if ($sort === 'creator') {
-            $query->join('users as creator_users', 'special_requests.created_by', '=', 'creator_users.id')
+            $query->leftJoin('users as creator_users', 'special_requests.created_by', '=', 'creator_users.id')
                 ->orderBy('creator_users.name', $order);
         } elseif (in_array($sort, ['sales_agent', 'team_leader', 'manager'], true)) {
             $col = $sort . '_id';
@@ -251,7 +251,11 @@ class SpecialRequestApiController extends Controller
             'submitted_at' => now(),
         ]);
 
-        // Handle document uploads
+        // Validate and handle document uploads
+        $request->validate([
+            'documents' => ['sometimes', 'array', 'max:10'],
+            'documents.*' => ['file', new AllowedDocumentFile()],
+        ]);
         $files = $request->file('documents', []);
         if (is_array($files)) {
             foreach ($files as $file) {
@@ -483,7 +487,7 @@ class SpecialRequestApiController extends Controller
 
         $data = $request->validate([
             'visible_columns' => ['required', 'array', 'min:1'],
-            'visible_columns.*' => ['string'],
+            'visible_columns.*' => ['string', Rule::in(array_merge(self::ALLOWED_COLUMNS, self::COMPUTED_COLUMNS, ['creator', 'sales_agent', 'team_leader', 'manager']))],
         ]);
 
         UserColumnPreference::updateOrCreate(

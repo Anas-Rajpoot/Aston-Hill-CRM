@@ -248,6 +248,13 @@ class ExpenseApiController extends Controller
 
     private function storeAttachments(Request $request, Expense $expense): void
     {
+        $request->validate([
+            'invoice' => ['nullable', 'array', 'max:5'],
+            'invoice.*' => ['file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,doc,docx'],
+            'supporting_documents' => ['nullable', 'array', 'max:10'],
+            'supporting_documents.*' => ['file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,doc,docx,xls,xlsx,csv'],
+        ]);
+
         $baseDir = 'expense-attachments/' . $expense->id;
         $invoiceFiles = $request->file('invoice');
         if (! is_array($invoiceFiles)) {

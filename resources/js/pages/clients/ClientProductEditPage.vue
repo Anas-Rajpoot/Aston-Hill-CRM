@@ -1,7 +1,6 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
 import clientsApi from '@/services/clientsApi'
 
@@ -120,7 +119,7 @@ function validateForm() {
 function inputClass(field) {
   return fieldErrors.value[field]
     ? 'mt-1 block w-full rounded border border-red-500 px-3 py-2 text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500'
-    : 'mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500'
+    : 'mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary'
 }
 
 function selectClass(field) {
@@ -270,14 +269,12 @@ onMounted(loadInitial)
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] p-0">
+  <div class="min-h-[calc(100vh-4rem)] bg-gray-100 p-0">
     <div class="w-full">
       <div class="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="flex items-baseline gap-2">
-            <h1 class="text-xl font-semibold text-gray-900">Edit Product & Service</h1>
-            <Breadcrumbs />
-          </div>
+            <h1 class="text-xl font-semibold text-gray-900">Edit Product & Service</h1>          </div>
           <button type="button" class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="goClose">
             Back
           </button>
@@ -285,7 +282,7 @@ onMounted(loadInitial)
       </div>
 
       <div v-if="loading" class="flex justify-center py-16">
-        <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+        <svg class="h-10 w-10 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
@@ -353,42 +350,42 @@ onMounted(loadInitial)
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Service Type</label>
-              <select v-model="form.service_type" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <select v-model="form.service_type" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
                 <option value="">Select</option>
                 <option v-for="v in dropdowns.service_types" :key="v" :value="v">{{ v }}</option>
               </select>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Product Type</label>
-              <select v-model="form.product_type" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <select v-model="form.product_type" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
                 <option value="">Select</option>
                 <option v-for="v in productTypeOptions" :key="v" :value="v">{{ v }}</option>
               </select>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Address</label>
-              <input v-model="form.address" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <input v-model="form.address" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
             </div>
 
             <div>
               <label class="block text-sm font-medium text-gray-700">Product Name</label>
-              <input v-model="form.product_name" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <input v-model="form.product_name" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">MRC</label>
-              <input v-model="form.mrc" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <input v-model="form.mrc" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Quantity</label>
-              <input v-model="form.quantity" type="number" min="0" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <input v-model="form.quantity" type="number" min="0" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Offer</label>
-              <input v-model="form.other" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <input v-model="form.other" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Migration Numbers</label>
-              <input v-model="form.migration_numbers" type="text" placeholder="Enter Migration / FNP Number" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <input v-model="form.migration_numbers" type="text" placeholder="Enter Migration / FNP Number" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
             </div>
 
             <div>
@@ -407,7 +404,7 @@ onMounted(loadInitial)
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Work Order</label>
-              <input v-model="form.wo_number" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <input v-model="form.wo_number" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Work Order Status <span class="text-red-600">*</span></label>
@@ -425,7 +422,7 @@ onMounted(loadInitial)
 
             <div>
               <label class="block text-sm font-medium text-gray-700">Contract Type Term</label>
-              <select v-model="form.contract_type" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+              <select v-model="form.contract_type" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
                 <option value="">Select</option>
                 <option v-for="v in dropdowns.contract_types" :key="v" :value="v">{{ v }}</option>
               </select>
@@ -452,14 +449,14 @@ onMounted(loadInitial)
 
           <div class="mt-4">
             <label class="block text-sm font-medium text-gray-700">Additional Note</label>
-            <textarea v-model="form.additional_notes" rows="3" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"></textarea>
+            <textarea v-model="form.additional_notes" rows="3" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"></textarea>
           </div>
 
           <div class="mt-6 flex flex-wrap items-center justify-end gap-3 border-t border-gray-200 pt-4">
             <button type="button" class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="goClose">
               Back
             </button>
-            <button type="button" :disabled="saving" class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70" @click="save">
+            <button type="button" :disabled="saving" class="rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70" @click="save">
               {{ saving ? 'Updating...' : 'Update Product & Service' }}
             </button>
           </div>

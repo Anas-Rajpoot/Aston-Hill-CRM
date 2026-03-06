@@ -9,7 +9,6 @@ import { useTablePageSize } from '@/composables/useTablePageSize'
 import attendanceLogApi from '@/services/attendanceLogApi'
 import { useAuthStore } from '@/stores/auth'
 import { toDdMonYyyyDash } from '@/lib/dateFormat'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import FiltersBar from '@/components/attendance/FiltersBar.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import Toast from '@/components/Toast.vue'
@@ -47,6 +46,8 @@ const ATTENDANCE_COLUMNS = [
   { key: 'login_date', label: 'Login Date' },
   { key: 'login_time', label: 'Login Time' },
   { key: 'logout_time', label: 'Logout Time' },
+  { key: 'first_login_time', label: 'First Login' },
+  { key: 'last_logout_time', label: 'Last Logout' },
   { key: 'duration_text', label: 'Total Duration' },
   { key: 'status', label: 'Status' },
 ]
@@ -247,7 +248,7 @@ async function confirmForceLogout() {
 
 function statusPillClass(status) {
   if (status === 'logged_out') return 'bg-gray-100 text-gray-800'
-  if (status === 'logged_in') return 'bg-blue-100 text-blue-800'
+  if (status === 'logged_in') return 'bg-brand-primary-light text-brand-primary-hover'
   if (status === 'missing_logout') return 'bg-red-100 text-red-800'
   return 'bg-gray-100 text-gray-800'
 }
@@ -271,7 +272,7 @@ async function onExport() {
     const params = { ...buildParams(), page: 1, per_page: 5000 }
     const { data } = await attendanceLogApi.index(params)
     const rows = data.data ?? []
-    const headers = ['Employee Name', 'Employee ID', 'Role', 'Login Date', 'Login Time', 'Logout Time', 'Total Duration', 'Status']
+    const headers = ['Employee Name', 'Employee ID', 'Role', 'Login Date', 'Login Time', 'Logout Time', 'First Login', 'Last Logout', 'Total Duration', 'Status']
     const escape = (v) => (v == null ? '' : String(v).includes(',') || String(v).includes('"') ? '"' + String(v).replace(/"/g, '""') + '"' : v)
     const lines = [headers.map(escape).join(',')]
     for (const r of rows) {
@@ -282,6 +283,8 @@ async function onExport() {
         formatLoginDateDisplay(r.login_date),
         r.login_time,
         r.logout_time || 'Not logged out',
+        r.first_login_time || '—',
+        r.last_logout_time || '—',
         r.duration_text,
         statusLabel(r.status),
       ].map(escape).join(','))
@@ -314,9 +317,7 @@ onMounted(() => {
     <div class="mx-auto max-w-7xl space-y-4">
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div class="flex flex-wrap items-baseline gap-2">
-          <h1 class="text-xl font-semibold text-gray-900 leading-tight">Attendance Log</h1>
-          <Breadcrumbs />
-        </div>
+          <h1 class="text-xl font-semibold text-gray-900 leading-tight">Attendance Log</h1>        </div>
         <div v-if="canExport" class="flex items-center gap-2">
           <button
             type="button"
@@ -362,9 +363,9 @@ onMounted(() => {
           <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
             <div class="min-w-0">
               <p class="text-sm font-medium text-gray-500 leading-tight">Logged In</p>
-              <p class="mt-0.5 min-h-[2rem] text-2xl font-bold tabular-nums leading-tight text-blue-600">{{ summary.logged_in }}</p>
+              <p class="mt-0.5 min-h-[2rem] text-2xl font-bold tabular-nums leading-tight text-brand-primary">{{ summary.logged_in }}</p>
             </div>
-            <div class="ml-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+            <div class="ml-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-primary-light text-brand-primary">
               <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
               </svg>
@@ -445,7 +446,7 @@ onMounted(() => {
               <label class="block text-xs font-medium text-gray-600">Status</label>
               <select
                 v-model="filters.status"
-                class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                 :disabled="loading"
               >
                 <option value="">All</option>
@@ -456,7 +457,7 @@ onMounted(() => {
             </div>
             <button
               type="button"
-              class="rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 md:col-span-1"
+              class="rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50 md:col-span-1"
               :disabled="loading"
               @click="applyFilters"
             >
@@ -480,13 +481,13 @@ onMounted(() => {
               v-if="loading"
               class="absolute inset-0 z-10 flex items-center justify-center bg-white/80"
             >
-              <svg class="h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+              <svg class="h-8 w-8 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
             </div>
             <table class="min-w-full border-collapse">
-              <thead class="bg-green-700 border-b-2 border-black">
+              <thead class="bg-brand-primary border-b-2 border-green-700">
                 <tr>
                   <th
                     v-for="col in visibleColumns"
@@ -529,6 +530,10 @@ onMounted(() => {
                     <template v-else-if="col === 'logout_time'">
                       <span v-if="row.logout_time">{{ row.logout_time }}</span>
                       <span v-else class="italic text-gray-500">Not logged out</span>
+                    </template>
+                    <template v-else-if="col === 'last_logout_time'">
+                      <span v-if="row.last_logout_time">{{ row.last_logout_time }}</span>
+                      <span v-else class="italic text-gray-500">—</span>
                     </template>
                     <template v-else-if="col === 'duration_text'">
                       <span v-if="row.duration_state === 'missing'" class="font-bold text-red-600">{{ row.duration_text }}</span>
@@ -575,7 +580,7 @@ onMounted(() => {
                 <span class="whitespace-nowrap font-medium">Number of rows</span>
                 <select
                   :value="perPage"
-                  class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   @change="onPerPageChange"
                 >
                   <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>

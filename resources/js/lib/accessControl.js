@@ -78,7 +78,9 @@ const MODULE_ALIASES = {
 
 const ACTION_ALIASES = {
   view: ['view', 'list', 'read'],
+  read: ['read', 'list', 'view'],
   edit: ['edit', 'update'],
+  update: ['update', 'edit'],
   delete: ['delete'],
   export: ['export', 'bulk-download', 'download'],
   import: ['import', 'upload', 'bulk-upload', 'upload-csv'],
@@ -133,7 +135,7 @@ const ROUTE_ACCESS_RULES = [
   { prefix: '/customer-support', modules: ['customer_support_requests', 'customer-support', 'customer-support-requests', 'customer_support'] },
   { prefix: '/vas-requests', modules: ['vas_requests', 'vas-requests', 'vas'] },
   { prefix: '/special-requests', modules: ['special_requests', 'special-requests', 'special'] },
-  { prefix: '/all-clients', modules: ['all-clients', 'all_clients'] },
+  { prefix: '/all-clients', modules: ['all-clients', 'all_clients', 'accounts'] },
   { prefix: '/clients', modules: ['clients'] },
   { prefix: '/order-status', modules: ['order-status', 'order_status'] },
   { prefix: '/dsp-tracker', modules: ['dsp_tracker', 'dsp-tracker'] },
@@ -146,10 +148,12 @@ const ROUTE_ACCESS_RULES = [
   { prefix: '/reports', modules: ['reports'] },
   { prefix: '/users', modules: ['users'] },
   { prefix: '/teams', modules: ['teams'] },
+  { prefix: '/notifications', modules: ['notifications'] },
 ]
 
 export function canAccessRoute(user, path) {
   if (path === '/' || path === '/dashboard') return true
+  if (path === '/notifications') return true // all authenticated users can view their notifications
   if (isSuperAdmin(user)) return true
 
   if (path.startsWith('/submissions')) {

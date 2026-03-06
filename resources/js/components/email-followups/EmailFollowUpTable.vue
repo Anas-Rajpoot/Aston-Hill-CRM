@@ -158,7 +158,7 @@ function isEditing(rowId, col) {
 /** Approved = approved (legacy followed_up treated as approved). */
 const isApproved = (status) => status === 'approved' || status === 'followed_up'
 function statusLabel(status) {
-  return isApproved(status) ? 'Approved' : 'Pending'
+  return isApproved(status) ? 'Closed' : 'Open'
 }
 function onStatusToggle(row) {
   if (!canInlineEdit.value || !row?.id) return
@@ -176,7 +176,7 @@ function onStatusToggle(row) {
       aria-busy="true"
     >
       <div class="flex flex-col items-center gap-2">
-        <svg class="h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+        <svg class="h-8 w-8 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
@@ -186,7 +186,7 @@ function onStatusToggle(row) {
 
     <table class="min-w-full border-2 border-black border-collapse bg-white">
       <thead>
-        <tr class="border-b-2 border-black bg-gray-50">
+        <tr class="bg-brand-primary border-b-2 border-green-700">
           <th
             v-for="col in columns"
             :key="col"
@@ -238,7 +238,7 @@ function onStatusToggle(row) {
               <a
                 v-if="row.sent_to"
                 :href="'mailto:' + row.sent_to"
-                class="text-blue-600 underline hover:text-blue-800"
+                class="text-brand-primary underline hover:text-brand-primary-hover"
               >{{ truncate(row.sent_to) }}</a>
               <span v-else>—</span>
             </template>
@@ -256,7 +256,7 @@ function onStatusToggle(row) {
                     'inline-flex h-6 w-11 shrink-0 rounded-full border-2 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1',
                     canInlineEdit ? 'cursor-pointer' : 'cursor-default',
                     isApproved(row.status)
-                      ? 'border-green-500 bg-green-500 focus:ring-green-400'
+                      ? 'border-brand-primary bg-brand-primary focus:ring-brand-primary'
                       : 'border-red-500 bg-red-500 focus:ring-red-400',
                   ]"
                   :disabled="!canInlineEdit"
@@ -277,7 +277,7 @@ function onStatusToggle(row) {
               <div class="flex flex-col gap-1.5">
                 <select
                   v-model="inlineEditValue"
-                  class="w-full min-w-[160px] max-w-[220px] rounded border border-gray-300 bg-white px-3 py-1.5 pr-8 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full min-w-[160px] max-w-[220px] rounded border border-gray-300 bg-white px-3 py-1.5 pr-8 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   @keydown.enter="saveInlineEdit"
                   @keydown.esc="cancelInlineEdit"
                 >
@@ -285,7 +285,7 @@ function onStatusToggle(row) {
                 </select>
                 <div class="flex gap-1">
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
-                  <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
+                  <button type="button" class="rounded bg-brand-primary px-2 py-0.5 text-xs text-white hover:bg-brand-primary-hover" @click="saveInlineEdit">Save</button>
                 </div>
               </div>
             </template>
@@ -294,13 +294,13 @@ function onStatusToggle(row) {
                 <input
                   v-model="inlineEditValue"
                   type="text"
-                  class="w-full min-w-[100px] max-w-[220px] rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full min-w-[100px] max-w-[220px] rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   @keydown.enter="saveInlineEdit"
                   @keydown.esc="cancelInlineEdit"
                 />
                 <div class="flex gap-1">
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
-                  <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
+                  <button type="button" class="rounded bg-brand-primary px-2 py-0.5 text-xs text-white hover:bg-brand-primary-hover" @click="saveInlineEdit">Save</button>
                 </div>
               </div>
             </template>

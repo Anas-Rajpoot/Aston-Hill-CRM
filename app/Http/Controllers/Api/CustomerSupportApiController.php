@@ -395,26 +395,26 @@ class CustomerSupportApiController extends Controller
         foreach ($columns as $col) {
             if ($col === 'manager') {
                 $out['manager_id'] = $row->manager_id;
-                $out['manager'] = $row->manager?->name ?? null;
+                $out['manager'] = $row->relationLoaded('manager') ? ($row->manager?->name ?? null) : null;
                 continue;
             }
             if ($col === 'team_leader') {
                 $out['team_leader_id'] = $row->team_leader_id;
-                $out['team_leader'] = $row->teamLeader?->name ?? null;
+                $out['team_leader'] = $row->relationLoaded('teamLeader') ? ($row->teamLeader?->name ?? null) : null;
                 continue;
             }
             if ($col === 'sales_agent') {
                 $out['sales_agent_id'] = $row->sales_agent_id;
-                $out['sales_agent'] = $row->salesAgent?->name ?? null;
+                $out['sales_agent'] = $row->relationLoaded('salesAgent') ? ($row->salesAgent?->name ?? null) : null;
                 continue;
             }
             if ($col === 'csr' || $col === 'csr_id') {
                 $out['csr_id'] = $row->csr_id;
-                $out['csr'] = $row->csrUser?->name ?? $row->csr_name ?? null;
+                $out['csr'] = $row->relationLoaded('csrUser') ? ($row->csrUser?->name ?? null) : ($row->csr_name ?? null);
                 continue;
             }
             if ($col === 'creator') {
-                $out['creator'] = $row->creator?->name ?? null;
+                $out['creator'] = $row->relationLoaded('creator') ? ($row->creator?->name ?? null) : null;
                 continue;
             }
             if ($col === 'sla_timer') {
@@ -749,6 +749,11 @@ class CustomerSupportApiController extends Controller
     public function addAttachments(Request $request, CustomerSupportSubmission $customerSupportSubmission): JsonResponse
     {
         $this->authorize('update', $customerSupportSubmission);
+
+        $request->validate([
+            'documents' => ['required', 'array', 'max:10'],
+            'documents.*' => ['file', 'max:10240', 'mimes:pdf,doc,docx,jpg,jpeg,png,eml,xlsx,xls,csv'],
+        ]);
 
         $files = $request->allFiles();
         $newEntries = [];

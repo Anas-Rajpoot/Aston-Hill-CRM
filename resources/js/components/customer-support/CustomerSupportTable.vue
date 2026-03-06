@@ -295,10 +295,10 @@ function isEditing(rowId, col) {
 const STATUS_BADGES = {
   unassigned: 'bg-amber-100 text-amber-700',
   draft: 'bg-gray-100 text-gray-700',
-  submitted: 'bg-blue-100 text-blue-700',
-  approved: 'bg-green-100 text-green-700',
+  submitted: 'bg-brand-primary-light text-brand-primary-hover',
+  approved: 'bg-brand-primary-light text-brand-primary-hover',
   rejected: 'bg-red-100 text-red-700',
-  completed: 'bg-emerald-100 text-emerald-700',
+  completed: 'bg-brand-primary-light text-brand-primary',
   'Pending with CM': 'bg-orange-100 text-orange-700',
   'Pending with DU': 'bg-yellow-100 text-yellow-700',
   'Pending with Sales': 'bg-purple-100 text-purple-700',
@@ -315,16 +315,16 @@ function statusLabel(status) {
 }
 
 const WORKFLOW_BADGES = {
-  'On Time': 'bg-green-100 text-green-700',
-  'on_time': 'bg-green-100 text-green-700',
+  'On Time': 'bg-brand-primary-light text-brand-primary-hover',
+  'on_time': 'bg-brand-primary-light text-brand-primary-hover',
   'Breached': 'bg-red-100 text-red-700',
   'breached': 'bg-red-100 text-red-700',
   'Approaching Breach': 'bg-orange-100 text-orange-700',
   'approaching_breach': 'bg-orange-100 text-orange-700',
-  'open': 'bg-blue-100 text-blue-700',
+  'open': 'bg-brand-primary-light text-brand-primary-hover',
   'in_progress': 'bg-yellow-100 text-yellow-700',
   'pending': 'bg-orange-100 text-orange-700',
-  'resolved': 'bg-green-100 text-green-700',
+  'resolved': 'bg-brand-primary-light text-brand-primary-hover',
   'closed': 'bg-gray-100 text-gray-700',
 }
 function workflowBadgeClass(val) {
@@ -351,7 +351,7 @@ const hasAnyRowAction = computed(() => {
     >
       <div class="flex flex-col items-center gap-2">
         <svg
-          class="h-8 w-8 animate-spin text-green-600"
+          class="h-8 w-8 animate-spin text-brand-primary"
           xmlns="http://www.w3.org/2000/svg"
           fill="none"
           viewBox="0 0 24 24"
@@ -366,28 +366,22 @@ const hasAnyRowAction = computed(() => {
 
     <table class="min-w-full border-2 border-black border-collapse">
       <thead>
-        <tr class="border-b-2 border-black bg-green-600">
-          <th v-if="canBulkAssign" class="w-10 px-3 py-3 text-left">
-            <input
-              type="checkbox"
-              class="rounded border-gray-300"
-              aria-label="Select all"
-              :checked="isAllSelected"
-              :indeterminate="selectedSet.size > 0 && !isAllSelected"
-              @change="toggleSelectAll"
-            />
+        <tr class="bg-brand-primary border-b-2 border-green-700">
+          <th v-if="canBulkAssign" class="w-10 px-3 py-3">
+            <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll()" class="rounded border-gray-300 text-brand-primary focus:ring-brand-primary" />
           </th>
           <th
             v-for="col in columns"
             :key="col"
             scope="col"
-            class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold capitalize text-white"
+            class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold text-black cursor-pointer select-none"
+            @click="sortable(col) ? toggleSort(col) : null"
           >
             <button
               v-if="sortable(col)"
               type="button"
-              class="inline-flex items-center gap-1 font-bold text-white hover:text-white/90"
-              @click="toggleSort(col)"
+              class="inline-flex items-center gap-1 font-bold text-white hover:text-white/70"
+              @click.stop="toggleSort(col)"
             >
               {{ label(col) }}
               <svg
@@ -401,7 +395,7 @@ const hasAnyRowAction = computed(() => {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
               </svg>
             </button>
-            <span v-else class="font-bold text-white">{{ label(col) }}</span>
+            <span v-else class="font-bold text-black">{{ label(col) }}</span>
           </th>
           <th v-if="hasAnyRowAction" scope="col" class="whitespace-nowrap px-4 py-3 text-center text-sm font-bold capitalize text-white">
             Actions
@@ -442,7 +436,7 @@ const hasAnyRowAction = computed(() => {
               <div class="flex flex-col gap-1.5">
                 <select
                   v-model="inlineEditValue"
-                  class="w-full min-w-[200px] rounded border bg-white px-3 py-1.5 pr-8 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full min-w-[200px] rounded border bg-white px-3 py-1.5 pr-8 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   :class="inlineEditError ? 'border-red-500' : 'border-gray-300'"
                   @change="inlineEditError = ''"
                   @keydown.enter="saveInlineEdit"
@@ -453,7 +447,7 @@ const hasAnyRowAction = computed(() => {
                 <p v-if="inlineEditError" class="text-xs text-red-600">{{ inlineEditError }}</p>
                 <div class="flex gap-1">
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
-                  <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
+                  <button type="button" class="rounded bg-brand-primary px-2 py-0.5 text-xs text-white hover:bg-brand-primary-hover" @click="saveInlineEdit">Save</button>
                 </div>
               </div>
             </template>
@@ -464,7 +458,7 @@ const hasAnyRowAction = computed(() => {
                   v-if="col === 'issue_description'"
                   v-model="inlineEditValue"
                   rows="3"
-                  class="w-full min-w-[180px] max-w-[280px] rounded border bg-white px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full min-w-[180px] max-w-[280px] rounded border bg-white px-2 py-1 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   :class="inlineEditError ? 'border-red-500' : 'border-gray-300'"
                   @input="inlineEditError = ''"
                   @keydown.esc="cancelInlineEdit"
@@ -475,7 +469,7 @@ const hasAnyRowAction = computed(() => {
                   type="text"
                   maxlength="12"
                   placeholder="971XXXXXXXXX"
-                  class="w-full min-w-[100px] max-w-[220px] rounded border bg-white px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full min-w-[100px] max-w-[220px] rounded border bg-white px-2 py-1 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   :class="inlineEditError ? 'border-red-500' : 'border-gray-300'"
                   @input="onPhoneInput($event)"
                   @keydown.enter="saveInlineEdit"
@@ -485,7 +479,7 @@ const hasAnyRowAction = computed(() => {
                   v-else
                   v-model="inlineEditValue"
                   type="text"
-                  class="w-full min-w-[100px] max-w-[220px] rounded border bg-white px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full min-w-[100px] max-w-[220px] rounded border bg-white px-2 py-1 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   :class="inlineEditError ? 'border-red-500' : 'border-gray-300'"
                   @input="inlineEditError = ''"
                   @keydown.enter="saveInlineEdit"
@@ -494,7 +488,7 @@ const hasAnyRowAction = computed(() => {
                 <p v-if="inlineEditError" class="text-xs text-red-600">{{ inlineEditError }}</p>
                 <div class="flex gap-1">
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
-                  <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
+                  <button type="button" class="rounded bg-brand-primary px-2 py-0.5 text-xs text-white hover:bg-brand-primary-hover" @click="saveInlineEdit">Save</button>
                 </div>
               </div>
             </template>
@@ -503,7 +497,7 @@ const hasAnyRowAction = computed(() => {
               <div class="flex flex-col gap-1.5">
                 <select
                   v-model="inlineEditValue"
-                  class="w-full min-w-[160px] max-w-[220px] rounded border bg-white px-3 py-1.5 pr-8 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="w-full min-w-[160px] max-w-[220px] rounded border bg-white px-3 py-1.5 pr-8 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   :class="inlineEditError ? 'border-red-500' : 'border-gray-300'"
                   @change="inlineEditError = ''"
                   @keydown.enter="saveInlineEdit"
@@ -514,7 +508,7 @@ const hasAnyRowAction = computed(() => {
                 <p v-if="inlineEditError" class="text-xs text-red-600">{{ inlineEditError }}</p>
                 <div class="flex gap-1">
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
-                  <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
+                  <button type="button" class="rounded bg-brand-primary px-2 py-0.5 text-xs text-white hover:bg-brand-primary-hover" @click="saveInlineEdit">Save</button>
                 </div>
               </div>
             </template>
@@ -549,9 +543,9 @@ const hasAnyRowAction = computed(() => {
                 :class="[
                   'inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium',
                   String(row.sla_timer).startsWith('Overdue') ? 'bg-red-100 text-red-700'
-                    : String(row.sla_timer) === 'Assigned' ? 'bg-green-100 text-green-700'
+                    : String(row.sla_timer) === 'Assigned' ? 'bg-brand-primary-light text-brand-primary-hover'
                       : String(row.sla_timer).startsWith('Due in') ? 'bg-orange-100 text-orange-700'
-                        : 'bg-blue-100 text-blue-700',
+                        : 'bg-brand-primary-light text-brand-primary-hover',
                 ]"
               >
                 {{ row.sla_timer }}
@@ -560,7 +554,7 @@ const hasAnyRowAction = computed(() => {
             </template>
             <template v-else-if="col === 'status' && canInlineEdit">
               <span
-                :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium cursor-pointer hover:ring-2 hover:ring-green-400', statusBadgeClass(row.status)]"
+                :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium cursor-pointer hover:ring-2 hover:ring-brand-primary', statusBadgeClass(row.status)]"
                 @dblclick="openDropdownEdit(row, 'status')"
               >
                 {{ statusLabel(row.status) }}
@@ -596,7 +590,7 @@ const hasAnyRowAction = computed(() => {
                 <button
                   v-if="canViewAction"
                   type="button"
-                  class="rounded-full p-1.5 text-blue-600 hover:bg-blue-50"
+                  class="rounded-full p-1.5 text-brand-primary hover:bg-brand-primary-light"
                   title="View"
                   @click="goToView(row)"
                 >
@@ -608,7 +602,7 @@ const hasAnyRowAction = computed(() => {
                 <button
                   v-if="canEditAction"
                   type="button"
-                  class="rounded-full p-1.5 text-green-600 hover:bg-green-50"
+                  class="rounded-full p-1.5 text-brand-primary hover:bg-brand-primary-light"
                   title="Edit"
                   @click="goToEdit(row)"
                 >

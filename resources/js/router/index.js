@@ -3,8 +3,6 @@ import { createRouter, createWebHistory } from 'vue-router'
 import AppLayout from '@/layouts/AppLayout.vue'
 import Dashboard from '@/pages/Dashboard.vue'
 import PlaceholderPage from '@/pages/PlaceholderPage.vue'
-import UserShow from '@/pages/users/UserShow.vue'
-import UserEdit from '@/pages/users/UserEdit.vue'
 import LoginPage from '@/pages/auth/Login.vue'
 import RegisterPage from '@/pages/auth/Register.vue'
 import ForgotPasswordPage from '@/pages/auth/ForgotPassword.vue'
@@ -35,55 +33,57 @@ const routes = [
     component: AppLayout,
     children: [
       { path: '', component: Dashboard, name: 'home' },
-      { path: 'submissions', component: () => import('@/pages/submissions/SubmissionsPage.vue') },
-      { path: 'lead-submissions', component: () => import('@/pages/lead-submissions/LeadSubmissionsListingPage.vue') },
+      { path: 'submissions', component: () => import('@/pages/submissions/SubmissionsPage.vue'), meta: { title: 'All Forms' } },
+      { path: 'lead-submissions', component: () => import('@/pages/lead-submissions/LeadSubmissionsListingPage.vue'), meta: { title: 'Lead Submissions' } },
       { path: 'lead-submissions/audit-log', component: () => import('@/pages/lead-submissions/LeadSubmissionAuditLogPage.vue'), name: 'lead-submission-audit-log' },
       { path: 'lead-submissions/:id/resubmit', component: () => import('@/pages/lead-submissions/LeadResubmissionPage.vue'), name: 'lead-resubmission' },
       { path: 'lead-submissions/:id/edit', component: () => import('@/pages/lead-submissions/LeadSubmissionEditPage.vue'), name: 'lead-submission-edit' },
       { path: 'lead-submissions/:id', component: () => import('@/pages/lead-submissions/LeadSubmissionDetailPage.vue'), name: 'lead-submission-detail' },
-      { path: 'users', component: () => import('@/pages/users/UsersPage.vue') },
-      { path: 'users/create', component: () => import('@/pages/users/UserCreate.vue') },
-      { path: 'users/:id', component: UserShow },
-      { path: 'users/:id/edit', component: UserEdit },
+      { path: 'users', component: () => import('@/pages/users/UsersPage.vue'), meta: { title: 'Users' } },
+      { path: 'users/create', component: () => import('@/pages/users/UserCreate.vue'), meta: { title: 'Add User' } },
+      { path: 'users/:id', component: () => import('@/pages/users/UserShow.vue'), meta: { title: 'User Details' } },
+      { path: 'users/:id/edit', component: () => import('@/pages/users/UserEdit.vue'), meta: { title: 'Edit User' } },
       { path: 'back-office', ...ph('Back Office') },
-      { path: 'field-submissions', component: () => import('@/pages/field-submissions/FieldSubmissionsListingPage.vue') },
+      { path: 'field-submissions', component: () => import('@/pages/field-submissions/FieldSubmissionsListingPage.vue'), meta: { title: 'Field Submissions' } },
       { path: 'field-submissions/audit-log', component: () => import('@/pages/field-submissions/FieldSubmissionAuditLogPage.vue'), name: 'field-submission-audit-log' },
       { path: 'field-submissions/:id/edit', component: () => import('@/pages/field-submissions/FieldSubmissionEditPage.vue'), name: 'field-submission-edit' },
       { path: 'field-submissions/:id', component: () => import('@/pages/field-submissions/FieldSubmissionDetailPage.vue'), name: 'field-submission-detail' },
-      { path: 'customer-support', component: () => import('@/pages/customer-support/CustomerSupportListingPage.vue') },
+      { path: 'customer-support', component: () => import('@/pages/customer-support/CustomerSupportListingPage.vue'), meta: { title: 'Customer Support' } },
       { path: 'customer-support/:id', component: () => import('@/pages/customer-support/CustomerSupportDetailPage.vue') },
       { path: 'customer-support/:id/edit', component: () => import('@/pages/customer-support/CustomerSupportEditPage.vue') },
       { path: 'customer-support/:id/resubmit', component: () => import('@/pages/customer-support/CustomerSupportResubmitPage.vue'), name: 'cs-resubmit' },
-      { path: 'vas-requests', component: () => import('@/pages/vas-requests/VasRequestsListingPage.vue') },
+      { path: 'vas-requests', component: () => import('@/pages/vas-requests/VasRequestsListingPage.vue'), meta: { title: 'VAS Requests' } },
       { path: 'vas-requests/:id/edit', component: () => import('@/pages/vas-requests/VasRequestEditPage.vue'), name: 'vas-request-edit' },
       { path: 'vas-requests/:id', component: () => import('@/pages/vas-requests/VasRequestDetailPage.vue'), name: 'vas-request-detail' },
-      { path: 'special-requests', component: () => import('@/pages/special-requests/SpecialRequestsListingPage.vue') },
+      { path: 'special-requests', component: () => import('@/pages/special-requests/SpecialRequestsListingPage.vue'), meta: { title: 'Special Requests' } },
       { path: 'special-requests/:id/edit', component: () => import('@/pages/special-requests/SpecialRequestEditPage.vue'), name: 'special-request-edit' },
       { path: 'special-requests/:id', component: () => import('@/pages/special-requests/SpecialRequestDetailPage.vue'), name: 'special-request-detail' },
       { path: 'all-clients', name: 'clients.all', component: () => import('@/pages/clients/AllClientsListingPage.vue'), meta: { title: 'All Clients' } },
-      { path: 'clients', name: 'clients.index', component: () => import('@/pages/clients/ClientsListingPage.vue') },
+      { path: 'clients', name: 'clients.index', component: () => import('@/pages/clients/ClientsListingPage.vue'), meta: { title: 'Clients' } },
       { path: 'clients/create', name: 'clients.create', component: () => import('@/pages/clients/ClientCreatePage.vue'), meta: { title: 'Add New Client' } },
       { path: 'clients/products/:id', component: () => import('@/pages/clients/ClientProductDetailPage.vue'), name: 'client-product-detail' },
       { path: 'clients/products/:id/edit', component: () => import('@/pages/clients/ClientProductEditPage.vue'), name: 'client-product-edit' },
       { path: 'clients/:id', component: () => import('@/pages/clients/ClientProfilePage.vue'), name: 'client-profile' },
       { path: 'clients/:id/edit', component: () => import('@/pages/clients/ClientEditPage.vue'), meta: { title: 'Edit Client' } },
       { path: 'order-status', component: () => import('@/pages/order-status/OrderStatusListingPage.vue'), meta: { title: 'Order Status' } },
-      { path: 'dsp-tracker', component: () => import('@/pages/dsp-tracker/DSPTrackerListingPage.vue') },
+      { path: 'dsp-tracker', component: () => import('@/pages/dsp-tracker/DSPTrackerListingPage.vue'), meta: { title: 'DSP Tracker' } },
       { path: 'gsm-tracker', redirect: '/dsp-tracker' },
       { path: 'verifiers-detail', component: () => import('@/pages/verifiers/VerifiersDetailPage.vue'), meta: { title: 'Verifiers Detail' } },
-      { path: 'employees', component: () => import('@/pages/employees/EmployeesListingPage.vue') },
-      { path: 'employees/:id', component: UserShow },
-      { path: 'employees/:id/edit', component: UserEdit },
-      { path: 'cisco-extensions', component: () => import('@/pages/extensions/ExtensionsListingPage.vue') },
+      { path: 'employees', redirect: '/users' },
+      { path: 'employees/:id', component: () => import('@/pages/users/UserShow.vue'), meta: { title: 'Employee Details' } },
+      { path: 'employees/:id/edit', component: () => import('@/pages/users/UserEdit.vue'), meta: { title: 'Edit Employee' } },
+      { path: 'cisco-extensions', component: () => import('@/pages/extensions/ExtensionsListingPage.vue'), meta: { title: 'Cisco Extensions' } },
       { path: 'cisco-extensions/create', ...ph('Add Extension') },
       { path: 'cisco-extensions/:id', component: () => import('@/pages/extensions/ExtensionDetailPage.vue') },
       { path: 'cisco-extensions/:id/edit', ...ph('Edit Extension') },
-      { path: 'attendance-log', component: () => import('@/pages/attendance/AttendanceLogPage.vue') },
+      { path: 'attendance-log', component: () => import('@/pages/attendance/AttendanceLogPage.vue'), meta: { title: 'Attendance Log' } },
       { path: 'reports', component: () => import('@/pages/reports/ReportsMainPage.vue'), meta: { title: 'Reports' } },
       { path: 'reports/lead', component: () => import('@/pages/reports/LeadReportsPage.vue'), meta: { title: 'Lead Reports' } },
       { path: 'reports/field-operations', component: () => import('@/pages/reports/FieldOperationsReportsPage.vue'), meta: { title: 'Field Operations Reports' } },
       { path: 'reports/vas', component: () => import('@/pages/reports/VasReportsPage.vue'), meta: { title: 'VAS Reports' } },
       { path: 'reports/sla', component: () => import('@/pages/reports/SlaPerformanceReportsPage.vue'), meta: { title: 'SLA Performance Report' } },
+      { path: 'reports/customer-support', component: () => import('@/pages/reports/CustomerSupportReportsPage.vue'), meta: { title: 'Customer Support Reports' } },
+      { path: 'reports/clients', component: () => import('@/pages/reports/ClientReportsPage.vue'), meta: { title: 'Client & Company Reports' } },
       { path: 'settings', component: () => import('@/pages/settings/SettingsPage.vue'), meta: { title: 'Settings' } },
       { path: 'settings/team-hierarchy', component: () => import('@/pages/settings/TeamHierarchyPage.vue') },
       { path: 'settings/system-preferences', component: () => import('@/pages/settings/SystemPreferencesPage.vue'), meta: { title: 'System Preferences' } },
@@ -92,12 +92,13 @@ const routes = [
       { path: 'settings/announcement-center', component: () => import('@/pages/settings/AnnouncementCenterPage.vue'), meta: { title: 'Announcement Center' } },
       { path: 'settings/library', component: () => import('@/pages/settings/LibraryPage.vue'), meta: { title: 'Library — Templates & Forms' } },
       { path: 'settings/data-import-export', component: () => import('@/pages/PlaceholderPage.vue'), props: { title: 'Data & Import/Export' }, meta: { title: 'Data & Import/Export' } },
+      { path: 'settings/dropdown-seeder', component: () => import('@/pages/settings/DropdownSeederPage.vue'), meta: { title: 'Dropdown Seeder' } },
       { path: 'settings/security-session', component: () => import('@/pages/settings/SecuritySessionPage.vue'), meta: { title: 'Security, Session & Access Control' } },
       { path: 'settings/audit-logs', component: () => import('@/pages/settings/AuditLogsPage.vue'), meta: { title: 'Audit Logs' } },
       { path: 'announcements', ...ph('Announcements') },
-      { path: 'notifications', ...ph('Notifications') },
+      { path: 'notifications', component: () => import('@/pages/notifications/NotificationsPage.vue'), meta: { title: 'Notifications' } },
       { path: 'accounts', ...ph('Accounts') },
-      { path: 'email-followups', component: () => import('@/pages/email-followups/EmailFollowUpPage.vue') },
+      { path: 'email-followups', component: () => import('@/pages/email-followups/EmailFollowUpPage.vue'), meta: { title: 'Email Follow-Up' } },
       { path: 'login-logs', ...ph('Login Logs') },
       { path: 'expenses', component: () => import('@/pages/expenses/ExpenseTrackerPage.vue') },
       { path: 'expenses/create', ...ph('Add Expense') },
@@ -111,14 +112,16 @@ const routes = [
       { path: 'teams/:id', component: () => import('@/pages/teams/TeamDetailPage.vue'), meta: { title: 'Team Details' } },
       { path: 'teams/:id/edit', component: () => import('@/pages/teams/TeamEditPage.vue'), meta: { title: 'Edit Team' } },
       { path: 'teams/:id/members', component: () => import('@/pages/teams/TeamMembersPage.vue'), meta: { title: 'Manage Team Members' } },
-      { path: 'roles', component: () => import('@/pages/roles/RolesPage.vue') },
-      { path: 'roles/create', component: () => import('@/pages/roles/RoleCreate.vue') },
+      { path: 'roles', component: () => import('@/pages/roles/RolesPage.vue'), meta: { title: 'Roles' } },
+      { path: 'roles/create', component: () => import('@/pages/roles/RoleCreate.vue'), meta: { title: 'Create Role' } },
       { path: 'roles/:role', redirect: (to) => ({ path: `/roles/${to.params.role}/permissions` }) },
-      { path: 'roles/:role/edit', component: () => import('@/pages/roles/RoleEdit.vue') },
-      { path: 'roles/:role/permissions', component: () => import('@/pages/roles/RolePermissions.vue') },
-      { path: 'permissions', component: () => import('@/pages/roles/PermissionsPage.vue') },
+      { path: 'roles/:role/edit', component: () => import('@/pages/roles/RoleEdit.vue'), meta: { title: 'Edit Role' } },
+      { path: 'roles/:role/permissions', component: () => import('@/pages/roles/RolePermissions.vue'), meta: { title: 'Role Permissions' } },
+      { path: 'permissions', component: () => import('@/pages/roles/PermissionsPage.vue'), meta: { title: 'Permissions' } },
     ],
   },
+  { path: '/forbidden', name: 'Forbidden', component: () => import('@/pages/errors/ForbiddenPage.vue'), meta: { title: 'Access Denied' } },
+  { path: '/:pathMatch(.*)*', name: 'NotFound', component: () => import('@/pages/errors/NotFoundPage.vue'), meta: { title: 'Page Not Found' } },
 ]
 
 const router = createRouter({
@@ -199,7 +202,7 @@ router.beforeEach(async (to, from, next) => {
   // Default-deny module access for non-superadmin users.
   // Dashboard remains the safe fallback for users with no assigned permissions.
   if (!canAccessRoute(auth.user, to.path)) {
-    return next('/')
+    return next('/forbidden')
   }
 
   next()
@@ -211,12 +214,9 @@ router.onError((err) => {
   if (/Loading chunk \d+ failed|Failed to fetch dynamically imported module|Importing a module script failed/i.test(msg)) {
     const key = '__router_chunk_retry__'
     const retried = sessionStorage.getItem(key) === '1'
-    if (!retried) {
-      sessionStorage.setItem(key, '1')
-      window.location.reload()
-      return
-    }
-    sessionStorage.removeItem(key)
+    if (retried) return
+    sessionStorage.setItem(key, '1')
+    window.location.reload()
   }
 })
 

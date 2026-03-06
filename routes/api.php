@@ -54,6 +54,7 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
 
     // Dashboard
     Route::get('/dashboard/stats', [\App\Http\Controllers\Api\DashboardController::class, 'stats']);
+    Route::get('/dashboard/filters', [\App\Http\Controllers\Api\DashboardController::class, 'filters']);
 
     // Session heartbeat (extend session)
     Route::post('/session/heartbeat', function (\Illuminate\Http\Request $request) {
@@ -167,6 +168,9 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::put('/clients/{client}/contacts', [\App\Http\Controllers\Api\ClientApiController::class, 'updateContacts'])->whereNumber('client');
     Route::put('/clients/{client}/addresses', [\App\Http\Controllers\Api\ClientApiController::class, 'updateAddresses'])->whereNumber('client');
     Route::post('/clients/renewal-alerts/generate', [\App\Http\Controllers\Api\ClientApiController::class, 'generateRenewalAlerts']);
+    Route::post('/clients/bulk-assign-csr', [\App\Http\Controllers\Api\ClientApiController::class, 'bulkAssignCsr']);
+    Route::post('/clients/bulk-assign-account-manager', [\App\Http\Controllers\Api\ClientApiController::class, 'bulkAssignAccountManager']);
+    Route::post('/clients/bulk-delete', [\App\Http\Controllers\Api\ClientApiController::class, 'bulkDelete']);
     Route::get('/clients/{client}/alerts', [\App\Http\Controllers\Api\ClientApiController::class, 'alerts'])->whereNumber('client');
     Route::post('/clients/{client}/alerts', [\App\Http\Controllers\Api\ClientApiController::class, 'storeAlert'])->whereNumber('client');
     Route::put('/clients/{client}/alerts/{alert}', [\App\Http\Controllers\Api\ClientApiController::class, 'updateAlert'])->whereNumber('client')->whereNumber('alert');
@@ -337,6 +341,10 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::post('/users', [UserController::class, 'store']);
     Route::post('/users/bulk-activate', [UserController::class, 'bulkActivate']);
     Route::post('/users/bulk-deactivate', [UserController::class, 'bulkDeactivate']);
+    Route::post('/users/bulk-assign-monthly-target', [UserController::class, 'bulkAssignMonthlyTarget']);
+    Route::get('/users/export', [UserController::class, 'export']);
+    Route::get('/users/import-template', [UserController::class, 'importTemplate']);
+    Route::post('/users/bulk-import', [UserController::class, 'bulkImport']);
     Route::get('/users/{user}', [UserController::class, 'show'])->whereNumber('user');
     Route::get('/users/{user}/prime', [UserController::class, 'prime'])->whereNumber('user');
     Route::get('/users/{user}/extras', [UserController::class, 'extras'])->whereNumber('user');
@@ -344,6 +352,10 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::patch('/users/{user}', [UserController::class, 'patch'])->whereNumber('user');
     Route::get('/users/{user}/audit-log', [UserController::class, 'auditLog'])->whereNumber('user');
     Route::post('/users/{user}/send-password-reset', [UserController::class, 'sendPasswordReset'])->whereNumber('user');
+    Route::post('/users/{user}/monthly-target', [UserController::class, 'updateMonthlyTarget'])->whereNumber('user');
+    Route::get('/users/{user}/monthly-target-history', [UserController::class, 'monthlyTargetHistory'])->whereNumber('user');
+    Route::post('/users/{user}/request-delete-otp', [UserController::class, 'requestDeleteOtp'])->whereNumber('user');
+    Route::post('/users/{user}/otp-delete', [UserController::class, 'otpDelete'])->whereNumber('user');
     Route::delete('/users/{user}', [UserController::class, 'destroy'])->whereNumber('user');
 
     // Super admin only (same auth stack as above; extra role check)
@@ -437,6 +449,13 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
         Route::post('/library/documents/{document}', [\App\Http\Controllers\Api\LibraryDocumentController::class, 'update']);
         Route::delete('/library/documents/{document}', [\App\Http\Controllers\Api\LibraryDocumentController::class, 'destroy']);
         Route::get('/library/documents', [\App\Http\Controllers\Api\LibraryDocumentController::class, 'index']);
+
+        // Dropdown Seeder
+        Route::get('/settings/dropdown-seeder', [\App\Http\Controllers\Api\DropdownSeederController::class, 'index']);
+        Route::post('/settings/dropdown-seeder', [\App\Http\Controllers\Api\DropdownSeederController::class, 'store']);
+        Route::put('/settings/dropdown-seeder/{id}', [\App\Http\Controllers\Api\DropdownSeederController::class, 'update']);
+        Route::delete('/settings/dropdown-seeder/{id}', [\App\Http\Controllers\Api\DropdownSeederController::class, 'destroy']);
+        Route::post('/settings/dropdown-seeder/bulk-sort', [\App\Http\Controllers\Api\DropdownSeederController::class, 'bulkSort']);
     });
 
     // Aggregated bootstrap endpoints (reduce 3-4 requests to 1 per page)
@@ -450,6 +469,8 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::get('/reports/field-stats', [ReportsApiController::class, 'fieldStats'])->middleware('api.cache:15,30');
     Route::get('/reports/vas-stats', [ReportsApiController::class, 'vasStats'])->middleware('api.cache:15,30');
     Route::get('/reports/sla-performance', [ReportsApiController::class, 'slaPerformance'])->middleware('api.cache:30,60');
+    Route::get('/reports/support-stats', [ReportsApiController::class, 'supportStats'])->middleware('api.cache:15,30');
+    Route::get('/reports/client-stats', [ReportsApiController::class, 'clientStats'])->middleware('api.cache:15,30');
 
     // Datatable
     Route::get('/datatable/{module}', [DataTableController::class, 'index']);

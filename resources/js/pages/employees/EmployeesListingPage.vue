@@ -9,7 +9,6 @@ import FiltersBar from '@/components/employees/FiltersBar.vue'
 import AdvancedFilters from '@/components/employees/AdvancedFilters.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import EmployeeTable from '@/components/employees/EmployeeTable.vue'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Toast from '@/components/Toast.vue'
 import RecordHistoryModal from '@/components/RecordHistoryModal.vue'
 import api from '@/lib/axios'
@@ -449,9 +448,7 @@ onMounted(async () => {
     <div class="mx-auto max-w-7xl space-y-4">
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div class="flex flex-wrap items-baseline gap-2">
-          <h1 class="text-xl font-semibold text-gray-900 leading-tight">Employees</h1>
-          <Breadcrumbs />
-        </div>
+          <h1 class="text-xl font-semibold text-gray-900 leading-tight">Employees</h1>        </div>
         <div class="flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -488,7 +485,7 @@ onMounted(async () => {
           </button>
           <button
             type="button"
-            class="inline-flex items-center rounded border border-green-200 bg-white px-3 py-2 text-sm text-green-700 hover:bg-green-50 disabled:opacity-50"
+            class="inline-flex items-center rounded border border-brand-primary-muted bg-white px-3 py-2 text-sm text-brand-primary-hover hover:bg-brand-primary-light disabled:opacity-50"
             :disabled="loading || selectedEmployeeIds.length === 0"
             @click="bulkActivate"
           >
@@ -510,7 +507,7 @@ onMounted(async () => {
           </button>
           <router-link
             to="/users/create"
-            class="inline-flex items-center rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+            class="inline-flex items-center rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover"
           >
             <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -622,7 +619,7 @@ onMounted(async () => {
               <span class="whitespace-nowrap font-medium">Number of rows</span>
               <select
                 :value="meta.per_page"
-                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                 @change="onPerPageChange"
               >
                 <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
@@ -732,7 +729,7 @@ onMounted(async () => {
           <div class="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
             <button
               type="button"
-              class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+              class="rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50"
               :disabled="activating"
               @click="confirmActivate"
             >

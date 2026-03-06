@@ -9,7 +9,6 @@ import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/lib/axios'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Toast from '@/components/Toast.vue'
 import SkeletonBox from '@/components/skeletons/SkeletonBox.vue'
 
@@ -239,11 +238,9 @@ function closeTzDropdown() {
     <!-- Header -->
     <div>
       <div class="flex items-center gap-3">
-        <h1 class="text-2xl font-bold text-gray-900">System Preferences</h1>
-        <Breadcrumbs />
-        <span
+        <h1 class="text-2xl font-bold text-gray-900">System Preferences</h1>        <span
           v-if="!loading && !canUpdate"
-          class="inline-flex items-center gap-1.5 rounded-lg bg-green-50 border border-green-200 px-3 py-1.5 text-xs font-semibold text-green-700"
+          class="inline-flex items-center gap-1.5 rounded-lg bg-brand-primary-light border border-brand-primary-muted px-3 py-1.5 text-xs font-semibold text-brand-primary-hover"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -295,7 +292,7 @@ function closeTzDropdown() {
                   v-model="tzSearch"
                   type="text"
                   placeholder="Search timezone..."
-                  class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:ring-blue-500"
+                  class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-primary focus:ring-brand-primary"
                   @blur="closeTzDropdown"
                 />
               </div>
@@ -303,8 +300,8 @@ function closeTzDropdown() {
                 <li
                   v-for="tz in filteredTimezones"
                   :key="tz.value"
-                  class="px-3 py-2 text-sm cursor-pointer hover:bg-blue-50"
-                  :class="tz.value === form.timezone ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'"
+                  class="px-3 py-2 text-sm cursor-pointer hover:bg-brand-primary-light"
+                  :class="tz.value === form.timezone ? 'bg-brand-primary-light text-brand-primary-hover font-medium' : 'text-gray-700'"
                   @mousedown.prevent="selectTimezone(tz)"
                 >
                   {{ tz.label }}
@@ -381,8 +378,8 @@ function closeTzDropdown() {
               :aria-checked="form.auto_refresh_dashboard"
               :aria-label="'Auto Refresh Dashboard'"
               :disabled="!canUpdate"
-              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              :class="form.auto_refresh_dashboard ? 'bg-blue-600' : 'bg-gray-300'"
+              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              :class="form.auto_refresh_dashboard ? 'bg-brand-primary' : 'bg-gray-300'"
               @click="canUpdate && (form.auto_refresh_dashboard = !form.auto_refresh_dashboard)"
             >
               <span
@@ -390,7 +387,7 @@ function closeTzDropdown() {
                 :class="form.auto_refresh_dashboard ? 'translate-x-6' : 'translate-x-1'"
               />
             </button>
-            <span class="text-sm" :class="form.auto_refresh_dashboard ? 'text-blue-700 font-medium' : 'text-gray-500'">
+            <span class="text-sm" :class="form.auto_refresh_dashboard ? 'text-brand-primary-hover font-medium' : 'text-gray-500'">
               {{ form.auto_refresh_dashboard ? 'Enabled' : 'Disabled' }}
             </span>
           </div>
@@ -409,8 +406,8 @@ function closeTzDropdown() {
               :aria-checked="form.auto_save_draft_forms"
               :aria-label="'Auto Save Draft Forms'"
               :disabled="!canUpdate"
-              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              :class="form.auto_save_draft_forms ? 'bg-blue-600' : 'bg-gray-300'"
+              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              :class="form.auto_save_draft_forms ? 'bg-brand-primary' : 'bg-gray-300'"
               @click="canUpdate && (form.auto_save_draft_forms = !form.auto_save_draft_forms)"
             >
               <span
@@ -418,7 +415,7 @@ function closeTzDropdown() {
                 :class="form.auto_save_draft_forms ? 'translate-x-6' : 'translate-x-1'"
               />
             </button>
-            <span class="text-sm" :class="form.auto_save_draft_forms ? 'text-blue-700 font-medium' : 'text-gray-500'">
+            <span class="text-sm" :class="form.auto_save_draft_forms ? 'text-brand-primary-hover font-medium' : 'text-gray-500'">
               {{ form.auto_save_draft_forms ? 'Enabled' : 'Disabled' }}
             </span>
           </div>
@@ -437,8 +434,8 @@ function closeTzDropdown() {
               :aria-checked="form.session_warning_before_logout"
               :aria-label="'Session Warning Before Logout'"
               :disabled="!canUpdate"
-              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              :class="form.session_warning_before_logout ? 'bg-blue-600' : 'bg-gray-300'"
+              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              :class="form.session_warning_before_logout ? 'bg-brand-primary' : 'bg-gray-300'"
               @click="canUpdate && (form.session_warning_before_logout = !form.session_warning_before_logout)"
             >
               <span
@@ -446,7 +443,7 @@ function closeTzDropdown() {
                 :class="form.session_warning_before_logout ? 'translate-x-6' : 'translate-x-1'"
               />
             </button>
-            <span class="text-sm" :class="form.session_warning_before_logout ? 'text-blue-700 font-medium' : 'text-gray-500'">
+            <span class="text-sm" :class="form.session_warning_before_logout ? 'text-brand-primary-hover font-medium' : 'text-gray-500'">
               {{ form.session_warning_before_logout ? 'Enabled' : 'Disabled' }}
             </span>
           </div>
@@ -479,7 +476,7 @@ function closeTzDropdown() {
           v-if="canUpdate"
           type="button"
           :disabled="!isDirty || saving"
-          class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          class="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           @click="save"
         >
           <svg v-if="saving" class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
@@ -490,13 +487,13 @@ function closeTzDropdown() {
     </div>
 
     <!-- ═══════ System Notes ═══════ -->
-    <div class="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 flex gap-3">
-      <svg class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+    <div class="rounded-xl border border-brand-primary-muted bg-brand-primary-light px-5 py-4 flex gap-3">
+      <svg class="w-5 h-5 text-brand-primary flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
         <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
       </svg>
       <div>
-        <p class="font-semibold text-blue-900">System Notes</p>
-        <ul class="mt-2 space-y-1 text-sm text-blue-800 list-disc list-inside">
+        <p class="font-semibold text-brand-primary-dark">System Notes</p>
+        <ul class="mt-2 space-y-1 text-sm text-brand-primary-hover list-disc list-inside">
           <li>Changes are logged in Audit Logs for accountability.</li>
           <li>Only Super Admin can modify these settings.</li>
           <li>Date format will be applied consistently across the entire UI.</li>

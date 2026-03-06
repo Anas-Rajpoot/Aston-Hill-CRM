@@ -10,7 +10,6 @@ import { useAuthStore } from '@/stores/auth'
 import api from '@/lib/axios'
 import SkeletonStatsCards from '@/components/skeletons/SkeletonStatsCards.vue'
 import SkeletonTable from '@/components/skeletons/SkeletonTable.vue'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import { toDdMonYyyyLower } from '@/lib/dateFormat'
 
 const router = useRouter()
@@ -289,15 +288,13 @@ onUnmounted(() => {
     <div class="flex flex-wrap items-center justify-between gap-4">
       <div>
         <div class="flex flex-wrap items-baseline gap-2">
-          <h1 class="text-2xl font-bold text-gray-900 leading-tight">Roles</h1>
-          <Breadcrumbs />
-        </div>
+          <h1 class="text-2xl font-bold text-gray-900 leading-tight">Roles</h1>        </div>
         <p class="mt-1 text-sm text-gray-500">Define and manage system roles and permissions.</p>
       </div>
       <button
         type="button"
         @click="goToCreate"
-        class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+        class="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover"
       >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -306,9 +303,9 @@ onUnmounted(() => {
       </button>
     </div>
 
-    <div v-if="successMessage" class="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700 flex items-center justify-between">
+    <div v-if="successMessage" class="rounded-xl bg-brand-primary-light border border-brand-primary-muted px-4 py-3 text-sm text-brand-primary-hover flex items-center justify-between">
       <span>{{ successMessage }}</span>
-      <button type="button" @click="successMessage = ''" class="text-green-600 hover:text-green-800">×</button>
+      <button type="button" @click="successMessage = ''" class="text-brand-primary hover:text-brand-primary-hover">×</button>
     </div>
     <div v-if="errorMessage" class="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 flex items-center justify-between">
       <span>{{ errorMessage }}</span>
@@ -320,27 +317,27 @@ onUnmounted(() => {
     <div v-else class="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <p class="text-sm font-medium text-gray-500">Total Roles</p>
-        <p class="mt-1 text-2xl font-bold text-blue-600">{{ stats.total_roles }}</p>
+        <p class="mt-1 text-2xl font-bold text-brand-primary">{{ stats.total_roles }}</p>
       </div>
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <p class="text-sm font-medium text-gray-500">Active Roles</p>
-        <p class="mt-1 text-2xl font-bold text-green-600">{{ stats.active_roles }}</p>
+        <p class="mt-1 text-2xl font-bold text-brand-primary">{{ stats.active_roles }}</p>
       </div>
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <p class="text-sm font-medium text-gray-500">Total Users Assigned</p>
-        <p class="mt-1 text-2xl font-bold text-rose-600">{{ stats.total_users_assigned }}</p>
+        <p class="mt-1 text-2xl font-bold text-brand-primary">{{ stats.total_users_assigned }}</p>
       </div>
     </div>
 
     <!-- Guidelines -->
-    <div class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+    <div class="rounded-xl border border-brand-primary-muted bg-brand-primary-light px-4 py-3">
       <div class="flex gap-3">
-        <svg class="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+        <svg class="h-5 w-5 text-brand-primary flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
           <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
         </svg>
-        <div class="text-sm text-blue-800">
-          <p class="font-medium text-blue-900 mb-2">Role Management Guidelines</p>
-          <ul class="list-disc list-inside space-y-1 text-blue-800">
+        <div class="text-sm text-brand-primary-hover">
+          <p class="font-medium text-brand-primary-dark mb-2">Role Management Guidelines</p>
+          <ul class="list-disc list-inside space-y-1 text-brand-primary-hover">
             <li>Super Admin role is locked and cannot be edited or removed</li>
             <li>Multiple roles can be assigned to a single user</li>
             <li>Inactive roles cannot be assigned to users</li>
@@ -360,14 +357,14 @@ onUnmounted(() => {
       <div v-else-if="!roles.length" class="p-8 text-center text-gray-500">No roles yet. Create one to get started.</div>
       <div v-else class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
-          <thead class="bg-gray-50">
+          <thead class="bg-brand-primary border-b-2 border-green-700">
             <tr>
-              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 tracking-wider">Role name</th>
-              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 tracking-wider">Description</th>
-              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 tracking-wider">Users assigned</th>
-              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 tracking-wider">Status</th>
-              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 tracking-wider">Created date</th>
-              <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 tracking-wider">Actions</th>
+              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-white tracking-wider">Role name</th>
+              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-white tracking-wider">Description</th>
+              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-white tracking-wider">Users assigned</th>
+              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-white tracking-wider">Status</th>
+              <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-white tracking-wider">Created date</th>
+              <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-white tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
@@ -388,7 +385,7 @@ onUnmounted(() => {
                       @keydown.enter="saveEdit"
                       @keydown.escape="cancelEdit"
                     />
-                    <button type="button" class="rounded bg-green-600 px-2 py-1 text-xs text-white hover:bg-green-700 disabled:opacity-50" :disabled="savingCell" @click="saveEdit">Save</button>
+                    <button type="button" class="rounded bg-brand-primary px-2 py-1 text-xs text-white hover:bg-brand-primary-hover disabled:opacity-50" :disabled="savingCell" @click="saveEdit">Save</button>
                     <button type="button" class="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50" :disabled="savingCell" @click="cancelEdit">Cancel</button>
                   </div>
                 </template>
@@ -417,14 +414,14 @@ onUnmounted(() => {
                       @keydown.enter="saveEdit"
                       @keydown.escape="cancelEdit"
                     />
-                    <button type="button" class="rounded bg-green-600 px-2 py-1 text-xs text-white hover:bg-green-700 disabled:opacity-50" :disabled="savingCell" @click="saveEdit">Save</button>
+                    <button type="button" class="rounded bg-brand-primary px-2 py-1 text-xs text-white hover:bg-brand-primary-hover disabled:opacity-50" :disabled="savingCell" @click="saveEdit">Save</button>
                     <button type="button" class="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50" :disabled="savingCell" @click="cancelEdit">Cancel</button>
                   </div>
                 </template>
                 <span v-else>{{ truncateDescription(role.description).short }}</span>
               </td>
               <td class="px-4 py-3 whitespace-nowrap">
-                <span class="text-sm text-indigo-600 underline cursor-pointer hover:text-indigo-800">{{ role.users_count ?? 0 }}</span>
+                <router-link :to="`/users?role=${role.name}`" class="text-sm text-indigo-600 underline cursor-pointer hover:text-indigo-800">{{ role.users_count ?? 0 }}</router-link>
               </td>
               <!-- Status: double-click to edit (dropdown) -->
               <td
@@ -441,13 +438,13 @@ onUnmounted(() => {
                     >
                       <option v-for="opt in STATUS_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                     </select>
-                    <button type="button" class="rounded bg-green-600 px-2 py-1 text-xs text-white hover:bg-green-700 disabled:opacity-50" :disabled="savingCell" @click="saveEdit">Save</button>
+                    <button type="button" class="rounded bg-brand-primary px-2 py-1 text-xs text-white hover:bg-brand-primary-hover disabled:opacity-50" :disabled="savingCell" @click="saveEdit">Save</button>
                     <button type="button" class="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50" :disabled="savingCell" @click="cancelEdit">Cancel</button>
                   </div>
                 </template>
                 <span
                   v-else
-                  :class="(role.status || 'active') === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'"
+                  :class="(role.status || 'active') === 'active' ? 'bg-brand-primary-light text-brand-primary-hover' : 'bg-gray-100 text-gray-700'"
                   class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium"
                 >
                   {{ (role.status || 'active') === 'active' ? 'Active' : 'Inactive' }}
@@ -568,7 +565,7 @@ onUnmounted(() => {
                 <button
                   type="submit"
                   :disabled="createSaving"
-                  class="rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-70"
+                  class="rounded-lg bg-brand-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-primary-hover focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 disabled:opacity-70"
                 >
                   {{ createSaving ? 'Creating…' : 'Create Role' }}
                 </button>
@@ -653,7 +650,7 @@ onUnmounted(() => {
                 <button
                   type="submit"
                   :disabled="editSaving"
-                  class="rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-70"
+                  class="rounded-lg bg-brand-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-primary-hover focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 disabled:opacity-70"
                 >
                   {{ editSaving ? 'Saving…' : 'Update' }}
                 </button>

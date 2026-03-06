@@ -580,16 +580,16 @@ function cancel() {
 const emit = defineEmits(['submitted', 'draft-saved'])
 
 const inputClass = (field) =>
-  `w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-green-500 focus:ring-1 focus:ring-green-500 ${getError(field) ? 'border-red-500' : 'border-gray-300'}`
+  `w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary ${getError(field) ? 'border-red-500' : 'border-gray-300'}`
 const selectClass = (field) =>
-  `w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 focus:border-green-500 focus:ring-1 focus:ring-green-500 ${getError(field) ? 'border-red-500' : 'border-gray-300'}`
+  `w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary ${getError(field) ? 'border-red-500' : 'border-gray-300'}`
 </script>
 
 <template>
   <div class="space-y-6">
     <!-- Loading state (same as Lead Submissions) -->
     <div v-if="loading" class="flex items-center justify-center py-12">
-      <svg class="h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+      <svg class="h-8 w-8 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
       </svg>
@@ -797,7 +797,7 @@ const selectClass = (field) =>
                       :accept="ALLOWED_EXT.join(',')"
                       @change="onFileChange(doc.key, $event)"
                     />
-                    <span class="inline-flex items-center gap-1 rounded-lg bg-green-600 px-2 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-green-700">
+                    <span class="inline-flex items-center gap-1 rounded-lg bg-brand-primary px-2 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-brand-primary-hover">
                       <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                       </svg>
@@ -815,7 +815,7 @@ const selectClass = (field) =>
                   type="button"
                   @click="addAdditionalDoc"
                   :disabled="!canAddMoreAdditional"
-                  class="inline-flex items-center gap-1.5 text-sm font-medium text-green-600 hover:text-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-primary hover:text-brand-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -840,7 +840,7 @@ const selectClass = (field) =>
                     v-model="ad.label"
                     type="text"
                     :placeholder="'Additional Document ' + (index + 1)"
-                    class="min-w-0 flex-1 rounded border border-gray-300 px-3 py-1.5 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    class="min-w-0 flex-1 rounded border border-gray-300 px-3 py-1.5 text-sm placeholder:text-gray-400 focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
                   />
                   <label class="shrink-0 cursor-pointer">
                     <input
@@ -849,7 +849,7 @@ const selectClass = (field) =>
                       :accept="ALLOWED_EXT.join(',')"
                       @change="onAdditionalFileChange(index, $event)"
                     />
-                    <span class="inline-flex items-center gap-1.5 rounded-lg border border-blue-500 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-100">
+                    <span class="inline-flex items-center gap-1.5 rounded-lg border border-brand-primary bg-brand-primary-light px-3 py-1.5 text-sm font-medium text-brand-primary hover:bg-brand-primary-light">
                       <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                       </svg>
@@ -877,7 +877,7 @@ const selectClass = (field) =>
         <button
           type="button"
           @click="cancel"
-          class="rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-green-700"
+          class="rounded-lg bg-brand-primary px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-brand-primary-hover"
         >
           Cancel
         </button>
@@ -898,7 +898,7 @@ const selectClass = (field) =>
           type="button"
           @click="nextStep"
           :disabled="saving || savingDraft"
-          class="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white shadow-sm disabled:opacity-50 bg-green-600 hover:bg-green-700"
+          class="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white shadow-sm disabled:opacity-50 bg-brand-primary hover:bg-brand-primary-hover"
         >
           {{ saving ? 'Submitting...' : 'Next' }}
           <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

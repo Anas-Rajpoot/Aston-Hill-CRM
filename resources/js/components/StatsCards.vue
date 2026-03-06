@@ -10,8 +10,8 @@ defineProps({
 
 <template>
   <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-    <!-- Card 1: Blue - Document icon - Total -->
-    <div class="bg-blue-500 text-white p-5 rounded-xl shadow flex items-center justify-between relative overflow-hidden">
+    <!-- Card 1: Green - Document icon - Total -->
+    <div class="bg-brand-primary text-white p-5 rounded-xl shadow flex items-center justify-between relative overflow-hidden">
       <div class="relative z-10">
         <p class="text-sm font-medium opacity-90">Total Submissions</p>
         <p class="text-2xl font-bold mt-1">{{ total.toLocaleString() }}</p>
@@ -23,8 +23,8 @@ defineProps({
       </div>
     </div>
 
-    <!-- Card 2: Blue - Person icon - 89 -->
-    <div class="bg-blue-500 text-white p-5 rounded-xl shadow flex items-center justify-between relative overflow-hidden">
+    <!-- Card 2: Green - Person icon - 89 -->
+    <div class="bg-brand-primary text-white p-5 rounded-xl shadow flex items-center justify-between relative overflow-hidden">
       <div class="relative z-10">
         <p class="text-sm font-medium opacity-90">Pending Tasks</p>
         <p class="text-2xl font-bold mt-1">{{ pending.toLocaleString() }}</p>
@@ -47,7 +47,7 @@ defineProps({
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
         </svg>
       </div>
-      <span class="absolute top-2 right-2 w-6 h-6 rounded-full bg-green-500 text-white text-xs font-bold flex items-center justify-center">N</span>
+      <span class="absolute top-2 right-2 w-6 h-6 rounded-full bg-brand-primary text-white text-xs font-bold flex items-center justify-center">N</span>
     </div>
 
     <!-- Card 4: Red - Alert icon (N badge) -->
@@ -61,11 +61,11 @@ defineProps({
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
         </svg>
       </div>
-      <span class="absolute top-2 right-2 w-6 h-6 rounded-full bg-green-500 text-white text-xs font-bold flex items-center justify-center">N</span>
+      <span class="absolute top-2 right-2 w-6 h-6 rounded-full bg-brand-primary text-white text-xs font-bold flex items-center justify-center">N</span>
     </div>
 
     <!-- Card 5: Green - Checkmark - 156 (N badge) -->
-    <div class="bg-green-500 text-white p-5 rounded-xl shadow flex items-center justify-between relative">
+    <div class="bg-brand-primary text-white p-5 rounded-xl shadow flex items-center justify-between relative">
       <div>
         <p class="text-sm font-medium opacity-90">Completed Today</p>
         <p class="text-2xl font-bold mt-1">{{ completed.toLocaleString() }}</p>
@@ -75,7 +75,7 @@ defineProps({
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       </div>
-      <span class="absolute top-2 right-2 w-6 h-6 rounded-full bg-green-600 text-white text-xs font-bold flex items-center justify-center">N</span>
+      <span class="absolute top-2 right-2 w-6 h-6 rounded-full bg-brand-primary text-white text-xs font-bold flex items-center justify-center">N</span>
     </div>
   </div>
 </template>

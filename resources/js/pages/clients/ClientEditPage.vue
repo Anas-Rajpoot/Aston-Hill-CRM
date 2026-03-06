@@ -3,7 +3,6 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import clientsApi from '@/services/clientsApi'
 import api from '@/lib/axios'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
 
 const route = useRoute()
@@ -197,13 +196,13 @@ async function load() {
 function inputClass(field) {
   return fieldErrors.value[field]
     ? 'mt-0.5 w-full rounded border border-red-500 bg-white px-3 py-2 text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500'
-    : 'mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500'
+    : 'mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary'
 }
 
 function selectClass(field) {
   return fieldErrors.value[field]
     ? 'mt-0.5 w-full rounded border border-red-500 bg-white px-3 py-2 text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500'
-    : 'mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500'
+    : 'mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary'
 }
 
 function applyBillsBulkAction() {
@@ -292,15 +291,13 @@ onMounted(() => load())
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] p-0">
+  <div class="min-h-[calc(100vh-4rem)] bg-gray-100 p-0">
     <div class="w-full">
       <!-- Header -->
       <div class="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div class="flex flex-wrap items-baseline gap-2">
-            <h1 class="text-xl font-semibold text-gray-900">Edit Client</h1>
-            <Breadcrumbs />
-          </div>
+            <h1 class="text-xl font-semibold text-gray-900">Edit Client</h1>          </div>
           <button
             type="button"
             class="inline-flex items-center gap-1.5 rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
@@ -316,7 +313,7 @@ onMounted(() => load())
 
       <!-- Loading -->
       <div v-if="loading" class="flex justify-center py-16">
-        <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+        <svg class="h-10 w-10 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
@@ -330,7 +327,7 @@ onMounted(() => load())
       <!-- Form -->
       <form v-else class="space-y-6" @submit.prevent="submitForm">
         <!-- Success -->
-        <div v-if="successMessage" class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-800">
+        <div v-if="successMessage" class="rounded-lg border border-brand-primary-muted bg-brand-primary-light px-4 py-3 text-sm font-medium text-brand-primary-hover">
           {{ successMessage }}
         </div>
         <!-- Error -->
@@ -471,27 +468,27 @@ onMounted(() => load())
                 <div class="mt-1 flex flex-wrap items-end gap-2">
                   <div class="flex min-h-[42px] flex-wrap items-center gap-3 rounded border border-gray-300 bg-white px-3 py-2">
                     <label class="inline-flex items-center gap-1.5 text-sm text-gray-700">
-                      <input v-model="selectedBillFields" type="checkbox" value="first_bill" class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500" />
+                      <input v-model="selectedBillFields" type="checkbox" value="first_bill" class="h-4 w-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary" />
                       First Bill
                     </label>
                     <label class="inline-flex items-center gap-1.5 text-sm text-gray-700">
-                      <input v-model="selectedBillFields" type="checkbox" value="second_bill" class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500" />
+                      <input v-model="selectedBillFields" type="checkbox" value="second_bill" class="h-4 w-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary" />
                       Second Bill
                     </label>
                     <label class="inline-flex items-center gap-1.5 text-sm text-gray-700">
-                      <input v-model="selectedBillFields" type="checkbox" value="third_bill" class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500" />
+                      <input v-model="selectedBillFields" type="checkbox" value="third_bill" class="h-4 w-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary" />
                       Third Bill
                     </label>
                     <label class="inline-flex items-center gap-1.5 text-sm text-gray-700">
-                      <input v-model="selectedBillFields" type="checkbox" value="fourth_bill" class="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500" />
+                      <input v-model="selectedBillFields" type="checkbox" value="fourth_bill" class="h-4 w-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary" />
                       Fourth Bill
                     </label>
                   </div>
-                  <select v-model="billsBulkValue" class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 sm:w-auto sm:min-w-[180px]">
+                  <select v-model="billsBulkValue" class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary sm:w-auto sm:min-w-[180px]">
                     <option value="">Select</option>
                     <option v-for="b in BILL_OPTIONS" :key="`bulk-${b}`" :value="b">{{ b }}</option>
                   </select>
-                  <button type="button" class="rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700" @click="applyBillsBulkAction">Apply</button>
+                  <button type="button" class="rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover" @click="applyBillsBulkAction">Apply</button>
                 </div>
               </div>
             </div>
@@ -521,7 +518,7 @@ onMounted(() => load())
               <button
                 type="submit"
                 :disabled="saving"
-                class="inline-flex items-center gap-2 rounded bg-green-600 px-5 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-70"
+                class="inline-flex items-center gap-2 rounded bg-brand-primary px-5 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70"
               >
                 <svg v-if="saving" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />

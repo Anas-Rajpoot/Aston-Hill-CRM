@@ -6,7 +6,6 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import customerSupportApi from '@/services/customerSupportApi'
 import api from '@/lib/axios'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import TruncatedText from '@/components/TruncatedText.vue'
 import { formatUserDate, formatSystemDateTime } from '@/lib/dateFormat'
 
@@ -204,15 +203,13 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] p-0">
+  <div class="min-h-[calc(100vh-4rem)] bg-gray-100 p-0">
     <div class="w-full">
       <!-- Header + Breadcrumb -->
       <div class="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div class="flex flex-wrap items-baseline gap-2">
-            <h1 class="text-xl font-semibold text-gray-900">Customer Support Request Details</h1>
-            <Breadcrumbs />
-          </div>
+            <h1 class="text-xl font-semibold text-gray-900">Customer Support Request Details</h1>          </div>
           <div class="flex items-center gap-2">
             <router-link
               to="/customer-support"
@@ -223,7 +220,7 @@ onMounted(() => {
             <button
               v-if="submission"
               type="button"
-              class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+              class="inline-flex items-center rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover"
               @click="goToEdit"
             >
               Edit Customer Support Request
@@ -233,7 +230,7 @@ onMounted(() => {
       </div>
 
       <div v-if="loading" class="flex justify-center py-16">
-        <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+        <svg class="h-10 w-10 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
@@ -299,7 +296,7 @@ onMounted(() => {
                     <span
                       v-for="(name, idx) in submission.account_csr_names"
                       :key="idx"
-                      class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800"
+                      class="inline-flex items-center rounded-full bg-brand-primary-light px-2.5 py-0.5 text-xs font-medium text-brand-primary-hover"
                     >{{ name }}</span>
                   </div>
                 </div>
@@ -363,7 +360,7 @@ onMounted(() => {
               <h2 class="mb-3 text-sm font-semibold text-gray-900">Change History</h2>
               <p class="mb-3 text-xs text-gray-500">All field changes with previous value, new value, date/time and who made the change.</p>
               <div v-if="auditsLoading" class="flex justify-center py-6">
-                <svg class="h-6 w-6 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+                <svg class="h-6 w-6 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
@@ -372,7 +369,7 @@ onMounted(() => {
               <template v-else>
                 <div class="overflow-x-auto rounded-lg border border-gray-200">
                   <table class="min-w-full text-left text-sm">
-                    <thead class="border-b border-gray-200 bg-gray-100">
+                    <thead class="bg-brand-primary border-b-2 border-green-700">
                       <tr>
                         <th class="px-4 py-2 font-semibold text-gray-900">Field</th>
                         <th class="px-4 py-2 font-semibold text-gray-900">Old Value</th>
@@ -421,7 +418,7 @@ onMounted(() => {
                   </div>
                   <button
                     type="button"
-                    class="shrink-0 rounded p-1.5 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                    class="shrink-0 rounded p-1.5 text-brand-primary hover:bg-brand-primary-light hover:text-brand-primary-hover"
                     title="Download"
                     @click="downloadAttachment(idx)"
                   >

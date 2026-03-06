@@ -186,12 +186,6 @@ class RoleApiController extends Controller
         $names = array_values(array_unique(array_filter($data['permission_names'] ?? [])));
         $validNames = Permission::whereIn('name', $names)->where('guard_name', 'web')->pluck('name')->toArray();
 
-        if ($role->name === 'superadmin' && ! in_array('roles.assign_permissions', $validNames, true)) {
-            return response()->json([
-                'message' => 'Superadmin invariants violated: roles.assign_permissions is required.',
-            ], 422);
-        }
-
         $role->syncPermissions($validNames);
         $this->cache->forgetPermissionsPageForRole((int) $role->id);
         $this->cache->forgetAll();

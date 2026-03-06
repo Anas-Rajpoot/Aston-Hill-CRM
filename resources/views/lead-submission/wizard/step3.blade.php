@@ -8,9 +8,9 @@
             <p class="text-sm text-gray-500">Step 3 — Service Type & Dynamic Fields</p>
         </div>
 
-        @include('Lead-submissios.partials._wizard_steps', ['step' => 3])
+        @include('lead-submissions.partials._wizard_steps', ['step' => 3])
 
-        <form method="GET" action="{{ route('Lead-submissios.wizard.step3', $leadSubmission) }}" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <form method="GET" action="{{ route('lead-submissions.wizard.step3', $leadSubmission) }}" class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <x-ui/select
                 name="service_type_id"
                 label="Service Type"
@@ -23,7 +23,7 @@
             </div>
         </form>
 
-        <form method="POST" action="{{ route('Lead-submissios.wizard.step3.store', $leadSubmission) }}" class="mt-2 space-y-4">
+        <form method="POST" action="{{ route('lead-submissions.wizard.step3.store', $leadSubmission) }}" class="mt-2 space-y-4">
             @csrf
 
             <input type="hidden" name="service_type_id" value="{{ $selectedType?->id ?? $leadSubmission->service_type_id }}"/>
@@ -92,7 +92,7 @@
             @endif
 
             <div class="flex justify-between gap-2 mt-2">
-                <a href="{{ route('Lead-submissios.wizard.step2', $leadSubmission) }}" class="px-4 py-2 rounded bg-gray-200 text-gray-900">Back</a>
+                <a href="{{ route('lead-submissions.wizard.step2', $leadSubmission) }}" class="px-4 py-2 rounded bg-gray-200 text-gray-900">Back</a>
                 <button class="px-4 py-2 rounded bg-brand-primary text-white">Continue</button>
             </div>
         </form>

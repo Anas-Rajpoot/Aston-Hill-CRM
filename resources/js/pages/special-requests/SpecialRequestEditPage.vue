@@ -1,13 +1,20 @@
 <script setup>
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import { canModuleAction } from '@/lib/accessControl'
 import specialRequestsApi from '@/services/specialRequestsApi'
 import { useFormErrors } from '@/composables/useFormErrors'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Toast from '@/components/Toast.vue'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
+
+// RBAC gate — redirect if user lacks edit permission
+if (!canModuleAction(auth.user, 'special', 'edit', ['special-requests.edit'])) {
+  router.replace('/special-requests')
+}
 
 const id = computed(() => Number(route.params.id))
 
@@ -233,8 +240,6 @@ function validateForm() {
   if (!form.value.company_name?.trim()) err.company_name = ['Company name is required.']
   if (!form.value.request_type?.trim()) err.request_type = ['Request type is required.']
   if (!form.value.manager_id) err.manager_id = ['Manager is required.']
-  if (!form.value.team_leader_id) err.team_leader_id = ['Team leader is required.']
-  if (!form.value.sales_agent_id) err.sales_agent_id = ['Sales agent is required.']
   return Object.keys(err).length ? err : null
 }
 
@@ -256,8 +261,8 @@ async function save() {
       complete_address: form.value.complete_address?.trim() || null,
       special_instruction: form.value.special_instruction?.trim() || null,
       manager_id: Number(form.value.manager_id),
-      team_leader_id: Number(form.value.team_leader_id),
-      sales_agent_id: Number(form.value.sales_agent_id),
+      team_leader_id: form.value.team_leader_id ? Number(form.value.team_leader_id) : null,
+      sales_agent_id: form.value.sales_agent_id ? Number(form.value.sales_agent_id) : null,
     })
     toast('success', 'Special request updated successfully.')
     setTimeout(() => router.push(`/special-requests/${id.value}`), 800)
@@ -344,22 +349,20 @@ async function removeDocument(doc) {
 function goBack() { router.push(`/special-requests/${id.value}`) }
 
 const inputClass = (field) =>
-  `w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-green-500 focus:ring-1 focus:ring-green-500 ${getError(field) ? 'border-red-500' : 'border-gray-300'}`
+  `w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary ${getError(field) ? 'border-red-500' : 'border-gray-300'}`
 const selectClass = (field) =>
-  `w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 focus:border-green-500 focus:ring-1 focus:ring-green-500 ${getError(field) ? 'border-red-500' : 'border-gray-300'}`
+  `w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary ${getError(field) ? 'border-red-500' : 'border-gray-300'}`
 
 onMounted(() => loadData())
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] p-0">
+  <div class="min-h-[calc(100vh-4rem)] bg-gray-100 p-0">
     <div class="w-full">
       <div class="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div class="flex flex-wrap items-baseline gap-2">
-            <h1 class="text-xl font-semibold text-gray-900">Edit Special Request</h1>
-            <Breadcrumbs />
-          </div>
+            <h1 class="text-xl font-semibold text-gray-900">Edit Special Request</h1>          </div>
           <div class="flex items-center gap-2">
             <button
               type="button"
@@ -379,7 +382,7 @@ onMounted(() => loadData())
         </div>
 
       <div v-if="loading" class="flex justify-center py-16">
-          <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+          <svg class="h-10 w-10 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
         </div>
 
       <div v-else class="space-y-6">
@@ -436,7 +439,7 @@ onMounted(() => loadData())
                   <p v-if="getError('manager_id')" class="mt-1 text-xs text-red-600">{{ getError('manager_id') }}</p>
               </div>
               <div>
-                  <label class="block text-xs font-medium text-gray-500">Team Leader <span class="text-red-500">*</span></label>
+                  <label class="block text-xs font-medium text-gray-500">Team Leader</label>
                   <select v-model="form.team_leader_id" :class="`${selectClass('team_leader_id')} mt-0.5`" @change="clearFieldError('team_leader_id')">
                   <option value="">Select Team Leader</option>
                   <option v-for="u in filteredTeamLeaders" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
@@ -444,7 +447,7 @@ onMounted(() => loadData())
                   <p v-if="getError('team_leader_id')" class="mt-1 text-xs text-red-600">{{ getError('team_leader_id') }}</p>
               </div>
               <div>
-                  <label class="block text-xs font-medium text-gray-500">Sales Agent <span class="text-red-500">*</span></label>
+                  <label class="block text-xs font-medium text-gray-500">Sales Agent</label>
                   <select v-model="form.sales_agent_id" :class="`${selectClass('sales_agent_id')} mt-0.5`" @change="clearFieldError('sales_agent_id')">
                   <option value="">Select Sales Agent</option>
                   <option v-for="u in filteredSalesAgents" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
@@ -486,7 +489,7 @@ onMounted(() => loadData())
                   <div class="flex shrink-0 items-center gap-1">
                     <button
                       type="button"
-                      class="rounded p-1.5 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                      class="rounded p-1.5 text-brand-primary hover:bg-brand-primary-light hover:text-brand-primary-hover"
                       title="Download"
                       @click="downloadDocument(doc)"
                     >
@@ -515,10 +518,10 @@ onMounted(() => loadData())
                   <h3 class="text-base font-semibold text-gray-900">Add Document</h3>
                   <button
                     type="button"
-                    class="inline-flex items-center gap-2 text-sm font-medium text-green-600 hover:text-green-700"
+                    class="inline-flex items-center gap-2 text-sm font-medium text-brand-primary hover:text-brand-primary-hover"
                     @click="addDocumentSlot"
                   >
-                    <svg class="h-5 w-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="h-5 w-5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                     </svg>
                     Add Document
@@ -551,7 +554,7 @@ onMounted(() => loadData())
               <button
                 type="button"
                 :disabled="saving"
-                class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                class="inline-flex items-center rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50"
                 @click="save"
               >
               {{ saving ? 'Saving...' : 'Save Changes' }}

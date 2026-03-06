@@ -271,9 +271,9 @@ const hasAnyRowAction = computed(() => canViewAction.value || canEditAction.valu
 
 const STATUS_BADGES = {
   draft: 'bg-gray-100 text-gray-700',
-  submitted_under_process: 'bg-blue-100 text-blue-700',
-  completed: 'bg-green-100 text-green-700',
-  approved: 'bg-green-100 text-green-700',
+  submitted_under_process: 'bg-brand-primary-light text-brand-primary-hover',
+  completed: 'bg-brand-primary-light text-brand-primary-hover',
+  approved: 'bg-brand-primary-light text-brand-primary-hover',
   rejected: 'bg-red-100 text-red-700',
   unassigned: 'bg-rose-100 text-rose-700',
 }
@@ -297,7 +297,7 @@ function formatStatus(status) {
       aria-busy="true"
     >
       <div class="flex flex-col items-center gap-2">
-        <svg class="h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <svg class="h-8 w-8 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
         </svg>
@@ -307,35 +307,29 @@ function formatStatus(status) {
 
     <table class="min-w-full border-2 border-black border-collapse">
       <thead>
-        <tr class="border-b-2 border-black bg-green-600">
-          <th class="w-10 px-3 py-3 text-left">
-            <input
-              type="checkbox"
-              class="rounded border-gray-300"
-              aria-label="Select all"
-              :checked="isAllSelected"
-              :indeterminate="selectedSet.size > 0 && !isAllSelected"
-              @change="toggleSelectAll"
-            />
+        <tr class="bg-brand-primary border-b-2 border-green-700">
+          <th class="w-10 px-3 py-3">
+            <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll()" class="rounded border-gray-300 text-brand-primary focus:ring-brand-primary" />
           </th>
           <th
             v-for="col in columns"
             :key="col"
             scope="col"
-            class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold capitalize text-white"
+            class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold text-black cursor-pointer select-none"
+            @click="sortable(col) ? toggleSort(col) : null"
           >
             <button
               v-if="sortable(col)"
               type="button"
-              class="inline-flex items-center gap-1 font-bold text-white hover:text-white/90"
-              @click="toggleSort(col)"
+              class="inline-flex items-center gap-1 font-bold text-white hover:text-white/70"
+              @click.stop="toggleSort(col)"
             >
               {{ label(col) }}
               <svg v-if="sort === col" class="h-4 w-4" :class="order === 'asc' ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
               </svg>
             </button>
-            <span v-else class="font-bold text-white">{{ label(col) }}</span>
+            <span v-else class="font-bold text-black">{{ label(col) }}</span>
           </th>
           <th v-if="hasAnyRowAction" scope="col" class="whitespace-nowrap px-4 py-3 text-center text-sm font-bold capitalize text-white">Actions</th>
         </tr>
@@ -372,7 +366,7 @@ function formatStatus(status) {
               <div class="flex flex-col gap-1.5">
                 <select
                   v-model="inlineEditValue"
-                  :class="['w-full min-w-[160px] max-w-[220px] rounded border bg-white px-3 py-1.5 pr-8 text-sm focus:ring-1', inlineEditError ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+                  :class="['w-full min-w-[160px] max-w-[220px] rounded border bg-white px-3 py-1.5 pr-8 text-sm focus:ring-1', inlineEditError ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-brand-primary focus:ring-brand-primary']"
                   @change="inlineEditError = ''"
                   @keydown.enter="saveInlineEdit"
                   @keydown.esc="cancelInlineEdit"
@@ -382,7 +376,7 @@ function formatStatus(status) {
                 <p v-if="inlineEditError" class="text-xs text-red-600">{{ inlineEditError }}</p>
                 <div class="flex gap-1">
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
-                  <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
+                  <button type="button" class="rounded bg-brand-primary px-2 py-0.5 text-xs text-white hover:bg-brand-primary-hover" @click="saveInlineEdit">Save</button>
                 </div>
               </div>
             </template>
@@ -392,7 +386,7 @@ function formatStatus(status) {
                   v-if="col === 'description'"
                   v-model="inlineEditValue"
                   rows="3"
-                  :class="['w-full min-w-[180px] max-w-[280px] rounded border bg-white px-2 py-1 text-sm focus:ring-1', inlineEditError ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+                  :class="['w-full min-w-[180px] max-w-[280px] rounded border bg-white px-2 py-1 text-sm focus:ring-1', inlineEditError ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-brand-primary focus:ring-brand-primary']"
                   @input="inlineEditError = ''"
                   @keydown.esc="cancelInlineEdit"
                 />
@@ -402,7 +396,7 @@ function formatStatus(status) {
                   type="text"
                   maxlength="12"
                   placeholder="971XXXXXXXXX"
-                  :class="['w-full min-w-[130px] max-w-[220px] rounded border bg-white px-2 py-1 text-sm focus:ring-1', inlineEditError ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+                  :class="['w-full min-w-[130px] max-w-[220px] rounded border bg-white px-2 py-1 text-sm focus:ring-1', inlineEditError ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-brand-primary focus:ring-brand-primary']"
                   @input="onPhoneInlineInput"
                   @keydown.enter="saveInlineEdit"
                   @keydown.esc="cancelInlineEdit"
@@ -411,7 +405,7 @@ function formatStatus(status) {
                   v-else
                   v-model="inlineEditValue"
                   type="text"
-                  :class="['w-full min-w-[100px] max-w-[220px] rounded border bg-white px-2 py-1 text-sm focus:ring-1', inlineEditError ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-green-500 focus:ring-green-500']"
+                  :class="['w-full min-w-[100px] max-w-[220px] rounded border bg-white px-2 py-1 text-sm focus:ring-1', inlineEditError ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-brand-primary focus:ring-brand-primary']"
                   @input="inlineEditError = ''"
                   @keydown.enter="saveInlineEdit"
                   @keydown.esc="cancelInlineEdit"
@@ -419,7 +413,7 @@ function formatStatus(status) {
                 <p v-if="inlineEditError" class="text-xs text-red-600">{{ inlineEditError }}</p>
                 <div class="flex gap-1">
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
-                  <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
+                  <button type="button" class="rounded bg-brand-primary px-2 py-0.5 text-xs text-white hover:bg-brand-primary-hover" @click="saveInlineEdit">Save</button>
                 </div>
               </div>
             </template>
@@ -438,7 +432,7 @@ function formatStatus(status) {
               <div class="flex flex-col gap-1.5">
                 <select
                   v-model="inlineEditValue"
-                  class="min-w-[160px] rounded border border-gray-300 bg-white px-3 py-1.5 pr-8 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="min-w-[160px] rounded border border-gray-300 bg-white px-3 py-1.5 pr-8 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   @keydown.enter="saveInlineEdit"
                   @keydown.esc="cancelInlineEdit"
                 >
@@ -449,13 +443,13 @@ function formatStatus(status) {
                 </select>
                 <div class="flex gap-1">
                   <button type="button" class="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50" @click="cancelInlineEdit">Cancel</button>
-                  <button type="button" class="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-700" @click="saveInlineEdit">Save</button>
+                  <button type="button" class="rounded bg-brand-primary px-2 py-0.5 text-xs text-white hover:bg-brand-primary-hover" @click="saveInlineEdit">Save</button>
                 </div>
               </div>
             </template>
             <template v-else-if="col === 'status' && canInlineEdit">
               <span
-                :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium cursor-pointer hover:ring-2 hover:ring-green-400', statusBadgeClass(row.status)]"
+                :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium cursor-pointer hover:ring-2 hover:ring-brand-primary', statusBadgeClass(row.status)]"
                 @dblclick="openDropdownEdit(row, 'status')"
               >
                 {{ formatStatus(row.status) }}
@@ -472,9 +466,9 @@ function formatStatus(status) {
                 :class="[
                   'inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium',
                   String(row.sla_timer).startsWith('Overdue') ? 'bg-red-100 text-red-700'
-                    : String(row.sla_timer) === 'Assigned' ? 'bg-green-100 text-green-700'
+                    : String(row.sla_timer) === 'Assigned' ? 'bg-brand-primary-light text-brand-primary-hover'
                       : String(row.sla_timer).startsWith('Due in') ? 'bg-orange-100 text-orange-700'
-                        : 'bg-blue-100 text-blue-700',
+                        : 'bg-brand-primary-light text-brand-primary-hover',
                 ]"
               >
                 {{ row.sla_timer }}
@@ -498,13 +492,13 @@ function formatStatus(status) {
           <td v-if="hasAnyRowAction" class="whitespace-nowrap px-4 py-3">
             <div class="flex items-center justify-between gap-3">
               <div class="inline-flex items-center gap-1">
-                <button v-if="canViewAction" type="button" class="rounded-full p-1.5 text-blue-600 hover:bg-blue-50" title="View" @click="goToView(row)">
+                <button v-if="canViewAction" type="button" class="rounded-full p-1.5 text-brand-primary hover:bg-brand-primary-light" title="View" @click="goToView(row)">
                   <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                   </svg>
                 </button>
-                <button v-if="canEditAction" type="button" class="rounded-full p-1.5 text-green-600 hover:bg-green-50" title="Edit" @click="goToEdit(row)">
+                <button v-if="canEditAction" type="button" class="rounded-full p-1.5 text-brand-primary hover:bg-brand-primary-light" title="Edit" @click="goToEdit(row)">
                   <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                   </svg>

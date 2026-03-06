@@ -8,7 +8,6 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/lib/axios'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import { toDdMonYyyyLower } from '@/lib/dateFormat'
 import { useAuthStore } from '@/stores/auth'
@@ -318,9 +317,9 @@ function statusLabel(status) {
 
 function statusBadgeClass(status) {
   const s = (status || '').toLowerCase()
-  if (s === 'approved') return 'bg-green-100 text-green-800'
+  if (s === 'approved') return 'bg-brand-primary-light text-brand-primary-hover'
   if (s === 'rejected') return 'bg-red-100 text-red-800'
-  if (s === 'submitted') return 'bg-blue-100 text-blue-800'
+  if (s === 'submitted') return 'bg-brand-primary-light text-brand-primary-hover'
   return 'bg-gray-100 text-gray-700'
 }
 
@@ -333,7 +332,7 @@ function duStatusLabel(status) {
 
 function duStatusBadgeClass(status) {
   const s = (status || '').toLowerCase()
-  if (s === 'approved') return 'bg-green-100 text-green-800'
+  if (s === 'approved') return 'bg-brand-primary-light text-brand-primary-hover'
   if (s === 'rejected') return 'bg-red-100 text-red-800'
   return 'bg-amber-100 text-amber-800'
 }
@@ -364,7 +363,7 @@ function parseDate(str) {
 
 function slaBadgeClass(sla) {
   if (!sla) return 'bg-gray-100 text-gray-700'
-  return sla === 'Breached SLA' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+  return sla === 'Breached SLA' ? 'bg-red-100 text-red-800' : 'bg-brand-primary-light text-brand-primary-hover'
 }
 
 function cellValue(row, key) {
@@ -447,16 +446,14 @@ onMounted(async () => {
     <div class="flex flex-wrap items-start justify-between gap-4">
       <div>
         <div class="flex flex-wrap items-baseline gap-2">
-          <h1 class="text-2xl font-bold text-gray-900">VAS Reports</h1>
-          <Breadcrumbs />
-        </div>
+          <h1 class="text-2xl font-bold text-gray-900">VAS Reports</h1>        </div>
         <p class="text-sm text-gray-500 mt-1">Generate and analyze VAS request performance and SLA compliance.</p>
       </div>
       <div class="flex gap-2">
         <button
           v-if="canExport"
           type="button"
-          class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-70 disabled:cursor-wait"
+          class="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70 disabled:cursor-wait"
           :disabled="exportLoading"
           @click="exportReport"
         >
@@ -479,12 +476,12 @@ onMounted(async () => {
         :class="[
           'rounded-xl border-2 p-5 shadow-sm flex items-center gap-4 text-left transition-all',
           activeCard === 'all'
-            ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-200'
-            : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-md',
+            ? 'border-brand-primary bg-brand-primary-light ring-1 ring-brand-primary-muted'
+            : 'border-gray-200 bg-white hover:border-brand-primary-muted hover:shadow-md',
         ]"
         @click="selectCard('all')"
       >
-        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-brand-primary-light text-brand-primary">
           <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
         </div>
         <div>
@@ -519,12 +516,12 @@ onMounted(async () => {
         :class="[
           'rounded-xl border-2 p-5 shadow-sm flex items-center gap-4 text-left transition-all',
           activeCard === 'completed_today'
-            ? 'border-green-500 bg-green-50 ring-1 ring-green-200'
-            : 'border-gray-200 bg-white hover:border-green-300 hover:shadow-md',
+            ? 'border-brand-primary bg-brand-primary-light ring-1 ring-brand-primary-muted'
+            : 'border-gray-200 bg-white hover:border-brand-primary-muted hover:shadow-md',
         ]"
         @click="selectCard('completed_today')"
       >
-        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-600">
+        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-primary-light text-brand-primary">
           <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
         </div>
         <div>
@@ -535,7 +532,7 @@ onMounted(async () => {
 
       <!-- SLA Compliance -->
       <div class="rounded-xl border-2 border-gray-200 bg-white p-5 shadow-sm flex items-center gap-4">
-        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-green-100 text-green-600">
+        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-brand-primary-light text-brand-primary">
           <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h2v16H4V4z" /></svg>
         </div>
         <div>
@@ -550,19 +547,19 @@ onMounted(async () => {
       <div class="flex flex-wrap items-end gap-4">
         <div>
           <label class="block text-xs font-medium text-gray-500 mb-1">Status</label>
-          <select v-model="filters.status" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-44 focus:ring-green-500 focus:border-green-500">
+          <select v-model="filters.status" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-44 focus:ring-brand-primary focus:border-brand-primary">
             <option value="">All Status</option>
             <option v-for="s in filterOptions.statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
           </select>
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-500 mb-1">Request Type</label>
-          <select v-model="filters.request_type" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-44 focus:ring-green-500 focus:border-green-500">
+          <select v-model="filters.request_type" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-44 focus:ring-brand-primary focus:border-brand-primary">
             <option value="">All Types</option>
             <option v-for="t in filterOptions.request_types" :key="t.value" :value="t.value">{{ t.label }}</option>
           </select>
         </div>
-        <button type="button" class="ml-auto rounded-lg bg-green-600 px-5 py-2 text-sm font-medium text-white hover:bg-green-700" @click="applyFilters">Apply</button>
+        <button type="button" class="ml-auto rounded-lg bg-brand-primary px-5 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover" @click="applyFilters">Apply</button>
         <button type="button" class="rounded-lg border border-gray-300 bg-white px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="resetFilters">Reset</button>
         <div class="flex items-center gap-2">
           <button
@@ -572,7 +569,7 @@ onMounted(async () => {
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
             Advanced Filters
-            <span v-if="activeFilterCount > 0" class="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-600 text-[10px] font-bold text-white">{{ activeFilterCount }}</span>
+            <span v-if="activeFilterCount > 0" class="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-brand-primary text-[10px] font-bold text-white">{{ activeFilterCount }}</span>
           </button>
           <button
             type="button"
@@ -590,52 +587,52 @@ onMounted(async () => {
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Date From</label>
-            <input v-model="filters.from" type="date" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-green-500 focus:border-green-500" />
+            <input v-model="filters.from" type="date" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-brand-primary focus:border-brand-primary" />
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Date To</label>
-            <input v-model="filters.to" type="date" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-green-500 focus:border-green-500" />
+            <input v-model="filters.to" type="date" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-brand-primary focus:border-brand-primary" />
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Submitted From</label>
-            <input v-model="filters.submitted_from" type="date" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-green-500 focus:border-green-500" />
+            <input v-model="filters.submitted_from" type="date" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-brand-primary focus:border-brand-primary" />
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Submitted To</label>
-            <input v-model="filters.submitted_to" type="date" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-green-500 focus:border-green-500" />
+            <input v-model="filters.submitted_to" type="date" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-brand-primary focus:border-brand-primary" />
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Company Name</label>
-            <input v-model="filters.company_name" type="text" placeholder="Search company…" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-green-500 focus:border-green-500" />
+            <input v-model="filters.company_name" type="text" placeholder="Search company…" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-brand-primary focus:border-brand-primary" />
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Account Number</label>
-            <input v-model="filters.account_number" type="text" placeholder="Search account…" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-green-500 focus:border-green-500" />
+            <input v-model="filters.account_number" type="text" placeholder="Search account…" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-brand-primary focus:border-brand-primary" />
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Manager</label>
-            <select v-model="filters.manager_id" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-green-500 focus:border-green-500">
+            <select v-model="filters.manager_id" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-brand-primary focus:border-brand-primary">
               <option value="">All Managers</option>
               <option v-for="m in filterOptions.managers" :key="m.id" :value="m.id">{{ m.name }}</option>
             </select>
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Team Leader</label>
-            <select v-model="filters.team_leader_id" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-green-500 focus:border-green-500">
+            <select v-model="filters.team_leader_id" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-brand-primary focus:border-brand-primary">
               <option value="">All Team Leaders</option>
               <option v-for="tl in filterOptions.team_leaders" :key="tl.id" :value="tl.id">{{ tl.name }}</option>
             </select>
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Sales Agent</label>
-            <select v-model="filters.sales_agent_id" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-green-500 focus:border-green-500">
+            <select v-model="filters.sales_agent_id" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-brand-primary focus:border-brand-primary">
               <option value="">All Sales Agents</option>
               <option v-for="sa in filterOptions.sales_agents" :key="sa.id" :value="sa.id">{{ sa.name }}</option>
             </select>
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">BO Executive</label>
-            <select v-model="filters.back_office_executive_id" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-green-500 focus:border-green-500">
+            <select v-model="filters.back_office_executive_id" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-brand-primary focus:border-brand-primary">
               <option value="">All Executives</option>
               <option v-for="bo in boOptions" :key="bo.id" :value="bo.id">{{ bo.name }}</option>
             </select>
@@ -649,7 +646,7 @@ onMounted(async () => {
       <!-- Table header bar -->
       <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b-2 border-black bg-gray-50">
         <h2 class="text-base font-semibold text-gray-900">
-          Showing <span class="text-green-700">{{ tableMeta.total }}</span> VAS Requests
+          Showing <span class="text-brand-primary-hover">{{ tableMeta.total }}</span> VAS Requests
           <span v-if="activeCard === 'pending'" class="text-sm font-normal text-gray-500">(Pending)</span>
           <span v-if="activeCard === 'completed_today'" class="text-sm font-normal text-gray-500">(Completed Today)</span>
         </h2>
@@ -658,31 +655,31 @@ onMounted(async () => {
       <!-- Table -->
       <div class="overflow-x-auto">
         <table class="min-w-full bg-white">
-          <thead class="bg-gray-50 border-b-2 border-black">
+          <thead class="bg-brand-primary border-b-2 border-green-700">
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">#</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider w-12">#</th>
               <th
                 v-for="col in activeColumns"
                 :key="col.key"
-                class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 transition-colors"
+                class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider cursor-pointer select-none hover:bg-white/10 transition-colors"
                 @click="onSort(col.key)"
               >
                 <div class="flex items-center gap-1">
                   <span>{{ col.label }}</span>
-                  <span v-if="sort === col.key" class="text-green-600">
+                  <span v-if="sort === col.key" class="text-white">
                     <svg v-if="order === 'asc'" class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
                     <svg v-else class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                   </span>
-                  <span v-else class="text-gray-300">
+                  <span v-else class="text-white/40">
                     <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
                   </span>
                 </div>
               </th>
               <!-- DU Status (virtual) -->
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">DU Status</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">DU Status</th>
               <!-- SLA Status (virtual) -->
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SLA Status</th>
-              <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">SLA Status</th>
+              <th class="px-4 py-3 text-right text-xs font-medium text-white uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody class="bg-white">
@@ -731,7 +728,7 @@ onMounted(async () => {
                 <button
                   v-if="canView"
                   type="button"
-                  class="inline-flex items-center gap-1 text-sm text-green-600 hover:text-green-700 font-medium"
+                  class="inline-flex items-center gap-1 text-sm text-brand-primary hover:text-brand-primary-hover font-medium"
                   @click="goToDetail(row.id)"
                 >
                   <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
@@ -758,7 +755,7 @@ onMounted(async () => {
             <span class="whitespace-nowrap font-medium">Number of rows</span>
             <select
               :value="tableMeta.per_page"
-              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
               @change="onPerPageChange"
             >
               <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>

@@ -139,7 +139,7 @@ function onEditSubmission() {
 
           <div class="max-h-[calc(100vh-8rem)] overflow-y-auto px-6 py-4">
             <div v-if="loading" class="flex justify-center py-12">
-              <svg class="h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+              <svg class="h-8 w-8 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
@@ -286,7 +286,7 @@ function onEditSubmission() {
             <button
               v-if="canEditBackOffice && lead"
               type="button"
-              class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+              class="inline-flex items-center rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover"
               @click="onEditSubmission"
             >
               Edit Submission

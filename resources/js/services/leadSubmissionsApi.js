@@ -153,8 +153,8 @@ const leadSubmissionsApi = {
   },
 
   /** Back office edit (superadmin / backoffice only) */
-  async getBackOfficeOptions() {
-    if (backOfficeOptionsCache && Date.now() - backOfficeOptionsCacheAt < BACK_OFFICE_OPTIONS_TTL_MS) {
+  async getBackOfficeOptions(forceRefresh = false) {
+    if (!forceRefresh && backOfficeOptionsCache && Date.now() - backOfficeOptionsCacheAt < BACK_OFFICE_OPTIONS_TTL_MS) {
       return backOfficeOptionsCache
     }
     const { data } = await api.get('/lead-submissions/back-office-options')

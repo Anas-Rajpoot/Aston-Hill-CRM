@@ -117,8 +117,20 @@ class PermissionController extends Controller
         return redirect()->route('super-admin.permissions.index')->with('success', 'Permission updated');
     }
 
+    /** Permissions that must never be deleted (system-critical). */
+    private const PROTECTED_PERMISSIONS = [
+        'roles.assign_permissions',
+        'roles.read',
+        'roles.create',
+        'roles.delete',
+    ];
+
     public function destroy(Permission $permission)
     {
+        if (in_array($permission->name, self::PROTECTED_PERMISSIONS, true)) {
+            return back()->with('error', "Cannot delete system-critical permission '{$permission->name}'.");
+        }
+
         $permission->delete();
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();

@@ -126,7 +126,7 @@ async function save() {
                 <select
                   v-model="triggerKey"
                   :disabled="!canUpdate"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 disabled:opacity-70"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-brand-primary focus:ring-brand-primary disabled:bg-gray-100 disabled:opacity-70"
                 >
                   <option value="" disabled>Select trigger event…</option>
                   <option v-for="t in triggers" :key="t.key" :value="t.key">{{ t.name }}</option>
@@ -146,7 +146,7 @@ async function save() {
                 v-model="name"
                 type="text"
                 :disabled="!canUpdate"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 disabled:opacity-70"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-brand-primary focus:ring-brand-primary disabled:bg-gray-100 disabled:opacity-70"
                 placeholder="e.g. New Submission Notification"
               />
               <p v-if="errors.name" class="mt-1 text-xs text-red-600">{{ Array.isArray(errors.name) ? errors.name.join(' ') : errors.name }}</p>
@@ -160,7 +160,7 @@ async function save() {
                 v-model="subject"
                 type="text"
                 :disabled="!canUpdate"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 disabled:opacity-70"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-brand-primary focus:ring-brand-primary disabled:bg-gray-100 disabled:opacity-70"
                 placeholder="New Submission - {{CompanyName}}"
               />
               <p v-if="errors.subject" class="mt-1 text-xs text-red-600">{{ Array.isArray(errors.subject) ? errors.subject.join(' ') : errors.subject }}</p>
@@ -174,7 +174,7 @@ async function save() {
                 v-model="body"
                 rows="8"
                 :disabled="!canUpdate"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm font-mono leading-relaxed focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 disabled:opacity-70"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm font-mono leading-relaxed focus:border-brand-primary focus:ring-brand-primary disabled:bg-gray-100 disabled:opacity-70"
               />
               <p v-if="errors.body" class="mt-1 text-xs text-red-600">{{ Array.isArray(errors.body) ? errors.body.join(' ') : errors.body }}</p>
             </div>
@@ -185,13 +185,13 @@ async function save() {
               <div class="flex flex-wrap gap-1.5">
                 <code
                   v-for="v in (template?.available_variables ?? defaultVars)" :key="v"
-                  class="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-800 font-mono"
+                  class="rounded bg-brand-primary-light px-1.5 py-0.5 text-xs text-brand-primary-hover font-mono"
                 >{{ wrapVar(v) }}</code>
               </div>
             </div>
 
             <!-- Info -->
-            <div class="flex items-start gap-2 text-xs text-blue-700 bg-blue-50 rounded-lg px-3 py-2">
+            <div class="flex items-start gap-2 text-xs text-brand-primary-hover bg-brand-primary-light rounded-lg px-3 py-2">
               <svg class="w-4 h-4 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
               <span>Variables in double braces are automatically replaced with actual values when notifications are sent.</span>
             </div>
@@ -199,13 +199,13 @@ async function save() {
         </div>
 
         <!-- Footer -->
-        <div class="px-6 py-4 border-t border-gray-200 flex justify-end gap-3 bg-gray-50">
-          <button type="button" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="emit('close')">Close</button>
+        <div class="px-6 py-4 border-t border-gray-200 flex flex-wrap justify-end gap-3 bg-gray-50">
+          <button type="button" class="w-full sm:w-auto rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="emit('close')">Close</button>
           <button
             v-if="canUpdate"
             type="button"
             :disabled="saving || loading"
-            class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
+            class="inline-flex w-full sm:w-auto justify-center items-center gap-2 rounded-lg bg-brand-primary px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50 transition-colors"
             @click="save"
           >
             <svg v-if="saving" class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>

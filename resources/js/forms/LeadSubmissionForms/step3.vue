@@ -309,7 +309,7 @@ const cancel = () => window.history.back()
 
 <template>
   <div v-if="loading" class="flex justify-center items-center py-12">
-    <svg class="animate-spin h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24">
+    <svg class="animate-spin h-8 w-8 text-brand-primary" fill="none" viewBox="0 0 24 24">
       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
       <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
     </svg>
@@ -389,9 +389,9 @@ const cancel = () => window.history.back()
           v-if="canAddMoreAdditional"
           type="button"
           @click="addAdditionalDoc"
-          class="inline-flex items-center gap-2 text-sm font-medium text-green-600 hover:text-green-700"
+          class="inline-flex items-center gap-2 text-sm font-medium text-brand-primary hover:text-brand-primary-hover"
         >
-          <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-5 h-5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
           </svg>
           Add Document
@@ -421,7 +421,7 @@ const cancel = () => window.history.back()
           </div>
           <!-- Upload + Remove on the right, same row -->
           <div class="flex items-center gap-2 shrink-0 flex-nowrap">
-            <div v-if="ad.files?.length" class="w-6 h-6 rounded-full bg-blue-500 text-white text-xs font-bold flex items-center justify-center">
+            <div v-if="ad.files?.length" class="w-6 h-6 rounded-full bg-brand-primary text-white text-xs font-bold flex items-center justify-center">
               {{ ad.files.length }}
             </div>
             <div v-else-if="ad.existingItems?.length" class="w-6 h-6 rounded-full bg-gray-400 text-white text-xs font-bold flex items-center justify-center">
@@ -441,9 +441,9 @@ const cancel = () => window.history.back()
           <button
             type="button"
             @click="addAdditionalDoc"
-            class="inline-flex items-center gap-2 text-sm font-medium text-green-600 hover:text-green-700"
+            class="inline-flex items-center gap-2 text-sm font-medium text-brand-primary hover:text-brand-primary-hover"
           >
-            <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-5 h-5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
             Add Document
@@ -461,7 +461,7 @@ const cancel = () => window.history.back()
         <button
           type="button"
           @click="goBack"
-          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-primary text-white text-sm font-medium hover:bg-brand-primary-hover"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -492,7 +492,7 @@ const cancel = () => window.history.back()
           type="button"
           :disabled="submitting"
           @click="goNext"
-          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-50 bg-green-600 hover:bg-green-700"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-50 bg-brand-primary hover:bg-brand-primary-hover"
         >
           <span class="text-white">{{ submitting ? 'Saving...' : 'Next' }}</span>
           <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

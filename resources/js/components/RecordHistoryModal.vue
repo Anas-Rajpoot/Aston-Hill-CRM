@@ -316,7 +316,7 @@ watch(
 
         <!-- Record summary -->
         <div class="mx-6 mt-4 flex items-center gap-3 rounded-lg bg-gray-100 px-4 py-3">
-          <span class="flex h-10 w-10 items-center justify-center rounded-full bg-green-500 text-white">
+          <span class="flex h-10 w-10 items-center justify-center rounded-full bg-brand-primary text-white">
             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -330,7 +330,7 @@ watch(
         <!-- Timeline -->
         <div class="flex-1 overflow-y-auto px-6 py-4">
           <div v-if="loading" class="flex justify-center py-8">
-            <svg class="h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+            <svg class="h-8 w-8 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
@@ -344,7 +344,7 @@ watch(
                 :key="entry.id"
                 class="relative rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
               >
-                <span class="absolute -left-[19px] top-5 h-4 w-4 rounded-full bg-green-500 ring-4 ring-white" aria-hidden="true" />
+                <span class="absolute -left-[19px] top-5 h-4 w-4 rounded-full bg-brand-primary ring-4 ring-white" aria-hidden="true" />
                 <div class="flex items-start justify-between gap-2">
                   <div>
                     <p class="font-medium text-gray-900">{{ entry.user_name }}{{ entry.user_role ? ` (${entry.user_role})` : '' }}</p>
@@ -353,7 +353,7 @@ watch(
                   <button
                     v-if="entry.changes.length > 0"
                     type="button"
-                    class="shrink-0 text-sm font-medium text-green-600 hover:underline"
+                    class="shrink-0 text-sm font-medium text-brand-primary hover:underline"
                     @click="openChangeDetails(entry)"
                   >
                     View in Detail
@@ -368,7 +368,7 @@ watch(
                     <span class="font-medium text-gray-700">{{ c.field }}:</span>
                     <span class="text-red-500 line-through break-all">{{ formatVal(c.oldVal) }}</span>
                     <span class="text-gray-400">&rarr;</span>
-                    <span class="text-green-600 break-all">{{ formatVal(c.newVal) }}</span>
+                    <span class="text-brand-primary break-all">{{ formatVal(c.newVal) }}</span>
                   </div>
                   <p v-if="entry.moreCount > 0" class="text-sm text-gray-500">+{{ entry.moreCount }} more field(s) changed</p>
                 </div>
@@ -415,7 +415,7 @@ watch(
                   <span class="font-medium text-gray-700">{{ c.field }}:</span>
                   <span class="text-red-500 line-through break-all">{{ formatVal(c.oldVal) }}</span>
                   <span class="text-gray-400">&rarr;</span>
-                  <span class="text-green-600 break-all">{{ formatVal(c.newVal) }}</span>
+                  <span class="text-brand-primary break-all">{{ formatVal(c.newVal) }}</span>
                 </div>
               </div>
             </div>

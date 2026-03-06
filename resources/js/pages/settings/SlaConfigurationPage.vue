@@ -16,7 +16,6 @@
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import api from '@/lib/axios'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Toast from '@/components/Toast.vue'
 import SkeletonBox from '@/components/skeletons/SkeletonBox.vue'
 
@@ -222,9 +221,7 @@ onBeforeUnmount(() => {
     <!-- ═══ Header ═══ -->
     <div>
       <div class="flex items-center gap-3">
-        <h1 class="text-2xl font-bold text-gray-900">SLA Configuration</h1>
-        <Breadcrumbs />
-      </div>
+        <h1 class="text-2xl font-bold text-gray-900">SLA Configuration</h1>      </div>
       <p class="mt-1 text-sm text-gray-500">Manage SLA timers, warning thresholds, and notification rules per module.</p>
     </div>
 
@@ -262,13 +259,13 @@ onBeforeUnmount(() => {
       <div v-else class="overflow-x-auto">
         <table class="min-w-full text-sm">
           <thead>
-            <tr class="border-b border-gray-200 bg-gray-50 text-left">
-              <th class="px-6 py-3 font-semibold text-gray-600 whitespace-nowrap">Page name</th>
-              <th class="px-6 py-3 font-semibold text-gray-600 whitespace-nowrap">SLA Duration</th>
-              <th class="px-6 py-3 font-semibold text-gray-600 whitespace-nowrap">Warning Threshold</th>
-              <th class="px-6 py-3 font-semibold text-gray-600 whitespace-nowrap">Notification Email</th>
-              <th class="px-6 py-3 font-semibold text-gray-600 whitespace-nowrap">Status</th>
-              <th class="px-6 py-3 font-semibold text-gray-600 whitespace-nowrap text-right">Actions</th>
+            <tr class="bg-brand-primary border-b-2 border-green-700 text-left">
+              <th class="px-6 py-3 font-semibold text-white whitespace-nowrap">Page name</th>
+              <th class="px-6 py-3 font-semibold text-white whitespace-nowrap">SLA Duration</th>
+              <th class="px-6 py-3 font-semibold text-white whitespace-nowrap">Warning Threshold</th>
+              <th class="px-6 py-3 font-semibold text-white whitespace-nowrap">Notification Email</th>
+              <th class="px-6 py-3 font-semibold text-white whitespace-nowrap">Status</th>
+              <th class="px-6 py-3 font-semibold text-white whitespace-nowrap text-right">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
@@ -293,7 +290,7 @@ onBeforeUnmount(() => {
                     type="number"
                     min="1"
                     max="10080"
-                    class="w-24 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    class="w-24 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                     :disabled="editingRows[rule.id].saving"
                     placeholder="Minutes"
                   />
@@ -317,7 +314,7 @@ onBeforeUnmount(() => {
                     type="number"
                     min="0"
                     max="10080"
-                    class="w-24 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    class="w-24 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                     :disabled="editingRows[rule.id].saving"
                     placeholder="Minutes"
                   />
@@ -339,7 +336,7 @@ onBeforeUnmount(() => {
                   <input
                     v-model="editingRows[rule.id].email"
                     type="email"
-                    class="w-full min-w-[180px] rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    class="w-full min-w-[180px] rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                     :disabled="editingRows[rule.id].saving"
                     placeholder="email@example.com"
                   />
@@ -355,7 +352,7 @@ onBeforeUnmount(() => {
                 <select
                   :value="rule.is_active ? 'active' : 'inactive'"
                   :disabled="!canUpdate || !!togglingIds[rule.id] || isEditing(rule.id)"
-                  class="w-32 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  class="w-32 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary disabled:cursor-not-allowed disabled:opacity-50"
                   @change="updateStatus(rule, $event.target.value)"
                 >
                   <option value="active">Active</option>
@@ -370,7 +367,7 @@ onBeforeUnmount(() => {
                     <button
                       type="button"
                       :disabled="editingRows[rule.id].saving"
-                      class="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-green-700 disabled:opacity-50 transition-colors"
+                      class="inline-flex items-center gap-1.5 rounded-lg bg-brand-primary px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-primary-hover disabled:opacity-50 transition-colors"
                       @click="saveRow(rule)"
                     >
                       <svg v-if="editingRows[rule.id].saving" class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
@@ -391,7 +388,7 @@ onBeforeUnmount(() => {
                 <template v-else-if="canUpdate">
                   <button
                     type="button"
-                    class="inline-flex items-center justify-center h-8 w-8 rounded-lg text-teal-500 hover:bg-teal-50 hover:text-teal-600 transition-colors"
+                    class="inline-flex items-center justify-center h-8 w-8 rounded-lg text-brand-primary hover:bg-brand-primary-light hover:text-brand-primary-hover transition-colors"
                     title="Edit row"
                     @click="startEdit(rule)"
                   >
@@ -413,31 +410,31 @@ onBeforeUnmount(() => {
     </section>
 
     <!-- ═══ SLA Configuration Guidelines ═══ -->
-    <div class="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 flex gap-3">
-      <svg class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+    <div class="rounded-xl border border-brand-primary-muted bg-brand-primary-light px-5 py-4 flex gap-3">
+      <svg class="w-5 h-5 text-brand-primary flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
         <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
       </svg>
       <div>
-        <p class="font-semibold text-blue-900">SLA Configuration Guidelines</p>
-        <ul class="mt-2 space-y-1.5 text-sm text-blue-800">
+        <p class="font-semibold text-brand-primary-dark">SLA Configuration Guidelines</p>
+        <ul class="mt-2 space-y-1.5 text-sm text-brand-primary-hover">
           <li class="flex gap-1.5">
-            <span class="text-blue-400 mt-0.5">•</span>
+            <span class="text-brand-primary/60 mt-0.5">•</span>
             <span><strong>SLA Duration:</strong> Total time allowed before breach occurs.</span>
           </li>
           <li class="flex gap-1.5">
-            <span class="text-blue-400 mt-0.5">•</span>
+            <span class="text-brand-primary/60 mt-0.5">•</span>
             <span><strong>Warning Threshold:</strong> Time before breach when warning notification is sent.</span>
           </li>
           <li class="flex gap-1.5">
-            <span class="text-blue-400 mt-0.5">•</span>
+            <span class="text-brand-primary/60 mt-0.5">•</span>
             <span><strong>Notification Email:</strong> Recipient for SLA breach alerts (default: order@astonhill.ae).</span>
           </li>
           <li class="flex gap-1.5">
-            <span class="text-blue-400 mt-0.5">•</span>
+            <span class="text-brand-primary/60 mt-0.5">•</span>
             <span><strong>Active toggle:</strong> Enable/disable SLA tracking for specific modules.</span>
           </li>
           <li class="flex gap-1.5">
-            <span class="text-blue-400 mt-0.5">•</span>
+            <span class="text-brand-primary/60 mt-0.5">•</span>
             <span>All times are in minutes (e.g., 480 minutes = 8 hours).</span>
           </li>
         </ul>

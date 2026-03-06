@@ -8,8 +8,8 @@ import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import api from '@/lib/axios'
 import { useTablePageSize } from '@/composables/useTablePageSize'
 import { useFormDraft } from '@/composables/useFormDraft'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import Toast from '@/components/Toast.vue'
+import DeleteOtpModal from '@/components/DeleteOtpModal.vue'
 import SkeletonBox from '@/components/skeletons/SkeletonBox.vue'
 import { formatUserDate } from '@/lib/dateFormat'
 
@@ -320,7 +320,7 @@ function fileTypeIcon(ft) {
 }
 
 function statusClass(s) {
-  if (s === 'active')   return 'bg-green-100 text-green-700'
+  if (s === 'active')   return 'bg-brand-primary-light text-brand-primary-hover'
   if (s === 'inactive') return 'bg-yellow-100 text-yellow-700'
   return 'bg-gray-100 text-gray-600'
 }
@@ -341,21 +341,19 @@ onBeforeUnmount(() => {
     <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />
 
     <!-- ═══ Header ═══ -->
-    <div class="rounded-xl border border-gray-200 bg-gradient-to-r from-teal-50/60 via-white to-white px-6 py-5">
+    <div class="rounded-xl border border-gray-200 bg-gradient-to-r from-brand-primary-light/60 via-white to-white px-6 py-5">
       <div class="flex items-center justify-between">
         <div>
           <div class="flex items-center gap-2 mb-0.5">
-            <h1 class="text-xl font-bold text-gray-900">Library – Templates & Forms</h1>
-            <Breadcrumbs :items="crumbs" />
-          </div>
+            <h1 class="text-xl font-bold text-gray-900">Library – Templates & Forms</h1>          </div>
           <p class="text-sm text-gray-500">Central repository for forms, templates, and documents</p>
-          <p v-if="!canManage" class="mt-1 text-xs text-blue-600 flex items-center gap-1">
+          <p v-if="!canManage" class="mt-1 text-xs text-brand-primary flex items-center gap-1">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
             You are viewing documents shared with your role. Contact admin for upload access.
           </p>
         </div>
         <div class="flex items-center gap-2.5">
-          <span v-if="!canManage" class="inline-flex items-center gap-1.5 shrink-0 rounded-lg bg-blue-50 border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700">
+          <span v-if="!canManage" class="inline-flex items-center gap-1.5 shrink-0 rounded-lg bg-brand-primary-light border border-brand-primary-muted px-3 py-1.5 text-xs font-semibold text-brand-primary-hover">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
             View Only
           </span>
@@ -363,11 +361,11 @@ onBeforeUnmount(() => {
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" /></svg>
             Export Library List
           </button>
-          <button v-if="canManage" class="inline-flex items-center gap-1.5 rounded-lg border border-teal-600 bg-white px-3.5 py-2 text-sm font-medium text-teal-700 hover:bg-teal-50 transition" @click="bulkUploadOpen = true">
+          <button v-if="canManage" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-primary bg-white px-3.5 py-2 text-sm font-medium text-brand-primary hover:bg-brand-primary-light transition" @click="bulkUploadOpen = true">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
             Bulk Upload
           </button>
-          <button v-if="canManage" class="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition shadow-sm" @click="openCreate">
+          <button v-if="canManage" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover transition shadow-sm" @click="openCreate">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
             Add Document
           </button>
@@ -382,22 +380,22 @@ onBeforeUnmount(() => {
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 items-end">
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Document Name</label>
-            <input v-model="filters.q" type="text" placeholder="Search documents..." class="w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" @keyup.enter="fetchList(1)" />
+            <input v-model="filters.q" type="text" placeholder="Search documents..." class="w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" @keyup.enter="fetchList(1)" />
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Category</label>
-            <select v-model="filters.category_id" class="w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            <select v-model="filters.category_id" class="w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Categories</option>
               <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
             </select>
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Uploaded From</label>
-            <input v-model="filters.date_from" type="date" class="w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" />
+            <input v-model="filters.date_from" type="date" class="w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">File Type</label>
-            <select v-model="filters.file_type" class="w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            <select v-model="filters.file_type" class="w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Types</option>
               <option value="pdf">PDF</option><option value="docx">DOCX</option><option value="xlsx">XLSX</option>
               <option value="pptx">PPTX</option><option value="csv">CSV</option><option value="image">Image</option>
@@ -405,13 +403,13 @@ onBeforeUnmount(() => {
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Status</label>
-            <select v-model="filters.status" class="w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            <select v-model="filters.status" class="w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
               <option value="">All Statuses</option>
               <option value="active">Active</option><option value="inactive">Inactive</option><option value="archived">Archived</option>
             </select>
           </div>
           <div class="flex items-end gap-2">
-            <button class="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition flex-1" @click="fetchList(1)">Apply</button>
+            <button class="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover transition flex-1" @click="fetchList(1)">Apply</button>
             <button class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition flex-1" @click="clearFilters">Clear</button>
           </div>
         </div>
@@ -430,20 +428,20 @@ onBeforeUnmount(() => {
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead class="border-b-2 border-black">
-              <tr class="bg-gray-50/80">
+              <tr class="bg-brand-primary">
                 <th
                   v-for="col in activeColumns"
                   :key="col.key"
-                  class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap select-none"
-                  :class="{ 'cursor-pointer hover:text-gray-700': col.sortable }"
+                  class="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider whitespace-nowrap select-none"
+                  :class="{ 'cursor-pointer hover:text-white/80': col.sortable }"
                   @click="col.sortable && toggleSort(col.sortKey || col.key)"
                 >
                   <span class="inline-flex items-center gap-1">
                     {{ col.label }}
-                    <span v-if="col.sortable" class="text-gray-400">{{ sortIcon(col.sortKey || col.key) }}</span>
+                    <span v-if="col.sortable" class="text-white/60">{{ sortIcon(col.sortKey || col.key) }}</span>
                   </span>
                 </th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Actions</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-white uppercase tracking-wider whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -476,7 +474,7 @@ onBeforeUnmount(() => {
                     <!-- Allowed Roles (visible to) -->
                     <template v-else-if="col.key === 'allowed_roles'">
                       <template v-if="(doc.allowed_roles || []).length > 0">
-                        <span v-for="r in (doc.allowed_roles || []).slice(0, 2)" :key="r" class="inline-block rounded bg-green-50 text-green-700 px-1.5 py-0.5 text-[10px] mr-1 capitalize">{{ r.replace(/_/g, ' ') }}</span>
+                        <span v-for="r in (doc.allowed_roles || []).slice(0, 2)" :key="r" class="inline-block rounded bg-brand-primary-light text-brand-primary-hover px-1.5 py-0.5 text-[10px] mr-1 capitalize">{{ r.replace(/_/g, ' ') }}</span>
                         <span v-if="(doc.allowed_roles || []).length > 2" class="text-[10px] text-gray-400">+{{ doc.allowed_roles.length - 2 }}</span>
                       </template>
                       <template v-else>
@@ -503,7 +501,7 @@ onBeforeUnmount(() => {
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                       </button>
                       <!-- Download -->
-                      <button v-if="canDownload" class="p-1.5 rounded text-blue-500 hover:bg-blue-50 hover:text-blue-700 transition" title="Download" @click.stop="downloadDoc(doc)">
+                      <button v-if="canDownload" class="p-1.5 rounded text-brand-primary hover:bg-brand-primary-light hover:text-brand-primary-hover transition" title="Download" @click.stop="downloadDoc(doc)">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                       </button>
                       <!-- Edit -->
@@ -533,7 +531,7 @@ onBeforeUnmount(() => {
               <span class="whitespace-nowrap font-medium">Number of rows</span>
               <select
                 :value="perPage"
-                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                 @change="e => { setPerPage(e.target.value); fetchList(1) }"
               >
                 <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
@@ -558,7 +556,7 @@ onBeforeUnmount(() => {
               <h3 class="text-base font-bold text-gray-900">{{ formMode === 'edit' ? 'Edit Document' : 'Add Document' }}</h3>
               <span v-if="draftSavedAt" class="text-xs text-gray-400 flex items-center gap-1">
                 <svg v-if="draftSaving" class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="4" class="opacity-25" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                <svg v-else class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                <svg v-else class="w-3 h-3 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
                 Draft saved
               </span>
             </div>
@@ -567,24 +565,24 @@ onBeforeUnmount(() => {
           <div class="flex-1 overflow-y-auto px-6 py-5 space-y-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Name <span class="text-red-500">*</span></label>
-              <input v-model="form.name" type="text" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" placeholder="Document name" />
+              <input v-model="form.name" type="text" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" placeholder="Document name" />
               <p v-if="formErrors.name" class="mt-1 text-xs text-red-600">{{ formErrors.name }}</p>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-              <textarea v-model="form.description" rows="2" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 resize-none" placeholder="Brief description..." />
+              <textarea v-model="form.description" rows="2" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none" placeholder="Brief description..." />
             </div>
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                <select v-model="form.category_id" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+                <select v-model="form.category_id" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
                   <option value="">None</option>
                   <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
                 </select>
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                <select v-model="form.status" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+                <select v-model="form.status" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
                 </select>
@@ -598,7 +596,7 @@ onBeforeUnmount(() => {
               <div class="relative" ref="rolesDropdownRef">
                 <button
                   type="button"
-                  class="w-full flex items-center justify-between rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-left focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none"
+                  class="w-full flex items-center justify-between rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-left focus:border-brand-primary focus:ring-1 focus:ring-brand-primary focus:outline-none"
                   @click="rolesDropdownOpen = !rolesDropdownOpen"
                 >
                   <span v-if="form.allowed_roles.length === 0" class="text-gray-400">Select roles...</span>
@@ -616,7 +614,7 @@ onBeforeUnmount(() => {
                         :checked="roles.length > 0 && form.allowed_roles.length === roles.length"
                         :indeterminate="form.allowed_roles.length > 0 && form.allowed_roles.length < roles.length"
                         @change="e => { form.allowed_roles = e.target.checked ? [...roles] : [] }"
-                        class="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                        class="rounded border-gray-300 text-brand-primary focus:ring-brand-primary"
                       />
                       <span class="text-sm font-medium text-gray-700">Select All</span>
                     </label>
@@ -633,7 +631,7 @@ onBeforeUnmount(() => {
                         type="checkbox"
                         :checked="form.allowed_roles.includes(role)"
                         @change="toggleRole(role)"
-                        class="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                        class="rounded border-gray-300 text-brand-primary focus:ring-brand-primary"
                       />
                       <span class="text-sm text-gray-700 capitalize">{{ role.replace(/_/g, ' ') }}</span>
                     </label>
@@ -643,7 +641,7 @@ onBeforeUnmount(() => {
                   <div class="border-t border-gray-200 px-3 py-2">
                     <button
                       type="button"
-                      class="w-full rounded-md bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700"
+                      class="w-full rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-primary-hover"
                       @click.stop="rolesDropdownOpen = false"
                     >
                       Done
@@ -653,9 +651,9 @@ onBeforeUnmount(() => {
               </div>
               <!-- Selected role tags -->
               <div v-if="form.allowed_roles.length > 0" class="flex flex-wrap gap-1 mt-2">
-                <span v-for="r in form.allowed_roles" :key="r" class="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200 px-2 py-0.5 text-xs font-medium text-green-700 capitalize">
+                <span v-for="r in form.allowed_roles" :key="r" class="inline-flex items-center gap-1 rounded-full bg-brand-primary-light border border-brand-primary-muted px-2 py-0.5 text-xs font-medium text-brand-primary-hover capitalize">
                   {{ r.replace(/_/g, ' ') }}
-                  <button type="button" class="text-green-500 hover:text-green-700" @click="form.allowed_roles = form.allowed_roles.filter(x => x !== r)">&times;</button>
+                  <button type="button" class="text-brand-primary hover:text-brand-primary-hover" @click="form.allowed_roles = form.allowed_roles.filter(x => x !== r)">&times;</button>
                 </span>
               </div>
               <p v-if="form.allowed_roles.length === 0" class="mt-1 text-xs text-amber-600">
@@ -669,17 +667,17 @@ onBeforeUnmount(() => {
             </div>
             <div v-if="formMode === 'edit'">
               <label class="block text-sm font-medium text-gray-700 mb-1">Change Note</label>
-              <input v-model="form.change_note" type="text" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500" placeholder="What changed?" />
+              <input v-model="form.change_note" type="text" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" placeholder="What changed?" />
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">File {{ formMode === 'create' ? '*' : '(optional — new version)' }}</label>
-              <input type="file" class="w-full text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-green-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-green-700 hover:file:bg-green-100" @change="onFileChange" />
+              <input type="file" class="w-full text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-brand-primary-light file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand-primary-hover hover:file:bg-brand-primary-light" @change="onFileChange" />
               <p v-if="formErrors.file" class="mt-1 text-xs text-red-600">{{ formErrors.file }}</p>
             </div>
           </div>
           <div class="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
             <button class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="showFormModal = false">Cancel</button>
-            <button :disabled="formSaving" class="rounded-lg bg-green-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 transition" @click="submitForm">
+            <button :disabled="formSaving" class="rounded-lg bg-brand-primary px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50 transition" @click="submitForm">
               {{ formSaving ? 'Saving…' : (formMode === 'edit' ? 'Save Changes' : 'Add Document') }}
             </button>
           </div>
@@ -693,7 +691,7 @@ onBeforeUnmount(() => {
         <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden" @click.stop>
           <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50/50">
             <div class="flex items-center gap-2">
-              <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+              <svg class="w-5 h-5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
               <h3 class="text-base font-bold text-gray-900">Document Details</h3>
             </div>
             <button class="p-1 rounded hover:bg-gray-100 text-gray-400" @click="showDetail = false">
@@ -755,14 +753,14 @@ onBeforeUnmount(() => {
             <div>
               <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Visible to roles</p>
               <div v-if="(detailDoc.allowed_roles || []).length > 0" class="flex flex-wrap gap-1">
-                <span v-for="r in detailDoc.allowed_roles" :key="r" class="inline-flex items-center rounded-full bg-green-50 border border-green-200 px-2 py-0.5 text-xs font-medium text-green-700 capitalize">{{ r.replace(/_/g, ' ') }}</span>
+                <span v-for="r in detailDoc.allowed_roles" :key="r" class="inline-flex items-center rounded-full bg-brand-primary-light border border-brand-primary-muted px-2 py-0.5 text-xs font-medium text-brand-primary-hover capitalize">{{ r.replace(/_/g, ' ') }}</span>
               </div>
               <div v-else class="text-sm text-gray-400">Super admin only</div>
             </div>
           </div>
           <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-between gap-3">
             <div class="flex items-center gap-2">
-              <button v-if="canDownload" class="inline-flex items-center gap-1.5 rounded-lg border border-blue-300 bg-white px-3.5 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50 transition" @click="downloadDoc(detailDoc)">
+              <button v-if="canDownload" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-primary-muted bg-white px-3.5 py-2 text-sm font-medium text-brand-primary-hover hover:bg-brand-primary-light transition" @click="downloadDoc(detailDoc)">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                 Download
               </button>
@@ -773,26 +771,15 @@ onBeforeUnmount(() => {
       </div>
     </Teleport>
 
-    <!-- ═══ Delete Confirmation Modal ═══ -->
-    <Teleport to="body">
-      <div v-if="confirmDeleteDoc" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" @click.self="confirmDeleteDoc = null">
-        <div class="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden" @click.stop>
-          <div class="px-6 py-5 text-center">
-            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 mb-4">
-              <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-            </div>
-            <h3 class="text-lg font-semibold text-gray-900 mb-1">Delete Document</h3>
-            <p class="text-sm text-gray-500">Are you sure you want to delete <strong class="text-gray-700">{{ confirmDeleteDoc.name }}</strong>? This action cannot be undone.</p>
-          </div>
-          <div class="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
-            <button class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="confirmDeleteDoc = null">Cancel</button>
-            <button :disabled="!!deleting[confirmDeleteDoc.id]" class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 transition" @click="deleteDoc(confirmDeleteDoc)">
-              {{ deleting[confirmDeleteDoc.id] ? 'Deleting…' : 'Delete' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <!-- ═══ Delete Confirmation Modal (OTP) ═══ -->
+    <DeleteOtpModal
+      :visible="!!confirmDeleteDoc"
+      title="Delete Document"
+      :item-label="confirmDeleteDoc?.name || 'this document'"
+      :loading="!!deleting[confirmDeleteDoc?.id]"
+      @confirm="deleteDoc(confirmDeleteDoc)"
+      @close="confirmDeleteDoc = null"
+    />
 
     <!-- ═══ Bulk Upload Modal ═══ -->
     <Teleport to="body">
@@ -811,14 +798,14 @@ onBeforeUnmount(() => {
             <div class="px-5 py-4 space-y-4">
               <div>
                 <label class="block text-xs font-medium text-gray-500 mb-1">Category (optional)</label>
-                <select v-model="bulkCategoryId" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500">
+                <select v-model="bulkCategoryId" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
                   <option value="">No category</option>
                   <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
                 </select>
               </div>
               <div>
                 <label class="block text-xs font-medium text-gray-500 mb-1">Select Files</label>
-                <label class="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center hover:border-green-400 hover:bg-green-50/30 transition">
+                <label class="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center hover:border-brand-primary hover:bg-brand-primary-light/30 transition">
                   <svg class="w-8 h-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
                   <span class="text-sm text-gray-600 font-medium">Click to select files</span>
                   <span class="text-xs text-gray-400 mt-1">PDF, DOCX, XLSX, PPTX, CSV, Images — max 20 MB each</span>
@@ -838,9 +825,9 @@ onBeforeUnmount(() => {
                 </div>
               </div>
             </div>
-            <div class="flex justify-end gap-2 border-t border-gray-200 bg-gray-50 px-5 py-3">
-              <button type="button" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="closeBulkModal">Cancel</button>
-              <button type="button" :disabled="bulkUploading || !bulkFiles.length" class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 transition" @click="submitBulkUpload">
+            <div class="flex flex-wrap justify-end gap-2 border-t border-gray-200 bg-gray-50 px-5 py-3">
+              <button type="button" class="w-full sm:w-auto rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="closeBulkModal">Cancel</button>
+              <button type="button" :disabled="bulkUploading || !bulkFiles.length" class="w-full sm:w-auto rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50 transition" @click="submitBulkUpload">
                 {{ bulkUploading ? 'Uploading…' : `Upload ${bulkFiles.length} File${bulkFiles.length !== 1 ? 's' : ''}` }}
               </button>
             </div>
@@ -871,14 +858,14 @@ onBeforeUnmount(() => {
             <div class="min-h-0 flex-1 overflow-y-auto px-5 py-3">
               <div class="space-y-1">
                 <label v-for="col in ALL_COLUMNS" :key="col.key" class="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 transition-colors hover:bg-gray-50">
-                  <input type="checkbox" :checked="localSelectedCols.includes(col.key)" class="rounded border-gray-300 text-green-600 focus:ring-green-500" @change="toggleCol(col.key)" />
+                  <input type="checkbox" :checked="localSelectedCols.includes(col.key)" class="rounded border-gray-300 text-brand-primary focus:ring-brand-primary" @change="toggleCol(col.key)" />
                   <span class="text-sm text-gray-700">{{ col.label }}</span>
                 </label>
               </div>
             </div>
-            <div class="flex justify-end gap-2 border-t border-gray-200 bg-gray-50 px-5 py-3">
-              <button type="button" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="columnModalOpen = false">Cancel</button>
-              <button type="button" class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700" @click="saveColumns">Save</button>
+            <div class="flex flex-wrap justify-end gap-2 border-t border-gray-200 bg-gray-50 px-5 py-3">
+              <button type="button" class="w-full sm:w-auto rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="columnModalOpen = false">Cancel</button>
+              <button type="button" class="w-full sm:w-auto rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover" @click="saveColumns">Save</button>
             </div>
           </div>
         </div>

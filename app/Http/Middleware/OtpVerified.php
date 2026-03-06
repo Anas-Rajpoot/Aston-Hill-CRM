@@ -11,13 +11,22 @@ class OtpVerified
     /**
      * Handle an incoming request.
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * For API (expects JSON): return 403 with structured error.
+     * For web (session): redirect to OTP verify form.
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if(!session('otp_verified')){
+        if (! session('otp_verified')) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => 'OTP verification required.',
+                    'otp_required' => true,
+                ], 403);
+            }
+
             return redirect()->route('otp.verify');
         }
+
         return $next($request);
     }
 }

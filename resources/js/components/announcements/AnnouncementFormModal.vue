@@ -205,7 +205,7 @@ const isEdit = computed(() => props.mode === 'edit')
 
         <!-- ── Body ── -->
         <div v-if="loading" class="flex-1 flex items-center justify-center py-16">
-          <div class="h-8 w-8 animate-spin rounded-full border-4 border-teal-600 border-t-transparent" />
+          <div class="h-8 w-8 animate-spin rounded-full border-4 border-brand-primary border-t-transparent" />
         </div>
 
         <div v-else class="flex-1 overflow-y-auto px-6 py-5 space-y-0">
@@ -216,7 +216,7 @@ const isEdit = computed(() => props.mode === 'edit')
             <input
               v-model="form.title"
               type="text"
-              class="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition"
+              class="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition"
               placeholder="Enter announcement title"
             />
             <p v-if="errors.title" class="mt-1 text-xs text-red-600">{{ errors.title }}</p>
@@ -229,11 +229,11 @@ const isEdit = computed(() => props.mode === 'edit')
             <label class="block text-sm font-semibold text-gray-800 mb-2">Announcement Type <span class="text-red-500">*</span></label>
             <div class="flex items-center gap-6">
               <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                <input type="radio" v-model="form.type" value="text" class="w-4 h-4 text-teal-600 focus:ring-teal-500 border-gray-300" />
+                <input type="radio" v-model="form.type" value="text" class="w-4 h-4 text-brand-primary focus:ring-brand-primary border-gray-300" />
                 Text
               </label>
               <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                <input type="radio" v-model="form.type" value="image" class="w-4 h-4 text-teal-600 focus:ring-teal-500 border-gray-300" />
+                <input type="radio" v-model="form.type" value="image" class="w-4 h-4 text-brand-primary focus:ring-brand-primary border-gray-300" />
                 Image
               </label>
             </div>
@@ -246,7 +246,7 @@ const isEdit = computed(() => props.mode === 'edit')
             <textarea
               v-model="form.body"
               rows="5"
-              class="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition resize-none"
+              class="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition resize-none"
               placeholder="Enter announcement content"
             />
             <p v-if="errors.body" class="mt-1 text-xs text-red-600">{{ errors.body }}</p>
@@ -258,7 +258,7 @@ const isEdit = computed(() => props.mode === 'edit')
             <input
               v-model="form.link_url"
               type="url"
-              class="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition"
+              class="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition"
               placeholder="https://example.com/image.jpg"
             />
             <p v-if="errors.link_url" class="mt-1 text-xs text-red-600">{{ errors.link_url }}</p>
@@ -272,7 +272,7 @@ const isEdit = computed(() => props.mode === 'edit')
             <div class="relative">
               <select
                 v-model="form.priority"
-                class="w-full appearance-none rounded-lg border border-gray-300 px-3.5 py-2.5 pr-10 text-sm text-gray-900 bg-white focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition"
+                class="w-full appearance-none rounded-lg border border-gray-300 px-3.5 py-2.5 pr-10 text-sm text-gray-900 bg-white focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition"
               >
                 <option value="low">Low</option>
                 <option value="normal">Normal</option>
@@ -298,7 +298,7 @@ const isEdit = computed(() => props.mode === 'edit')
                   type="checkbox"
                   :checked="selectedRoles.has(role.key)"
                   @change="toggleVisibility(role.key)"
-                  class="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                  class="w-4 h-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary"
                 />
                 {{ role.label }}
               </label>
@@ -312,11 +312,11 @@ const isEdit = computed(() => props.mode === 'edit')
             <label class="block text-sm font-semibold text-gray-800 mb-2">Publish Options</label>
             <div class="flex items-center gap-6">
               <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                <input type="radio" v-model="form.publish_option" value="immediately" class="w-4 h-4 text-teal-600 focus:ring-teal-500 border-gray-300" />
+                <input type="radio" v-model="form.publish_option" value="immediately" class="w-4 h-4 text-brand-primary focus:ring-brand-primary border-gray-300" />
                 Publish Immediately
               </label>
               <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                <input type="radio" v-model="form.publish_option" value="schedule" class="w-4 h-4 text-teal-600 focus:ring-teal-500 border-gray-300" />
+                <input type="radio" v-model="form.publish_option" value="schedule" class="w-4 h-4 text-brand-primary focus:ring-brand-primary border-gray-300" />
                 Schedule for Later
               </label>
             </div>
@@ -325,7 +325,7 @@ const isEdit = computed(() => props.mode === 'edit')
               <input
                 v-model="form.published_at"
                 type="datetime-local"
-                class="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition"
+                class="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition"
               />
               <p v-if="errors.published_at" class="mt-1 text-xs text-red-600">{{ errors.published_at }}</p>
             </div>
@@ -339,7 +339,7 @@ const isEdit = computed(() => props.mode === 'edit')
             <input
               v-model="form.expire_at"
               type="date"
-              class="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition"
+              class="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary transition"
             />
             <p v-if="errors.expire_at" class="mt-1 text-xs text-red-600">{{ errors.expire_at }}</p>
           </div>
@@ -352,7 +352,7 @@ const isEdit = computed(() => props.mode === 'edit')
               <input
                 type="checkbox"
                 v-model="form.require_ack"
-                class="mt-0.5 w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                class="mt-0.5 w-4 h-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary"
               />
               <div>
                 <span class="text-sm font-semibold text-gray-800">Require Acknowledgement</span>
@@ -363,16 +363,16 @@ const isEdit = computed(() => props.mode === 'edit')
         </div>
 
         <!-- ── Footer ── -->
-        <div class="px-6 py-4 border-t border-gray-200 flex justify-end gap-3 bg-white">
+        <div class="px-6 py-4 border-t border-gray-200 flex flex-wrap justify-end gap-3 bg-white">
           <button
             type="button"
-            class="rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            class="w-full sm:w-auto rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             @click="emit('close')"
           >Cancel</button>
           <button
             type="button"
             :disabled="saving"
-            class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
+            class="inline-flex w-full sm:w-auto justify-center items-center gap-2 rounded-lg bg-brand-primary px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50 transition-colors"
             @click="submit"
           >
             <svg v-if="saving" class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

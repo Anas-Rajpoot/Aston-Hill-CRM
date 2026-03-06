@@ -113,11 +113,11 @@ function formatDate(d) {
 
 function statusBadgeClass(status) {
   const s = (status ?? '').toLowerCase()
-  if (s === 'approved' || s === 'completed') return 'bg-green-100 text-green-800'
+  if (s === 'approved' || s === 'completed') return 'bg-brand-primary-light text-brand-primary-hover'
   if (s === 'pending' || s === 'in_progress' || s === 'in progress') return 'bg-amber-100 text-amber-800'
   if (s === 'rejected' || s === 'cancelled') return 'bg-red-100 text-red-800'
   if (s === 'draft') return 'bg-gray-100 text-gray-600'
-  return 'bg-blue-100 text-blue-800'
+  return 'bg-brand-primary-light text-brand-primary-hover'
 }
 </script>
 
@@ -142,8 +142,8 @@ function statusBadgeClass(status) {
         <div class="w-full max-w-lg rounded-xl bg-white shadow-xl border border-gray-200 max-h-[90vh] flex flex-col overflow-hidden">
           <!-- Header -->
           <div class="flex items-center gap-3 border-b border-gray-200 px-6 py-4 bg-gray-50">
-            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
-              <svg class="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-primary-light">
+              <svg class="h-5 w-5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
             </div>
@@ -167,7 +167,7 @@ function statusBadgeClass(status) {
 
           <!-- Loading -->
           <div v-if="loading" class="flex flex-col items-center justify-center py-12">
-            <svg class="h-8 w-8 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+            <svg class="h-8 w-8 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
@@ -262,15 +262,15 @@ function statusBadgeClass(status) {
               </div>
 
               <!-- Bulk assign info -->
-              <div v-if="isBulk" class="rounded-lg border border-blue-200 bg-blue-50 p-4 flex items-center gap-3">
-                <div class="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 shrink-0">
-                  <svg class="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div v-if="isBulk" class="rounded-lg border border-brand-primary-muted bg-brand-primary-light p-4 flex items-center gap-3">
+                <div class="flex h-9 w-9 items-center justify-center rounded-full bg-brand-primary-light shrink-0">
+                  <svg class="h-5 w-5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
                 </div>
                 <div>
-                  <p class="text-sm font-semibold text-blue-900">{{ bulkIds.length }} submission(s) selected</p>
-                  <p class="text-xs text-blue-700 mt-0.5">All selected submissions will be assigned to the same user.</p>
+                  <p class="text-sm font-semibold text-brand-primary-dark">{{ bulkIds.length }} submission(s) selected</p>
+                  <p class="text-xs text-brand-primary-hover mt-0.5">All selected submissions will be assigned to the same user.</p>
                 </div>
               </div>
 
@@ -282,7 +282,7 @@ function statusBadgeClass(status) {
                 <select
                   id="assign-select"
                   v-model="selectedId"
-                  class="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                 >
                   <option :value="null">Select...</option>
                   <option v-for="opt in options" :key="opt.id" :value="opt.id">{{ opt.name }}</option>
@@ -302,7 +302,7 @@ function statusBadgeClass(status) {
                   id="assign-notes"
                   v-model="notes"
                   rows="3"
-                  class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                   placeholder="Add any notes for the assigned user..."
                 />
               </div>
@@ -325,7 +325,7 @@ function statusBadgeClass(status) {
               </button>
               <button
                 type="button"
-                class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-60"
+                class="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-primary-hover focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 disabled:opacity-60"
                 :disabled="saving || selectedId == null"
                 @click="assign"
               >

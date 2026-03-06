@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Models\Account;
+use App\Models\CiscoExtension;
 use App\Models\Client;
 use App\Models\CustomerSupportSubmission;
 use App\Models\FieldSubmission;
@@ -16,6 +17,7 @@ use App\Models\EmailFollowUp;
 use App\Models\SpecialRequest;
 use App\Models\User;
 use App\Policies\AccountPolicy;
+use App\Policies\CiscoExtensionPolicy;
 use App\Policies\ClientPolicy;
 use App\Policies\CustomerSupportSubmissionPolicy;
 use App\Policies\FieldSubmissionPolicy;
@@ -36,10 +38,6 @@ use App\Repositories\Eloquent\LeadSubmissionRepository;
 
 class AppServiceProvider extends ServiceProvider
 {
-    protected $policies = [
-        Account::class => AccountPolicy::class,
-        LeadSubmissionPolicy::class,
-    ];
 
     /**
      * Register any application services.
@@ -92,6 +90,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(VasRequestSubmission::class, VasRequestPolicy::class);
         Gate::policy(EmailFollowUp::class, EmailFollowUpPolicy::class);
         Gate::policy(SpecialRequest::class, SpecialRequestPolicy::class);
+        Gate::policy(Account::class, AccountPolicy::class);
+        Gate::policy(CiscoExtension::class, CiscoExtensionPolicy::class);
         Gate::before(function ($user, $ability) {
             return $user->hasRole('superadmin') ? true : null;
         });

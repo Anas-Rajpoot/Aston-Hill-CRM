@@ -11,6 +11,14 @@ function displayDate(item) {
   if (!item) return '—'
   return item.display_date || item.expiry_date || '—'
 }
+
+function statusBadge(status) {
+  const s = (status || '').toLowerCase()
+  if (s === 'active') return 'bg-brand-primary-light text-brand-primary-hover'
+  if (s === 'resolved') return 'bg-brand-primary-light text-brand-primary-hover'
+  if (s === 'expired') return 'bg-red-100 text-red-700'
+  return 'bg-gray-100 text-gray-700'
+}
 </script>
 
 <template>
@@ -23,10 +31,10 @@ function displayDate(item) {
         aria-modal="true"
         @click.self="emit('close')"
       >
-        <div class="w-full max-w-xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
+        <div class="w-full max-w-4xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
           <div class="flex items-center justify-between border-b border-gray-200 px-5 py-3">
             <div>
-              <h3 class="text-base font-semibold text-gray-900">Renewal Alerts</h3>
+              <h3 class="text-base font-semibold text-gray-900">Alerts</h3>
               <p class="text-xs text-gray-500">{{ companyName || 'Client' }}</p>
             </div>
             <button type="button" class="rounded p-1.5 text-gray-500 hover:bg-gray-100" @click="emit('close')">
@@ -36,21 +44,33 @@ function displayDate(item) {
             </button>
           </div>
 
-          <div class="max-h-[65vh] overflow-y-auto p-5">
+          <div class="max-h-[65vh] overflow-x-auto overflow-y-auto p-5">
             <div v-if="!alerts.length" class="rounded border border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
               No alerts found for this client.
             </div>
             <table v-else class="min-w-full border-collapse">
               <thead>
-                <tr class="border-b border-gray-200 bg-gray-50">
-                  <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">Alert Type</th>
-                  <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">Date</th>
+                <tr class="bg-brand-primary border-b-2 border-green-700">
+                  <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-white">SR</th>
+                  <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-white">Alert Type</th>
+                  <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-white">Expiry Date</th>
+                  <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-white">Days Remaining</th>
+                  <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-white">Manager</th>
+                  <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-white">Status</th>
+                  <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-white">Created Date</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(item, idx) in alerts" :key="`${item.alert_type || 'Alert'}-${item.expiry_date || idx}`" class="border-b border-gray-100">
+                <tr v-for="(item, idx) in alerts" :key="item.id || idx" class="border-b border-gray-100">
+                  <td class="px-3 py-2 text-sm text-gray-800">{{ idx + 1 }}</td>
                   <td class="px-3 py-2 text-sm text-gray-800">{{ item.alert_type || '—' }}</td>
                   <td class="px-3 py-2 text-sm text-gray-700">{{ displayDate(item) }}</td>
+                  <td class="px-3 py-2 text-sm text-gray-700">{{ item.days_remaining != null ? item.days_remaining : '—' }}</td>
+                  <td class="px-3 py-2 text-sm text-gray-700">{{ item.manager || '—' }}</td>
+                  <td class="px-3 py-2 text-sm">
+                    <span :class="['inline-flex rounded-full px-2 py-0.5 text-xs font-medium', statusBadge(item.status)]">{{ item.status || '—' }}</span>
+                  </td>
+                  <td class="px-3 py-2 text-sm text-gray-700">{{ item.created_date || '—' }}</td>
                 </tr>
               </tbody>
             </table>

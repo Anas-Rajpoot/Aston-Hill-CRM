@@ -6,9 +6,9 @@ import { ref, computed, onMounted, nextTick, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import extensionsApi from '@/services/extensionsApi'
 import { useAuthStore } from '@/stores/auth'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import api from '@/lib/axios'
 import Toast from '@/components/Toast.vue'
+import DeleteOtpModal from '@/components/DeleteOtpModal.vue'
 import { useProgressiveHydration } from '@/composables/useProgressiveHydration'
 import { useDeferredQuery } from '@/composables/useDeferredQuery'
 import { canModuleAction } from '@/lib/accessControl'
@@ -354,11 +354,15 @@ function sampleLabel(col) {
 function downloadCsvSample() {
   if (!canSample.value) return
   const headers = SAMPLE_COLUMNS.map(sampleLabel)
-  const sampleRow = [
+  const sampleRow1 = [
     '', '1001', '042123456', 'Etisalat', 'user_1001', 'secret123',
     'active', '', '', 'assigned', '12', 'Sample comment', '',
   ]
-  const csvRows = [headers.map(escapeCsv).join(','), sampleRow.map(escapeCsv).join(',')]
+  const sampleRow2 = [
+    '', '1002', '042654321', 'Du', 'user_1002', 'pass456',
+    'active', '', '', 'unassigned', '6', 'Second extension', '',
+  ]
+  const csvRows = [headers.map(escapeCsv).join(','), sampleRow1.map(escapeCsv).join(','), sampleRow2.map(escapeCsv).join(',')]
   const blob = new Blob([csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -608,12 +612,10 @@ onMounted(async () => {
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-white py-6 px-4 sm:px-6">
     <div class="mx-auto max-w-7xl space-y-4">
-      <div class="flex items-center justify-between gap-3 overflow-x-auto">
-        <div class="flex items-baseline gap-2 shrink-0">
-          <h1 class="text-xl font-semibold text-gray-900 leading-tight">Cisco Extensions</h1>
-          <Breadcrumbs />
-        </div>
-        <div class="ml-auto flex items-center gap-1.5 shrink-0">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-baseline gap-2">
+          <h1 class="text-xl font-semibold text-gray-900 leading-tight">Cisco Extensions</h1>        </div>
+        <div class="flex flex-wrap items-center gap-1.5">
           <button
             v-if="canSample"
             type="button"
@@ -667,7 +669,7 @@ onMounted(async () => {
           <button
             v-if="canCreate"
             type="button"
-            class="inline-flex items-center rounded bg-green-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-green-700"
+            class="inline-flex items-center rounded bg-brand-primary px-2.5 py-1.5 text-xs font-medium text-white hover:bg-brand-primary-hover"
             @click="openAddModal"
           >
             <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -686,7 +688,7 @@ onMounted(async () => {
             <p class="text-sm font-medium text-gray-500 leading-tight">Total Extensions</p>
             <p class="mt-0.5 min-h-[2rem] text-2xl font-bold tabular-nums leading-tight text-gray-900">{{ summary.total_extensions }}</p>
           </div>
-          <div class="ml-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-teal-100 text-teal-600">
+          <div class="ml-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-primary-light text-brand-primary">
             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
             </svg>
@@ -695,9 +697,9 @@ onMounted(async () => {
         <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <div class="min-w-0">
             <p class="text-sm font-medium text-gray-500 leading-tight">Assigned</p>
-            <p class="mt-0.5 min-h-[2rem] text-2xl font-bold tabular-nums leading-tight text-green-600">{{ summary.assigned }}</p>
+            <p class="mt-0.5 min-h-[2rem] text-2xl font-bold tabular-nums leading-tight text-brand-primary">{{ summary.assigned }}</p>
           </div>
-          <div class="ml-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-100 text-green-600">
+          <div class="ml-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-primary-light text-brand-primary">
             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
@@ -706,9 +708,9 @@ onMounted(async () => {
         <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <div class="min-w-0">
             <p class="text-sm font-medium text-gray-500 leading-tight">Unassigned</p>
-            <p class="mt-0.5 min-h-[2rem] text-2xl font-bold tabular-nums leading-tight text-orange-600">{{ summary.unassigned }}</p>
+            <p class="mt-0.5 min-h-[2rem] text-2xl font-bold tabular-nums leading-tight text-amber-600">{{ summary.unassigned }}</p>
           </div>
-          <div class="ml-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-orange-100 text-orange-600">
+          <div class="ml-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
             </svg>
@@ -717,9 +719,9 @@ onMounted(async () => {
         <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <div class="min-w-0">
             <p class="text-sm font-medium text-gray-500 leading-tight">Active Status</p>
-            <p class="mt-0.5 min-h-[2rem] text-2xl font-bold tabular-nums leading-tight text-blue-600">{{ summary.active_status }}</p>
+            <p class="mt-0.5 min-h-[2rem] text-2xl font-bold tabular-nums leading-tight text-brand-primary">{{ summary.active_status }}</p>
           </div>
-          <div class="ml-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+          <div class="ml-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-primary-light text-brand-primary">
             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -754,7 +756,7 @@ onMounted(async () => {
           <label class="block text-xs font-medium text-gray-600">Status</label>
           <select
             v-model="filters.status"
-            class="mt-0.5 min-w-[140px] rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="mt-0.5 min-w-[140px] rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           >
             <option value="">All Statuses</option>
@@ -767,14 +769,14 @@ onMounted(async () => {
             v-model="filters.landline_number"
             type="text"
             placeholder="Search landline..."
-            class="mt-0.5 min-w-[160px] rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            class="mt-0.5 min-w-[160px] rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
             :disabled="loading"
           />
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+            class="inline-flex items-center rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover focus:ring-2 focus:ring-brand-primary disabled:opacity-50"
             :disabled="loading"
             @click="applyFilters"
           >
@@ -868,7 +870,7 @@ onMounted(async () => {
               <span class="whitespace-nowrap font-medium">Number of rows</span>
               <select
                 :value="meta.per_page"
-                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm min-w-[80px] text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
                 @change="onPerPageChange"
               >
                 <option v-for="opt in perPageOptions" :key="opt" :value="opt">{{ opt }}</option>
@@ -918,57 +920,15 @@ onMounted(async () => {
       @save="onSaveColumns"
     />
 
-    <!-- Delete confirmation -->
-    <Teleport to="body">
-      <div
-        v-if="extensionToDelete"
-        class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-gray-500/50 p-4"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="confirm-delete-title"
-        @click.self="closeDeleteConfirm"
-      >
-        <div class="w-full max-w-md rounded-lg bg-white shadow-xl">
-          <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-            <h2 id="confirm-delete-title" class="text-lg font-semibold text-gray-900">Confirm Delete</h2>
-            <button
-              type="button"
-              class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-              aria-label="Close"
-              @click="closeDeleteConfirm"
-            >
-              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <div class="px-6 py-4">
-            <p class="text-sm text-gray-600">
-              Are you sure you want to delete extension
-              <span class="font-medium text-gray-900">{{ extensionToDelete?.extension || extensionToDelete?.id }}</span>
-              ? This action cannot be undone.
-            </p>
-          </div>
-          <div class="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
-            <button
-              type="button"
-              class="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
-              :disabled="deleting"
-              @click="confirmDelete"
-            >
-              {{ deleting ? 'Deleting...' : 'Delete' }}
-            </button>
-            <button
-              type="button"
-              class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              @click="closeDeleteConfirm"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <!-- Delete confirmation (OTP) -->
+    <DeleteOtpModal
+      :visible="!!extensionToDelete"
+      title="Delete Extension"
+      :item-label="extensionToDelete ? `Extension ${extensionToDelete.extension || extensionToDelete.id}` : 'this extension'"
+      :loading="deleting"
+      @confirm="confirmDelete"
+      @close="closeDeleteConfirm"
+    />
 
     <RecordHistoryModal
       :visible="Boolean(historyModalExtension)"

@@ -6,7 +6,6 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import leadSubmissionsApi from '@/services/leadSubmissionsApi'
 import { useAuthStore } from '@/stores/auth'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 import TruncatedText from '@/components/TruncatedText.vue'
 import { formatUserDate, formatSystemDateTime } from '@/lib/dateFormat'
 
@@ -267,15 +266,13 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-4rem)] bg-[#f0f2f5] p-0">
+  <div class="min-h-[calc(100vh-4rem)] bg-gray-100 p-0">
     <div class="w-full">
       <!-- Header + Breadcrumb: background and border like content section -->
       <div class="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div class="flex flex-wrap items-baseline gap-2">
-            <h1 class="text-xl font-semibold text-gray-900">Lead Submission Details</h1>
-            <Breadcrumbs />
-          </div>
+            <h1 class="text-xl font-semibold text-gray-900">Lead Submission Details</h1>          </div>
           <div class="flex items-center gap-2">
             <router-link
               to="/lead-submissions"
@@ -286,7 +283,7 @@ onMounted(() => {
             <button
               v-if="canEditBackOffice && lead"
               type="button"
-              class="inline-flex items-center rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+              class="inline-flex items-center rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover"
               @click="goToEdit"
             >
               Edit Lead Submission
@@ -296,7 +293,7 @@ onMounted(() => {
       </div>
 
       <div v-if="loading" class="flex justify-center py-16">
-        <svg class="h-10 w-10 animate-spin text-green-600" fill="none" viewBox="0 0 24 24">
+        <svg class="h-10 w-10 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
@@ -490,7 +487,7 @@ onMounted(() => {
               <template v-else>
                 <div class="overflow-x-auto rounded-lg border border-gray-200">
                   <table class="min-w-full text-left text-sm">
-                    <thead class="border-b border-gray-200 bg-gray-100">
+                    <thead class="bg-brand-primary border-b-2 border-green-700">
                       <tr>
                         <th class="px-4 py-2 font-semibold text-gray-900">Field</th>
                         <th class="px-4 py-2 font-semibold text-gray-900">Old Value</th>
@@ -549,7 +546,7 @@ onMounted(() => {
                   </div>
                   <button
                     type="button"
-                    class="shrink-0 rounded p-1.5 text-green-700 hover:bg-green-50 hover:text-green-800"
+                    class="shrink-0 rounded p-1.5 text-brand-primary-hover hover:bg-brand-primary-light hover:text-brand-primary-hover"
                     title="Download"
                     @click="downloadDoc(doc)"
                   >

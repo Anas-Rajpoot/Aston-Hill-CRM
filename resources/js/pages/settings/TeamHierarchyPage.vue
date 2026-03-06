@@ -2,7 +2,6 @@
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/lib/axios'
-import Breadcrumbs from '@/components/Breadcrumbs.vue'
 
 const auth = useAuthStore()
 const loading = ref(true)
@@ -67,10 +66,8 @@ const save = async () => {
         Assign Spatie roles to the three hierarchy slots. Super admin can change role names or reassign roles – forms will adapt automatically.
       </p>
     </div>
-    <Breadcrumbs />
-
     <div v-if="loading" class="flex items-center justify-center py-12">
-      <svg class="animate-spin h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24">
+      <svg class="animate-spin h-8 w-8 text-brand-primary" fill="none" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
       </svg>
@@ -80,7 +77,7 @@ const save = async () => {
       <div v-if="errorMessage" class="rounded-lg bg-red-50 border border-red-200 p-4 text-sm text-red-700">
         {{ errorMessage }}
       </div>
-      <div v-if="successMessage" class="rounded-lg bg-green-50 border border-green-200 p-4 text-sm text-green-700">
+      <div v-if="successMessage" class="rounded-lg bg-brand-primary-light border border-brand-primary-muted p-4 text-sm text-brand-primary-hover">
         {{ successMessage }}
       </div>
 
@@ -93,7 +90,7 @@ const save = async () => {
         <p class="text-xs text-gray-500 mb-2">{{ slotLabels[slotKey] }}</p>
         <select
           v-model="mappings[slotKey]"
-          class="w-full rounded-lg border-gray-300 text-sm focus:border-green-500 focus:ring-green-500"
+          class="w-full rounded-lg border-gray-300 text-sm focus:border-brand-primary focus:ring-brand-primary"
         >
           <option :value="null">-- Select Role --</option>
           <option v-for="r in roles" :key="r.id" :value="r.id">{{ r.name }}</option>
@@ -104,7 +101,7 @@ const save = async () => {
         <button
           type="submit"
           :disabled="saving"
-          class="px-4 py-2 rounded-lg bg-green-500 text-white text-sm font-medium hover:bg-green-600 disabled:opacity-50"
+          class="px-4 py-2 rounded-lg bg-brand-primary text-white text-sm font-medium hover:bg-brand-primary-hover disabled:opacity-50"
         >
           {{ saving ? 'Saving...' : 'Save' }}
         </button>
