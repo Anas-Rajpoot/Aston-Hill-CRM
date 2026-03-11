@@ -12,6 +12,7 @@ import Toast from '@/components/Toast.vue'
 import RenewalAlertsModal from '@/components/clients/RenewalAlertsModal.vue'
 import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
 import RecordHistoryModal from '@/components/RecordHistoryModal.vue'
+import DeleteOtpModal from '@/components/DeleteOtpModal.vue'
 import api from '@/lib/axios'
 import { useAuthStore } from '@/stores/auth'
 import { canModuleAction } from '@/lib/accessControl'
@@ -37,9 +38,11 @@ async function fetchClientAudits(id) {
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const hideDeleteActions = true
 const canCreate = computed(() => canModuleAction(authStore.user, 'clients', 'create'))
 const canExport = computed(() => canModuleAction(authStore.user, 'clients', 'export'))
 const canImport = computed(() => canModuleAction(authStore.user, 'clients', 'import'))
+const canDelete = computed(() => canModuleAction(authStore.user, 'clients', 'delete'))
 const loading = ref(true)
 
 /* ───── Toast ───── */
@@ -49,14 +52,15 @@ const toastMsg  = ref('')
 function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
 
 const clients = ref([])
+const selectedClientIds = ref([])
 const TABLE_MODULE = 'clients'
 const perPageOptions = ref([10, 20, 25, 50])
 const meta = ref({ current_page: 1, last_page: 1, per_page: authStore.defaultTablePageSize || 25, total: 0 })
 const allColumns = ref([])
 const defaultColumns = ref([])
 const visibleColumns = ref([
-  'company_name', 'account_number',
   'submitted_at',
+  'company_name', 'account_number',
   'submission_type', 'service_category', 'service_type',
   'manager', 'team_leader', 'sales_agent', 'product_type',
   'address', 'product_name', 'mrc', 'quantity', 'other',
@@ -75,6 +79,11 @@ const pageTitle = ref('Clients')
 const renewalAlertsModalVisible = ref(false)
 const renewalAlertsModalCompany = ref('')
 const renewalAlertsModalItems = ref([])
+const deleteModalVisible = ref(false)
+const deleteLoading = ref(false)
+const deleteTargetIds = ref([])
+const deleteTargetLabel = ref('selected product/service rows')
+const deleteTargetHint = ref(null)
 
 const accountNumbers = ref([])
 const alertTypes = ref([])
@@ -180,7 +189,7 @@ const COLUMN_LABELS = {
   submission_type: 'Submission Type',
   service_category: 'Service Category',
   manager: 'Manager Name',
-  team_leader: 'Team Leader',
+  team_leader: 'Team Leader Name',
   sales_agent: 'Sales Agent Name',
   status: 'Status',
   service_type: 'Service Type',
@@ -209,6 +218,103 @@ function escapeCsv(val) {
   const s = String(val)
   if (s.includes(',') || s.includes('"') || s.includes('\n')) return '"' + s.replace(/"/g, '""') + '"'
   return s
+}
+
+function downloadSampleCsv() {
+  const datatableHeaders = [...visibleColumns.value]
+  const additionalHeaders = ['contact_1_name', 'contact_1_contact_number']
+  const headers = [...new Set([...datatableHeaders, ...additionalHeaders])]
+  const stamp = Date.now()
+  const sampleData = [
+    {
+      company_name: 'Demo Telecom LLC',
+      account_number: `SAMPLE-${stamp}-1`,
+      submitted_at: '2026-03-10',
+      submission_type: 'New | Submit',
+      service_category: 'New Connection',
+      service_type: 'Internet',
+      product_type: 'Broadband',
+      address: 'Business Bay, Dubai',
+      product_name: 'Business Starter 100',
+      mrc: '499',
+      quantity: '1',
+      other: 'Starter offer',
+      migration_numbers: '',
+      wo_number: 'WO-10001',
+      work_order_status: 'In Progress',
+      activation_date: '2026-03-12',
+      contract_type: '12 months',
+      contract_end_date: '2027-03-12',
+      clawback_chum: 'No',
+      remarks: 'Sample row 1',
+      additional_notes: 'Can be imported directly',
+      contact_1_name: 'John Doe',
+      contact_1_contact_number: '971501112233',
+    },
+    {
+      company_name: 'Al Noor Trading',
+      account_number: `SAMPLE-${stamp}-2`,
+      submitted_at: '2026-03-11',
+      submission_type: 'Resubmit',
+      service_category: 'Upgrade',
+      service_type: 'Voice',
+      product_type: 'SIP Trunk',
+      address: 'Abu Dhabi',
+      product_name: 'Voice Pro 30',
+      mrc: '799',
+      quantity: '2',
+      other: '',
+      migration_numbers: 'MN-2001',
+      wo_number: 'WO-10002',
+      work_order_status: 'Pending',
+      activation_date: '2026-03-15',
+      contract_type: '24 months',
+      contract_end_date: '2028-03-15',
+      clawback_chum: 'No',
+      remarks: 'Sample row 2',
+      additional_notes: '',
+      contact_1_name: 'Ali Hassan',
+      contact_1_contact_number: '971502223344',
+    },
+    {
+      company_name: 'Bright Star FZE',
+      account_number: `SAMPLE-${stamp}-3`,
+      submitted_at: '2026-03-12',
+      submission_type: 'New | Submit',
+      service_category: 'Migration',
+      service_type: 'Cloud',
+      product_type: 'Dedicated Internet',
+      address: 'Sharjah',
+      product_name: 'Cloud Connect 200',
+      mrc: '1299',
+      quantity: '1',
+      other: '',
+      migration_numbers: 'MN-2002',
+      wo_number: 'WO-10003',
+      work_order_status: 'Completed',
+      activation_date: '2026-03-16',
+      contract_type: '12 months',
+      contract_end_date: '2027-03-16',
+      clawback_chum: 'Yes',
+      remarks: 'Sample row 3',
+      additional_notes: 'Imported via sample',
+      contact_1_name: 'Sara Khan',
+      contact_1_contact_number: '971503334455',
+    },
+  ]
+
+  const csvRows = [headers.map(escapeCsv).join(',')]
+  for (const row of sampleData) {
+    csvRows.push(headers.map((col) => escapeCsv(row[col] ?? '')).join(','))
+  }
+
+  const blob = new Blob([csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'clients-template.csv'
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 async function onExport() {
@@ -265,16 +371,146 @@ function closeRenewalAlertsModal() {
   renewalAlertsModalItems.value = []
 }
 
+async function handleUnauthorized(err) {
+  if (err?.response?.status !== 401) return false
+  try {
+    await authStore.fetchUser(true)
+  } catch {
+    // ignore and rely on current auth state check below
+  }
+  if (!authStore.isAuthenticated) {
+    router.push('/login')
+    return true
+  }
+  return false
+}
+
 async function load() {
   window.scrollTo(0, 0)
   loading.value = true
   try {
     const data = await clientsApi.index(buildParams())
-    clients.value = data.data ?? []
+    const incomingRows = data.data ?? []
+    clients.value = incomingRows.map((row) => {
+      const resolvedId = Number(row?._row_id ?? row?.id ?? row?.client_id)
+      if (Number.isInteger(resolvedId) && resolvedId > 0) {
+        // Canonicalize row identity for all UI actions (single delete, checkbox, inline edit).
+        return { ...row, _row_id: resolvedId, id: resolvedId }
+      }
+      return row
+    })
+    const visibleIds = new Set(
+      clients.value
+        .map((row) => Number(row?._row_id ?? row?.id))
+        .filter((id) => Number.isFinite(id) && id > 0)
+    )
+    selectedClientIds.value = selectedClientIds.value.filter((id) => visibleIds.has(Number(id)))
     meta.value = normalizeMeta(data.meta)
+  } catch (err) {
+    if (await handleUnauthorized(err)) return
+    toast('error', err?.response?.data?.message || 'Failed to load clients.')
   } finally {
     loading.value = false
     window.scrollTo(0, 0)
+  }
+}
+
+function onToggleSelect(clientId) {
+  const id = Number(clientId)
+  if (!Number.isFinite(id)) return
+  if (selectedClientIds.value.includes(id)) {
+    selectedClientIds.value = selectedClientIds.value.filter((v) => v !== id)
+    return
+  }
+  selectedClientIds.value = [...selectedClientIds.value, id]
+}
+
+function onToggleSelectAll() {
+  const visibleIds = clients.value.map((row) => Number(row.id)).filter((id) => Number.isFinite(id))
+  const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedClientIds.value.includes(id))
+  if (allSelected) {
+    selectedClientIds.value = selectedClientIds.value.filter((id) => !visibleIds.includes(id))
+    return
+  }
+  selectedClientIds.value = Array.from(new Set([...selectedClientIds.value, ...visibleIds]))
+}
+
+function openDeleteModal(ids, label, hint = null) {
+  if (hideDeleteActions) return
+  const normalizedIds = Array.from(new Set((ids || []).map((v) => Number(v)).filter((v) => Number.isInteger(v) && v > 0)))
+  if (!normalizedIds.length || !canDelete.value) return
+  deleteTargetIds.value = normalizedIds
+  deleteTargetHint.value = hint && normalizedIds.length === 1 ? hint : null
+  deleteTargetLabel.value = label || (normalizedIds.length === 1 ? `Product/Service #${normalizedIds[0]}` : `${normalizedIds.length} selected product/service rows`)
+  deleteModalVisible.value = true
+}
+
+function closeDeleteModal() {
+  if (deleteLoading.value) return
+  deleteModalVisible.value = false
+  deleteTargetIds.value = []
+  deleteTargetHint.value = null
+  deleteTargetLabel.value = 'selected product/service rows'
+}
+
+function openDeleteModalForRow(row) {
+  const candidates = [
+    row?._row_id,
+    row?.id,
+    row?.client_id,
+    row?.clientId,
+    row?.ID,
+    row?._id,
+    row?.pk,
+    row?.client?.id,
+  ]
+  const rawId = candidates.find((v) => v != null && String(v).trim() !== '')
+  if (rawId == null) {
+    toast('error', 'Could not determine row ID for delete.')
+    return
+  }
+  const id = Number(rawId)
+  if (!Number.isInteger(id) || id <= 0) return
+  const label = row.product_name || `Product/Service #${id}`
+  const hint = {
+    account_number: row?.account_number ?? null,
+    company_name: row?.company_name ?? null,
+    product_name: row?.product_name ?? null,
+    wo_number: row?.wo_number ?? null,
+    submitted_at: row?.submitted_at ?? null,
+    service_type: row?.service_type ?? null,
+    product_type: row?.product_type ?? null,
+  }
+  openDeleteModal([id], label, hint)
+}
+
+function openBulkDeleteModal() {
+  if (!selectedClientIds.value.length) return
+  openDeleteModal(selectedClientIds.value, `${selectedClientIds.value.length} selected product/service row${selectedClientIds.value.length === 1 ? '' : 's'}`)
+}
+
+async function confirmOtpDelete() {
+  if (!deleteTargetIds.value.length || !canDelete.value || deleteLoading.value) return
+  deleteLoading.value = true
+  try {
+    const idsToDelete = [...deleteTargetIds.value]
+    const res = await clientsApi.bulkDelete(idsToDelete, { scope: 'products', hint: deleteTargetHint.value })
+    toast('success', res?.message || 'Selected product/service rows deleted successfully.')
+    selectedClientIds.value = selectedClientIds.value.filter((id) => !idsToDelete.includes(Number(id)))
+    // Close modal immediately on success.
+    deleteModalVisible.value = false
+    deleteTargetIds.value = []
+    deleteTargetHint.value = null
+    deleteTargetLabel.value = 'selected product/service rows'
+    await load()
+  } catch (err) {
+    const msg = err?.response?.data?.message || 'Failed to delete selected product/service rows.'
+    toast('error', msg)
+  } finally {
+    deleteLoading.value = false
+    if (!deleteModalVisible.value) {
+      deleteTargetHint.value = null
+    }
   }
 }
 
@@ -294,12 +530,15 @@ async function loadFilters() {
       contract_types: data.contract_types ?? [],
       clawback_chum_options: data.clawback_chum_options ?? [],
     }
-  } catch { /* silent */ }
+  } catch (err) {
+    if (await handleUnauthorized(err)) return
+    // keep previous options silently for non-auth transient failures
+  }
 }
 
 const COLUMN_ORDER = [
-  'company_name', 'account_number',
   'submitted_at',
+  'company_name', 'account_number',
   'submission_type', 'service_category', 'service_type',
   'manager', 'team_leader', 'sales_agent', 'product_type',
   'address', 'product_name', 'mrc', 'quantity', 'other',
@@ -312,8 +551,8 @@ function enforceColumnOrder(cols) {
   const set = new Set(cols)
   // Keep Products & Services fields + minimal company info for this page.
   ;[
-    'company_name', 'account_number',
     'submitted_at',
+    'company_name', 'account_number',
     'submission_type', 'service_category', 'service_type',
     'manager', 'team_leader', 'sales_agent', 'product_type',
     'address', 'product_name', 'mrc', 'quantity', 'other',
@@ -331,11 +570,14 @@ async function loadColumns() {
   try {
     const data = await clientsApi.columns()
     allColumns.value = data.all_columns ?? []
-    visibleColumns.value = enforceColumnOrder(data.visible_columns ?? visibleColumns.value)
-    defaultColumns.value = data.default_columns ?? []
+    const allowedKeys = new Set(allColumns.value.map((c) => c?.key).filter(Boolean))
+    const requestedVisible = data.visible_columns ?? visibleColumns.value
+    const requestedDefaults = data.default_columns ?? []
+    visibleColumns.value = enforceColumnOrder((requestedVisible || []).filter((c) => allowedKeys.has(c)))
+    defaultColumns.value = (requestedDefaults || []).filter((c) => allowedKeys.has(c))
     updateTableColumns()
-  } catch {
-    //
+  } catch (err) {
+    if (await handleUnauthorized(err)) return
   }
 }
 
@@ -438,7 +680,10 @@ async function loadTablePreference() {
       perPageOptions.value = [...new Set(data.options.map((opt) => Math.min(toPositiveInt(opt, 25), 50)))]
         .filter((opt) => opt <= 50)
     }
-  } catch { /* use system default */ }
+  } catch (err) {
+    if (await handleUnauthorized(err)) return
+    /* use system default */
+  }
 }
 
 function goToAddClient() {
@@ -499,23 +744,38 @@ function updateTableColumns() {
 
 onMounted(() => {
   pageTitle.value = route.path.startsWith('/all-clients') ? 'All Clients' : 'Clients'
-  loadFilters()
-  loadTablePreference().then(() => {
-    loadColumns().then(() => {
-      updateTableColumns()
-      load()
-    })
-  })
+  ;(async () => {
+    try {
+      await authStore.fetchUser(true)
+    } catch {
+      // handled by checks below
+    }
+    if (!authStore.isAuthenticated) {
+      router.push('/login')
+      return
+    }
+    await loadFilters()
+    await loadTablePreference()
+    await loadColumns()
+    updateTableColumns()
+    await load()
+  })()
 })
 </script>
 
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-white p-4">
     <div class="w-full space-y-4">
-      <div class="flex flex-wrap items-center justify-between gap-4">
-        <div class="flex flex-wrap items-baseline gap-2">
-          <h1 class="text-xl font-semibold text-gray-900 leading-tight">Clients</h1>        </div>
-        <div class="flex items-center gap-2">
+      <ClientsFiltersBar
+        :filters="filters"
+        :loading="loading"
+        :account-numbers="accountNumbers"
+        :alert-types="alertTypes"
+        :show-alert-type-filter="false"
+        @search="applyFilters"
+        @clear="clearSearch"
+      >
+        <template #customize-columns>
           <input
             ref="importFileInputRef"
             type="file"
@@ -540,6 +800,18 @@ onMounted(() => {
             {{ importLoading ? 'Importing...' : 'Import CSV' }}
           </button>
           <button
+            v-if="canImport"
+            type="button"
+            class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            :disabled="loading || importLoading"
+            @click="downloadSampleCsv"
+          >
+            <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v12m0 0l-4-4m4 4l4-4M5 20h14" />
+            </svg>
+            Template
+          </button>
+          <button
             v-if="canExport"
             type="button"
             class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
@@ -556,33 +828,6 @@ onMounted(() => {
             {{ exportLoading ? 'Exporting...' : 'Export' }}
           </button>
           <button
-            v-if="canCreate"
-            type="button"
-            class="inline-flex items-center rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70 disabled:cursor-wait"
-            :disabled="loading"
-            @click="goToAddClient"
-          >
-            <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-            </svg>
-            Add New Client
-          </button>
-        </div>
-      </div>
-
-      <p class="text-sm text-gray-500">Search for a client to view their profile.</p>
-
-      <ClientsFiltersBar
-        :filters="filters"
-        :loading="loading"
-        :account-numbers="accountNumbers"
-        :alert-types="alertTypes"
-        :show-alert-type-filter="false"
-        @search="applyFilters"
-        @clear="clearSearch"
-      >
-        <template #customize-columns>
-          <button
             type="button"
             class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
             @click="advancedVisible = !advancedVisible"
@@ -598,6 +843,29 @@ onMounted(() => {
             <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
             </svg>
+          </button>
+          <button
+            v-if="canCreate"
+            type="button"
+            class="inline-flex items-center rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70 disabled:cursor-wait"
+            :disabled="loading"
+            @click="goToAddClient"
+          >
+            <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Add New Client
+          </button>
+          <button
+            v-if="!hideDeleteActions && canDelete && selectedClientIds.length > 0"
+            type="button"
+            class="inline-flex items-center rounded border border-red-300 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
+            @click="openBulkDeleteModal"
+          >
+            <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+            </svg>
+            Delete Selected ({{ selectedClientIds.length }})
           </button>
         </template>
       </ClientsFiltersBar>
@@ -723,11 +991,17 @@ onMounted(() => {
           :current-page="meta.current_page"
           :per-page="meta.per_page"
           :edit-options="filterOptions"
+          :selectable="true"
+          :selected-ids="selectedClientIds"
+          :hide-delete="hideDeleteActions"
           permission-module="clients"
           @sort="onSort"
           @update-cell="onUpdateCell"
           @view-history="openHistoryModal"
           @show-renewal-alerts="openRenewalAlertsModal"
+          @toggle-select="onToggleSelect"
+          @toggle-select-all="onToggleSelectAll"
+          @delete="openDeleteModalForRow"
         />
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
           <p class="text-sm text-gray-600">
@@ -779,6 +1053,15 @@ onMounted(() => {
       :company-name="renewalAlertsModalCompany"
       :alerts="renewalAlertsModalItems"
       @close="closeRenewalAlertsModal"
+    />
+
+    <DeleteOtpModal
+      :visible="deleteModalVisible"
+      title="Delete Product/Service"
+      :item-label="deleteTargetLabel"
+      :loading="deleteLoading"
+      @close="closeDeleteModal"
+      @confirm="confirmOtpDelete"
     />
 
     <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />

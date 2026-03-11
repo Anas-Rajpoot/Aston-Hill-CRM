@@ -5,6 +5,7 @@
  */
 import { ref, onMounted, defineAsyncComponent, computed, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { isSuperAdmin as isSuperAdminUser } from '@/lib/accessControl'
 import Tabs from '@/components/Tabs.vue'
 import SubmissionFormSkeleton from '@/components/skeletons/SubmissionFormSkeleton.vue'
 
@@ -37,7 +38,7 @@ const allTabs = [
   { key: 'new', label: 'Special Request' },
 ]
 
-const isSuperAdmin = computed(() => auth.user?.roles?.includes('superadmin') ?? false)
+const isSuperAdmin = computed(() => isSuperAdminUser(auth.user))
 const userPermissions = computed(() => auth.user?.permissions ?? [])
 
 function hasAnyPermission(keys = []) {

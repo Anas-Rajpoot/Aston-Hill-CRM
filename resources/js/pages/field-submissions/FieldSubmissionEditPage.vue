@@ -114,8 +114,11 @@ const resolveTeamLeaderManagerId = (teamLeader) => {
 
 const filteredTeamLeaders = computed(() => {
   const mid = form.value.manager_id
-  if (!mid) return teamOptions.value.team_leaders ?? []
-  return (teamOptions.value.team_leaders ?? []).filter((t) => resolveTeamLeaderManagerId(t) === String(mid))
+  const allTeamLeaders = teamOptions.value.team_leaders ?? []
+  if (!mid) return allTeamLeaders
+  const filtered = allTeamLeaders.filter((t) => resolveTeamLeaderManagerId(t) === String(mid))
+  // Fallback when hierarchy links are missing; keep role-based options visible.
+  return filtered.length ? filtered : allTeamLeaders
 })
 
 const filteredSalesAgents = computed(() => {
@@ -156,14 +159,16 @@ const filteredSalesAgents = computed(() => {
   }
 
   if (tlId) {
-    return (teamOptions.value.sales_agents ?? []).filter((salesAgent) => resolveSalesAgentTeamLeaderId(salesAgent) === String(tlId))
+    const filteredByTeamLeader = (teamOptions.value.sales_agents ?? []).filter((salesAgent) => resolveSalesAgentTeamLeaderId(salesAgent) === String(tlId))
+    return filteredByTeamLeader.length ? filteredByTeamLeader : (teamOptions.value.sales_agents ?? [])
   }
   if (managerId) {
-    return (teamOptions.value.sales_agents ?? []).filter((salesAgent) => {
+    const filteredByManager = (teamOptions.value.sales_agents ?? []).filter((salesAgent) => {
       const resolvedManagerId = resolveSalesAgentManagerId(salesAgent)
       const resolvedTeamLeaderId = resolveSalesAgentTeamLeaderId(salesAgent)
       return resolvedManagerId === String(managerId) || teamLeaderIdsUnderManager.has(resolvedTeamLeaderId)
     })
+    return filteredByManager.length ? filteredByManager : (teamOptions.value.sales_agents ?? [])
   }
   return teamOptions.value.sales_agents ?? []
 })
@@ -200,7 +205,7 @@ async function load() {
   try {
     const [subRes, teamRes, optionsRes] = await Promise.all([
       fieldSubmissionsApi.getSubmission(id.value),
-      fieldSubmissionsApi.getTeamOptions().then((r) => r?.data ?? r).catch(() => ({})),
+      fieldSubmissionsApi.getTeamOptions(true).then((r) => r?.data ?? r).catch(() => ({})),
       fieldSubmissionsApi.getEditOptions().catch(() => ({})),
     ])
     const data = subRes?.data ?? subRes
@@ -484,7 +489,7 @@ onMounted(() => {
               <p v-if="serverErrors.account_number" class="mt-1 text-xs text-red-600">{{ serverErrors.account_number[0] }}</p>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700">Company Name <span class="text-red-500">*</span></label>
+              <label class="block text-sm font-medium text-gray-700">Company Name as per Trade License <span class="text-red-500">*</span></label>
               <input
                 v-model="form.company_name"
                 type="text"

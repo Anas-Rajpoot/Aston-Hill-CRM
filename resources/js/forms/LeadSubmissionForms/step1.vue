@@ -536,6 +536,11 @@ watch(
 onMounted(async () => {
   try {
     await auth.fetchUser()
+    if (!auth.isAuthenticated) {
+      generalMessage.value = 'Your session expired. Please sign in again.'
+      await router.push('/login')
+      return
+    }
 
     const [teamRes, catsRes] = await Promise.all([
       api.getTeamOptions(true),

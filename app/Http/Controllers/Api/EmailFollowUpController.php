@@ -399,4 +399,77 @@ class EmailFollowUpController extends Controller
             'status' => $emailFollowUp->status,
         ]);
     }
+
+    public function bulkAction(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'action' => ['required', 'string', Rule::in(['delete', 'status'])],
+            'ids' => ['required', 'array', 'min:1', 'max:500'],
+            'ids.*' => ['integer', 'distinct'],
+            'status' => ['required_if:action,status', 'nullable', 'string', Rule::in(EmailFollowUp::STATUSES)],
+        ]);
+
+        $user = $request->user();
+        $ids = array_values(array_unique(array_map('intval', $data['ids'])));
+
+        $rows = EmailFollowUp::query()
+            ->visibleTo($user)
+            ->whereIn('id', $ids)
+            ->get()
+            ->keyBy('id');
+
+        if ($rows->count() !== count($ids)) {
+            return response()->json(['message' => 'Some selected rows are not accessible.'], 403);
+        }
+
+        if ($data['action'] === 'delete') {
+            foreach ($ids as $id) {
+                $row = $rows->get($id);
+                $this->authorize('delete', $row);
+                $row->delete();
+            }
+
+            try {
+                SystemAuditLog::record(
+                    'email_follow_up.bulk_deleted',
+                    null,
+                    ['ids' => $ids, 'count' => count($ids)],
+                    $user->id,
+                    'email_follow_up'
+                );
+            } catch (\Exception $e) {
+                // Ignore audit logging errors
+            }
+
+            return response()->json([
+                'message' => 'Selected email follow-ups deleted.',
+                'affected' => count($ids),
+            ]);
+        }
+
+        $status = $data['status'];
+        foreach ($ids as $id) {
+            $row = $rows->get($id);
+            $this->authorize('update', $row);
+            $row->update(['status' => $status]);
+        }
+
+        try {
+            SystemAuditLog::record(
+                'email_follow_up.bulk_status_updated',
+                null,
+                ['ids' => $ids, 'count' => count($ids), 'status' => $status],
+                $user->id,
+                'email_follow_up'
+            );
+        } catch (\Exception $e) {
+            // Ignore audit logging errors
+        }
+
+        return response()->json([
+            'message' => 'Status updated for selected email follow-ups.',
+            'affected' => count($ids),
+            'status' => $status,
+        ]);
+    }
 }

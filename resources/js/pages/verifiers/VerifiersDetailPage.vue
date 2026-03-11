@@ -244,17 +244,23 @@ function csvEscape(val) {
   return s
 }
 
-function downloadCsvSample() {
+function downloadTemplateCsv() {
   if (!canSample.value) return
-  const headers = ['no.', 'Verifier Name', 'Verifier Number', 'Remarks']
-  const sampleRow1 = ['1', 'Ahmed Khan', '971501234567', 'Primary verifier']
-  const sampleRow2 = ['2', 'Sara Ali', '971509876543', 'Backup verifier']
-  const csv = [headers.map(csvEscape).join(','), sampleRow1.map(csvEscape).join(','), sampleRow2.map(csvEscape).join(',')].join('\r\n')
+  const headers = ['no.', 'Verifier Name', 'Verifier Number', 'Remarks', 'Other 1', 'Other 2']
+  const sampleRows = [
+    ['1', 'Ahmed Khan', '971501234567', 'Primary verifier', 'Sample extra value A', 'Sample extra value B'],
+    ['2', 'Sara Ali', '971509876543', 'Backup verifier', 'Sample extra value C', 'Sample extra value D'],
+    ['3', 'Khalid Noor', '971507778889', 'Night-shift verifier', 'Sample extra value E', 'Sample extra value F'],
+  ]
+  const csv = [
+    headers.map(csvEscape).join(','),
+    ...sampleRows.map((row) => row.map(csvEscape).join(',')),
+  ].join('\r\n')
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = 'verifiers-sample.csv'
+  a.download = 'verifiers-template.csv'
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -512,13 +518,30 @@ onMounted(() => load())
       @dismiss="dismissToast"
     />
 
-    <div class="flex flex-wrap items-center justify-between gap-4">
-      <div>
-        <div class="flex flex-wrap items-baseline gap-2">
-          <h1 class="text-2xl font-bold text-gray-900 leading-tight">Verifiers Detail</h1>        </div>
-        <p class="mt-1 text-sm text-gray-500">Manage verifier directory for DSP Tracker integration.</p>
-      </div>
-      <div class="flex flex-wrap items-center gap-2">
+    <div class="overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+      <div class="flex w-max min-w-full items-center justify-between gap-2">
+        <div class="relative w-[420px] shrink-0">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </span>
+          <input
+            v-model="searchQ"
+            type="search"
+            placeholder="Search by verifier name, number, or ID..."
+            class="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-20 text-sm focus:border-brand-primary focus:ring-brand-primary"
+            @keydown.enter="load(1)"
+          />
+          <button
+            type="button"
+            class="absolute right-2 top-1/2 -translate-y-1/2 rounded px-3 py-1 text-sm text-indigo-600 hover:bg-indigo-50"
+            @click="load(1)"
+          >
+            Search
+          </button>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
         <input
           ref="csvInputRef"
           type="file"
@@ -529,13 +552,13 @@ onMounted(() => load())
         <button
           v-if="canSample"
           type="button"
-          @click="downloadCsvSample"
+          @click="downloadTemplateCsv"
           class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
-          Download CSV Sample
+          Template
         </button>
         <button
           v-if="canImport"
@@ -570,6 +593,7 @@ onMounted(() => load())
           </svg>
           Add Verifier
         </button>
+        </div>
       </div>
     </div>
 
@@ -583,29 +607,6 @@ onMounted(() => load())
     </div>
     <div v-if="importSuccess" class="rounded-xl bg-brand-primary-light border border-brand-primary-muted px-4 py-3 text-sm text-brand-primary-hover">{{ importSuccess }}</div>
     <div v-if="importError" class="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{{ importError }}</div>
-
-    <!-- Search -->
-    <div class="relative w-full md:max-w-2xl">
-      <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-      </span>
-      <input
-        v-model="searchQ"
-        type="search"
-        placeholder="Search by verifier name, number, or ID..."
-        class="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 text-sm focus:border-brand-primary focus:ring-brand-primary"
-        @keydown.enter="load(1)"
-      />
-      <button
-        type="button"
-        class="absolute right-2 top-1/2 -translate-y-1/2 rounded px-3 py-1 text-sm text-indigo-600 hover:bg-indigo-50"
-        @click="load(1)"
-      >
-        Search
-      </button>
-    </div>
 
     <!-- Table -->
     <div class="rounded-xl border-2 border-black bg-white shadow-sm overflow-hidden">

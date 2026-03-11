@@ -14,6 +14,7 @@ import ExpenseDetailModal from '@/components/expenses/ExpenseDetailModal.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import ExpenseTable from '@/components/expenses/ExpenseTable.vue'
 import ExpenseEditHistoryModal from '@/components/expenses/ExpenseEditHistoryModal.vue'
+import HorizontalScrollToolbar from '@/components/common/HorizontalScrollToolbar.vue'
 import Toast from '@/components/Toast.vue'
 import DeleteOtpModal from '@/components/DeleteOtpModal.vue'
 import { canModuleAction } from '@/lib/accessControl'
@@ -61,14 +62,20 @@ const expenses = ref([])
 const meta = ref({ current_page: 1, last_page: 1, per_page: auth.defaultTablePageSize || 25, total: 0 })
 const allColumns = ref([])
 const visibleColumns = ref([
-  'status', 'expense_date', 'product_category', 'product_description', 'invoice_number', 'vat_amount',
-  'amount_without_vat', 'vat_amount_currency', 'full_amount', 'added_by', 'created_at',
+  'id', 'status', 'created_at', 'expense_date', 'product_category', 'product_description', 'invoice_number', 'vat_amount',
+  'amount_without_vat', 'vat_amount_currency', 'full_amount', 'added_by',
 ])
 const sort = ref('expense_date')
 const order = ref('desc')
 const advancedVisible = ref(false)
 const columnModalVisible = ref(false)
 const exportLoading = ref(false)
+const importLoading = ref(false)
+const importInputRef = ref(null)
+const bulkLoading = ref(false)
+const bulkStatus = ref('')
+const selectedExpenseIds = ref([])
+const bulkDeleteConfirmVisible = ref(false)
 const expenseToDelete = ref(null)
 const deleting = ref(false)
 const addModalVisible = ref(false)
@@ -81,6 +88,21 @@ const historyExpenseId = ref(null)
 const historyExpenseRef = ref('')
 const savingRowId = ref(null)
 const savingCell = ref({ rowId: null, col: null })
+
+const CANONICAL_COLUMN_ORDER = [
+  'id', 'status', 'created_at', 'expense_date', 'product_category', 'product_description', 'invoice_number', 'vat_amount',
+  'amount_without_vat', 'vat_amount_currency', 'full_amount', 'added_by',
+]
+
+function normalizeVisibleColumns(cols) {
+  const unique = [...new Set((Array.isArray(cols) ? cols : []).filter(Boolean))]
+  if (!unique.includes('id')) unique.unshift('id')
+  const canonical = CANONICAL_COLUMN_ORDER.filter((col) => unique.includes(col))
+  const extras = unique.filter((col) => !CANONICAL_COLUMN_ORDER.includes(col))
+  return [...canonical, ...extras]
+}
+
+const selectedCount = computed(() => selectedExpenseIds.value.length)
 
 const showToast = ref(false)
 const toastType = ref('success')
@@ -137,6 +159,8 @@ async function load() {
       expensesApi.summary(),
     ])
     expenses.value = listRes.data?.data ?? []
+    selectedExpenseIds.value = []
+    bulkStatus.value = ''
     meta.value = listRes.data?.meta ?? { current_page: 1, last_page: 1, per_page: auth.defaultTablePageSize || 25, total: 0 }
     summary.value = summaryRes.data ?? summary.value
   } catch (e) {
@@ -166,9 +190,86 @@ async function loadColumns() {
   try {
     const { data } = await expensesApi.columns()
     allColumns.value = data.all_columns ?? []
-    visibleColumns.value = data.visible_columns ?? visibleColumns.value
+    visibleColumns.value = normalizeVisibleColumns(data.visible_columns ?? visibleColumns.value)
   } catch {
     //
+  }
+}
+
+function toggleSelectRow({ id, checked }) {
+  const n = Number(id)
+  if (!n) return
+  if (checked) {
+    if (!selectedExpenseIds.value.includes(n)) selectedExpenseIds.value.push(n)
+    return
+  }
+  selectedExpenseIds.value = selectedExpenseIds.value.filter((x) => x !== n)
+}
+
+function toggleSelectAll(checked) {
+  const pageIds = (expenses.value || []).map((r) => Number(r?.id)).filter(Boolean)
+  if (!checked) {
+    selectedExpenseIds.value = selectedExpenseIds.value.filter((id) => !pageIds.includes(id))
+    return
+  }
+  selectedExpenseIds.value = [...new Set([...selectedExpenseIds.value, ...pageIds])]
+}
+
+async function onBulkStatusChange() {
+  if (!canEdit.value || !selectedExpenseIds.value.length || !bulkStatus.value) return
+  bulkLoading.value = true
+  try {
+    const targetStatus = bulkStatus.value === 'on' ? 'approved' : 'pending'
+    const selectedSet = new Set(selectedExpenseIds.value)
+    const targets = (expenses.value || []).filter((row) => selectedSet.has(Number(row?.id)))
+    const results = await Promise.allSettled(
+      targets.map((row) => expensesApi.update(row.id, { status: targetStatus }))
+    )
+    const ok = results.filter((r) => r.status === 'fulfilled').length
+    const failed = results.length - ok
+    if (ok > 0) toast('success', `Status updated for ${ok} expense${ok > 1 ? 's' : ''}.`)
+    if (failed > 0) toast('error', `Failed to update ${failed} expense${failed > 1 ? 's' : ''}.`)
+    await load()
+  } catch {
+    toast('error', 'Failed to update selected expenses.')
+  } finally {
+    bulkLoading.value = false
+  }
+}
+
+async function onBulkDelete() {
+  if (!canDelete.value || !selectedExpenseIds.value.length) return
+  bulkDeleteConfirmVisible.value = true
+}
+
+function closeBulkDeleteConfirm() {
+  bulkDeleteConfirmVisible.value = false
+}
+
+async function confirmBulkDelete() {
+  if (!canDelete.value || !selectedExpenseIds.value.length) {
+    closeBulkDeleteConfirm()
+    return
+  }
+  bulkLoading.value = true
+  try {
+    const ids = [...selectedExpenseIds.value]
+    const results = await Promise.allSettled(ids.map((id) => expensesApi.destroy(id)))
+    const ok = results.filter((r) => r.status === 'fulfilled').length
+    const failed = results.length - ok
+    if (ok === 0) {
+      toast('error', `Could not delete selected expense${ids.length > 1 ? 's' : ''}.`)
+    } else if (failed === 0) {
+      toast('success', `${ok} expense${ok > 1 ? 's' : ''} deleted successfully.`)
+    } else {
+      toast('error', `Deleted ${ok} expense${ok > 1 ? 's' : ''}, but failed to delete ${failed}.`)
+    }
+    await load()
+  } catch {
+    toast('error', 'Failed to delete selected expenses.')
+  } finally {
+    bulkLoading.value = false
+    closeBulkDeleteConfirm()
   }
 }
 
@@ -274,8 +375,9 @@ function onPerPageChange(e) {
 }
 async function onSaveColumns(cols) {
   try {
-    await expensesApi.saveColumns(cols)
-    visibleColumns.value = cols
+    const normalized = normalizeVisibleColumns(cols)
+    await expensesApi.saveColumns(normalized)
+    visibleColumns.value = normalized
     load()
   } catch {
     //
@@ -316,17 +418,72 @@ async function onExport() {
   }
 }
 
+function onDownloadTemplate() {
+  const preferredOrder = [
+    'status', 'created_at', 'expense_date', 'product_category', 'product_description', 'invoice_number',
+    'vat_amount', 'amount_without_vat', 'vat_amount_currency', 'full_amount',
+    'added_by',
+  ]
+  const fromColumns = (allColumns.value || []).map((c) => c?.key).filter(Boolean)
+  const selected = fromColumns.length ? preferredOrder.filter((k) => fromColumns.includes(k)) : [...visibleColumns.value]
+  const cols = selected.length ? selected : preferredOrder
+  const headers = cols.map((c) => (COLUMN_HEADERS[c] ?? c))
+  const finalHeaders = [...headers, 'Other 1', 'Other 2']
+  const sampleRows = [
+    ['11-Mar-2026', 'water', 'Office water supply', 'INV-EXP-001', '5', '100.00', '5.00', '105.00', (auth.user?.name || 'Admin User'), '11-Mar-2026', 'pending', 'Note A', 'Ref A'],
+    ['12-Mar-2026', 'telecom', 'Internet renewal', 'INV-EXP-002', '5', '250.00', '12.50', '262.50', (auth.user?.name || 'Admin User'), '12-Mar-2026', 'approved', 'Note B', 'Ref B'],
+    ['13-Mar-2026', 'others', 'Office miscellaneous', 'INV-EXP-003', '0', '80.00', '0.00', '80.00', (auth.user?.name || 'Admin User'), '13-Mar-2026', 'pending', 'Note C', 'Ref C'],
+  ]
+
+  const csvRows = [finalHeaders.map(escapeCsv).join(',')]
+  for (const row of sampleRows) {
+    csvRows.push(row.map(escapeCsv).join(','))
+  }
+
+  const blob = new Blob([csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'expenses-template.csv'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function openImportCsv() {
+  importInputRef.value?.click()
+}
+
+async function onImportCsvChange(event) {
+  const file = event?.target?.files?.[0]
+  if (!file) return
+  importLoading.value = true
+  try {
+    const fd = new FormData()
+    fd.append('file', file)
+    const { data } = await expensesApi.importCsv(fd)
+    toast('success', data?.message || 'CSV imported successfully.')
+    meta.value.current_page = 1
+    await load()
+  } catch (e) {
+    const msg = e?.response?.data?.message || 'CSV import failed.'
+    toast('error', msg)
+  } finally {
+    importLoading.value = false
+    if (event?.target) event.target.value = ''
+  }
+}
+
 const COLUMN_HEADERS = {
   expense_date: 'Expense Date',
   product_category: 'Product Category',
   product_description: 'Product Description',
   invoice_number: 'Invoice Number',
   vat_amount: 'VAT %',
-  amount_without_vat: 'Amount (Without VAT)',
-  vat_amount_currency: 'VAT Amount',
-  full_amount: 'Total Amount',
+  amount_without_vat: 'Amount Without VAT (AED)',
+  vat_amount_currency: 'VAT Amount (AED)',
+  full_amount: 'Total Amount (AED)',
   added_by: 'Added By',
-  created_at: 'Created Date',
+  created_at: 'Created',
   status: 'Status',
 }
 
@@ -417,43 +574,6 @@ onMounted(() => {
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-white py-6 px-4 sm:px-6">
     <div class="mx-auto max-w-7xl space-y-4">
-      <div class="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div class="flex flex-wrap items-center gap-2">
-            <h1 class="text-xl font-semibold text-gray-900 leading-tight">Expense Tracker</h1>          </div>
-          <p class="mt-0.5 text-sm text-gray-500">Track and manage operational expenses with detailed financial records.</p>
-        </div>
-        <div class="flex flex-nowrap items-center gap-2 overflow-x-auto">
-          <button
-            v-if="canExport"
-            type="button"
-            class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            :disabled="loading || exportLoading"
-            @click="onExport"
-          >
-            <svg v-if="exportLoading" class="mr-1.5 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            <svg v-else class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-            </svg>
-            {{ exportLoading ? 'Exporting...' : 'Export Expenses' }}
-          </button>
-          <button
-            v-if="canCreate"
-            type="button"
-            class="inline-flex items-center rounded-lg bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover"
-            @click="addModalVisible = true"
-          >
-            <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-            </svg>
-            Add Expense
-          </button>
-        </div>
-      </div>
-
       <div v-if="loadError" class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
         {{ loadError }}
       </div>
@@ -511,8 +631,15 @@ onMounted(() => {
 
       <!-- Filters: Status, Product Category, Apply/Reset, Advanced Filters, Customize Columns -->
       <div v-if="canView" class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-        <div class="flex flex-wrap items-end gap-4">
-          <div class="min-w-[140px] max-w-[180px]">
+        <input
+          ref="importInputRef"
+          type="file"
+          accept=".csv,text/csv"
+          class="hidden"
+          @change="onImportCsvChange"
+        />
+        <HorizontalScrollToolbar :step="340">
+          <div class="w-[180px] shrink-0">
             <label class="mb-1 block text-xs font-medium text-gray-600">Status</label>
             <select
               v-model="filters.status"
@@ -523,7 +650,7 @@ onMounted(() => {
               <option v-for="o in filterOptions.status_options" :key="o.value" :value="o.value">{{ o.label }}</option>
             </select>
           </div>
-          <div class="min-w-[140px] max-w-[200px]">
+          <div class="w-[220px] shrink-0">
             <label class="mb-1 block text-xs font-medium text-gray-600">Product Category</label>
             <select
               v-model="filters.product_category"
@@ -534,7 +661,7 @@ onMounted(() => {
               <option v-for="c in filterOptions.categories" :key="c.value" :value="c.value">{{ c.label }}</option>
             </select>
           </div>
-          <div class="flex gap-2">
+          <div class="flex shrink-0 gap-2">
             <button
               type="button"
               class="rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50"
@@ -552,7 +679,7 @@ onMounted(() => {
               Reset
             </button>
           </div>
-          <div class="flex gap-2 ml-auto">
+          <div class="flex shrink-0 gap-2">
             <button
               type="button"
               class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -560,6 +687,94 @@ onMounted(() => {
             >
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
               Advanced Filters
+            </button>
+            <span
+              v-if="selectedCount > 0"
+              class="inline-flex items-center rounded border border-brand-primary/30 bg-brand-primary-light px-2.5 py-2 text-xs font-medium text-brand-primary"
+            >
+              {{ selectedCount }} selected
+            </span>
+            <select
+              v-if="canEdit && selectedCount > 0"
+              v-model="bulkStatus"
+              class="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+              :disabled="loading || bulkLoading || selectedCount === 0"
+            >
+              <option value="">Bulk Status</option>
+              <option value="approved">On</option>
+              <option value="pending">Off</option>
+            </select>
+            <button
+              v-if="canEdit && selectedCount > 0"
+              type="button"
+              class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              :disabled="loading || bulkLoading || selectedCount === 0 || !bulkStatus"
+              @click="onBulkStatusChange"
+            >
+              Change Status
+            </button>
+            <button
+              v-if="canDelete && selectedCount > 0"
+              type="button"
+              class="inline-flex items-center rounded border border-red-300 bg-white px-3 py-2 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
+              :disabled="loading || bulkLoading || selectedCount === 0"
+              @click="onBulkDelete"
+            >
+              Delete Selected
+            </button>
+            <button
+              v-if="canCreate"
+              type="button"
+              class="inline-flex items-center rounded-lg bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover"
+              @click="onDownloadTemplate"
+            >
+              <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              Template
+            </button>
+            <button
+              v-if="canCreate"
+              type="button"
+              class="inline-flex items-center rounded-lg bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50"
+              :disabled="loading || importLoading"
+              @click="openImportCsv"
+            >
+              <svg v-if="importLoading" class="mr-1.5 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              <svg v-else class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              {{ importLoading ? 'Importing...' : 'Import' }}
+            </button>
+            <button
+              v-if="canExport"
+              type="button"
+              class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              :disabled="loading || exportLoading"
+              @click="onExport"
+            >
+              <svg v-if="exportLoading" class="mr-1.5 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              <svg v-else class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              {{ exportLoading ? 'Exporting...' : 'Export Expenses' }}
+            </button>
+            <button
+              v-if="canCreate"
+              type="button"
+              class="inline-flex items-center rounded-lg bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover"
+              @click="addModalVisible = true"
+            >
+              <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              </svg>
+              Add Expense
             </button>
             <button
               type="button"
@@ -572,7 +787,7 @@ onMounted(() => {
               </svg>
             </button>
           </div>
-        </div>
+        </HorizontalScrollToolbar>
       </div>
 
       <AdvancedFilters
@@ -601,12 +816,16 @@ onMounted(() => {
           :can-delete="canDelete"
           :can-view="canView"
           :can-history="canHistory"
+          :selectable="canEdit || canDelete"
+          :selected-ids="selectedExpenseIds"
           @sort="onSort"
           @view="openDetailModal"
           @open-edit="openEditModal"
           @edit="onInlineEdit"
           @view-history="openHistoryModal"
           @delete="openDeleteConfirm"
+          @toggle-select-row="toggleSelectRow"
+          @toggle-select-all="toggleSelectAll"
         />
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
           <!-- Left: entries info -->
@@ -699,6 +918,15 @@ onMounted(() => {
       :loading="deleting"
       @confirm="confirmDelete"
       @close="closeDeleteConfirm"
+    />
+
+    <DeleteOtpModal
+      :visible="bulkDeleteConfirmVisible"
+      title="Delete Expenses"
+      :item-label="selectedCount ? `${selectedCount} selected expense${selectedCount > 1 ? 's' : ''}` : 'selected expenses'"
+      :loading="bulkLoading"
+      @confirm="confirmBulkDelete"
+      @close="closeBulkDeleteConfirm"
     />
 
     <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />

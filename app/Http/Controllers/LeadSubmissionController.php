@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\LeadSubmission;
 use App\Models\ServiceCategory;
 use App\Models\ServiceType;
+use App\Models\User;
 use App\Models\UserColumnPreference;
 use App\Models\LeadSubmissionDocument;
 use App\Services\LeadSubmissionService;
+use App\Services\NotificationService;
 use App\Support\LeadSubmissionSchema;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -933,6 +935,15 @@ if ($request->expectsJson() || $request->ajax()) {
             'submission_type' => $leadSubmission->submission_type ?? 'new',
         ]);
 
+        NotificationService::dispatchOnce('new_submission_created', 'lead_submission:' . (int) $leadSubmission->id, [
+            'module' => 'Lead Submissions',
+            'title' => 'New Lead Submission',
+            'message' => sprintf('Lead submission #%d was created for %s.', $leadSubmission->id, $leadSubmission->company_name ?: 'N/A'),
+            'url' => '/lead-submissions',
+            'users' => User::query()->get(['id', 'name', 'email']),
+            'submission_id' => (int) $leadSubmission->id,
+        ], 900);
+
         if (request()->expectsJson() || request()->ajax()) {
             return response()->json([
                 'message' => 'Lead submission submitted successfully.',
@@ -1138,6 +1149,16 @@ if ($request->expectsJson() || $request->ajax()) {
             if (!$newLeadSubmission->documents()->where('doc_key', 'trade_license')->exists()) {
                 return response()->json(['message' => 'Trade License is required.'], 422);
             }
+
+            NotificationService::dispatchOnce('new_submission_created', 'lead_submission:' . (int) $newLeadSubmission->id, [
+                'module' => 'Lead Submissions',
+                'title' => 'New Lead Submission',
+                'message' => sprintf('Lead submission #%d was created for %s.', $newLeadSubmission->id, $newLeadSubmission->company_name ?: 'N/A'),
+                'url' => '/lead-submissions',
+                'users' => User::query()->get(['id', 'name', 'email']),
+                'submission_id' => (int) $newLeadSubmission->id,
+            ], 900);
+
         }
 
         return response()->json([

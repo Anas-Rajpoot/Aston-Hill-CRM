@@ -2,7 +2,7 @@
 /**
  * Email Follow-Up table – sortable, inline edit, status column (two statuses).
  */
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { canModuleAction } from '@/lib/accessControl'
 
@@ -16,9 +16,12 @@ const props = defineProps({
   perPage: { type: Number, default: 15 },
   editOptions: { type: Object, default: () => ({}) },
   canInlineEdit: { type: Boolean, default: undefined },
+  selectedIds: { type: Array, default: () => [] },
+  allRowsSelected: { type: Boolean, default: false },
+  someRowsSelected: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['sort', 'updateCell'])
+const emit = defineEmits(['sort', 'updateCell', 'toggleSelectAll', 'toggleRowSelection', 'delete'])
 
 const auth = useAuthStore()
 const canInlineEdit = computed(() => {
@@ -36,6 +39,9 @@ const canInlineEdit = computed(() => {
   const hasRole = (name) => roles.some((r) => (typeof r === 'string' ? r : r?.name) === name)
   return hasRole('superadmin')
 })
+const canDeleteAction = computed(() =>
+  canModuleAction(auth.user, 'email-follow-up', 'delete', ['emails_followup.delete'])
+)
 
 function rowNumber(index) {
   return (props.currentPage - 1) * props.perPage + index + 1
@@ -113,6 +119,20 @@ function getCellValueForEdit(row, col) {
 
 const editingCell = ref(null)
 const inlineEditValue = ref('')
+const selectAllRef = ref(null)
+
+watch(
+  () => [props.allRowsSelected, props.someRowsSelected],
+  () => {
+    if (!selectAllRef.value) return
+    selectAllRef.value.indeterminate = !props.allRowsSelected && props.someRowsSelected
+  },
+  { immediate: true }
+)
+
+function isRowSelected(rowId) {
+  return props.selectedIds.includes(Number(rowId))
+}
 
 function openDropdownEdit(row, col) {
   if (!canInlineEdit.value) return
@@ -187,16 +207,25 @@ function onStatusToggle(row) {
     <table class="min-w-full border-2 border-black border-collapse bg-white">
       <thead>
         <tr class="bg-brand-primary border-b-2 border-green-700">
+          <th class="w-10 px-2 py-3 text-center">
+            <input
+              ref="selectAllRef"
+              type="checkbox"
+              class="h-4 w-4 cursor-pointer rounded border-gray-300 text-brand-primary focus:ring-brand-primary"
+              :checked="allRowsSelected"
+              @change="emit('toggleSelectAll')"
+            />
+          </th>
           <th
             v-for="col in columns"
             :key="col"
             scope="col"
-            class="whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-gray-900"
+            class="whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-white"
           >
             <button
               v-if="sortable(col)"
               type="button"
-              class="inline-flex items-center gap-1 font-semibold text-gray-900 hover:text-gray-700"
+              class="inline-flex items-center gap-1 font-semibold text-white hover:text-white/80"
               @click="toggleSort(col)"
             >
               {{ label(col) }}
@@ -204,19 +233,34 @@ function onStatusToggle(row) {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
               </svg>
             </button>
-            <span v-else class="font-semibold text-gray-900">{{ label(col) }}</span>
+            <span v-else class="font-semibold text-white">{{ label(col) }}</span>
+          </th>
+          <th
+            v-if="canDeleteAction"
+            scope="col"
+            class="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold text-white"
+          >
+            Actions
           </th>
         </tr>
       </thead>
       <tbody class="bg-white">
         <tr v-if="!loading && !data.length" class="border-b border-black bg-white">
-          <td :colspan="columns.length" class="px-4 py-12 text-center text-sm text-gray-500">No email follow-up entries found.</td>
+          <td :colspan="columns.length + (canDeleteAction ? 2 : 1)" class="px-4 py-12 text-center text-sm text-gray-500">No email follow-up entries found.</td>
         </tr>
         <tr
           v-for="(row, rowIndex) in data"
           :key="row.id"
           class="border-b border-black bg-white hover:bg-gray-50/30"
         >
+          <td class="px-2 py-3 text-center">
+            <input
+              type="checkbox"
+              class="h-4 w-4 cursor-pointer rounded border-gray-300 text-brand-primary focus:ring-brand-primary"
+              :checked="isRowSelected(row.id)"
+              @change="emit('toggleRowSelection', row.id)"
+            />
+          </td>
           <td
             v-for="col in columns"
             :key="col"
@@ -317,6 +361,18 @@ function onStatusToggle(row) {
             <template v-else>
               {{ truncate(formatValue(row, col)) }}
             </template>
+          </td>
+          <td v-if="canDeleteAction" class="whitespace-nowrap px-4 py-3 text-right">
+            <button
+              type="button"
+              class="rounded-full p-1.5 text-red-600 hover:bg-red-50"
+              title="Delete"
+              @click="emit('delete', row)"
+            >
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+              </svg>
+            </button>
           </td>
         </tr>
       </tbody>

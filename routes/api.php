@@ -42,8 +42,10 @@ Route::get('/password-policy', [\App\Http\Controllers\Api\ChangePasswordControll
 // ----- Auth (guest) – login needs session for same-origin SPA -----
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('web');
 
-// ----- Protected (auth:sanctum = session OR token) – web middleware for session auth -----
-Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_superadmin'])->group(function () {
+// ----- Protected (session OR token) -----
+// Use auth:web,sanctum so first-party session auth works consistently
+// while preserving bearer-token access for API clients.
+Route::middleware(['web', 'auth:web,sanctum', 'verified', 'approved', '2fa_or_superadmin'])->group(function () {
 
     Route::get('/me', MeController::class);
     Route::get('/bootstrap', \App\Http\Controllers\Api\BootstrapController::class);
@@ -140,6 +142,8 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
         ->whereNumber('customerSupportSubmission');
     Route::post('/customer-support/{customerSupportSubmission}/attachments', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'addAttachments'])
         ->whereNumber('customerSupportSubmission');
+    Route::delete('/customer-support/{customerSupportSubmission}/attachments/{index}', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'removeAttachment'])
+        ->whereNumber(['customerSupportSubmission', 'index']);
     Route::get('/customer-support/{customerSupportSubmission}/attachments/{index}/download', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'downloadAttachment'])
         ->whereNumber(['customerSupportSubmission', 'index']);
     Route::patch('/customer-support/{customerSupportSubmission}/assign-csr', [\App\Http\Controllers\Api\CustomerSupportApiController::class, 'assignCsr'])
@@ -248,6 +252,7 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::post('/email-follow-ups', [\App\Http\Controllers\Api\EmailFollowUpController::class, 'store']);
     Route::patch('/email-follow-ups/{emailFollowUp}', [\App\Http\Controllers\Api\EmailFollowUpController::class, 'patch'])->whereNumber('emailFollowUp');
     Route::patch('/email-follow-ups/{emailFollowUp}/status', [\App\Http\Controllers\Api\EmailFollowUpController::class, 'updateStatus'])->whereNumber('emailFollowUp');
+    Route::post('/email-follow-ups/bulk-action', [\App\Http\Controllers\Api\EmailFollowUpController::class, 'bulkAction']);
 
     // Personal notes
     Route::get('/personal-notes', [\App\Http\Controllers\Api\PersonalNoteApiController::class, 'index']);
@@ -278,6 +283,8 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     Route::get('/cisco-extensions/{ciscoExtension}/audit-log', [\App\Http\Controllers\Api\ExtensionsApiController::class, 'auditLog'])->whereNumber('ciscoExtension');
     Route::post('/cisco-extensions', [\App\Http\Controllers\Api\ExtensionsApiController::class, 'store']);
     Route::post('/cisco-extensions/bulk-import', [\App\Http\Controllers\Api\ExtensionsApiController::class, 'bulkImport']);
+    Route::post('/cisco-extensions/bulk-delete', [\App\Http\Controllers\Api\ExtensionsApiController::class, 'bulkDelete']);
+    Route::patch('/cisco-extensions/bulk-status', [\App\Http\Controllers\Api\ExtensionsApiController::class, 'bulkStatusUpdate']);
     Route::put('/cisco-extensions/{ciscoExtension}', [\App\Http\Controllers\Api\ExtensionsApiController::class, 'update'])->whereNumber('ciscoExtension');
     Route::patch('/cisco-extensions/{ciscoExtension}', [\App\Http\Controllers\Api\ExtensionsApiController::class, 'patch'])->whereNumber('ciscoExtension');
     Route::delete('/cisco-extensions/{ciscoExtension}', [\App\Http\Controllers\Api\ExtensionsApiController::class, 'destroy'])->whereNumber('ciscoExtension');
@@ -292,6 +299,7 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
     // Expenses (Expense Tracker)
     Route::get('/expenses', [\App\Http\Controllers\Api\ExpenseApiController::class, 'index']);
     Route::post('/expenses', [\App\Http\Controllers\Api\ExpenseApiController::class, 'store']);
+    Route::post('/expenses/import-csv', [\App\Http\Controllers\Api\ExpenseApiController::class, 'importCsv']);
     Route::get('/expenses/summary', [\App\Http\Controllers\Api\ExpenseApiController::class, 'summary']);
     Route::get('/expenses/filters', [\App\Http\Controllers\Api\ExpenseApiController::class, 'filters']);
     Route::get('/expenses/columns', [\App\Http\Controllers\Api\ExpenseApiController::class, 'columns']);
@@ -485,7 +493,7 @@ Route::middleware(['web', 'auth:sanctum', 'verified', 'approved', '2fa_or_supera
 });
 
 // ----- Auth actions (need auth but no 2fa for logout) -----
-Route::middleware(['web', 'auth:sanctum'])->group(function () {
+Route::middleware(['web', 'auth:web,sanctum'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::post('/auth/2fa/verify', [AuthController::class, 'verify2FA'])->name('api.auth.2fa.verify')->middleware('throttle:5,1');
 });

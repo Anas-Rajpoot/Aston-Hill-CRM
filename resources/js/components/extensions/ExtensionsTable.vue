@@ -11,6 +11,7 @@ const auth = useAuthStore()
 const props = defineProps({
   columns: { type: Array, required: true },
   data: { type: Array, default: () => [] },
+  selectedIds: { type: Array, default: () => [] },
   sort: { type: String, default: 'extension' },
   order: { type: String, default: 'asc' },
   loading: { type: Boolean, default: false },
@@ -22,7 +23,7 @@ const props = defineProps({
   teamLeaderOptions: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['sort', 'delete', 'updateCell', 'openHistory', 'edit', 'view'])
+const emit = defineEmits(['sort', 'delete', 'updateCell', 'openHistory', 'edit', 'view', 'toggleSelectRow', 'toggleSelectAll'])
 
 const editingCell = ref(null)
 const inlineEditValue = ref('')
@@ -53,6 +54,16 @@ const canDelete = computed(() =>
 )
 const canInlineEdit = computed(() => canEdit.value)
 const hasAnyRowAction = computed(() => canView.value || canEdit.value || canDelete.value)
+const hasSelectionColumn = computed(() => canEdit.value || canDelete.value)
+const selectedSet = computed(() => new Set((props.selectedIds ?? []).map((id) => Number(id))))
+const allVisibleSelected = computed(() => {
+  if (!props.data?.length) return false
+  return props.data.every((row) => selectedSet.value.has(Number(row.id)))
+})
+const someVisibleSelected = computed(() => {
+  if (!props.data?.length) return false
+  return props.data.some((row) => selectedSet.value.has(Number(row.id))) && !allVisibleSelected.value
+})
 
 const EDITABLE_COLUMNS = ['extension', 'landline_number', 'gateway', 'username', 'password', 'status', 'assigned_to_name', 'manager', 'team_leader', 'comment']
 const DROPDOWN_COLUMNS = ['gateway', 'status', 'assigned_to_name', 'manager', 'team_leader']
@@ -226,6 +237,18 @@ function goToHistory(row) {
 function onDelete(row) {
   if (row?.id && canDelete.value) emit('delete', row)
 }
+
+function isSelected(id) {
+  return selectedSet.value.has(Number(id))
+}
+
+function toggleRow(row, checked) {
+  emit('toggleSelectRow', { id: Number(row.id), checked: Boolean(checked) })
+}
+
+function toggleAll(checked) {
+  emit('toggleSelectAll', { checked: Boolean(checked) })
+}
 </script>
 
 <template>
@@ -248,6 +271,19 @@ function onDelete(row) {
     <table class="min-w-full border-2 border-black border-collapse bg-white">
       <thead>
         <tr class="bg-brand-primary border-b-2 border-green-700">
+          <th
+            v-if="hasSelectionColumn"
+            scope="col"
+            class="w-10 whitespace-nowrap px-2 py-3 text-center text-sm font-semibold text-white"
+          >
+            <input
+              type="checkbox"
+              class="h-4 w-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary"
+              :checked="allVisibleSelected"
+              :indeterminate.prop="someVisibleSelected"
+              @change="toggleAll($event.target.checked)"
+            />
+          </th>
           <th
             v-for="col in columns"
             :key="col"
@@ -272,13 +308,21 @@ function onDelete(row) {
       </thead>
       <tbody class="bg-white">
         <tr v-if="!loading && !data.length" class="border-b border-black">
-          <td :colspan="columns.length + (hasAnyRowAction ? 1 : 0)" class="px-4 py-12 text-center text-sm text-gray-500">No extensions found.</td>
+          <td :colspan="columns.length + (hasAnyRowAction ? 1 : 0) + (hasSelectionColumn ? 1 : 0)" class="px-4 py-12 text-center text-sm text-gray-500">No extensions found.</td>
         </tr>
         <tr
           v-for="(row, rowIndex) in data"
           :key="row.id"
           class="border-b border-black bg-white hover:bg-gray-50/30"
         >
+          <td v-if="hasSelectionColumn" class="whitespace-nowrap px-2 py-3 text-center">
+            <input
+              type="checkbox"
+              class="h-4 w-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary"
+              :checked="isSelected(row.id)"
+              @change="toggleRow(row, $event.target.checked)"
+            />
+          </td>
           <td
             v-for="col in columns"
             :key="col"

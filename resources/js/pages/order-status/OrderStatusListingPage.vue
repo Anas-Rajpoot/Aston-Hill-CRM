@@ -1,6 +1,6 @@
 <script setup>
 /**
- * Order Status – list product/service data from clients. Title + breadcrumbs, filters, advanced filters, sortable table, column customizer.
+ * Order Status listing with focused filters/columns.
  */
 import { ref, computed, onMounted } from 'vue'
 import clientsApi from '@/services/clientsApi'
@@ -32,6 +32,7 @@ const advancedFiltersOpen = ref(false)
 const hasSearched = ref(false)
 
 const defaultVisibleColumns = [
+  'company_name',
   'activity',
   'account_number',
   'wo_number',
@@ -39,35 +40,32 @@ const defaultVisibleColumns = [
   'submitted_at',
   'additional_notes',
 ]
+const canonicalColumnOrder = [...defaultVisibleColumns]
+const requiredOrderStatusColumns = new Set(['company_name', 'activity', 'account_number', 'wo_number', 'status', 'submitted_at', 'additional_notes'])
 
 const allOrderStatusColumns = [
-  { key: 'activity', label: 'Activity' },
   { key: 'company_name', label: 'Company Name' },
+  { key: 'activity', label: 'Activity' },
   { key: 'account_number', label: 'Account Number' },
-  { key: 'submitted_at', label: 'Activation Date' },
-  { key: 'manager', label: 'Manager Name' },
-  { key: 'team_leader', label: 'Team Leader' },
-  { key: 'sales_agent', label: 'Sales Agent Name' },
+  { key: 'wo_number', label: 'Work Order Number' },
   { key: 'status', label: 'Work Order Status' },
-  { key: 'service_type', label: 'Service Type' },
-  { key: 'product_type', label: 'Product Type' },
-  { key: 'address', label: 'Address' },
-  { key: 'product_name', label: 'Product Name' },
-  { key: 'mrc', label: 'MRC' },
-  { key: 'quantity', label: 'Quantity' },
-  { key: 'other', label: 'Activity Notes' },
-  { key: 'migration_numbers', label: 'Migration Numbers' },
-  { key: 'wo_number', label: 'Work Order' },
-  { key: 'completion_date', label: 'Completion Date' },
-  { key: 'payment_connection', label: 'Payment Connection' },
-  { key: 'contract_type', label: 'Contract Type' },
-  { key: 'contract_end_date', label: 'Contract End Date' },
-  { key: 'renewal_alert', label: 'Renewal Alert' },
-  { key: 'additional_notes', label: 'Remarks' },
-  { key: 'creator', label: 'Created By' },
+  { key: 'submitted_at', label: 'Activation Date' },
+  { key: 'additional_notes', label: 'Additional Notes' },
 ]
 
 const visibleColumns = ref([...defaultVisibleColumns])
+const orderedVisibleColumns = computed(() => normalizeVisibleColumns(visibleColumns.value))
+
+function normalizeVisibleColumns(cols) {
+  const input = Array.isArray(cols) ? cols : []
+  const allowed = new Set(allOrderStatusColumns.map((c) => c.key))
+  const picked = new Set(input.filter((c) => allowed.has(c)))
+  // Keep key order-status columns always present to avoid broken legacy preferences.
+  requiredOrderStatusColumns.forEach((c) => picked.add(c))
+  // Keep canonical order so Activity always follows Company Name.
+  const ordered = canonicalColumnOrder.filter((c) => picked.has(c))
+  return ordered.length ? ordered : [...defaultVisibleColumns]
+}
 
 const filters = ref({
   activity: '',
@@ -103,10 +101,9 @@ const filters = ref({
   establishment_card_expiry_to: '',
 })
 
-// Keep only non-primary filters here; Activity + Account Number stay in the general filter bar.
+// Keep only non-primary filters here; Activity + Account Number + Work Order stay in the general filter bar.
 const advancedTextFilters = [
   { key: 'company_name', label: 'Company Name', placeholder: 'Company name...' },
-  { key: 'wo_number', label: 'Work Order', placeholder: 'Work order...' },
   { key: 'work_order_status', label: 'Work Order Status', placeholder: 'Work order status...' },
   { key: 'status', label: 'Client Status', placeholder: 'Client status...' },
   { key: 'submission_type', label: 'Submission Type', placeholder: 'Submission type...' },
@@ -177,7 +174,7 @@ function normalizeMeta(incoming) {
 
 function buildParams() {
   const f = filters.value
-  const cols = visibleColumns.value.filter((c) => c !== 'activity' && c !== 'id')
+  const cols = orderedVisibleColumns.value.filter((c) => c !== 'activity' && c !== 'id')
   const columns = ['id', ...cols]
   if (!columns.includes('submitted_at')) columns.push('submitted_at')
 
@@ -322,18 +319,16 @@ async function loadTablePreference() {
 }
 
 async function loadColumns() {
-  const allowed = new Set(allOrderStatusColumns.map((c) => c.key))
-  const normalize = (cols) => (Array.isArray(cols) ? cols.filter((c) => allowed.has(c)) : [])
   try {
     const { data } = await api.get('/clients/columns', { params: { module: COLUMN_MODULE } })
-    const cols = normalize(data?.visible_columns)
+    const cols = normalizeVisibleColumns(data?.visible_columns)
     if (cols.length) {
       visibleColumns.value = cols
       return
     }
     // Backward-compatible fallback for previously saved module keys.
     const { data: legacy } = await api.get('/clients/columns', { params: { module: TABLE_MODULE } })
-    const legacyCols = normalize(legacy?.visible_columns)
+    const legacyCols = normalizeVisibleColumns(legacy?.visible_columns)
     if (legacyCols.length) {
       visibleColumns.value = legacyCols
     }
@@ -342,8 +337,7 @@ async function loadColumns() {
 
 async function saveColumns(cols) {
   try {
-    const allowed = new Set(allOrderStatusColumns.map((c) => c.key))
-    const normalized = (Array.isArray(cols) ? cols : []).filter((c) => allowed.has(c))
+    const normalized = normalizeVisibleColumns(cols)
     await api.post('/clients/columns', { module: COLUMN_MODULE, visible_columns: normalized })
     visibleColumns.value = normalized
     meta.value.current_page = 1
@@ -360,20 +354,6 @@ onMounted(async () => {
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-white py-6 px-4 sm:px-6">
     <div class="mx-auto max-w-[1600px] space-y-4">
-      <!-- Heading first, then breadcrumb -->
-      <div class="flex items-center gap-3">
-        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-primary-light">
-          <svg class="h-6 w-6 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-          </svg>
-        </span>
-        <div>
-          <div class="flex items-center gap-2">
-            <h1 class="text-2xl font-bold text-gray-900 leading-tight">Order Status</h1>          </div>
-          <p class="text-sm text-gray-500">Track and monitor order status by Activity, Account Number, or Work Order.</p>
-        </div>
-      </div>
-
       <!-- Filters card: Activity, Account Number, Work Order + Search, Clear, Advanced Filters, Customize Columns -->
       <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
         <div class="flex flex-wrap items-end gap-3">
@@ -396,6 +376,18 @@ onMounted(async () => {
               v-model="filters.account_number"
               type="text"
               placeholder="Account number..."
+              class="w-full rounded border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+              :disabled="loading"
+              @keyup.enter="applyFilters"
+            />
+          </div>
+          <div class="w-full sm:min-w-[140px] sm:max-w-[220px] sm:flex-1">
+            <label for="os-wo-number" class="mb-0.5 block text-xs text-gray-700">Work Order Number</label>
+            <input
+              id="os-wo-number"
+              v-model="filters.wo_number"
+              type="text"
+              placeholder="Work order number..."
               class="w-full rounded border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
               :disabled="loading"
               @keyup.enter="applyFilters"
@@ -490,11 +482,13 @@ onMounted(async () => {
       <!-- Table -->
       <div v-else class="overflow-hidden rounded-lg border-2 border-black bg-white shadow-sm">
         <OrderStatusTable
-          :columns="visibleColumns.filter((c) => c !== 'id' && c !== 'fiber' && c !== 'order_number')"
+          :columns="orderedVisibleColumns.filter((c) => c !== 'id' && c !== 'fiber' && c !== 'order_number')"
           :data="orders"
           :sort="sort"
           :order="order"
           :loading="loading"
+          :current-page="meta.current_page"
+          :per-page="meta.per_page"
           :can-view-action="canViewAction()"
           @sort="onSort"
         />

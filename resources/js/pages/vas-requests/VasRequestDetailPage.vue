@@ -250,20 +250,20 @@ onMounted(() => {
               <h2 class="mb-3 text-sm font-semibold text-gray-900">Primary Information</h2>
               <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Request Type</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.request_type) }}</div>
+                  <label class="block text-xs font-medium text-gray-500">Company Name as per Trade License</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.company_name) }}</div>
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Account Number</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.account_number) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Contact Number</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.contact_number) }}</div>
+                  <label class="block text-xs font-medium text-gray-500">Request Type</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.request_type) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Company Name as per Trade License</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.company_name) }}</div>
+                  <label class="block text-xs font-medium text-gray-500">Contact Number</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.contact_number) }}</div>
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Status</label>
@@ -289,22 +289,18 @@ onMounted(() => {
             <!-- Team Assignment -->
             <section class="mb-6">
               <h2 class="mb-3 text-sm font-semibold text-gray-900">Team Assignment</h2>
-              <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Sales Agent</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.sales_agent_name) }}</div>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">Team Leader</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.team_leader_name) }}</div>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">Manager</label>
+                  <label class="block text-xs font-medium text-gray-500">Manager Name</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.manager_name) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Back Office Executive</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.back_office_executive_name) }}</div>
+                  <label class="block text-xs font-medium text-gray-500">Team Leader Name</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.team_leader_name) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Sales Agent Name</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.sales_agent_name) }}</div>
                 </div>
               </div>
             </section>

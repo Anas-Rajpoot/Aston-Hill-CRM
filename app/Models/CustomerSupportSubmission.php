@@ -43,6 +43,7 @@ class CustomerSupportSubmission extends Model
         'company_name',
         'account_number',
         'contact_number',
+        'alternate_contact_number',
         'issue_description',
         'attachments',
         'manager_id',

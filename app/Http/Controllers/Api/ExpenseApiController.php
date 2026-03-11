@@ -246,6 +246,125 @@ class ExpenseApiController extends Controller
         return response()->json(['message' => 'Expense created.', 'data' => ['id' => $expense->id]], 201);
     }
 
+    public function importCsv(Request $request): JsonResponse
+    {
+        $this->authorizeAction($request, 'create', ['expense_tracker.create']);
+
+        $validated = $request->validate([
+            'file' => ['required', 'file', 'mimes:csv,txt', 'max:10240'],
+        ]);
+
+        $file = $validated['file'];
+        $lines = @file($file->getRealPath(), FILE_IGNORE_NEW_LINES);
+        if (! is_array($lines) || count($lines) < 2) {
+            return response()->json(['message' => 'CSV file is empty or invalid.'], 422);
+        }
+
+        $parse = function (string $line): array {
+            $line = preg_replace('/^\xEF\xBB\xBF/', '', $line) ?? $line;
+            return str_getcsv($line);
+        };
+
+        $headers = array_map(fn ($h) => $this->normalizeCsvHeader((string) $h), $parse((string) $lines[0]));
+        $headerIndex = array_flip($headers);
+        $imported = 0;
+        $skipped = 0;
+        $errors = [];
+        $userNameMap = User::query()->pluck('id', 'name')->all();
+
+        for ($i = 1; $i < count($lines); $i++) {
+            $rawLine = (string) ($lines[$i] ?? '');
+            if (trim($rawLine) === '') {
+                continue;
+            }
+            $cols = $parse($rawLine);
+            $get = function (string $header) use ($cols, $headerIndex) {
+                $idx = $headerIndex[$header] ?? null;
+                if ($idx === null) return null;
+                return isset($cols[$idx]) ? trim((string) $cols[$idx]) : null;
+            };
+
+            $expenseDateRaw = $get('expense_date');
+            $productCategory = $get('product_category');
+            $productDescription = $get('product_description');
+            $invoiceNumber = $get('invoice_number');
+            $vatPercentRaw = $get('vat_percent');
+            $amountWithoutVatRaw = $get('amount_without_vat');
+            $statusRaw = strtolower((string) ($get('status') ?? ''));
+            $addedByRaw = $get('added_by');
+
+            // Skip fully empty rows
+            if (
+                ($expenseDateRaw ?? '') === '' &&
+                ($productCategory ?? '') === '' &&
+                ($productDescription ?? '') === '' &&
+                ($invoiceNumber ?? '') === '' &&
+                ($vatPercentRaw ?? '') === '' &&
+                ($amountWithoutVatRaw ?? '') === ''
+            ) {
+                continue;
+            }
+
+            $expenseDate = $this->parseCsvDate($expenseDateRaw);
+            $vatPercent = is_numeric($vatPercentRaw) ? (float) $vatPercentRaw : 0.0;
+            $amountWithoutVat = is_numeric($amountWithoutVatRaw) ? (float) $amountWithoutVatRaw : null;
+
+            if (! $expenseDate || ! $productCategory || ! $productDescription || $amountWithoutVat === null || $amountWithoutVat < 0) {
+                $skipped++;
+                $errors[] = 'Row ' . ($i + 1) . ': missing/invalid required fields.';
+                continue;
+            }
+
+            if (! in_array($productCategory, self::PRODUCT_CATEGORIES, true)) {
+                $normalizedCategory = strtolower($productCategory);
+                $matched = collect(self::PRODUCT_CATEGORIES)->first(fn ($c) => strtolower((string) $c) === $normalizedCategory);
+                if ($matched) {
+                    $productCategory = $matched;
+                } else {
+                    $skipped++;
+                    $errors[] = 'Row ' . ($i + 1) . ': invalid product category "' . $productCategory . '".';
+                    continue;
+                }
+            }
+
+            $userId = $request->user()->id;
+            if ($request->user()->hasRole('superadmin') && $addedByRaw) {
+                $mapped = $userNameMap[$addedByRaw] ?? null;
+                if ($mapped) {
+                    $userId = (int) $mapped;
+                }
+            }
+
+            $status = in_array($statusRaw, Expense::STATUSES, true) ? $statusRaw : Expense::STATUS_PENDING;
+            $vatAmountCurrency = round($amountWithoutVat * ($vatPercent / 100), 2);
+            $fullAmount = round($amountWithoutVat + $vatAmountCurrency, 2);
+
+            $expense = Expense::create([
+                'user_id' => $userId,
+                'expense_date' => $expenseDate,
+                'product_category' => $productCategory,
+                'product_description' => $productDescription,
+                'invoice_number' => $invoiceNumber ?: null,
+                'comment' => 'Imported via CSV',
+                'vat_amount' => $vatPercent,
+                'amount_without_vat' => $amountWithoutVat,
+                'full_amount' => $fullAmount,
+                'status' => $status,
+            ]);
+
+            $this->writeAuditLog($expense, 'created', null, $expense->fresh()->toArray());
+            $this->invalidateExpenseFiltersCache($expense);
+            $imported++;
+        }
+
+        return response()->json([
+            'message' => "CSV import completed. Imported {$imported} row(s), skipped {$skipped}.",
+            'imported' => $imported,
+            'skipped' => $skipped,
+            'errors' => array_slice($errors, 0, 20),
+        ]);
+    }
+
     private function storeAttachments(Request $request, Expense $expense): void
     {
         $request->validate([
@@ -649,5 +768,41 @@ class ExpenseApiController extends Controller
                 return ucfirst(strtolower($part));
             })
             ->implode('/');
+    }
+
+    private function normalizeCsvHeader(string $header): string
+    {
+        $h = strtolower(trim($header));
+        $h = str_replace(['%', '(', ')', '/', '-'], ['', ' ', ' ', ' ', ' '], $h);
+        $h = preg_replace('/\s+/', ' ', $h) ?? $h;
+
+        $map = [
+            'expense date' => 'expense_date',
+            'product category' => 'product_category',
+            'product description' => 'product_description',
+            'invoice number' => 'invoice_number',
+            'vat' => 'vat_percent',
+            'vat percent' => 'vat_percent',
+            'amount without vat' => 'amount_without_vat',
+            'vat amount' => 'vat_amount_currency',
+            'total amount' => 'full_amount',
+            'added by' => 'added_by',
+            'created date' => 'created_at',
+            'status' => 'status',
+        ];
+
+        return $map[$h] ?? str_replace(' ', '_', $h);
+    }
+
+    private function parseCsvDate(?string $value): ?string
+    {
+        $v = trim((string) ($value ?? ''));
+        if ($v === '') return null;
+
+        try {
+            return \Carbon\Carbon::parse($v)->toDateString();
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 }

@@ -53,13 +53,17 @@ const { errors, generalMessage, setErrors, clearErrors, clearFieldError, getErro
 const filteredTeamLeaders = computed(() => {
   const mid = form.value.manager_id
   if (!mid) return options.value.team_leaders
-  return options.value.team_leaders.filter((t) => String(t.manager_id) === String(mid))
+  const filtered = options.value.team_leaders.filter((t) => String(t.manager_id) === String(mid))
+  // Fallback to all role users when hierarchy mapping is missing/incomplete.
+  return filtered.length ? filtered : options.value.team_leaders
 })
 
 const filteredSalesAgents = computed(() => {
   const tlId = form.value.team_leader_id
   if (!tlId) return options.value.sales_agents
-  return options.value.sales_agents.filter((sa) => String(sa.team_leader_id) === String(tlId))
+  const filtered = options.value.sales_agents.filter((sa) => String(sa.team_leader_id) === String(tlId))
+  // Fallback to all role users when hierarchy mapping is missing/incomplete.
+  return filtered.length ? filtered : options.value.sales_agents
 })
 
 watch(() => form.value.manager_id, () => {
@@ -91,7 +95,7 @@ watch(() => form.value.sales_agent_id, (id) => {
 onMounted(async () => {
   loading.value = true
   try {
-    const res = await specialRequestsApi.getTeamOptions()
+    const res = await specialRequestsApi.getTeamOptions(true)
     const data = res?.data ?? res ?? {}
     options.value = {
       managers: data.managers ?? [],
@@ -235,9 +239,9 @@ const selectClass = (field) =>
       </div>
 
       <h3 class="text-base font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Primary Information</h3>
-      <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-[1.35fr_1fr_1fr_1fr]">
         <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700">Company Name <span class="text-red-500">*</span></label>
+          <label class="mb-1 block whitespace-nowrap text-sm font-medium text-gray-700">Company Name as per Trade License <span class="text-red-500">*</span></label>
           <input v-model="form.company_name" type="text" placeholder="Enter company name" :class="inputClass('company_name')" @input="clearFieldError('company_name')" />
           <p v-if="getError('company_name')" class="mt-1 text-sm text-red-600">{{ getError('company_name') }}</p>
         </div>
@@ -261,25 +265,25 @@ const selectClass = (field) =>
       </div>
       <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700">Manager <span class="text-red-500">*</span></label>
+          <label class="mb-1 block text-sm font-medium text-gray-700">Manager Name <span class="text-red-500">*</span></label>
           <select v-model="form.manager_id" :class="selectClass('manager_id')" @change="clearFieldError('manager_id')">
-            <option value="">Select</option>
+            <option value="">Select Manager Name</option>
             <option v-for="m in options.managers" :key="m.id" :value="String(m.id)">{{ m.name }}</option>
           </select>
           <p v-if="getError('manager_id')" class="mt-1 text-sm text-red-600">{{ getError('manager_id') }}</p>
         </div>
         <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700">Team Leader</label>
+          <label class="mb-1 block text-sm font-medium text-gray-700">Team Leader Name</label>
           <select v-model="form.team_leader_id" :class="selectClass('team_leader_id')" @change="clearFieldError('team_leader_id')">
-            <option value="">Select</option>
+            <option value="">Select Team Leader Name</option>
             <option v-for="t in filteredTeamLeaders" :key="t.id" :value="String(t.id)">{{ t.name }}</option>
           </select>
           <p v-if="getError('team_leader_id')" class="mt-1 text-sm text-red-600">{{ getError('team_leader_id') }}</p>
         </div>
         <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700">Sales Agent</label>
+          <label class="mb-1 block text-sm font-medium text-gray-700">Sales Agent Name</label>
           <select v-model="form.sales_agent_id" :class="selectClass('sales_agent_id')" @change="clearFieldError('sales_agent_id')">
-            <option value="">Select</option>
+            <option value="">Select Sales Agent Name</option>
             <option v-for="s in filteredSalesAgents" :key="s.id" :value="String(s.id)">{{ s.name }}</option>
           </select>
           <p v-if="getError('sales_agent_id')" class="mt-1 text-sm text-red-600">{{ getError('sales_agent_id') }}</p>

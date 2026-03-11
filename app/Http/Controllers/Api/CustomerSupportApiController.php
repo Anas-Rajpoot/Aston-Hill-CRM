@@ -590,6 +590,7 @@ class CustomerSupportApiController extends Controller
             'company_name' => ['sometimes', 'required', 'string', 'max:255'],
             'account_number' => ['sometimes', 'nullable', 'string', 'max:100'],
             'contact_number' => ['sometimes', 'required', 'string', 'max:50'],
+            'alternate_contact_number' => ['sometimes', 'nullable', 'regex:/^971\d{9}$/'],
             'issue_description' => ['sometimes', 'required', 'string', 'max:5000'],
             'manager_id' => ['sometimes', 'required', 'integer', 'min:1', 'exists:users,id'],
             'team_leader_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
@@ -685,6 +686,7 @@ class CustomerSupportApiController extends Controller
             'company_name' => ['required', 'string', 'max:255'],
             'account_number' => ['nullable', 'string', 'max:100'],
             'contact_number' => ['required', 'string', 'max:50'],
+            'alternate_contact_number' => ['nullable', 'regex:/^971\d{9}$/'],
             'issue_description' => ['required', 'string', 'max:5000'],
             'manager_id' => ['required', 'integer', 'exists:users,id'],
             'team_leader_id' => ['nullable', 'integer', 'exists:users,id'],
@@ -781,6 +783,34 @@ class CustomerSupportApiController extends Controller
         return response()->json([
             'message' => count($newEntries) . ' file(s) added.',
             'attachments' => $customerSupportSubmission->fresh()->attachments,
+        ]);
+    }
+
+    /**
+     * DELETE /api/customer-support/{customerSupportSubmission}/attachments/{index}
+     * Remove an attachment by zero-based index.
+     */
+    public function removeAttachment(Request $request, CustomerSupportSubmission $customerSupportSubmission, int $index): JsonResponse
+    {
+        $this->authorize('update', $customerSupportSubmission);
+
+        $attachments = $customerSupportSubmission->attachments;
+        if (! is_array($attachments) || ! isset($attachments[$index])) {
+            return response()->json(['message' => 'Attachment not found.'], 404);
+        }
+
+        $entry = $attachments[$index];
+        $path = is_array($entry) ? ($entry['path'] ?? null) : null;
+        if (is_string($path) && $path !== '' && Storage::disk('public')->exists($path)) {
+            Storage::disk('public')->delete($path);
+        }
+
+        array_splice($attachments, $index, 1);
+        $customerSupportSubmission->update(['attachments' => array_values($attachments)]);
+
+        return response()->json([
+            'message' => 'Document removed.',
+            'attachments' => $customerSupportSubmission->fresh()->attachments ?? [],
         ]);
     }
 

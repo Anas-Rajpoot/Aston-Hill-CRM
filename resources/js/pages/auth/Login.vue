@@ -20,6 +20,31 @@ onMounted(() => {
       sessionStorage.removeItem('session_terminated_msg')
     }
   } catch { /* */ }
+
+  // Defensive cleanup for stale UI backdrops/body locks that can survive hard redirects.
+  // Auth pages should never render behind a full-screen overlay.
+  const body = document.body
+  body.classList.remove('overflow-hidden', 'overflow-y-hidden', 'modal-open')
+  body.style.removeProperty('pointer-events')
+  body.style.removeProperty('filter')
+
+  const staleBackdropSelectors = ['.modal-backdrop', '.offcanvas-backdrop']
+  staleBackdropSelectors.forEach((selector) => {
+    document.querySelectorAll(selector).forEach((el) => el.remove())
+  })
+
+  document.querySelectorAll('body > div').forEach((el) => {
+    if (!(el instanceof HTMLElement)) return
+    if (el.id === 'app') return
+
+    const cls = String(el.className || '')
+    const looksFullscreen = cls.includes('fixed') && cls.includes('inset-0')
+    const looksBackdrop = cls.includes('bg-black') || cls.includes('bg-gray-') || cls.includes('backdrop-blur')
+
+    if (looksFullscreen && looksBackdrop) {
+      el.remove()
+    }
+  })
 })
 
 const submit = async () => {

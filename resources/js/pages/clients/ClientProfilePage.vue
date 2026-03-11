@@ -87,10 +87,13 @@ const productsOrder = ref('desc')
 const allColumns = ref([])
 const defaultColumns = ref([])
 const PRODUCT_SECTION_COLUMNS = [
-  'company_name', 'submitted_at', 'manager', 'team_leader', 'sales_agent',
-  'submission_type', 'service_category', 'service_type', 'product_type', 'address',
-  'product_name', 'mrc', 'quantity', 'other', 'migration_numbers', 'activity',
-  'account_number', 'wo_number', 'work_order_status', 'activation_date',
+  'submitted_at',
+  'company_name', 'account_number',
+  'submission_type', 'service_category', 'service_type',
+  'manager', 'team_leader', 'sales_agent', 'product_type',
+  'address', 'product_name', 'mrc', 'quantity', 'other',
+  'migration_numbers', 'activity', 'wo_number', 'work_order_status',
+  'activation_date',
   'contract_type', 'contract_end_date', 'clawback_chum', 'remarks', 'additional_notes',
 ]
 
@@ -291,7 +294,7 @@ function enforceColumnOrder(cols) {
 async function loadColumns() {
   try {
     const data = await clientsApi.columns()
-    allColumns.value = (data.all_columns ?? []).filter((c) => PRODUCT_SECTION_COLUMNS.includes(c))
+    allColumns.value = (data.all_columns ?? []).filter((c) => PRODUCT_SECTION_COLUMNS.includes(c?.key))
     visibleColumns.value = enforceColumnOrder(data.visible_columns ?? visibleColumns.value)
     defaultColumns.value = (data.default_columns ?? []).filter((c) => PRODUCT_SECTION_COLUMNS.includes(c))
   } catch {}
@@ -903,11 +906,11 @@ onMounted(() => {
                   <p class="text-xs font-medium text-gray-500">Fourth Bill</p>
                   <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm font-medium text-gray-900">{{ displayVal(companyDetail?.fourth_bill) }}</p>
                 </div>
-                <div class="sm:col-span-2 lg:col-span-4">
+                <div class="sm:col-span-2 lg:col-span-2">
                   <p class="text-xs font-medium text-gray-500">Additional Comment 1</p>
                   <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm font-medium text-gray-900">{{ displayVal(companyDetail?.additional_comment_1) }}</p>
                 </div>
-                <div class="sm:col-span-2 lg:col-span-4">
+                <div class="sm:col-span-2 lg:col-span-2">
                   <p class="text-xs font-medium text-gray-500">Additional Comment 2</p>
                   <p class="mt-1 rounded bg-gray-50 px-3 py-2 text-sm font-medium text-gray-900">{{ displayVal(companyDetail?.additional_comment_2) }}</p>
                 </div>
@@ -937,7 +940,7 @@ onMounted(() => {
                   <div class="mb-3 font-medium text-gray-700">Contact Person {{ idx + 1 }}</div>
                   <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
-                      <label class="block text-xs text-gray-500">Name <span class="text-red-500">*</span></label>
+                      <label class="block text-xs text-gray-500">Contact Person Name <span class="text-red-500">*</span></label>
                       <input
                         v-model="c.name"
                         type="text"
@@ -979,7 +982,7 @@ onMounted(() => {
                       />
                     </div>
                     <div>
-                      <label class="block text-xs text-gray-500">Email <span class="text-red-500">*</span></label>
+                      <label class="block text-xs text-gray-500">Email ID <span class="text-red-500">*</span></label>
                       <input
                         v-model="c.email"
                         type="email"
@@ -1204,31 +1207,36 @@ onMounted(() => {
                 Requests pulled for Account Number: {{ client.account_number }}
               </p>
               <div class="overflow-x-auto rounded-lg border border-gray-200">
-                <table class="min-w-full border-collapse">
+                <table class="min-w-full border-collapse whitespace-nowrap">
                   <thead class="bg-brand-primary border-b-2 border-green-700 text-white">
                     <tr>
                       <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">SR</th>
                       <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Created</th>
                       <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Request Type</th>
                       <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Account Number</th>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Company Name</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Company Name as per Trade License</th>
                       <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Contact Number</th>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Description</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Request Description</th>
                       <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Additional Notes</th>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Manager</th>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Team Leader</th>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Sales Agent</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Manager Name</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Team Leader Name</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Sales Agent Name</th>
                       <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Back Office Executive</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Submission Date</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">SLA Timer</th>
                       <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Status</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Completion Date</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Activity</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Remarks</th>
                       <th class="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold whitespace-nowrap">Created By</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr v-if="vasLoading" class="bg-white">
-                      <td colspan="14" class="px-4 py-8 text-center text-gray-500">Loading…</td>
+                      <td colspan="19" class="px-4 py-8 text-center text-gray-500">Loading…</td>
                     </tr>
                     <tr v-else-if="!vasRequests.length" class="bg-white">
-                      <td colspan="14" class="px-4 py-8 text-center text-gray-500">No VAS requests found.</td>
+                      <td colspan="19" class="px-4 py-8 text-center text-gray-500">No VAS requests found.</td>
                     </tr>
                     <tr
                       v-for="(row, idx) in vasRequests"
@@ -1247,11 +1255,16 @@ onMounted(() => {
                       <td class="px-4 py-2 text-sm text-gray-900">{{ row.team_leader || '—' }}</td>
                       <td class="px-4 py-2 text-sm text-gray-900">{{ row.sales_agent || '—' }}</td>
                       <td class="px-4 py-2 text-sm text-gray-900">{{ row.executive || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.submitted_at || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.sla_timer || '—' }}</td>
                       <td class="px-4 py-2">
                         <span :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap', statusBadgeClass(row.status)]">
                           {{ row.status || '—' }}
                         </span>
                       </td>
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.completion_date || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900">{{ row.activity || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900">{{ row.remarks || '—' }}</td>
                       <td class="px-4 py-2 text-sm text-gray-900">{{ row.creator || '—' }}</td>
                     </tr>
                   </tbody>
@@ -1266,38 +1279,40 @@ onMounted(() => {
                 Tickets pulled for Account Number: {{ client.account_number }}
               </p>
               <div class="overflow-x-auto rounded-lg border border-gray-200">
-                <table class="min-w-full border-collapse">
+                <table class="min-w-full border-collapse whitespace-nowrap">
                   <thead class="bg-brand-primary border-b-2 border-green-700 text-white">
                     <tr>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">ID</th>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Submission Date</th>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Ticket ID</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">SR</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Created</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Ticket Number</th>
                       <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Account Number</th>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Company Name</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Company Name as per Trade License</th>
                       <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Issue Category</th>
                       <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Contact Number</th>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Submitted By</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Alternate Contact Number</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Issue Description</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Submitter Name</th>
                       <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">CSR Name</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">SLA Timer</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Manager Name</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Team Leader Name</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Sales Agent Name</th>
                       <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Status</th>
                       <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">SLA Status</th>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Pending With</th>
                       <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Completion Date</th>
                       <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Last Updated</th>
                       <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Trouble Ticket</th>
                       <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Activity</th>
                       <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Resolution Remarks</th>
                       <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Internal Remarks</th>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Manager</th>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Team Leader</th>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold whitespace-nowrap">Sales Agent</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr v-if="csLoading" class="bg-white">
-                      <td colspan="21" class="px-4 py-8 text-center text-gray-500">Loading…</td>
+                      <td colspan="23" class="px-4 py-8 text-center text-gray-500">Loading…</td>
                     </tr>
                     <tr v-else-if="!customerSupport.length" class="bg-white">
-                      <td colspan="21" class="px-4 py-8 text-center text-gray-500">No tickets found.</td>
+                      <td colspan="23" class="px-4 py-8 text-center text-gray-500">No tickets found.</td>
                     </tr>
                     <tr
                       v-for="row in customerSupport"
@@ -1311,25 +1326,26 @@ onMounted(() => {
                       <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.company_name || '—' }}</td>
                       <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.issue_category || '—' }}</td>
                       <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.contact_number || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.alternate_contact_number || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.issue_description || '—' }}</td>
                       <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.creator || '—' }}</td>
                       <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.csr || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.sla_timer || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.manager || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.team_leader || '—' }}</td>
+                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.sales_agent || '—' }}</td>
                       <td class="px-4 py-2 whitespace-nowrap">
                         <span :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', statusBadgeClass(row.status)]">
                           {{ row.status || '—' }}
                         </span>
                       </td>
                       <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.workflow_status || '—' }}</td>
-                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.pending || '—' }}</td>
                       <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.completion_date || '—' }}</td>
                       <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.updated_at || '—' }}</td>
                       <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.trouble_ticket || '—' }}</td>
                       <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.activity || '—' }}</td>
                       <td class="px-4 py-2 text-sm text-gray-900">{{ row.resolution_remarks || '—' }}</td>
                       <td class="px-4 py-2 text-sm text-gray-900">{{ row.internal_remarks || '—' }}</td>
-                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.manager || '—' }}</td>
-                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.team_leader || '—' }}</td>
-                      <td class="px-4 py-2 text-sm text-gray-900 whitespace-nowrap">{{ row.sales_agent || '—' }}</td>
-                      <td class="px-4 py-2 text-sm text-gray-900">{{ row.issue_description || '—' }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -1433,27 +1449,27 @@ onMounted(() => {
 
               <!-- Alerts table -->
               <div class="overflow-x-auto rounded-lg border border-gray-200">
-                <table class="min-w-full border-collapse">
+                <table class="min-w-full border-collapse whitespace-nowrap">
                   <thead class="bg-brand-primary border-b-2 border-green-700">
                     <tr>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold text-gray-700">SR</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold text-white whitespace-nowrap">SR</th>
                       <th
                         v-for="col in alertVisibleCols"
                         :key="col"
-                        class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold text-gray-700 select-none"
-                        :class="ALERT_SORTABLE.includes(col) ? 'cursor-pointer hover:bg-gray-200' : ''"
+                        class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold text-white whitespace-nowrap select-none"
+                        :class="ALERT_SORTABLE.includes(col) ? 'cursor-pointer' : ''"
                         @click="toggleAlertSort(col)"
                       >
                         <span class="inline-flex items-center gap-1">
                           {{ alertColLabel(col) }}
                           <template v-if="ALERT_SORTABLE.includes(col)">
-                            <svg v-if="alertSort === col && alertOrder === 'asc'" class="h-3.5 w-3.5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
-                            <svg v-else-if="alertSort === col && alertOrder === 'desc'" class="h-3.5 w-3.5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-                            <svg v-else class="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
+                            <svg v-if="alertSort === col && alertOrder === 'asc'" class="h-3.5 w-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
+                            <svg v-else-if="alertSort === col && alertOrder === 'desc'" class="h-3.5 w-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                            <svg v-else class="h-3 w-3 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
                           </template>
                         </span>
                       </th>
-                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold text-gray-700">Actions</th>
+                      <th class="border-b border-gray-200 px-4 py-2 text-left text-sm font-semibold text-white whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
                   <tbody>

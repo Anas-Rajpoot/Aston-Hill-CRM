@@ -14,6 +14,7 @@ import { useDeferredQuery } from '@/composables/useDeferredQuery'
 import { canModuleAction } from '@/lib/accessControl'
 
 const FiltersBar = defineAsyncComponent(() => import('@/components/extensions/AdvancedFilters.vue'))
+const HorizontalScrollToolbar = defineAsyncComponent(() => import('@/components/common/HorizontalScrollToolbar.vue'))
 const ColumnCustomizerModal = defineAsyncComponent(() => import('@/components/lead-submissions/ColumnCustomizerModal.vue'))
 const AddExtensionModal = defineAsyncComponent(() => import('@/components/extensions/AddExtensionModal.vue'))
 const EditExtensionModal = defineAsyncComponent(() => import('@/components/extensions/EditExtensionModal.vue'))
@@ -36,6 +37,8 @@ const canViewAction = computed(() => canModuleAction(auth.user, 'extensions', 'v
 const canEditAction = computed(() => canModuleAction(auth.user, 'extensions', 'edit'))
 const canDeleteAction = computed(() => canModuleAction(auth.user, 'extensions', 'delete'))
 const canSample = computed(() => canImport.value)
+const canBulkStatus = computed(() => canEditAction.value)
+const canBulkDelete = computed(() => canDeleteAction.value)
 const summaryHydration = useProgressiveHydration({ strategy: 'visible-or-idle', idleTimeout: 900 })
 const advancedFiltersHydration = useProgressiveHydration({ strategy: 'visible-or-idle', idleTimeout: 1200 })
 
@@ -63,6 +66,9 @@ const exportLoading = ref(false)
 const importLoading = ref(false)
 const importFileInput = ref(null)
 const importResult = ref(null)
+const selectedExtensionIds = ref([])
+const bulkStatus = ref('')
+const bulkActionLoading = ref(false)
 const extensionToDelete = ref(null)
 const deleting = ref(false)
 const addModalVisible = ref(false)
@@ -80,6 +86,7 @@ const summary = ref({
   unassigned: 0,
   active_status: 0,
 })
+const selectedCount = computed(() => selectedExtensionIds.value.length)
 
 const EXTENSION_HISTORY_FIELD_LABELS = {
   extension: 'Extension',
@@ -171,6 +178,8 @@ async function load() {
     const { data } = await extensionsApi.index(buildParams())
     extensions.value = data.data ?? []
     meta.value = data.meta ?? { current_page: 1, last_page: 1, per_page: auth.defaultTablePageSize || 25, total: 0 }
+    const visibleIds = new Set((extensions.value ?? []).map((row) => Number(row.id)))
+    selectedExtensionIds.value = selectedExtensionIds.value.filter((id) => visibleIds.has(Number(id)))
   } catch (e) {
     loadError.value = e?.response?.data?.message || 'Failed to load extensions.'
     extensions.value = []
@@ -347,27 +356,84 @@ function sampleLabel(col) {
     assigned_to_name: 'Assigned To',
     comment: 'Comment',
     updated_at: 'Updated At',
+    other_1: 'Other 1',
+    other_2: 'Other 2',
   }
   return labels[col] ?? col.replace(/_/g, ' ')
 }
 
-function downloadCsvSample() {
+function downloadTemplateCsv() {
   if (!canSample.value) return
-  const headers = SAMPLE_COLUMNS.map(sampleLabel)
-  const sampleRow1 = [
-    '', '1001', '042123456', 'Etisalat', 'user_1001', 'secret123',
-    'active', '', '', 'assigned', '12', 'Sample comment', '',
+  const tableCols = [...visibleColumns.value]
+  if (!tableCols.includes('extension')) tableCols.unshift('extension')
+  if (!tableCols.includes('landline_number')) tableCols.push('landline_number')
+
+  const extraCols = ['other_1', 'other_2']
+  const exportCols = [...tableCols, ...extraCols]
+  const headers = exportCols.map(sampleLabel)
+  const seed = String(Date.now()).slice(-4)
+  const rows = [
+    {
+      id: '',
+      extension: `EXT-${seed}-01`,
+      landline_number: `97150${seed}001`,
+      gateway: 'Etisalat',
+      username: `ext_user_${seed}_01`,
+      password: 'Pass@123',
+      status: 'active',
+      team_leader: '',
+      manager: '',
+      usage: 'assigned',
+      assigned_to_name: '',
+      comment: 'Sample extension row 1',
+      updated_at: '',
+      other_1: 'Sample extra value A',
+      other_2: 'Sample extra value B',
+    },
+    {
+      id: '',
+      extension: `EXT-${seed}-02`,
+      landline_number: `97150${seed}002`,
+      gateway: 'Du',
+      username: `ext_user_${seed}_02`,
+      password: 'Pass@456',
+      status: 'active',
+      team_leader: '',
+      manager: '',
+      usage: 'unassigned',
+      assigned_to_name: '',
+      comment: 'Sample extension row 2',
+      updated_at: '',
+      other_1: 'Sample extra value C',
+      other_2: 'Sample extra value D',
+    },
+    {
+      id: '',
+      extension: `EXT-${seed}-03`,
+      landline_number: `97150${seed}003`,
+      gateway: 'Etisalat',
+      username: `ext_user_${seed}_03`,
+      password: 'Pass@789',
+      status: 'active',
+      team_leader: '',
+      manager: '',
+      usage: 'assigned',
+      assigned_to_name: '',
+      comment: 'Sample extension row 3',
+      updated_at: '',
+      other_1: 'Sample extra value E',
+      other_2: 'Sample extra value F',
+    },
   ]
-  const sampleRow2 = [
-    '', '1002', '042654321', 'Du', 'user_1002', 'pass456',
-    'active', '', '', 'unassigned', '6', 'Second extension', '',
+  const csvRows = [
+    headers.map(escapeCsv).join(','),
+    ...rows.map((row) => exportCols.map((col) => escapeCsv(row[col] ?? '')).join(',')),
   ]
-  const csvRows = [headers.map(escapeCsv).join(','), sampleRow1.map(escapeCsv).join(','), sampleRow2.map(escapeCsv).join(',')]
   const blob = new Blob([csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = 'cisco-extensions-sample.csv'
+  a.download = 'cisco-extensions-template.csv'
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -431,6 +497,74 @@ async function onExport() {
     //
   } finally {
     exportLoading.value = false
+  }
+}
+
+function onToggleSelectRow({ id, checked }) {
+  const nId = Number(id)
+  const set = new Set(selectedExtensionIds.value.map((x) => Number(x)))
+  if (checked) set.add(nId)
+  else set.delete(nId)
+  selectedExtensionIds.value = Array.from(set)
+}
+
+function onToggleSelectAll({ checked }) {
+  const visibleIds = (extensions.value ?? []).map((row) => Number(row.id))
+  if (checked) {
+    const set = new Set(selectedExtensionIds.value.map((x) => Number(x)))
+    for (const id of visibleIds) set.add(id)
+    selectedExtensionIds.value = Array.from(set)
+    return
+  }
+  const visibleSet = new Set(visibleIds)
+  selectedExtensionIds.value = selectedExtensionIds.value.filter((id) => !visibleSet.has(Number(id)))
+}
+
+async function onBulkStatusUpdate() {
+  if (!canBulkStatus.value || bulkActionLoading.value) return
+  if (!selectedCount.value) {
+    toast('error', 'Select at least one extension.')
+    return
+  }
+  if (!bulkStatus.value) {
+    toast('error', 'Select a status first.')
+    return
+  }
+
+  bulkActionLoading.value = true
+  try {
+    const { data } = await extensionsApi.bulkStatusUpdate(selectedExtensionIds.value, bulkStatus.value)
+    toast('success', data?.message || 'Bulk status update completed.')
+    selectedExtensionIds.value = []
+    bulkStatus.value = ''
+    await loadSummary()
+    await load()
+  } catch (e) {
+    toast('error', e?.response?.data?.message || 'Bulk status update failed.')
+  } finally {
+    bulkActionLoading.value = false
+  }
+}
+
+async function onBulkDelete() {
+  if (!canBulkDelete.value || bulkActionLoading.value) return
+  if (!selectedCount.value) {
+    toast('error', 'Select at least one extension.')
+    return
+  }
+  if (!window.confirm(`Delete ${selectedCount.value} selected extension(s)?`)) return
+
+  bulkActionLoading.value = true
+  try {
+    const { data } = await extensionsApi.bulkDelete(selectedExtensionIds.value)
+    toast('success', data?.message || 'Bulk delete completed.')
+    selectedExtensionIds.value = []
+    await loadSummary()
+    await load(1)
+  } catch (e) {
+    toast('error', e?.response?.data?.message || 'Bulk delete failed.')
+  } finally {
+    bulkActionLoading.value = false
   }
 }
 
@@ -612,74 +746,6 @@ onMounted(async () => {
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-white py-6 px-4 sm:px-6">
     <div class="mx-auto max-w-7xl space-y-4">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div class="flex items-baseline gap-2">
-          <h1 class="text-xl font-semibold text-gray-900 leading-tight">Cisco Extensions</h1>        </div>
-        <div class="flex flex-wrap items-center gap-1.5">
-          <button
-            v-if="canSample"
-            type="button"
-            class="inline-flex items-center rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
-            @click="downloadCsvSample"
-          >
-            <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-            </svg>
-            Download CSV Sample
-          </button>
-          <button
-            v-if="canImport"
-            type="button"
-            class="inline-flex items-center rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            :disabled="loading || importLoading"
-            @click="triggerImport"
-          >
-            <svg v-if="importLoading" class="mr-1.5 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            <svg v-else class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-            </svg>
-            {{ importLoading ? 'Importing...' : 'Bulk Import' }}
-          </button>
-          <input
-            ref="importFileInput"
-            type="file"
-            accept=".csv,.txt"
-            class="hidden"
-            @change="onImportFileChange"
-          />
-          <button
-            v-if="canExport"
-            type="button"
-            class="inline-flex items-center rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            :disabled="loading || exportLoading"
-            @click="onExport"
-          >
-            <svg v-if="exportLoading" class="mr-1.5 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            <svg v-else class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-            </svg>
-            {{ exportLoading ? 'Exporting...' : 'Export' }}
-          </button>
-          <button
-            v-if="canCreate"
-            type="button"
-            class="inline-flex items-center rounded bg-brand-primary px-2.5 py-1.5 text-xs font-medium text-white hover:bg-brand-primary-hover"
-            @click="openAddModal"
-          >
-            <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-            </svg>
-            Add New Extension
-          </button>
-        </div>
-      </div>
-
       <!-- Summary cards -->
       <div ref="summaryHydration.targetRef" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <template v-if="summaryHydration.isHydrated">
@@ -750,62 +816,163 @@ onMounted(async () => {
         </span>
       </div>
 
-      <!-- Quick filters: Status, Landline Number + Apply / Reset -->
-      <div class="flex flex-wrap items-end gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
-        <div>
-          <label class="block text-xs font-medium text-gray-600">Status</label>
-          <select
-            v-model="filters.status"
-            class="mt-0.5 min-w-[140px] rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
-            :disabled="loading"
-          >
-            <option value="">All Statuses</option>
-            <option v-for="s in filterOptions.statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-600">Landline Number</label>
+      <!-- Single-row toolbar: filters + actions (with left/right arrows) -->
+      <div class="rounded-lg border border-gray-200 bg-white px-2 py-2">
+        <HorizontalScrollToolbar>
           <input
-            v-model="filters.landline_number"
-            type="text"
-            placeholder="Search landline..."
-            class="mt-0.5 min-w-[160px] rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
-            :disabled="loading"
+            ref="importFileInput"
+            type="file"
+            accept=".csv,.txt"
+            class="hidden"
+            @change="onImportFileChange"
           />
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
+
+          <div class="w-[180px] shrink-0">
+            <label class="block text-xs font-medium text-gray-600">Status</label>
+            <select
+              v-model="filters.status"
+              class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+              :disabled="loading"
+            >
+              <option value="">All Statuses</option>
+              <option v-for="s in filterOptions.statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
+            </select>
+          </div>
+
+          <div class="w-[220px] shrink-0">
+            <label class="block text-xs font-medium text-gray-600">Landline Number</label>
+            <input
+              v-model="filters.landline_number"
+              type="text"
+              placeholder="Search landline..."
+              class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+              :disabled="loading"
+            />
+          </div>
+
+          <div class="shrink-0 flex items-center gap-2 pt-5">
+            <button
+              type="button"
+              class="inline-flex items-center rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover focus:ring-2 focus:ring-brand-primary disabled:opacity-50"
+              :disabled="loading"
+              @click="applyFilters"
+            >
+              <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+              </svg>
+              Apply
+            </button>
+            <button
+              type="button"
+              class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              :disabled="loading"
+              @click="resetFilters"
+            >
+              Reset
+            </button>
+          </div>
+
+          <div class="shrink-0 flex items-center gap-2 pt-5">
+            <span class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700">Selected: {{ selectedCount }}</span>
+            <select
+              v-if="canBulkStatus"
+              v-model="bulkStatus"
+              class="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+              :disabled="bulkActionLoading"
+            >
+              <option value="">Change Status</option>
+              <option v-for="s in filterOptions.statuses" :key="`bulk-${s.value}`" :value="s.value">{{ s.label }}</option>
+            </select>
+            <button
+              v-if="canBulkStatus"
+              type="button"
+              class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              :disabled="bulkActionLoading"
+              @click="onBulkStatusUpdate"
+            >
+              {{ bulkActionLoading ? 'Processing...' : 'Apply Status' }}
+            </button>
+            <button
+              v-if="canBulkDelete"
+              type="button"
+              class="inline-flex items-center rounded border border-red-300 bg-white px-3 py-2 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
+              :disabled="bulkActionLoading"
+              @click="onBulkDelete"
+            >
+              Bulk Delete
+            </button>
+          </div>
+
           <button
+            v-if="canSample"
             type="button"
-            class="inline-flex items-center rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover focus:ring-2 focus:ring-brand-primary disabled:opacity-50"
-            :disabled="loading"
-            @click="applyFilters"
+            class="shrink-0 inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 mt-5"
+            @click="downloadTemplateCsv"
           >
             <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
             </svg>
-            Apply
+            Template
           </button>
+
           <button
+            v-if="canImport"
             type="button"
-            class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            :disabled="loading"
-            @click="resetFilters"
+            class="shrink-0 inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 mt-5"
+            :disabled="loading || importLoading"
+            @click="triggerImport"
           >
-            Reset
+            <svg v-if="importLoading" class="mr-1.5 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <svg v-else class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+            </svg>
+            {{ importLoading ? 'Importing...' : 'Bulk Import' }}
           </button>
-        </div>
-        <div class="flex items-center gap-2">
+
+          <button
+            v-if="canExport"
+            type="button"
+            class="shrink-0 inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 mt-5"
+            :disabled="loading || exportLoading"
+            @click="onExport"
+          >
+            <svg v-if="exportLoading" class="mr-1.5 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <svg v-else class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+            {{ exportLoading ? 'Exporting...' : 'Export' }}
+          </button>
+
+          <button
+            v-if="canCreate"
+            type="button"
+            class="shrink-0 inline-flex items-center rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover mt-5"
+            @click="openAddModal"
+          >
+            <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Add New Extension
+          </button>
+
           <button
             type="button"
-            class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            class="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 mt-5"
             @click="openAdvancedFilters"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
             Advanced Filters
           </button>
+
           <button
             type="button"
-            class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            class="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 mt-5"
             @click="openColumnCustomizer"
           >
             Customize Columns
@@ -813,7 +980,7 @@ onMounted(async () => {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
             </svg>
           </button>
-        </div>
+        </HorizontalScrollToolbar>
       </div>
 
       <!-- Advanced Filters (all filters) -->
@@ -843,6 +1010,7 @@ onMounted(async () => {
         <ExtensionsTable
           :columns="visibleColumns"
           :data="extensions"
+          :selected-ids="selectedExtensionIds"
           :sort="sort"
           :order="order"
           :loading="loading"
@@ -858,6 +1026,8 @@ onMounted(async () => {
           @open-history="openHistoryModal"
           @view="openViewModal"
           @edit="openEditModal"
+          @toggle-select-row="onToggleSelectRow"
+          @toggle-select-all="onToggleSelectAll"
         />
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
           <p class="text-sm text-gray-600">

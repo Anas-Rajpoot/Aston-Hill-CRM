@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\User;
 use App\Models\VasRequestDocument;
 use App\Models\VasRequestSubmission;
 use Illuminate\Support\Facades\DB;
@@ -23,7 +24,17 @@ class VasRequestService
     public function submit(VasRequestSubmission $submission): VasRequestSubmission
     {
         $submission->submit();
-        return $submission->fresh();
+        $fresh = $submission->fresh();
+
+        NotificationService::dispatchOnce('new_submission_created', 'vas_request:' . $fresh->id, [
+            'module' => 'VAS Requests',
+            'title' => 'New VAS Request',
+            'message' => sprintf('VAS request #%d was created for %s.', $fresh->id, $fresh->company_name ?: 'N/A'),
+            'url' => '/vas-requests',
+            'users' => User::query()->get(['id', 'name', 'email']),
+        ], 900);
+
+        return $fresh;
     }
 
     public function storeDocument(VasRequestSubmission $submission, string $docKey, $file, ?string $label = null): void

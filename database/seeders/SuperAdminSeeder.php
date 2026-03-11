@@ -11,6 +11,8 @@ use Spatie\Permission\PermissionRegistrar;
 
 class SuperAdminSeeder extends Seeder
 {
+    private const DEFAULT_SUPERADMIN_PASSWORD = 'Password@123';
+
     /**
      * Run the database seeds.
      */
@@ -35,8 +37,11 @@ class SuperAdminSeeder extends Seeder
             ['email' => 'superadmin@example.com'],
             [
                 'name' => 'Super Admin',
-                'password' => bcrypt('password'),
+                // Must satisfy default password policy (min length + uppercase + number + special).
+                'password' => bcrypt(self::DEFAULT_SUPERADMIN_PASSWORD),
                 'status' => 'approved',
+                // Default password is policy-compliant, so first login should not be forced to change it.
+                'must_change_password' => false,
             ]
         );
 

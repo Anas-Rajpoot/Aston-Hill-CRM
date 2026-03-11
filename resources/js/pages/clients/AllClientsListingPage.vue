@@ -55,7 +55,7 @@ function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value 
 const selectedIds = ref([])
 const allSelected = computed({
   get: () => selectedIds.value.length > 0 && selectedIds.value.length === clients.value.length,
-  set: (v) => { selectedIds.value = v ? clients.value.map((r) => r.id) : [] },
+  set: (v) => { selectedIds.value = v ? clients.value.map((r) => Number(r?._row_id ?? r?.id)).filter((id) => Number.isInteger(id) && id > 0) : [] },
 })
 const bulkLoading = ref(false)
 const bulkCsrName = ref('')
@@ -67,7 +67,7 @@ async function loadBulkDropdownOptions() {
   try {
     const [csrRes, amRes] = await Promise.all([
       api.get('/customer-support/csr-options').then(r => r.data).catch(() => ({ csrs: [] })),
-      api.get('/users', { params: { status: 'active', per_page: 200, columns: 'id,name' } }).then(r => r.data).catch(() => ({ data: [] })),
+      api.get('/users', { params: { status: 'active', per_page: 200, columns: ['id', 'name'] } }).then(r => r.data).catch(() => ({ data: [] })),
     ])
     csrOptions.value = Array.isArray(csrRes?.csrs)
       ? csrRes.csrs.map(c => (typeof c?.name === 'string' ? c.name.trim() : '')).filter(Boolean)
@@ -78,9 +78,11 @@ async function loadBulkDropdownOptions() {
 }
 
 function toggleSelect(id) {
-  const idx = selectedIds.value.indexOf(id)
+  const normalized = Number(id)
+  if (!Number.isInteger(normalized) || normalized <= 0) return
+  const idx = selectedIds.value.indexOf(normalized)
   if (idx >= 0) selectedIds.value.splice(idx, 1)
-  else selectedIds.value.push(id)
+  else selectedIds.value.push(normalized)
 }
 
 async function bulkAssignCsr() {
@@ -122,18 +124,35 @@ async function bulkAssignAccountManager() {
 }
 
 const showBulkDeleteModal = ref(false)
+const deleteTargetIds = ref([])
+const deleteTargetLabel = ref('selected client(s)')
 
 async function bulkDelete() {
   if (!selectedIds.value.length) return
+  deleteTargetIds.value = [...selectedIds.value]
+  deleteTargetLabel.value = `${selectedIds.value.length} client(s)`
+  showBulkDeleteModal.value = true
+}
+
+function openDeleteModalForRow(row) {
+  const id = Number(row?._row_id ?? row?.id ?? row?.client_id)
+  if (!Number.isInteger(id) || id <= 0) {
+    toast('error', 'Could not determine row ID for delete.')
+    return
+  }
+  deleteTargetIds.value = [id]
+  deleteTargetLabel.value = row?.company_name || `Client #${id}`
   showBulkDeleteModal.value = true
 }
 
 async function confirmBulkDelete() {
+  if (!deleteTargetIds.value.length) return
   bulkLoading.value = true
   try {
-    await clientsApi.bulkDelete(selectedIds.value)
+    await clientsApi.bulkDelete(deleteTargetIds.value)
     showBulkDeleteModal.value = false
-    selectedIds.value = []
+    selectedIds.value = selectedIds.value.filter((id) => !deleteTargetIds.value.includes(Number(id)))
+    deleteTargetIds.value = []
     toast('success', 'Client(s) deleted successfully.')
     load()
   } catch (e) {
@@ -141,6 +160,12 @@ async function confirmBulkDelete() {
   } finally {
     bulkLoading.value = false
   }
+}
+
+function closeBulkDeleteModal() {
+  if (bulkLoading.value) return
+  showBulkDeleteModal.value = false
+  deleteTargetIds.value = []
 }
 
 async function bulkExport() {
@@ -172,18 +197,15 @@ const meta = ref({ current_page: 1, last_page: 1, per_page: authStore.defaultTab
 const allColumns = ref([])
 const defaultColumns = ref([])
 const visibleColumns = ref([
-  'company_name', 'account_number', 'submitted_at',
+  'submitted_at', 'company_name', 'account_number',
   'trade_license_issuing_authority', 'company_category', 'trade_license_number', 'trade_license_expiry_date',
   'establishment_card_number', 'establishment_card_expiry_date', 'account_taken_from', 'account_mapping_date',
-  'account_transfer_given_to', 'account_transfer_given_date', 'full_address',
-  'account_manager_name', 'csr_name_1', 'csr_name_2', 'csr_name_3',
-  'first_bill', 'second_bill', 'third_bill', 'fourth_bill', 'additional_comment_1', 'additional_comment_2',
-  'status', 'creator',
-  'submission_type', 'service_category', 'manager', 'team_leader', 'sales_agent',
-  'service_type', 'product_type', 'address', 'product_name', 'mrc', 'quantity',
-  'other', 'migration_numbers', 'activity', 'wo_number', 'work_order_status',
-  'activation_date', 'completion_date', 'payment_connection', 'contract_type', 'contract_end_date',
-  'clawback_chum', 'remarks', 'renewal_alert', 'additional_notes',
+  'account_transfer_given_to', 'account_transfer_given_date',
+  'first_bill', 'second_bill', 'third_bill', 'fourth_bill', 'additional_comment_1', 'primary_contact_detail',
+  'full_address',
+  'csr_name_2', 'csr_name_3',
+  'additional_comment_2',
+  'renewal_alert',
 ])
 const sort = ref('submitted_at')
 const order = ref('desc')
@@ -330,6 +352,7 @@ const COLUMN_LABELS = {
   account_mapping_date: 'Account Mapping Date',
   account_transfer_given_to: 'Account Transfer Given To',
   account_transfer_given_date: 'Account Transfer Given Date',
+  primary_contact_detail: 'Primary Contact Detail',
   full_address: 'Full Address',
   account_manager_name: 'Account Manager Name',
   csr_name_1: 'CSR Name 1',
@@ -339,7 +362,7 @@ const COLUMN_LABELS = {
   second_bill: 'Second Bill',
   third_bill: 'Third Bill',
   fourth_bill: 'Fourth Bill',
-  additional_comment_1: 'Additional Note 1',
+  additional_comment_1: 'Additional Note',
   additional_comment_2: 'Additional Note 2',
   submission_type: 'Submission Type',
   service_category: 'Service Category',
@@ -377,290 +400,47 @@ function escapeCsv(val) {
 }
 
 function downloadSampleCsv() {
-  const headers = [
-    'company_name',
-    'account_number',
-    'status',
-    'submitted_at',
-    'manager_id',
-    'team_leader_id',
-    'sales_agent_id',
-    'submission_type',
-    'service_category',
-    'service_type',
-    'product_type',
-    'address',
-    'product_name',
-    'mrc',
-    'quantity',
-    'offer',
-    'other',
-    'migration_numbers',
-    'fiber',
-    'order_number',
-    'activity',
-    'wo_number',
-    'work_order_status',
-    'activation_date',
-    'completion_date',
-    'payment_connection',
-    'contract_type',
-    'contract_end_date',
-    'clawback_chum',
-    'remarks',
-    'renewal_alert',
-    'additional_notes',
-    'trade_license_issuing_authority',
-    'company_category',
-    'trade_license_number',
-    'trade_license_expiry_date',
-    'establishment_card_number',
-    'establishment_card_expiry_date',
-    'account_taken_from',
-    'account_mapping_date',
-    'account_transfer_given_to',
-    'account_transfer_given_date',
-    'account_manager_name',
-    'first_bill',
-    'second_bill',
-    'third_bill',
-    'fourth_bill',
-    'additional_comment_1',
-    'additional_comment_2',
-    'csr_name_1',
-    'csr_name_2',
-    'csr_name_3',
-    'contact_1_name',
-    'contact_1_designation',
-    'contact_1_contact_number',
-    'contact_1_alternate_number',
-    'contact_1_email',
-    'contact_1_as_updated_or_not',
-    'contact_1_as_expiry_date',
-    'contact_1_additional_note',
-    'address_1_full_address',
-    'address_1_area',
-    'address_1_building',
-    'address_1_unit',
-    'address_1_emirates',
-  ]
-
-  const validationGuideRow = [
-    'REQUIRED',
-    'REQUIRED',
-    'REQUIRED (Normal/Churn/Clawback)',
-    'OPTIONAL (YYYY-MM-DD)',
-    'OPTIONAL (user id)',
-    'OPTIONAL (user id)',
-    'OPTIONAL (user id)',
-    'OPTIONAL',
-    'OPTIONAL',
-    'OPTIONAL',
-    'OPTIONAL',
-    'OPTIONAL',
-    'OPTIONAL',
-    'OPTIONAL',
-    'OPTIONAL (integer)',
-    'OPTIONAL',
-    'OPTIONAL',
-    'OPTIONAL',
-    'OPTIONAL',
-    'OPTIONAL',
-    'OPTIONAL',
-    'OPTIONAL',
-    'OPTIONAL (YYYY-MM-DD)',
-    'OPTIONAL (YYYY-MM-DD)',
-    'OPTIONAL',
-    'OPTIONAL',
-    'OPTIONAL (YYYY-MM-DD)',
-    'OPTIONAL',
-    'OPTIONAL',
-    'OPTIONAL (integer)',
-    'OPTIONAL',
-    'OPTIONAL',
-    'RECOMMENDED',
-    'REQUIRED',
-    'REQUIRED',
-    'OPTIONAL (YYYY-MM-DD)',
-    'OPTIONAL',
-    'OPTIONAL (YYYY-MM-DD)',
-    'OPTIONAL',
-    'OPTIONAL (YYYY-MM-DD)',
-    'OPTIONAL',
-    'OPTIONAL (YYYY-MM-DD)',
-    'REQUIRED',
-    'REQUIRED (paid/unpaid)',
-    'REQUIRED (paid/unpaid)',
-    'REQUIRED (paid/unpaid)',
-    'REQUIRED (paid/unpaid)',
-    'OPTIONAL',
-    'OPTIONAL',
-    'REQUIRED (at least one CSR)',
-    'OPTIONAL',
-    'OPTIONAL',
-    'REQUIRED',
-    'OPTIONAL',
-    'REQUIRED',
-    'OPTIONAL',
-    'REQUIRED',
-    'OPTIONAL (yes/no)',
-    'OPTIONAL (YYYY-MM-DD)',
-    'OPTIONAL',
-    'OPTIONAL',
-    'OPTIONAL',
-    'OPTIONAL',
-    'OPTIONAL',
-    'OPTIONAL',
-  ]
+  const datatableHeaders = [...visibleColumns.value]
+  const additionalHeaders = ['contact_1_name', 'contact_1_contact_number']
+  const headers = [...new Set([...datatableHeaders, ...additionalHeaders])]
 
   const sampleRows = [
-    [
-      'Demo Company LLC',
-      'ACCT-10001',
-      'Normal',
-      '2026-03-01',
-      '',
-      '',
-      '',
-      'New',
-      'Internet',
-      'Fiber',
-      'Business',
-      'Dubai, UAE',
-      'Business Internet Plan',
-      '999',
-      '1',
-      'Promo Offer',
-      'N/A',
-      'MN-001',
-      'No',
-      'ORD-1001',
-      'Initial activation',
-      'WO-12345',
-      'Completed',
-      '2026-03-01',
-      '2026-03-05',
-      'Connected',
-      '12 Months',
-      '2027-03-01',
-      'No',
-      'Imported from sample CSV',
-      '0',
-      'Sample note',
-      'DED',
-      'LLC',
-      'TL-12345',
-      '2027-03-01',
-      'EC-7788',
-      '2027-03-01',
-      'Referral',
-      '2026-03-01',
-      'Operations Team',
-      '2026-03-03',
-      'Imran Siddiqui',
-      'paid',
-      'paid',
-      'paid',
-      'paid',
-      'Additional comment 1',
-      'Additional comment 2',
-      'CSR A',
-      'CSR B',
-      '',
-      'John Doe',
-      'Admin',
-      '971501112233',
-      '971509998877',
-      'john.doe@example.com',
-      'yes',
-      '2027-03-01',
-      'Primary contact',
-      '1205, Example Tower, Business Bay, Dubai',
-      'Business Bay',
-      'Example Tower',
-      '1205',
-      'Dubai',
-    ],
-    [
-      'Al Noor Enterprises',
-      'ACCT-10002',
-      'VIP',
-      '2026-04-15',
-      '',
-      '',
-      '',
-      'Active',
-      'Internet',
-      'Copper',
-      'Enterprise',
-      'Abu Dhabi, UAE',
-      'Enterprise Plan 50Mbps',
-      '1500',
-      '2',
-      '',
-      'N/A',
-      'MN-002',
-      'No',
-      'ORD-1002',
-      'Upgrade',
-      'WO-12346',
-      'In Progress',
-      '2026-04-15',
-      '',
-      'Pending',
-      '24 Months',
-      '2028-04-15',
-      'No',
-      '',
-      '0',
-      '',
-      'DED',
-      'FZE',
-      'TL-12346',
-      '2028-04-15',
-      'EC-7789',
-      '2028-04-15',
-      'Walk-in',
-      '2026-04-15',
-      'Support Team',
-      '2026-04-16',
-      'Sara Ahmed',
-      'paid',
-      'unpaid',
-      'paid',
-      'paid',
-      '',
-      '',
-      'CSR C',
-      '',
-      '',
-      'Ali Hassan',
-      'Manager',
-      '971502223344',
-      '',
-      'ali.hassan@example.com',
-      'no',
-      '',
-      '',
-      '403, Al Salam Tower, Corniche, Abu Dhabi',
-      'Corniche',
-      'Al Salam Tower',
-      '403',
-      'Abu Dhabi',
-    ],
+    {
+      company_name: 'Demo Company LLC',
+      account_number: 'ACCT-10001',
+      status: 'Normal',
+      submitted_at: '2026-03-01',
+      contact_1_name: 'John Doe',
+      contact_1_contact_number: '971501112233',
+    },
+    {
+      company_name: 'Al Noor Enterprises',
+      account_number: 'ACCT-10002',
+      status: 'Normal',
+      submitted_at: '2026-03-05',
+      contact_1_name: 'Ali Hassan',
+      contact_1_contact_number: '971502223344',
+    },
+    {
+      company_name: 'Blue Wave Trading',
+      account_number: 'ACCT-10003',
+      status: 'Normal',
+      submitted_at: '2026-03-10',
+      contact_1_name: 'Sara Khan',
+      contact_1_contact_number: '971503334455',
+    },
   ]
 
-  const csvRows = [
-    headers.map(escapeCsv).join(','),
-    validationGuideRow.map(escapeCsv).join(','),
-    ...sampleRows.map((row) => row.map(escapeCsv).join(',')),
-  ]
+  const csvRows = [headers.map(escapeCsv).join(',')]
+  for (const row of sampleRows) {
+    csvRows.push(headers.map((col) => escapeCsv(row[col] ?? '')).join(','))
+  }
 
   const blob = new Blob([csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = 'clients-import-sample.csv'
+  a.download = 'all-clients-template.csv'
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -724,7 +504,20 @@ async function load() {
   loading.value = true
   try {
     const data = await clientsApi.index(buildParams())
-    clients.value = data.data ?? []
+    const incomingRows = data.data ?? []
+    clients.value = incomingRows.map((row) => {
+      const resolvedId = Number(row?._row_id ?? row?.id ?? row?.client_id)
+      if (Number.isInteger(resolvedId) && resolvedId > 0) {
+        return { ...row, _row_id: resolvedId, id: resolvedId }
+      }
+      return row
+    })
+    const visibleIds = new Set(
+      clients.value
+        .map((row) => Number(row?._row_id ?? row?.id))
+        .filter((id) => Number.isInteger(id) && id > 0)
+    )
+    selectedIds.value = selectedIds.value.filter((id) => visibleIds.has(Number(id)))
     meta.value = normalizeMeta(data.meta)
   } finally {
     loading.value = false
@@ -757,32 +550,59 @@ async function loadFilters() {
 }
 
 const COLUMN_ORDER = [
-  'company_name', 'account_number', 'submitted_at',
+  'submitted_at', 'company_name', 'account_number',
   'trade_license_issuing_authority', 'company_category', 'trade_license_number', 'trade_license_expiry_date',
   'establishment_card_number', 'establishment_card_expiry_date', 'account_taken_from', 'account_mapping_date',
-  'account_transfer_given_to', 'account_transfer_given_date', 'full_address',
-  'account_manager_name', 'csr_name_1', 'csr_name_2', 'csr_name_3',
-  'first_bill', 'second_bill', 'third_bill', 'fourth_bill', 'additional_comment_1', 'additional_comment_2',
-  'status', 'creator',
-  'submission_type', 'service_category', 'manager', 'team_leader', 'sales_agent',
-  'service_type', 'product_type', 'address', 'product_name', 'mrc', 'quantity', 'other',
-  'migration_numbers', 'activity', 'wo_number', 'work_order_status', 'activation_date', 'completion_date',
-  'payment_connection', 'contract_type', 'contract_end_date', 'clawback_chum', 'remarks',
-  'renewal_alert', 'additional_notes',
+  'account_transfer_given_to', 'account_transfer_given_date',
+  'first_bill', 'second_bill', 'third_bill', 'fourth_bill', 'additional_comment_1', 'primary_contact_detail',
+  'full_address',
+  'csr_name_2', 'csr_name_3',
+  'additional_comment_2',
+  'renewal_alert',
 ]
 
+const ALL_CLIENTS_HIDDEN_COLUMNS = new Set([
+  'completion_date',
+  'payment_connection',
+  'account_manager_name',
+  'csr_name_1',
+  'status',
+  'creator',
+  'submission_type',
+  'service_category',
+  'manager',
+  'team_leader',
+  'sales_agent',
+  'service_type',
+  'product_type',
+  'address',
+  'product_name',
+  'mrc',
+  'quantity',
+  'other',
+  'migration_numbers',
+  'activity',
+  'wo_number',
+  'work_order_status',
+  'activation_date',
+  'contract_type',
+  'contract_end_date',
+  'clawback_chum',
+  'remarks',
+  'additional_notes',
+])
+
 function enforceColumnOrder(cols) {
-  const set = new Set(cols)
+  const set = new Set((cols || []).filter((c) => !ALL_CLIENTS_HIDDEN_COLUMNS.has(c)))
   ;[
-    'company_name', 'account_number', 'trade_license_issuing_authority', 'company_category',
+    'submitted_at', 'company_name', 'account_number', 'trade_license_issuing_authority', 'company_category',
     'trade_license_number', 'trade_license_expiry_date', 'establishment_card_number',
     'establishment_card_expiry_date', 'account_taken_from', 'account_mapping_date',
-    'account_transfer_given_to', 'account_transfer_given_date', 'full_address',
-    'account_manager_name', 'csr_name_1', 'status', 'creator',
-    'submission_type', 'service_category', 'service_type', 'product_type', 'address', 'product_name',
-    'mrc', 'quantity', 'other', 'migration_numbers', 'activity', 'wo_number', 'work_order_status',
-    'activation_date', 'completion_date', 'payment_connection', 'contract_type', 'contract_end_date',
-    'clawback_chum', 'remarks', 'renewal_alert', 'additional_notes',
+    'account_transfer_given_to', 'account_transfer_given_date',
+    'first_bill', 'second_bill', 'third_bill', 'fourth_bill', 'additional_comment_1', 'additional_comment_2',
+    'primary_contact_detail',
+    'full_address', 'csr_name_2', 'csr_name_3',
+    'renewal_alert',
   ].forEach((c) => set.add(c))
   const ordered = COLUMN_ORDER.filter((c) => set.has(c))
   const extra = [...set].filter((c) => !COLUMN_ORDER.includes(c))
@@ -792,9 +612,9 @@ function enforceColumnOrder(cols) {
 async function loadColumns() {
   try {
     const data = await clientsApi.columns()
-    allColumns.value = data.all_columns ?? []
+    allColumns.value = (data.all_columns ?? []).filter((c) => !ALL_CLIENTS_HIDDEN_COLUMNS.has(c?.key))
     visibleColumns.value = enforceColumnOrder(data.visible_columns ?? visibleColumns.value)
-    defaultColumns.value = data.default_columns ?? []
+    defaultColumns.value = (data.default_columns ?? []).filter((c) => !ALL_CLIENTS_HIDDEN_COLUMNS.has(c))
     updateTableColumns()
   } catch {
     //
@@ -1002,38 +822,17 @@ onMounted(() => {
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-white p-4">
     <div class="w-full space-y-4">
-      <div class="flex flex-wrap items-center justify-between gap-4">
-        <div class="flex items-center gap-2">
-          <!-- Bulk actions (visible when items selected) -->
-          <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0 translate-x-2" enter-to-class="opacity-100 translate-x-0" leave-active-class="transition ease-in duration-100" leave-from-class="opacity-100" leave-to-class="opacity-0">
-            <div v-if="selectedIds.length" class="flex flex-wrap items-center gap-2">
-              <span class="text-sm text-gray-600 font-medium">{{ selectedIds.length }} selected</span>
-              <select
-                v-if="canEdit"
-                v-model="bulkCsrName"
-                class="rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
-              >
-                <option value="">Select CSR</option>
-                <option v-for="name in csrOptions" :key="name" :value="name">{{ name }}</option>
-              </select>
-              <button v-if="canEdit" type="button" class="rounded bg-brand-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-primary-hover" :disabled="bulkLoading" @click="bulkAssignCsr">Assign CSR</button>
-
-              <select
-                v-if="canEdit"
-                v-model="bulkAccountManagerName"
-                class="rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
-              >
-                <option value="">Select Account Manager</option>
-                <option v-for="name in accountManagerOptions" :key="name" :value="name">{{ name }}</option>
-              </select>
-              <button v-if="canEdit" type="button" class="rounded bg-brand-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-primary-hover" :disabled="bulkLoading" @click="bulkAssignAccountManager">Assign Account Manager</button>
-
-              <button v-if="canExport" type="button" class="rounded bg-brand-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-primary-hover" :disabled="bulkLoading || exportLoading" @click="bulkExport">Export Selected</button>
-              <button v-if="canDelete" type="button" class="rounded bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700" :disabled="bulkLoading" @click="bulkDelete">Delete Selected</button>
-            </div>
-          </Transition>
-        </div>
-        <div class="flex items-center gap-2">
+      <ClientsFiltersBar
+        :filters="filters"
+        :loading="loading"
+        :account-numbers="accountNumbers"
+        :alert-types="alertTypes"
+        title="Search Clients"
+        :compact-actions="true"
+        @search="applyFilters"
+        @clear="clearSearch"
+      >
+        <template #customize-columns>
           <input
             ref="importFileInputRef"
             type="file"
@@ -1067,7 +866,7 @@ onMounted(() => {
             <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v12m0 0l-4-4m4 4l4-4M5 20h14" />
             </svg>
-            Sample CSV
+            Template
           </button>
           <button
             v-if="canExport"
@@ -1086,34 +885,6 @@ onMounted(() => {
             {{ exportLoading ? 'Exporting...' : 'Export' }}
           </button>
           <button
-            v-if="canCreate"
-            type="button"
-            class="inline-flex items-center rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70 disabled:cursor-wait"
-            :disabled="loading"
-            @click="goToAddClient"
-          >
-            <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-            </svg>
-            Add New Client
-          </button>
-        </div>
-      </div>
-
-
-
-      <ClientsFiltersBar
-        :filters="filters"
-        :loading="loading"
-        :account-numbers="accountNumbers"
-        :alert-types="alertTypes"
-        title="Search Clients"
-        :compact-actions="true"
-        @search="applyFilters"
-        @clear="clearSearch"
-      >
-        <template #customize-columns>
-          <button
             type="button"
             class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
             @click="advancedVisible = !advancedVisible"
@@ -1130,8 +901,62 @@ onMounted(() => {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
             </svg>
           </button>
+          <button
+            v-if="canCreate"
+            type="button"
+            class="inline-flex items-center rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70 disabled:cursor-wait"
+            :disabled="loading"
+            @click="goToAddClient"
+          >
+            <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Add New Client
+          </button>
+          <button
+            v-if="canDelete && selectedIds.length > 0"
+            type="button"
+            class="inline-flex items-center rounded border border-red-300 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
+            :disabled="bulkLoading"
+            @click="bulkDelete"
+          >
+            <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+            </svg>
+            Delete Selected ({{ selectedIds.length }})
+          </button>
         </template>
       </ClientsFiltersBar>
+
+      <!-- Bulk actions (visible when items selected) -->
+      <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0 translate-y-2" enter-to-class="opacity-100 translate-y-0" leave-active-class="transition ease-in duration-100" leave-from-class="opacity-100" leave-to-class="opacity-0">
+        <div v-if="selectedIds.length" class="rounded-lg border border-gray-200 bg-white p-3">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-sm text-gray-600 font-medium">{{ selectedIds.length }} selected</span>
+            <select
+              v-if="canEdit"
+              v-model="bulkCsrName"
+              class="rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+            >
+              <option value="">Select CSR</option>
+              <option v-for="name in csrOptions" :key="name" :value="name">{{ name }}</option>
+            </select>
+            <button v-if="canEdit" type="button" class="rounded bg-brand-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-primary-hover" :disabled="bulkLoading" @click="bulkAssignCsr">Assign CSR</button>
+
+            <select
+              v-if="canEdit"
+              v-model="bulkAccountManagerName"
+              class="rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+            >
+              <option value="">Select Account Manager</option>
+              <option v-for="name in accountManagerOptions" :key="name" :value="name">{{ name }}</option>
+            </select>
+            <button v-if="canEdit" type="button" class="rounded bg-brand-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-primary-hover" :disabled="bulkLoading" @click="bulkAssignAccountManager">Assign Account Manager</button>
+
+            <button v-if="canExport" type="button" class="rounded bg-brand-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-primary-hover" :disabled="bulkLoading || exportLoading" @click="bulkExport">Export Selected</button>
+          </div>
+        </div>
+      </Transition>
 
       <div v-if="advancedVisible" class="rounded-lg border border-gray-200 bg-white p-4">
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
@@ -1327,6 +1152,7 @@ onMounted(() => {
           @show-renewal-alerts="openRenewalAlertsModal"
           @toggle-select="toggleSelect"
           @toggle-select-all="allSelected = !allSelected"
+          @delete="openDeleteModalForRow"
         />
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
           <p class="text-sm text-gray-600">
@@ -1386,10 +1212,10 @@ onMounted(() => {
     <DeleteOtpModal
       :visible="showBulkDeleteModal"
       title="Bulk Delete Clients"
-      :item-label="`${selectedIds.length} client(s)`"
+      :item-label="deleteTargetLabel"
       :loading="bulkLoading"
       @confirm="confirmBulkDelete"
-      @close="showBulkDeleteModal = false"
+      @close="closeBulkDeleteModal"
     />
   </div>
 </template>

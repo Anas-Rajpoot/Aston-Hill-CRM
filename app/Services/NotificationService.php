@@ -36,6 +36,20 @@ use Illuminate\Support\Facades\Mail;
  */
 class NotificationService
 {
+    /**
+     * Dispatch with dedupe guard. Returns true when dispatched.
+     */
+    public static function dispatchOnce(string $triggerKey, string $dedupeKey, array $payload = [], int $ttlSeconds = 180): bool
+    {
+        $cacheKey = 'notif_once:' . md5($triggerKey . '|' . $dedupeKey);
+        if (! Cache::add($cacheKey, 1, max(30, $ttlSeconds))) {
+            return false;
+        }
+
+        self::dispatch($triggerKey, $payload);
+        return true;
+    }
+
     // ──────────────────────────────────────────────────────────
     //  Cached channel config (master toggles)
     // ──────────────────────────────────────────────────────────
@@ -74,10 +88,10 @@ class NotificationService
     {
         try {
             $channels = self::channels();
-            $trigger  = NotificationTrigger::where('key', $triggerKey)->first();
+            $trigger  = NotificationTrigger::findByTriggerKey($triggerKey);
 
             // If trigger is inactive, skip entirely
-            if ($trigger && ! $trigger->is_active) {
+            if ($trigger && NotificationTrigger::hasTableColumn('is_active') && ! $trigger->is_active) {
                 return;
             }
 
@@ -85,14 +99,18 @@ class NotificationService
 
             // ── SLA gate: if this is SLA-related and SLA alerts are off → skip ──
             if ($isSla && ! $channels['sla_alerts']) {
-                self::log($triggerKey, 'all', $payload['module'] ?? null, '—', 'skipped', 'SLA alerts are disabled');
+                self::log($triggerKey, 'all', $payload['module'] ?? null, '—', 'skipped', 'SLA alerts are disabled', $payload);
                 return;
             }
 
             // ── Send email ──────────────────────────────────────────
             // Channel must be ON AND trigger system default must allow email
             $shouldEmail = $channels['email']
-                && ($trigger ? $trigger->email_enabled : true);
+                && (
+                    ! $trigger
+                    || ! NotificationTrigger::hasTableColumn('email_enabled')
+                    || (bool) $trigger->email_enabled
+                );
 
             if ($shouldEmail) {
                 self::sendEmail($triggerKey, $payload);
@@ -102,7 +120,11 @@ class NotificationService
             // Channel must be ON AND trigger system default must allow in-app
             // Additionally, filter recipients by their per-user preferences
             $shouldWeb = $channels['web']
-                && ($trigger ? $trigger->in_app_enabled : true);
+                && (
+                    ! $trigger
+                    || ! NotificationTrigger::hasTableColumn('in_app_enabled')
+                    || (bool) $trigger->in_app_enabled
+                );
 
             if ($shouldWeb) {
                 self::sendInApp($triggerKey, $payload, $trigger);
@@ -130,13 +152,20 @@ class NotificationService
             return false;
         }
 
-        $trigger = NotificationTrigger::where('key', $triggerKey)->first();
-        if (! $trigger || ! $trigger->is_active) {
+        $trigger = NotificationTrigger::findByTriggerKey($triggerKey);
+        if (! $trigger) {
+            // Backward compatibility for schemas that don't store trigger keys.
+            return true;
+        }
+        if (NotificationTrigger::hasTableColumn('is_active') && ! $trigger->is_active) {
             return false;
         }
 
         // 2) Check user preference
         $userPrefs = UserNotificationPreference::forUser($userId);
+        if (! isset($trigger->id)) {
+            return true;
+        }
         $prefKey   = $trigger->id . '_' . $channel;
 
         if (isset($userPrefs[$prefKey])) {
@@ -145,7 +174,13 @@ class NotificationService
 
         // 3) Fallback to trigger system default
         $defaultCol = NotificationTrigger::CHANNEL_TO_DEFAULT_COL[$channel] ?? null;
-        return $defaultCol ? (bool) $trigger->{$defaultCol} : true;
+        if (! $defaultCol) {
+            return true;
+        }
+        if (! NotificationTrigger::hasTableColumn($defaultCol)) {
+            return true;
+        }
+        return (bool) $trigger->{$defaultCol};
     }
 
     // ──────────────────────────────────────────────────────────
@@ -185,7 +220,7 @@ class NotificationService
                 $error  = $e->getMessage();
             }
 
-            self::log($triggerKey, 'email', $module, $to, $status, $error);
+            self::log($triggerKey, 'email', $module, $to, $status, $error, $payload);
         }
     }
 
@@ -213,7 +248,7 @@ class NotificationService
             // ── Per-user preference check ───────────────────────
             // Skip this user if their preference disables in_app for this trigger
             if (! self::isEnabledForUser($user->id, $triggerKey, 'in_app')) {
-                self::log($triggerKey, 'web', $module, $user->email ?? $user->name, 'skipped', 'User preference: disabled');
+                self::log($triggerKey, 'web', $module, $user->email ?? $user->name, 'skipped', 'User preference: disabled', $payload);
                 continue;
             }
 
@@ -227,9 +262,9 @@ class NotificationService
                     $isSla,
                 ));
 
-                self::log($triggerKey, 'web', $module, $user->email ?? $user->name, 'sent');
+                self::log($triggerKey, 'web', $module, $user->email ?? $user->name, 'sent', null, $payload);
             } catch (\Throwable $e) {
-                self::log($triggerKey, 'web', $module, $user->email ?? $user->name, 'failed', $e->getMessage());
+                self::log($triggerKey, 'web', $module, $user->email ?? $user->name, 'failed', $e->getMessage(), $payload);
             }
         }
     }
@@ -244,6 +279,7 @@ class NotificationService
         string  $sentTo,
         string  $status,
         ?string $error = null,
+        ?array  $payloadData = null,
     ): void {
         try {
             NotificationLog::create([
@@ -253,7 +289,7 @@ class NotificationService
                 'sent_to'     => $sentTo,
                 'status'      => $status,
                 'error'       => $error,
-                'payload'     => null,
+                'payload'     => $payloadData,
             ]);
         } catch (\Throwable $e) {
             Log::warning('NotificationService::log failed: ' . $e->getMessage());

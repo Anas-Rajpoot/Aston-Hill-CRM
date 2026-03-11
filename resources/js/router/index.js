@@ -157,20 +157,16 @@ router.beforeEach(async (to, from, next) => {
   // If already authenticated, move away from login/register screens.
   if (authPath && to.path !== '/change-password') {
     if (auth.isAuthenticated) return next('/')
-    auth.fetchUser()
-      .then(() => {
-        if (auth.isAuthenticated && router.currentRoute.value.path === to.path) {
-          router.replace('/')
-        }
-      })
-      .catch(() => {})
+    // If store is empty but server session is still valid, do not show login/register pages.
+    await withTimeout(auth.fetchUser(true), 3000)
+    if (auth.isAuthenticated) return next('/')
     return next()
   }
 
   // Allow /change-password for authenticated users who must change their password
   if (to.path === '/change-password') {
     if (!auth.user && !auth.isAuthenticated) {
-      await withTimeout(auth.fetchUser(), 3000)
+      await withTimeout(auth.fetchUser(true), 3000)
     }
     // If not authenticated at all, go to login
     if (!auth.isAuthenticated) return next('/login')
@@ -178,7 +174,7 @@ router.beforeEach(async (to, from, next) => {
   }
 
   if (!auth.user || !auth.user.pending2FA) {
-    await withTimeout(auth.fetchUser(), 3000)
+    await withTimeout(auth.fetchUser(true), 3000)
   }
 
   if (authPath && auth.isAuthenticated) {

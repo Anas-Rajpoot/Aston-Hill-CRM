@@ -25,7 +25,9 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->statefulApi();
+        // API routes already include `web` middleware where session auth is needed.
+        // Avoid duplicating Sanctum's stateful API stack globally; it can conflict
+        // with mixed web+api middleware pipelines in browser requests.
         // Minimal stack for SPA document requests: no auth, no CSRF, no BreadcrumbTrail. Auth deferred to Vue + API.
         // IMPORTANT: keep this stack DB-independent so /, /login, /register always render even if DB is down/slow.
         $middleware->group('spa_shell', [

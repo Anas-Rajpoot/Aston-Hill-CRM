@@ -319,21 +319,21 @@ function saveStatusChangedAt(rowId) {
 }
 
 const columnLabels = {
-  id: 'ID',
-  submitted_at: 'Submitted At',
+  id: 'SR',
+  submitted_at: 'Created',
   updated_at: 'Updated At',
   submission_type: 'Request Type',
   account_number: 'Account Number',
-  company_name: 'Company Name',
+  company_name: 'Company Name as per Trade License',
   authorized_signatory_name: 'Authorized Signatory Name',
   email: 'Email ID',
   contact_number_gsm: 'Contact Number',
   alternate_contact_number: 'Alternate Contact Number',
-  address: 'Complete Address',
-  emirate: 'Emirate',
+  address: 'Complete Address as per Ejari',
+  emirate: 'Emirates',
   location_coordinates: 'Location Coordinates',
-  category: 'Service Category',
-  type: 'Service Type',
+  category: 'Service Categories',
+  type: 'Service Types',
   product: 'Product',
   offer: 'Offer',
   mrc_aed: 'MRC (AED)',
@@ -343,9 +343,9 @@ const columnLabels = {
   previous_activity: 'Old Activity',
   resubmission_reason: 'Resubmission Reason',
   remarks: 'Remarks',
-  sales_agent: 'Sales Agent',
-  team_leader: 'Team Leader',
-  manager: 'Manager',
+  sales_agent: 'Sales Agent Name',
+  team_leader: 'Team Leader Name',
+  manager: 'Manager Name',
   status: 'Status',
   sla_timer: 'SLA Timer',
   executive: 'Back Office Executive',
@@ -357,7 +357,7 @@ const columnLabels = {
   submission_date_from: 'Submission Date',
   back_office_notes: 'Back Office Notes',
   activity: 'Activity',
-  back_office_account: 'Back Office Account',
+  back_office_account: 'Back Office Notes',
   work_order: 'Work Order',
   du_status: 'DU Status',
   completion_date: 'Completion Date',
@@ -419,6 +419,10 @@ function toggleSort(col) {
 }
 
 function formatValue(row, col) {
+  if (col === 'back_office_account') {
+    const notesVal = row.back_office_notes
+    if (notesVal != null && notesVal !== '') return notesVal
+  }
   const val = row[col]
   if (val == null || val === '') return '—'
   if (col === 'creator' && val && typeof val === 'object') return val.name ?? '—'
@@ -502,7 +506,7 @@ function statusBadgeClass(status) {
             v-for="col in effectiveColumns"
             :key="col"
             scope="col"
-            class="whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-black cursor-pointer select-none"
+            class="whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-white cursor-pointer select-none"
             @click="sortable(col) ? toggleSort(col) : null"
           >
             <button
@@ -523,7 +527,7 @@ function statusBadgeClass(status) {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
               </svg>
             </button>
-            <span v-else class="font-semibold text-black">{{ label(col) }}</span>
+            <span v-else class="font-semibold text-white">{{ label(col) }}</span>
           </th>
           <th v-if="hasAnyRowAction" scope="col" class="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold text-white">
             Actions

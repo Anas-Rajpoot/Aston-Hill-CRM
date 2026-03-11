@@ -22,7 +22,9 @@ class ReportsApiController extends Controller
 {
     public function __construct()
     {
-        $this->middleware(['auth:sanctum']);
+        // Route group already enforces auth + web session middleware.
+        // Keep this aligned to support session and token auth consistently.
+        $this->middleware(['auth:web,sanctum']);
     }
 
     /**

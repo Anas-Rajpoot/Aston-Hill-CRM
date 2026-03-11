@@ -64,6 +64,15 @@ function setBootstrapInStorage(data) {
   }
 }
 
+function clearStoredApiToken() {
+  try {
+    sessionStorage.removeItem('api_token')
+    localStorage.removeItem('api_token')
+  } catch {
+    //
+  }
+}
+
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null,
@@ -87,9 +96,9 @@ export const useAuthStore = defineStore('auth', {
   },
 
   actions: {
-    async fetchUser() {
+    async fetchUser(force = false) {
       if (this._fetchPromise) return this._fetchPromise
-      if (this.user && this._lastFetchedAt && Date.now() - this._lastFetchedAt < this._meMaxAgeMs) {
+      if (!force && this.user && this._lastFetchedAt && Date.now() - this._lastFetchedAt < this._meMaxAgeMs) {
         return
       }
       const promise = this._doFetchUser()
@@ -127,7 +136,10 @@ export const useAuthStore = defineStore('auth', {
         }
 
         try {
-          const { data } = await api.get('/bootstrap')
+          const { data } = await api.get('/bootstrap', {
+            skipAuthRedirect: true,
+            showToast: false,
+          })
           const u = data.user ?? data
           const roles = Array.isArray(u.roles) ? u.roles.map((r) => (typeof r === 'string' ? r : r?.name)).filter(Boolean) : []
           this.user = { id: u.id, name: u.name, email: u.email, roles, permissions: data.permissions ?? [] }
@@ -141,10 +153,16 @@ export const useAuthStore = defineStore('auth', {
           this._lastFetchedAt = Date.now()
           setBootstrapInStorage({ user: this.user, permissions: this.user.permissions, timezone: this.timezone, defaultTablePageSize: this.defaultTablePageSize, session: this.session, password_action: this.passwordAction })
           return
-        } catch {
-          if (this.user) return
+        } catch (e) {
+          const status = e?.response?.status
+          const isAuthError = status === 401 || status === 419
+          // Only trust cached user on transient failures (network/5xx), never on auth failures.
+          if (this.user && !isAuthError) return
         }
-        const { data } = await api.get('/me')
+        const { data } = await api.get('/me', {
+          skipAuthRedirect: true,
+          showToast: false,
+        })
         const roles = Array.isArray(data.roles) ? data.roles.map((r) => (typeof r === 'string' ? r : r?.name)).filter(Boolean) : []
         this.user = { ...data, roles, permissions: [] }
         if (data.timezone) this.timezone = data.timezone
@@ -152,14 +170,19 @@ export const useAuthStore = defineStore('auth', {
         if (data.session) this.session = { ...this.session, ...data.session }
         this.passwordAction = data.password_action ?? null
         this._lastFetchedAt = Date.now()
-      } catch {
-        this.user = null
-        this._lastFetchedAt = 0
-        try {
-          sessionStorage.removeItem(BOOTSTRAP_CACHE_KEY)
-          localStorage.removeItem(BOOTSTRAP_CACHE_KEY)
-        } catch {
-          //
+      } catch (e) {
+        const status = e?.response?.status
+        const isAuthError = status === 401 || status === 419
+        // Clear auth state for real auth errors, and also when we had no user to begin with.
+        if (isAuthError || !this.user) {
+          this.user = null
+          this._lastFetchedAt = 0
+          try {
+            sessionStorage.removeItem(BOOTSTRAP_CACHE_KEY)
+            localStorage.removeItem(BOOTSTRAP_CACHE_KEY)
+          } catch {
+            //
+          }
         }
       }
     },
@@ -171,13 +194,14 @@ export const useAuthStore = defineStore('auth', {
           await ensureCsrfCookie(true)
         }
         const headers = options.token ? { 'X-Request-Token': 'true' } : {}
+        const requestConfig = { headers, showToast: false }
         let response
         try {
-          response = await api.post('/auth/login', credentials, { headers })
+          response = await api.post('/auth/login', credentials, requestConfig)
         } catch (error) {
           if (!options.token && error?.response?.status === 419) {
             await ensureCsrfCookie(true)
-            response = await api.post('/auth/login', credentials, { headers })
+            response = await api.post('/auth/login', credentials, requestConfig)
           } else {
             throw error
           }
@@ -194,12 +218,60 @@ export const useAuthStore = defineStore('auth', {
           return data
         }
         if (data.user && data.permissions) {
+          // Session-based login should not carry stale bearer tokens.
+          clearStoredApiToken()
+          this.token = null
           this.user = { ...data.user, permissions: data.permissions }
-          this._lastFetchedAt = Date.now()
-          setBootstrapInStorage({ user: this.user, permissions: data.permissions, password_action: this.passwordAction })
-          return data
+
+          // Verify that server session is actually established before routing to protected pages.
+          // This prevents "login succeeded, then immediate 401/logout" when cookies are blocked/missing.
+          try {
+            const { data: bootstrap } = await api.get('/bootstrap', {
+              skipAuthRedirect: true,
+              showToast: false,
+            })
+            const u = bootstrap.user ?? bootstrap
+            const roles = Array.isArray(u.roles) ? u.roles.map((r) => (typeof r === 'string' ? r : r?.name)).filter(Boolean) : []
+            this.user = { id: u.id, name: u.name, email: u.email, roles, permissions: bootstrap.permissions ?? [] }
+            if (bootstrap.timezone) this.timezone = bootstrap.timezone
+            if (bootstrap.default_table_page_size) this.defaultTablePageSize = Number(bootstrap.default_table_page_size) || 25
+            if (bootstrap.session) {
+              this.session = { ...this.session, ...bootstrap.session }
+              setForceLogoutFlag(!!bootstrap.session.force_logout_on_close)
+            }
+            this.passwordAction = bootstrap.password_action ?? this.passwordAction
+            this._lastFetchedAt = Date.now()
+            setBootstrapInStorage({
+              user: this.user,
+              permissions: this.user.permissions,
+              timezone: this.timezone,
+              defaultTablePageSize: this.defaultTablePageSize,
+              session: this.session,
+              password_action: this.passwordAction,
+            })
+            return data
+          } catch (e) {
+            this.user = null
+            this._lastFetchedAt = 0
+            try {
+              sessionStorage.removeItem(BOOTSTRAP_CACHE_KEY)
+              localStorage.removeItem(BOOTSTRAP_CACHE_KEY)
+            } catch {
+              //
+            }
+            const status = e?.response?.status
+            if (status === 401 || status === 419) {
+              const authError = new Error('Unable to establish a login session. Please try signing in again.')
+              authError.response = { data: { message: 'Unable to establish a login session. Please try signing in again.' } }
+              throw authError
+            }
+            throw e
+          }
         }
         if (data.redirect === '/2fa/verify') {
+          // 2FA flow is also session-based; clear stale bearer tokens.
+          clearStoredApiToken()
+          this.token = null
           this.user = { pending2FA: true }
           try {
             sessionStorage.removeItem(BOOTSTRAP_CACHE_KEY)

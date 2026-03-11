@@ -186,7 +186,7 @@ onMounted(() => loadData())
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ request.id }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Company Name</label>
+                  <label class="block text-xs font-medium text-gray-500">Company Name as per Trade License</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.company_name) }}</div>
               </div>
                 <div>
@@ -232,15 +232,15 @@ onMounted(() => loadData())
               <h2 class="mb-3 text-sm font-semibold text-gray-900">Team</h2>
               <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Manager</label>
+                  <label class="block text-xs font-medium text-gray-500">Manager Name</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.manager_name) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Team Leader</label>
+                  <label class="block text-xs font-medium text-gray-500">Team Leader Name</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.team_leader_name) }}</div>
               </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Sales Agent</label>
+                  <label class="block text-xs font-medium text-gray-500">Sales Agent Name</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(request.sales_agent_name) }}</div>
               </div>
                 <div>

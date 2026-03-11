@@ -133,14 +133,24 @@ class VasRequestController extends Controller
         $schema = collect(self::documentSchema())->keyBy('key');
         $rules = [];
         $messages = [];
+        $allowedExtensions = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'eml', 'xls', 'xlsx'];
+        $extensionRule = function ($attribute, $value, $fail) use ($allowedExtensions) {
+            if (! $value instanceof \Illuminate\Http\UploadedFile) {
+                return;
+            }
+            $extension = strtolower((string) $value->getClientOriginalExtension());
+            if (! in_array($extension, $allowedExtensions, true)) {
+                $fail('The ' . str_replace('_', ' ', $attribute) . ' field must be a file of type: ' . implode(', ', $allowedExtensions) . '.');
+            }
+        };
         foreach ($schema as $key => $doc) {
-            $rules[$key] = ['nullable', 'file', 'max:' . self::MAX_FILE_KB, 'mimes:pdf,doc,docx,jpg,jpeg,png,eml,xls,xlsx'];
+            $rules[$key] = ['nullable', 'file', 'max:' . self::MAX_FILE_KB, $extensionRule];
             $messages[$key . '.max'] = 'The file must not be greater than 3 MB.';
         }
         $rules['additional_document_label'] = ['nullable', 'array'];
         $rules['additional_document_label.*'] = ['nullable', 'string', 'max:255'];
         $rules['additional_documents'] = ['nullable', 'array'];
-        $rules['additional_documents.*'] = ['nullable', 'file', 'max:' . self::MAX_FILE_KB, 'mimes:pdf,doc,docx,jpg,jpeg,png,eml,xls,xlsx'];
+        $rules['additional_documents.*'] = ['nullable', 'file', 'max:' . self::MAX_FILE_KB, $extensionRule];
         $messages['additional_documents.*.max'] = 'Each file must not be greater than 3 MB.';
 
         $request->validate($rules, $messages);

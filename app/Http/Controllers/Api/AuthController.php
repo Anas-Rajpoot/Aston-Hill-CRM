@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\SecuritySetting;
 use App\Models\SystemAuditLog;
+use App\Models\SystemPreference;
 use App\Models\User;
 use App\Models\UserLoginLog;
 use App\Services\AuditLogger;
@@ -29,6 +30,30 @@ class AuthController extends Controller
      */
     public function login(Request $request): JsonResponse
     {
+        // If an authenticated session/token already exists, return landing redirect
+        // instead of re-showing login flow.
+        $alreadyUser = $request->user();
+        if ($alreadyUser) {
+            $resolved = $this->safeResolveRolesAndPermissions($alreadyUser);
+            $settings = $this->resolveSecuritySettings();
+            $passwordAction = null;
+            if (($settings->force_password_reset_on_first_login ?? false) && $alreadyUser->must_change_password) {
+                $passwordAction = 'must_change_password';
+            }
+
+            return response()->json([
+                'redirect' => $passwordAction ? '/change-password' : $this->resolveHomeRedirect(),
+                'user' => [
+                    'id' => $alreadyUser->id,
+                    'name' => $alreadyUser->name,
+                    'email' => $alreadyUser->email,
+                    'roles' => $resolved['roles'],
+                ],
+                'permissions' => $resolved['permissions'],
+                'password_action' => $passwordAction,
+            ]);
+        }
+
         $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required'],
@@ -145,7 +170,7 @@ class AuthController extends Controller
         }
 
         // ── Determine if password change is required ──
-        $passwordAction = $this->resolvePasswordAction($user);
+        $passwordAction = $this->resolvePasswordAction($user, (string) $request->input('password'));
 
         // ── Audit log for successful login ──
         AuditLogger::record([
@@ -192,8 +217,8 @@ class AuthController extends Controller
         $roles = $resolved['roles'];
         $permissions = $resolved['permissions'];
 
-        // If password change required, redirect to change-password instead of home
-        $redirect = $passwordAction ? '/change-password' : '/';
+        // If password change required, redirect to change-password; otherwise use configured landing page.
+        $redirect = $passwordAction ? '/change-password' : $this->resolveHomeRedirect();
 
         if (in_array('superadmin', $roles, true)) {
             $request->session()->put('2fa_passed', true);
@@ -225,13 +250,20 @@ class AuthController extends Controller
      * Check if user must change their password.
      * Returns null if no action needed, or 'must_change_password'.
      */
-    private function resolvePasswordAction(User $user): ?string
+    private function resolvePasswordAction(User $user, string $plainPassword): ?string
     {
         try {
             $settings = $this->resolveSecuritySettings();
 
             // First-login password reset
             if ($settings->force_password_reset_on_first_login && $user->must_change_password) {
+                if ($this->isPlainPasswordPolicyCompliant($plainPassword, $settings)) {
+                    $this->safeFillAndSaveUser($user, [
+                        'must_change_password' => false,
+                        'password_changed_at' => $user->password_changed_at ?: now(),
+                    ]);
+                    return null;
+                }
                 return 'must_change_password';
             }
 
@@ -240,6 +272,46 @@ class AuthController extends Controller
         }
 
         return null;
+    }
+
+    /**
+     * Resolve configured home route from System Preferences.
+     */
+    private function resolveHomeRedirect(): string
+    {
+        try {
+            $landing = (string) (SystemPreference::singleton()->default_dashboard_landing_page ?? 'dashboard');
+            $landing = trim($landing);
+            if ($landing === '' || $landing === 'dashboard') {
+                return '/';
+            }
+            return '/'.ltrim($landing, '/');
+        } catch (\Throwable $e) {
+            return '/';
+        }
+    }
+
+    /**
+     * Validate plaintext password against current security policy.
+     *
+     * @param object $settings Security settings object or DEFAULTS fallback object.
+     */
+    private function isPlainPasswordPolicyCompliant(string $password, object $settings): bool
+    {
+        $minLength = (int) ($settings->min_length ?? 8);
+        if (mb_strlen($password) < $minLength) {
+            return false;
+        }
+        if ((bool) ($settings->require_uppercase ?? false) && ! preg_match('/[A-Z]/', $password)) {
+            return false;
+        }
+        if ((bool) ($settings->require_number ?? false) && ! preg_match('/[0-9]/', $password)) {
+            return false;
+        }
+        if ((bool) ($settings->require_special ?? false) && ! preg_match('/[^A-Za-z0-9]/', $password)) {
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -338,7 +410,7 @@ class AuthController extends Controller
     {
         if ((bool) config('auth.disable_google_authentication', false)) {
             $request->session()->put('2fa_passed', true);
-            return response()->json(['redirect' => '/']);
+            return response()->json(['redirect' => $this->resolveHomeRedirect()]);
         }
 
         $request->validate(['otp' => ['required', 'string']]);
@@ -346,7 +418,7 @@ class AuthController extends Controller
         $user = $request->user();
         if (!$user?->two_factor_enabled) {
             $request->session()->put('2fa_passed', true);
-            return response()->json(['redirect' => '/']);
+            return response()->json(['redirect' => $this->resolveHomeRedirect()]);
         }
 
         $google2fa = new \PragmaRX\Google2FA\Google2FA();
@@ -357,6 +429,6 @@ class AuthController extends Controller
         }
 
         $request->session()->put('2fa_passed', true);
-        return response()->json(['redirect' => '/']);
+        return response()->json(['redirect' => $this->resolveHomeRedirect()]);
     }
 }

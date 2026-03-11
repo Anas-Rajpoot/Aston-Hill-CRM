@@ -79,7 +79,9 @@ const resolveTeamLeaderManagerId = (teamLeader) => {
 const filteredTeamLeaders = computed(() => {
   const mid = form.value.manager_id
   if (!mid) return teamLeaders.value
-  return teamLeaders.value.filter((t) => resolveTeamLeaderManagerId(t) === String(mid))
+  const filtered = teamLeaders.value.filter((t) => resolveTeamLeaderManagerId(t) === String(mid))
+  // Fallback to all role users when hierarchy mapping is missing/incomplete.
+  return filtered.length ? filtered : teamLeaders.value
 })
 
 const filteredSalesAgents = computed(() => {
@@ -120,14 +122,16 @@ const filteredSalesAgents = computed(() => {
   }
 
   if (tlId) {
-    return salesAgents.value.filter((salesAgent) => resolveSalesAgentTeamLeaderId(salesAgent) === String(tlId))
+    const filteredByTeamLeader = salesAgents.value.filter((salesAgent) => resolveSalesAgentTeamLeaderId(salesAgent) === String(tlId))
+    return filteredByTeamLeader.length ? filteredByTeamLeader : salesAgents.value
   }
   if (managerId) {
-    return salesAgents.value.filter((salesAgent) => {
+    const filteredByManager = salesAgents.value.filter((salesAgent) => {
       const resolvedManagerId = resolveSalesAgentManagerId(salesAgent)
       const resolvedTeamLeaderId = resolveSalesAgentTeamLeaderId(salesAgent)
       return resolvedManagerId === String(managerId) || teamLeaderIdsUnderManager.has(resolvedTeamLeaderId)
     })
+    return filteredByManager.length ? filteredByManager : salesAgents.value
   }
   return salesAgents.value
 })
@@ -445,7 +449,7 @@ const selectClass = (field) =>
         <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <div>
             <label class="mb-1 block text-sm font-medium text-gray-700">
-              Company Name <span class="text-red-500">*</span>
+              Company Name as per Trade License <span class="text-red-500">*</span>
             </label>
             <input
               v-model="form.company_name"

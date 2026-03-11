@@ -11,7 +11,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import api from '@/lib/axios'
+import api, { ensureCsrfCookie } from '@/lib/axios'
 import PasswordStrengthMeter from '@/components/PasswordStrengthMeter.vue'
 
 const router = useRouter()
@@ -20,6 +20,7 @@ const auth = useAuthStore()
 const loading = ref(true)
 const submitting = ref(false)
 const success = ref(false)
+const successRedirect = ref('/')
 const errors = reactive({})
 
 const form = reactive({
@@ -66,7 +67,25 @@ async function submit() {
   Object.keys(errors).forEach(k => delete errors[k])
 
   try {
-    await api.post('/change-password', { ...form })
+    const payload = { ...form }
+    const requestConfig = { showToast: false, skipAuthRedirect: true }
+    let response = null
+
+    const submitChange = () => api.post('/change-password', payload, requestConfig)
+
+    try {
+      response = await submitChange()
+    } catch (e) {
+      // Retry once on stale CSRF token without pre-emptively touching session cookies.
+      if (e?.response?.status === 419) {
+        await ensureCsrfCookie(true)
+        response = await submitChange()
+      } else {
+        throw e
+      }
+    }
+
+    successRedirect.value = response?.data?.redirect || '/'
     success.value = true
 
     // Clear the password action in the auth store
@@ -77,9 +96,14 @@ async function submit() {
 
     // Redirect to home after brief delay
     setTimeout(() => {
-      router.push('/')
+      router.push(successRedirect.value)
     }, 2000)
   } catch (e) {
+    if (e?.response?.status === 401) {
+      errors.general = 'Your session expired. Please sign in again.'
+      setTimeout(() => router.push('/login'), 900)
+      return
+    }
     if (e?.response?.status === 422) {
       const fe = e.response.data?.errors ?? {}
       Object.keys(fe).forEach(k => {

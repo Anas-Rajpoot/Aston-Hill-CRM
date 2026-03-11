@@ -8,6 +8,10 @@ export default defineConfig({
         host: '127.0.0.1', // Match Laravel origin; avoid [::1] vs 127.0.0.1 mismatch
         port: 5173,
         strictPort: true,
+        watch: {
+            // Prevent full-page reload when uploaded files are written by Laravel.
+            ignored: ['**/storage/**', '**/public/storage/**'],
+        },
         // Allow Laravel app origin to load Vite dev scripts without CORS mismatch.
         cors: {
             origin: ['http://127.0.0.1:8000', 'http://localhost:8000'],

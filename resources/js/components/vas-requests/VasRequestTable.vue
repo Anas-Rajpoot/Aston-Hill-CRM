@@ -58,22 +58,26 @@ function rowNumber(index) {
 }
 
 const columnLabels = {
-  id: 'ID',
-  created_at: 'Created At',
+  id: 'SR',
+  created_at: 'Created',
   updated_at: 'Last Updated',
   request_type: 'Request Type',
   account_number: 'Account Number',
-  company_name: 'Company Name',
+  company_name: 'Company Name as per Trade License',
   description: 'Request Description',
   request_description: 'Request Description',
   additional_notes: 'Additional Notes',
   contact_number: 'Contact Number',
-  manager: 'Manager',
-  team_leader: 'Team Leader',
-  sales_agent: 'Sales Agent',
+  manager: 'Manager Name',
+  team_leader: 'Team Leader Name',
+  sales_agent: 'Sales Agent Name',
   executive: 'Back Office Executive',
+  submitted_at: 'Submission Date',
   sla_timer: 'SLA Timer',
   status: 'Status',
+  activity: 'Activity',
+  completion_date: 'Completion Date',
+  remarks: 'Remarks',
   approved_at: 'Completion Date',
   rejected_at: 'Rejected Date',
   creator: 'Submitter Name',
@@ -315,7 +319,7 @@ function formatStatus(status) {
             v-for="col in columns"
             :key="col"
             scope="col"
-            class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold text-black cursor-pointer select-none"
+            class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold text-white cursor-pointer select-none"
             @click="sortable(col) ? toggleSort(col) : null"
           >
             <button
@@ -329,7 +333,7 @@ function formatStatus(status) {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
               </svg>
             </button>
-            <span v-else class="font-bold text-black">{{ label(col) }}</span>
+            <span v-else class="font-bold text-white">{{ label(col) }}</span>
           </th>
           <th v-if="hasAnyRowAction" scope="col" class="whitespace-nowrap px-4 py-3 text-center text-sm font-bold capitalize text-white">Actions</th>
         </tr>

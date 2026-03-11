@@ -274,8 +274,8 @@ class NotificationConfigController extends Controller
 
         SystemAuditLog::record(
             'user_notification_preference.updated',
-            ['channel' => $channel, 'trigger' => $trigger->key, 'old_enabled' => ! $validated['enabled']],
-            ['channel' => $channel, 'trigger' => $trigger->key, 'new_enabled' => $validated['enabled']],
+            ['channel' => $channel, 'trigger' => $trigger->resolvedTriggerKey(), 'old_enabled' => ! $validated['enabled']],
+            ['channel' => $channel, 'trigger' => $trigger->resolvedTriggerKey(), 'new_enabled' => $validated['enabled']],
             $user->id,
             'user_notification_preference',
             $pref->id,
@@ -377,7 +377,7 @@ class NotificationConfigController extends Controller
         }
 
         $request->validate([
-            'trigger_key' => 'required|exists:notification_triggers,key',
+            'trigger_key' => 'required|string|max:120',
             'email'       => 'required|email|max:255',
         ]);
 
@@ -388,10 +388,16 @@ class NotificationConfigController extends Controller
             ], 422);
         }
 
-        $trigger  = NotificationTrigger::where('key', $request->input('trigger_key'))->first();
+        $triggerKey = (string) $request->input('trigger_key');
+        $trigger = NotificationTrigger::findByTriggerKey($triggerKey);
+        if (! $trigger) {
+            return response()->json([
+                'message' => 'Selected trigger does not exist.',
+                'errors'  => ['trigger_key' => ['Invalid trigger key.']],
+            ], 422);
+        }
 
         // If this is an SLA trigger, also check SLA alerts toggle
-        $triggerKey = $request->input('trigger_key');
         if (\App\Services\NotificationService::isSlaRelated($triggerKey)
             && ! \App\Services\NotificationService::isSlaAlertsEnabled()) {
             return response()->json([

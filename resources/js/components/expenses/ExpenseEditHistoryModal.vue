@@ -22,8 +22,8 @@ const FIELD_LABELS = {
   invoice_number: 'Invoice Number',
   comment: 'Comment / Remarks',
   vat_amount: 'VAT %',
-  amount_without_vat: 'Amount (Without VAT)',
-  full_amount: 'Total Amount',
+  amount_without_vat: 'Amount Without VAT (AED)',
+  full_amount: 'Total Amount (AED)',
   user_id: 'Added By',
   status: 'Status',
 }

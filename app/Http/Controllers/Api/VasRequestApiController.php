@@ -29,10 +29,10 @@ class VasRequestApiController extends Controller
     private const MODULE = 'vas_request_submissions';
 
     private const ALLOWED_COLUMNS = [
-        'id', 'created_at', 'created_by', 'updated_at', 'approved_at', 'rejected_at',
+        'id', 'created_at', 'submitted_at', 'created_by', 'updated_at', 'approved_at', 'rejected_at',
         'request_type', 'account_number', 'contact_number', 'company_name', 'request_description', 'description', 'additional_notes',
         'manager_id', 'team_leader_id', 'sales_agent_id', 'back_office_executive_id',
-        'status', 'sla_timer',
+        'status', 'sla_timer', 'activity', 'completion_date', 'remarks',
     ];
 
     private const BASE_COLUMNS = ['id', 'status'];
@@ -281,6 +281,7 @@ class VasRequestApiController extends Controller
         $base = ["{$t}.id", "{$t}.status"];
         $map = [
             'created_at' => "{$t}.created_at",
+            'submitted_at' => "{$t}.submitted_at",
             'created_by' => "{$t}.created_by",
             'creator' => "{$t}.created_by",
             'request_type' => "{$t}.request_type",
@@ -301,6 +302,9 @@ class VasRequestApiController extends Controller
             'approved_at' => "{$t}.approved_at",
             'rejected_at' => "{$t}.rejected_at",
             'updated_at' => "{$t}.updated_at",
+            'activity' => "{$t}.activity",
+            'completion_date' => "{$t}.completion_date",
+            'remarks' => "{$t}.remarks",
         ];
         foreach ($columns as $col) {
             if ($col === 'id' || $col === 'status') {
@@ -358,6 +362,15 @@ class VasRequestApiController extends Controller
             }
             if (in_array($col, ['created_at', 'approved_at', 'rejected_at', 'updated_at'], true)) {
                 $out[$col] = $row->$col ? $row->$col->format('d-M-Y H:i') : null;
+                continue;
+            }
+            if ($col === 'submitted_at') {
+                $submissionDate = $row->submitted_at ?? $row->created_at;
+                $out['submitted_at'] = $submissionDate ? $submissionDate->format('d-M-Y H:i') : null;
+                continue;
+            }
+            if ($col === 'completion_date') {
+                $out[$col] = $row->completion_date ? $row->completion_date->format('d-M-Y') : null;
                 continue;
             }
             if ($col === 'request_description') {

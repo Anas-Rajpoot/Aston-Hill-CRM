@@ -171,6 +171,30 @@ function close() {
             <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.email) }}</p>
           </div>
           <div>
+            <p class="text-xs text-gray-500">.ae Domain</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.ae_domain) }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">GAID</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.gaid) }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">Product</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.product) }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">MRC (AED)</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.mrc_aed) }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">Quantity</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.quantity) }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">Offer</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.offer) }}</p>
+          </div>
+          <div>
             <p class="text-xs text-gray-500">Complete Address as per Ejari</p>
             <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.address) }}</p>
           </div>
@@ -182,37 +206,32 @@ function close() {
             <p class="text-xs text-gray-500">Location Coordinates</p>
             <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.location_coordinates) }}</p>
           </div>
+        </div>
+      </div>
+
+      <!-- Part 2: Service Category & Service Type -->
+      <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <h3 class="mb-3 text-base font-semibold text-gray-800">Service Category & Service Type</h3>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <p class="text-xs text-gray-500">Product</p>
-            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.product) }}</p>
+            <p class="text-xs text-gray-500">Service Category</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayNameOrId(lead.category_name || lead.category?.name, lead.service_category_id) }}</p>
           </div>
           <div>
-            <p class="text-xs text-gray-500">Offer</p>
-            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.offer) }}</p>
-          </div>
-          <div>
-            <p class="text-xs text-gray-500">MRC (AED)</p>
-            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.mrc_aed) }}</p>
-          </div>
-          <div>
-            <p class="text-xs text-gray-500">Quantity</p>
-            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.quantity) }}</p>
-          </div>
-          <div>
-            <p class="text-xs text-gray-500">.ae Domain</p>
-            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.ae_domain) }}</p>
-          </div>
-          <div>
-            <p class="text-xs text-gray-500">GAID</p>
-            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.gaid) }}</p>
+            <p class="text-xs text-gray-500">Service Type</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayNameOrId(lead.type_name || lead.type?.name, lead.service_type_id) }}</p>
           </div>
         </div>
       </div>
 
-      <!-- Part 2: Team Information -->
+      <!-- Part 3: Team Information -->
       <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
         <h3 class="mb-3 text-base font-semibold text-gray-800">Team Information</h3>
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div>
+            <p class="text-xs text-gray-500">Submitter Name</p>
+            <p class="text-sm font-medium text-gray-900">{{ displayValue(lead.creator_name) }}</p>
+          </div>
           <div>
             <p class="text-xs text-gray-500">Manager Name</p>
             <p class="text-sm font-medium text-gray-900">{{ displayNameOrId(lead.manager_name, lead.manager_id) }}</p>
@@ -228,21 +247,6 @@ function close() {
           <div class="sm:col-span-2 lg:col-span-3">
             <p class="text-xs text-gray-500">Comment / Remarks</p>
             <p class="mt-0.5 whitespace-pre-wrap text-sm font-medium text-gray-900">{{ displayValue(lead.remarks) }}</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Part 3: Service Category & Service Type -->
-      <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-        <h3 class="mb-3 text-base font-semibold text-gray-800">Service Category & Service Type</h3>
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <p class="text-xs text-gray-500">Service Category</p>
-            <p class="text-sm font-medium text-gray-900">{{ displayNameOrId(lead.category_name || lead.category?.name, lead.service_category_id) }}</p>
-          </div>
-          <div>
-            <p class="text-xs text-gray-500">Service Type</p>
-            <p class="text-sm font-medium text-gray-900">{{ displayNameOrId(lead.type_name || lead.type?.name, lead.service_type_id) }}</p>
           </div>
         </div>
       </div>

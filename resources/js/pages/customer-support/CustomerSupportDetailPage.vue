@@ -101,7 +101,7 @@ function formatStatus(status) {
 
 const FIELD_LABELS = {
   issue_category: 'Issue Category',
-  company_name: 'Company Name',
+  company_name: 'Company Name as per Trade License',
   account_number: 'Account Number',
   contact_number: 'Contact Number',
   alternate_contact_number: 'Alternate Contact Number',
@@ -248,7 +248,7 @@ onMounted(() => {
               <h2 class="mb-3 text-sm font-semibold text-gray-900">Primary Information</h2>
               <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Company Name</label>
+                  <label class="block text-xs font-medium text-gray-500">Company Name as per Trade License</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.company_name) }}</div>
                 </div>
                 <div>

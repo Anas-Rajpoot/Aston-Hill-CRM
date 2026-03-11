@@ -3,6 +3,7 @@
  * Clients: Search card (Company Name required, Account Number optional) + filters bar.
  */
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import HorizontalScrollToolbar from '@/components/common/HorizontalScrollToolbar.vue'
 
 const props = defineProps({
   filters: { type: Object, required: true },
@@ -58,8 +59,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onClickOutside))
   <div class="space-y-4">
     <!-- Search Client card (as in reference image) -->
     <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-      <h3 class="text-sm font-medium text-gray-900 mb-3">{{ title }}</h3>
-      <div class="flex flex-wrap lg:flex-nowrap items-end gap-2.5">
+      <HorizontalScrollToolbar>
         <div class="min-w-[130px] max-w-[180px] flex-1 lg:flex-none lg:w-[165px]">
           <label for="client-company-name" class="block text-xs text-gray-700 mb-0.5">
             Company Name
@@ -170,7 +170,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onClickOutside))
             <slot name="customize-columns" />
           </span>
         </div>
-      </div>
+      </HorizontalScrollToolbar>
     </div>
   </div>
 </template>

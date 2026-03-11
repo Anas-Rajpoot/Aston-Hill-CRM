@@ -31,7 +31,13 @@ class ClientRepository
             ->leftJoin('users as tl', 'tl.id', '=', 'c.team_leader_id')
             ->leftJoin('users as sa', 'sa.id', '=', 'c.sales_agent_id')
             ->leftJoin('users as cr', 'cr.id', '=', 'c.created_by')
-            ->leftJoin('client_company_details as cd', 'cd.client_id', '=', 'c.id');
+            ->leftJoin('client_company_details as cd', 'cd.client_id', '=', 'c.id')
+            ->leftJoinSub($this->addressDisplaySubquery(), 'ca_addr', function ($join) {
+                $join->on('ca_addr.client_id', '=', 'c.id');
+            })
+            ->leftJoinSub($this->primaryContactDisplaySubquery(), 'cc_primary', function ($join) {
+                $join->on('cc_primary.client_id', '=', 'c.id');
+            });
 
         // Apply user-based visibility scope
         if ($user) {
@@ -65,9 +71,11 @@ class ClientRepository
     {
         $default = [
             'c.id',
+            'c.id as _row_id',
             'c.activity',
             'c.company_name',
             'c.account_number',
+            'c.submission_type',
             'c.wo_number',
             'c.status',
             'c.submitted_at',
@@ -77,6 +85,8 @@ class ClientRepository
             'c.service_category',
             'c.service_type',
             'c.product_type',
+            $this->addressSelectExpression(),
+            $this->fullAddressSelectExpression(),
             'c.product_name',
             'c.work_order_status',
             'c.payment_connection',
@@ -93,11 +103,21 @@ class ClientRepository
             'tl.name as team_leader',
             'sa.name as sales_agent',
             'cr.name as creator',
+            'cd.trade_license_issuing_authority',
             'cd.company_category',
+            'cd.trade_license_number',
             'cd.trade_license_expiry_date',
+            'cd.establishment_card_number',
             'cd.establishment_card_expiry_date',
+            'cd.account_taken_from',
+            'cd.account_mapping_date',
             'cd.account_transfer_given_to',
+            'cd.account_transfer_given_date',
+            $this->primaryContactSelectExpression(),
             'cd.account_manager_name',
+            'c.csr_name_1',
+            $this->additionalComment1SelectExpression(),
+            $this->additionalComment2SelectExpression(),
         ];
 
         if (empty($columns)) {
@@ -109,6 +129,7 @@ class ClientRepository
             'activity' => 'c.activity',
             'company_name' => 'c.company_name',
             'account_number' => 'c.account_number',
+            'submission_type' => 'c.submission_type',
             'wo_number' => 'c.wo_number',
             'status' => 'c.status',
             'submitted_at' => 'c.submitted_at',
@@ -118,6 +139,8 @@ class ClientRepository
             'service_category' => 'c.service_category',
             'service_type' => 'c.service_type',
             'product_type' => 'c.product_type',
+            'address' => $this->addressSelectExpression(),
+            'full_address' => $this->fullAddressSelectExpression(),
             'product_name' => 'c.product_name',
             'work_order_status' => 'c.work_order_status',
             'payment_connection' => 'c.payment_connection',
@@ -133,22 +156,38 @@ class ClientRepository
             'team_leader' => 'tl.name as team_leader',
             'sales_agent' => 'sa.name as sales_agent',
             'creator' => 'cr.name as creator',
+            'trade_license_issuing_authority' => 'cd.trade_license_issuing_authority',
             'company_category' => 'cd.company_category',
+            'trade_license_number' => 'cd.trade_license_number',
             'trade_license_expiry_date' => 'cd.trade_license_expiry_date',
+            'establishment_card_number' => 'cd.establishment_card_number',
             'establishment_card_expiry_date' => 'cd.establishment_card_expiry_date',
+            'account_taken_from' => 'cd.account_taken_from',
+            'account_mapping_date' => 'cd.account_mapping_date',
             'account_transfer_given_to' => 'cd.account_transfer_given_to',
+            'account_transfer_given_date' => 'cd.account_transfer_given_date',
+            'primary_contact_detail' => $this->primaryContactSelectExpression(),
             'account_manager_name' => 'cd.account_manager_name',
+            'csr_name_1' => 'c.csr_name_1',
+            'csr_name_2' => 'c.csr_name_2',
+            'csr_name_3' => 'c.csr_name_3',
+            'first_bill' => 'cd.first_bill',
+            'second_bill' => 'cd.second_bill',
+            'third_bill' => 'cd.third_bill',
+            'fourth_bill' => 'cd.fourth_bill',
+            'additional_comment_1' => $this->additionalComment1SelectExpression(),
+            'additional_comment_2' => $this->additionalComment2SelectExpression(),
             'created_at' => 'c.created_at',
         ];
 
-        $resolved = ['c.id'];
+        $resolved = ['c.id', 'c.id as _row_id'];
         foreach ($columns as $column) {
             if (isset($map[$column])) {
                 $resolved[] = $map[$column];
             }
         }
 
-        return array_values(array_unique($resolved));
+        return $this->uniqueSelectColumns($resolved);
     }
 
     /**
@@ -173,6 +212,7 @@ class ClientRepository
             ->when(! empty($params['manager_id']), fn ($q) => $q->where('c.manager_id', (int) $params['manager_id']))
             ->when(! empty($params['team_leader_id']), fn ($q) => $q->where('c.team_leader_id', (int) $params['team_leader_id']))
             ->when(! empty($params['sales_agent_id']), fn ($q) => $q->where('c.sales_agent_id', (int) $params['sales_agent_id']))
+            ->when(! empty($params['submission_type']), fn ($q) => $q->where('c.submission_type', 'like', $prefixLike($params['submission_type'])))
             ->when(! empty($params['service_category']), fn ($q) => $q->where('c.service_category', 'like', $prefixLike($params['service_category'])))
             ->when(! empty($params['service_type']), fn ($q) => $q->where('c.service_type', 'like', $prefixLike($params['service_type'])))
             ->when(! empty($params['product_type']), fn ($q) => $q->where('c.product_type', 'like', $prefixLike($params['product_type'])))
@@ -219,8 +259,77 @@ class ClientRepository
             'sales_agent' => ['sa.name', false],
             'creator' => ['cr.name', false],
             'company_category' => ['cd.company_category', false],
-            default => [in_array($sort, ['id', 'activity', 'company_name', 'account_number', 'wo_number', 'status', 'submitted_at', 'activation_date', 'completion_date', 'contract_end_date', 'service_category', 'service_type', 'product_type', 'product_name', 'work_order_status', 'payment_connection', 'contract_type', 'additional_notes', 'created_at'], true) ? 'c.' . $sort : 'c.submitted_at', false],
+            'address' => ["COALESCE(NULLIF(c.address, ''), NULLIF(ca_addr.primary_address, ''), NULLIF(ca_addr.any_address, ''))", true],
+            default => [in_array($sort, ['id', 'activity', 'company_name', 'account_number', 'submission_type', 'wo_number', 'status', 'submitted_at', 'activation_date', 'completion_date', 'contract_end_date', 'service_category', 'service_type', 'product_type', 'product_name', 'work_order_status', 'payment_connection', 'contract_type', 'additional_notes', 'created_at'], true) ? 'c.' . $sort : 'c.submitted_at', false],
         };
+    }
+
+    private function addressDisplaySubquery()
+    {
+        $composed = "TRIM(CONCAT_WS(', ', NULLIF(ca.unit, ''), NULLIF(ca.building, ''), NULLIF(ca.area, ''), NULLIF(ca.emirates, '')))";
+        $bestAddress = "COALESCE(NULLIF(ca.full_address, ''), NULLIF({$composed}, ''))";
+
+        return DB::table('client_addresses as ca')
+            ->select('ca.client_id')
+            ->selectRaw("MAX(CASE WHEN COALESCE(ca.sort_order, 999999) = 0 THEN {$bestAddress} END) as primary_address")
+            ->selectRaw("MAX({$bestAddress}) as any_address")
+            ->groupBy('ca.client_id');
+    }
+
+    private function addressSelectExpression()
+    {
+        return DB::raw("COALESCE(NULLIF(c.address, ''), NULLIF(ca_addr.primary_address, ''), NULLIF(ca_addr.any_address, '')) as address");
+    }
+
+    private function fullAddressSelectExpression()
+    {
+        return DB::raw("COALESCE(NULLIF(ca_addr.primary_address, ''), NULLIF(ca_addr.any_address, ''), NULLIF(c.address, '')) as full_address");
+    }
+
+    private function primaryContactSelectExpression()
+    {
+        return DB::raw("COALESCE(NULLIF(cc_primary.primary_contact_detail, ''), NULLIF(cc_primary.any_contact_detail, '')) as primary_contact_detail");
+    }
+
+    private function primaryContactDisplaySubquery()
+    {
+        $detailExpr = "TRIM(CONCAT_WS(' | ', NULLIF(cc.name, ''), NULLIF(cc.designation, ''), NULLIF(cc.contact_number, ''), NULLIF(cc.email, '')))";
+
+        return DB::table('client_contacts as cc')
+            ->select('cc.client_id')
+            ->selectRaw("MAX(CASE WHEN COALESCE(cc.sort_order, 999999) = 0 THEN {$detailExpr} END) as primary_contact_detail")
+            ->selectRaw("MAX({$detailExpr}) as any_contact_detail")
+            ->groupBy('cc.client_id');
+    }
+
+    private function additionalComment1SelectExpression()
+    {
+        return DB::raw("COALESCE(NULLIF(cd.additional_comment_1, ''), NULLIF(c.additional_notes, '')) as additional_comment_1");
+    }
+
+    private function additionalComment2SelectExpression()
+    {
+        return DB::raw("COALESCE(NULLIF(cd.additional_comment_2, ''), NULLIF(c.remarks, '')) as additional_comment_2");
+    }
+
+    /**
+     * @param  array<int,mixed>  $columns
+     * @return array<int,mixed>
+     */
+    private function uniqueSelectColumns(array $columns): array
+    {
+        $seen = [];
+        $out = [];
+        foreach ($columns as $column) {
+            $key = is_string($column) ? $column : 'expr_' . spl_object_id($column);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $out[] = $column;
+        }
+
+        return $out;
     }
 
     private function applyQueryTimeoutGuard(): void

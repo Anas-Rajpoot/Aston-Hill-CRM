@@ -9,7 +9,7 @@ import { useRoute } from 'vue-router'
 import api from '@/lib/axios'
 import leadSubmissionsApi from '@/services/leadSubmissionsApi'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
-import { toDdMonYyyyLower } from '@/lib/dateFormat'
+import { toDdMonYyyyLower, toDdMonYyyyDash } from '@/lib/dateFormat'
 import { useAuthStore } from '@/stores/auth'
 import { canModuleAction } from '@/lib/accessControl'
 
@@ -55,6 +55,10 @@ const filters = ref({
   team_leader_id: '',
 })
 const advancedVisible = ref(false)
+const fromPickerRef = ref(null)
+const toPickerRef = ref(null)
+const submittedFromPickerRef = ref(null)
+const submittedToPickerRef = ref(null)
 
 /* ───── Table data ───── */
 const tableData = ref([])
@@ -65,46 +69,61 @@ const order = ref('desc')
 /* ───── Column customization ───── */
 const columnModalVisible = ref(false)
 const allColumns = ref([])
-const visibleColumns = ref([
-  'submitted_at', 'company_name', 'category', 'status', 'sla_timer',
-  'sales_agent', 'executive',
-])
-const defaultVisibleColumns = [
-  'submitted_at', 'company_name', 'category', 'status', 'sla_timer',
-  'sales_agent', 'executive',
+const LEAD_SUBMISSIONS_COLUMN_ORDER = [
+  'id', 'submitted_at', 'submission_type', 'account_number', 'company_name', 'authorized_signatory_name',
+  'email', 'contact_number_gsm', 'alternate_contact_number', 'address', 'emirate', 'location_coordinates',
+  'category', 'type', 'product', 'offer', 'mrc_aed', 'quantity', 'ae_domain', 'gaid',
+  'previous_activity', 'resubmission_reason', 'remarks', 'manager', 'team_leader', 'sales_agent',
+  'status', 'executive', 'sla_timer', 'status_changed_at', 'creator',
 ]
+const visibleColumns = ref([...LEAD_SUBMISSIONS_COLUMN_ORDER])
+const defaultVisibleColumns = [...LEAD_SUBMISSIONS_COLUMN_ORDER]
 
 const COLUMN_LABELS = {
-  id: 'ID',
-  submitted_at: 'Submission Date',
-  updated_at: 'Updated',
+  id: 'SR',
+  submitted_at: 'Created',
+  updated_at: 'Updated At',
   submission_type: 'Request Type',
   account_number: 'Account Number',
-  company_name: 'Company Name',
-  authorized_signatory_name: 'Authorized Signatory',
-  email: 'Email',
+  company_name: 'Company Name as per Trade License',
+  authorized_signatory_name: 'Authorized Signatory Name',
+  email: 'Email ID',
   contact_number_gsm: 'Contact Number',
-  alternate_contact_number: 'Alternate Contact',
-  address: 'Address',
-  emirate: 'Emirate',
+  alternate_contact_number: 'Alternate Contact Number',
+  address: 'Complete Address as per Ejari',
+  emirate: 'Emirates',
   location_coordinates: 'Location Coordinates',
-  category: 'Service Category',
-  type: 'Service Type',
+  category: 'Service Categories',
+  type: 'Service Types',
   product: 'Product',
   offer: 'Offer',
   mrc_aed: 'MRC (AED)',
-  quantity: 'Qty',
-  ae_domain: 'AE Domain',
+  quantity: 'Quantity',
+  ae_domain: '.ae Domain',
   gaid: 'GAID',
+  previous_activity: 'Old Activity',
+  resubmission_reason: 'Resubmission Reason',
   remarks: 'Remarks',
-  sales_agent: 'Sales Agent',
-  team_leader: 'Team Leader',
-  manager: 'Manager',
+  sales_agent: 'Sales Agent Name',
+  team_leader: 'Team Leader Name',
+  manager: 'Manager Name',
   status: 'Status',
-  sla_timer: 'SLA Status',
-  executive: 'BO Executive',
-  status_changed_at: 'Last Updated',
-  creator: 'Created By',
+  sla_timer: 'SLA Timer',
+  executive: 'Back Office Executive',
+  status_changed_at: 'Status Updated At',
+  creator: 'Submitter Name',
+  call_verification: 'Call Verification',
+  pending_from_sales: 'Pending From Sales',
+  documents_verification: 'Documents Verification',
+  submission_date_from: 'Submission Date',
+  back_office_notes: 'Back Office Notes',
+  activity: 'Activity',
+  back_office_account: 'Back Office Notes',
+  work_order: 'Work Order',
+  du_status: 'DU Status',
+  completion_date: 'Completion Date',
+  du_remarks: 'DU Remarks',
+  additional_note: 'Additional Note',
 }
 
 /* ───── Computed helpers ───── */
@@ -160,6 +179,28 @@ function filterParams() {
   return p
 }
 
+function normalizeVisibleColumns(cols) {
+  const unique = [...new Set((Array.isArray(cols) ? cols : []).filter(Boolean))]
+  const canonical = LEAD_SUBMISSIONS_COLUMN_ORDER.filter((col) => unique.includes(col))
+  const extras = unique.filter((col) => !LEAD_SUBMISSIONS_COLUMN_ORDER.includes(col))
+  return [...canonical, ...extras]
+}
+
+function displayFilterDate(ymd) {
+  return toDdMonYyyyDash(ymd || '') || ''
+}
+
+function openPicker(inputRef) {
+  const el = inputRef?.value
+  if (!el) return
+  if (typeof el.showPicker === 'function') {
+    el.showPicker()
+  } else {
+    el.focus()
+    el.click()
+  }
+}
+
 /* ───── Data loading ───── */
 async function loadFilterOptions() {
   if (!canView.value) return
@@ -210,7 +251,7 @@ async function loadColumns() {
     allColumns.value = data.all_columns ?? []
     const visible = data.visible_columns
     if (Array.isArray(visible) && visible.length) {
-      visibleColumns.value = visible.filter((c) => c !== 'id')
+      visibleColumns.value = normalizeVisibleColumns(visible)
     }
   } catch {
     /* keep defaults */
@@ -264,8 +305,9 @@ watch(() => tableMeta.value.current_page, () => loadTable())
 /* ───── Column customization ───── */
 async function onSaveColumns(cols) {
   try {
-    await leadSubmissionsApi.saveColumns(cols)
-    visibleColumns.value = cols.filter((c) => c !== 'id')
+    const normalized = normalizeVisibleColumns(cols)
+    await leadSubmissionsApi.saveColumns(normalized)
+    visibleColumns.value = normalized
     tableMeta.value.current_page = 1
     loadTable()
   } catch {
@@ -408,28 +450,6 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-6 bg-white -mx-4 -my-5 min-h-full px-6 py-6">
-    <!-- Header -->
-    <div class="flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <div class="flex flex-wrap items-baseline gap-2">
-          <h1 class="text-2xl font-bold text-gray-900">Lead Reports</h1>        </div>
-        <p class="text-sm text-gray-500 mt-1">Analyze Lead Submissions, Resubmissions, and conversion metrics by service category and sales team.</p>
-      </div>
-      <div class="flex gap-2">
-        <button
-          v-if="canExport"
-          type="button"
-          class="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70 disabled:cursor-wait"
-          :disabled="exportLoading"
-          @click="exportExcel"
-        >
-          <svg v-if="exportLoading" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
-          <svg v-else class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-          {{ exportLoading ? 'Exporting…' : 'Export' }}
-        </button>
-      </div>
-    </div>
-
     <div v-if="!canView" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
       You do not have permission to view reports.
     </div>
@@ -546,24 +566,25 @@ onMounted(async () => {
 
     <!-- Filters Section (below charts) -->
     <div v-if="canView" class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-      <div class="flex flex-wrap items-end gap-4">
-        <div>
+      <div class="overflow-x-auto">
+        <div class="flex w-max min-w-full flex-nowrap items-end gap-4">
+        <div class="shrink-0">
           <label class="block text-xs font-medium text-gray-500 mb-1">Status</label>
           <select v-model="filters.status" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-44 focus:ring-brand-primary focus:border-brand-primary">
             <option value="">All Status</option>
             <option v-for="s in filterOptions.statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
           </select>
         </div>
-        <div>
+        <div class="shrink-0">
           <label class="block text-xs font-medium text-gray-500 mb-1">Service Category</label>
           <select v-model="filters.service_category_id" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-48 focus:ring-brand-primary focus:border-brand-primary">
             <option value="">All Categories</option>
             <option v-for="c in filterOptions.categories" :key="c.id" :value="c.id">{{ c.name }}</option>
           </select>
         </div>
-        <button type="button" class="ml-auto rounded-lg bg-brand-primary px-5 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover" @click="applyFilters">Apply</button>
-        <button type="button" class="rounded-lg border border-gray-300 bg-white px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="resetFilters">Reset</button>
-        <div class="flex items-center gap-2">
+        <button type="button" class="shrink-0 rounded-lg bg-brand-primary px-5 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover" @click="applyFilters">Apply</button>
+        <button type="button" class="shrink-0 rounded-lg border border-gray-300 bg-white px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="resetFilters">Reset</button>
+        <div class="flex shrink-0 items-center gap-2">
           <button
             type="button"
             class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -572,6 +593,17 @@ onMounted(async () => {
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
             Advanced Filters
             <span v-if="activeFilterCount > 0" class="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-brand-primary text-[10px] font-bold text-white">{{ activeFilterCount }}</span>
+          </button>
+          <button
+            v-if="canExport"
+            type="button"
+            class="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70 disabled:cursor-wait"
+            :disabled="exportLoading"
+            @click="exportExcel"
+          >
+            <svg v-if="exportLoading" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+            <svg v-else class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            {{ exportLoading ? 'Exporting…' : 'Export' }}
           </button>
           <button
             type="button"
@@ -583,25 +615,106 @@ onMounted(async () => {
           </button>
         </div>
       </div>
+      </div>
 
       <!-- Advanced Filters -->
       <div v-if="advancedVisible" class="mt-4 pt-4 border-t border-gray-200">
         <div class="flex flex-wrap items-end gap-4">
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Date From</label>
-            <input v-model="filters.from" type="date" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-40 focus:ring-brand-primary focus:border-brand-primary" />
+            <div class="relative w-40">
+              <input
+                :value="displayFilterDate(filters.from)"
+                type="text"
+                readonly
+                placeholder="DD-MMM-YYYY"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 pr-9 text-sm focus:ring-brand-primary focus:border-brand-primary"
+                @click="openPicker(fromPickerRef)"
+              />
+              <input
+                ref="fromPickerRef"
+                type="date"
+                class="pointer-events-none absolute opacity-0"
+                :value="filters.from"
+                tabindex="-1"
+                @change="filters.from = $event.target.value || ''"
+              />
+              <button type="button" class="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-gray-400 hover:bg-gray-100" @click="openPicker(fromPickerRef)">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+              </button>
+            </div>
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Date To</label>
-            <input v-model="filters.to" type="date" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-40 focus:ring-brand-primary focus:border-brand-primary" />
+            <div class="relative w-40">
+              <input
+                :value="displayFilterDate(filters.to)"
+                type="text"
+                readonly
+                placeholder="DD-MMM-YYYY"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 pr-9 text-sm focus:ring-brand-primary focus:border-brand-primary"
+                @click="openPicker(toPickerRef)"
+              />
+              <input
+                ref="toPickerRef"
+                type="date"
+                class="pointer-events-none absolute opacity-0"
+                :value="filters.to"
+                tabindex="-1"
+                @change="filters.to = $event.target.value || ''"
+              />
+              <button type="button" class="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-gray-400 hover:bg-gray-100" @click="openPicker(toPickerRef)">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+              </button>
+            </div>
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Submitted From</label>
-            <input v-model="filters.submitted_from" type="date" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-40 focus:ring-brand-primary focus:border-brand-primary" />
+            <div class="relative w-40">
+              <input
+                :value="displayFilterDate(filters.submitted_from)"
+                type="text"
+                readonly
+                placeholder="DD-MMM-YYYY"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 pr-9 text-sm focus:ring-brand-primary focus:border-brand-primary"
+                @click="openPicker(submittedFromPickerRef)"
+              />
+              <input
+                ref="submittedFromPickerRef"
+                type="date"
+                class="pointer-events-none absolute opacity-0"
+                :value="filters.submitted_from"
+                tabindex="-1"
+                @change="filters.submitted_from = $event.target.value || ''"
+              />
+              <button type="button" class="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-gray-400 hover:bg-gray-100" @click="openPicker(submittedFromPickerRef)">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+              </button>
+            </div>
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Submitted To</label>
-            <input v-model="filters.submitted_to" type="date" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-40 focus:ring-brand-primary focus:border-brand-primary" />
+            <div class="relative w-40">
+              <input
+                :value="displayFilterDate(filters.submitted_to)"
+                type="text"
+                readonly
+                placeholder="DD-MMM-YYYY"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 pr-9 text-sm focus:ring-brand-primary focus:border-brand-primary"
+                @click="openPicker(submittedToPickerRef)"
+              />
+              <input
+                ref="submittedToPickerRef"
+                type="date"
+                class="pointer-events-none absolute opacity-0"
+                :value="filters.submitted_to"
+                tabindex="-1"
+                @change="filters.submitted_to = $event.target.value || ''"
+              />
+              <button type="button" class="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-gray-400 hover:bg-gray-100" @click="openPicker(submittedToPickerRef)">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+              </button>
+            </div>
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Sales Agent ID</label>
@@ -616,23 +729,30 @@ onMounted(async () => {
     </div>
 
     <!-- Table Section -->
-    <div v-if="canView" class="rounded-xl border-2 border-black bg-white shadow-sm overflow-hidden">
-      <!-- Table header bar -->
-      <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b-2 border-black bg-white">
-        <h2 class="text-base font-semibold text-gray-900">Lead Submissions Details</h2>
-        <p class="text-sm text-gray-500">{{ tableMeta.total }} records</p>
-      </div>
-
-      <!-- Table -->
-      <div class="overflow-x-auto">
-        <table class="min-w-full">
+    <div v-if="canView" class="overflow-hidden rounded-xl border-2 border-black bg-white shadow-sm">
+      <div class="relative overflow-x-auto">
+        <div
+          v-if="tableLoading"
+          class="absolute inset-0 z-10 flex items-center justify-center bg-white/80"
+          aria-live="polite"
+          aria-busy="true"
+        >
+          <div class="flex flex-col items-center gap-2">
+            <svg class="h-8 w-8 animate-spin text-brand-primary" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <span class="text-sm font-medium text-gray-600">Updating...</span>
+          </div>
+        </div>
+        <table class="min-w-full border-2 border-black border-collapse bg-white">
           <thead class="bg-brand-primary border-b-2 border-green-700">
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider border-b-2 border-black">#</th>
+              <th class="whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-white border-b-2 border-black">SR</th>
               <th
                 v-for="col in activeColumns"
                 :key="col.key"
-                class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider cursor-pointer select-none hover:bg-white/10 transition-colors border-b-2 border-black"
+                class="whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-white cursor-pointer select-none border-b-2 border-black"
                 @click="onSort(col.key)"
               >
                 <div class="flex items-center gap-1">
@@ -649,18 +769,12 @@ onMounted(async () => {
             </tr>
           </thead>
           <tbody class="bg-white">
-            <tr v-if="tableLoading">
-              <td :colspan="activeColumns.length + 1" class="px-4 py-12 text-center text-gray-400 border-b border-black">
-                <svg class="mx-auto h-6 w-6 animate-spin text-gray-400 mb-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
-                Loading…
-              </td>
-            </tr>
-            <tr v-else-if="!tableData.length">
+            <tr v-if="!tableLoading && !tableData.length" class="border-b border-black bg-white">
               <td :colspan="activeColumns.length + 1" class="px-4 py-12 text-center text-gray-400 border-b border-black">No records found</td>
             </tr>
-            <tr v-else v-for="(row, idx) in tableData" :key="row.id" class="hover:bg-gray-50 transition-colors">
-              <td class="px-4 py-2.5 text-sm text-gray-500 whitespace-nowrap border-b border-black">{{ rowNumber(idx) }}</td>
-              <td v-for="col in activeColumns" :key="col.key" class="px-4 py-2.5 text-sm whitespace-nowrap border-b border-black">
+            <tr v-else v-for="(row, idx) in tableData" :key="row.id" class="border-b border-black bg-white hover:bg-gray-50/50">
+              <td class="px-4 py-3 text-sm text-gray-500 whitespace-nowrap border-b border-black">{{ rowNumber(idx) }}</td>
+              <td v-for="col in activeColumns" :key="col.key" class="px-4 py-3 text-sm text-gray-900 whitespace-nowrap border-b border-black">
                 <!-- Status badge -->
                 <template v-if="col.key === 'status'">
                   <span :class="['inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', statusBadgeClass(row.status)]">
@@ -691,7 +805,7 @@ onMounted(async () => {
       </div>
 
       <!-- Pagination footer -->
-      <div class="flex flex-wrap items-center justify-between gap-3 border-t-2 border-black bg-white px-4 py-3">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
         <!-- Left: entries info -->
         <p class="text-sm text-gray-600">
           Showing {{ tableMeta.total ? ((tableMeta.current_page - 1) * tableMeta.per_page) + 1 : 0 }}

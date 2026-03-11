@@ -42,6 +42,10 @@ export const api = axios.create({
 
 // Add Bearer token when using token auth (e.g. separate frontend deploy)
 api.interceptors.request.use((config) => {
+  // Defensive: ensure browser session cookies are always sent for same-origin API calls.
+  if (typeof config.withCredentials === 'undefined') {
+    config.withCredentials = true
+  }
   const forceLogout = sessionStorage.getItem('force_logout_on_close') === '1'
   const token = forceLogout
     ? sessionStorage.getItem('api_token')
@@ -94,6 +98,30 @@ const addCsrf = (config) => {
 api.interceptors.request.use(addCsrf)
 web.interceptors.request.use(addCsrf)
 
+// Auto-recover from stale CSRF token after session regeneration (e.g., right after login).
+// Retries the failed request once after refreshing /sanctum/csrf-cookie.
+api.interceptors.response.use(
+  (res) => res,
+  async (err) => {
+    const status = err?.response?.status
+    const config = err?.config
+    const requestUrl = String(config?.url || '')
+    const isCsrfCookieCall = /\/sanctum\/csrf-cookie$/i.test(requestUrl)
+
+    if (status !== 419 || !config || config.__csrfRetried || isCsrfCookieCall) {
+      return Promise.reject(err)
+    }
+
+    config.__csrfRetried = true
+    try {
+      await ensureCsrfCookie(true)
+      return api.request(config)
+    } catch {
+      return Promise.reject(err)
+    }
+  }
+)
+
 // Intercept X-Password-Action header from security middleware.
 // When the server signals a password change is needed, update the auth store and redirect.
 api.interceptors.response.use(
@@ -138,6 +166,8 @@ api.interceptors.response.use(
     const status = err.response?.status
     const requestUrl = String(err?.config?.url || '')
     const isAuthLoginRequest = /\/auth\/login$/i.test(requestUrl)
+    const isAuthStateProbe = /\/bootstrap$|\/me$|\/auth\/logout$/i.test(requestUrl)
+    const skipAuthRedirect = err?.config?.skipAuthRedirect === true
 
     if (
       status === 401 &&
@@ -165,9 +195,14 @@ api.interceptors.response.use(
       return new Promise(() => {}) // never resolves – page is navigating away
     }
 
-    // Generic unauthorized handler: redirect to login for protected API calls.
-    // Skip auth/login call so invalid credentials can still show inline error on login page.
-    if (status === 401 && !isAuthLoginRequest) {
+    // Generic unauthorized handler:
+    // - never interfere with login endpoint validation
+    // - do not force logout on module-level 401s (often permission/policy mismatches)
+    // - only redirect on explicit auth-state probes (/bootstrap, /me, /auth/logout)
+    if (status === 401 && !isAuthLoginRequest && !skipAuthRedirect) {
+      if (!isAuthStateProbe) {
+        return Promise.reject(err)
+      }
       import('@/stores/auth').then(({ useAuthStore }) => {
         const auth = useAuthStore()
         auth.user = null

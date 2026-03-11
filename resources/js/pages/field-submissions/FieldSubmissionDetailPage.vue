@@ -133,7 +133,7 @@ function docDisplayName(doc) {
 
 const FIELD_LABELS = {
   account_number: 'Account Number',
-  company_name: 'Company Name',
+  company_name: 'Company Name as per Trade License',
   authorized_signatory_name: 'Authorized Signatory Name',
   contact_number: 'Contact Number',
   product: 'Product',
@@ -318,8 +318,12 @@ onMounted(() => load())
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.account_number) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Company Name</label>
+                  <label class="block text-xs font-medium text-gray-500">Company Name as per Trade License</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.company_name) }}</div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500">Product</label>
+                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.product) }}</div>
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Authorized Signatory Name</label>
@@ -328,10 +332,6 @@ onMounted(() => load())
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Contact Number</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.contact_number) }}</div>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-500">Product</label>
-                  <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(submission.product) }}</div>
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500">Alternate Contact Number</label>

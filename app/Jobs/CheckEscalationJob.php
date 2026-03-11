@@ -11,6 +11,7 @@ use App\Models\CustomerSupportSubmission;
 use App\Models\NotificationLog;
 use App\Models\NotificationSetting;
 use App\Models\SlaRule;
+use App\Models\User;
 use App\Services\NotificationService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -236,6 +237,16 @@ class CheckEscalationJob implements ShouldQueue
             'error'            => $error,
             'sent_at'          => now(),
         ]);
+
+        if ((int) $level->level === 1) {
+            NotificationService::dispatchOnce('sla_breached', 'sla_breached:' . $rule->module_key . ':' . $submission->id, [
+                'module' => $rule->module_name,
+                'title' => 'SLA Breached',
+                'message' => sprintf('%s #%d exceeded SLA and triggered escalation.', $rule->module_name, $submission->id),
+                'url' => '/notifications',
+                'users' => User::query()->get(['id', 'name', 'email']),
+            ], 3600);
+        }
 
         // Also record in notification_logs for the unified log view
         try {

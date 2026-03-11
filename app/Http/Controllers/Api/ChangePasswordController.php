@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\SecuritySetting;
+use App\Models\SystemPreference;
 use App\Models\SystemAuditLog;
 use App\Rules\MeetsPasswordPolicy;
 use App\Services\AuditLogger;
@@ -102,6 +103,21 @@ class ChangePasswordController extends Controller
 
         return response()->json([
             'message' => 'Password changed successfully.',
+            'redirect' => $this->resolveHomeRedirect(),
         ]);
+    }
+
+    private function resolveHomeRedirect(): string
+    {
+        try {
+            $landing = (string) (SystemPreference::singleton()->default_dashboard_landing_page ?? 'dashboard');
+            $landing = trim($landing);
+            if ($landing === '' || $landing === 'dashboard') {
+                return '/';
+            }
+            return '/'.ltrim($landing, '/');
+        } catch (\Throwable $e) {
+            return '/';
+        }
     }
 }

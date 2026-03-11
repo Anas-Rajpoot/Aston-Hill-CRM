@@ -71,10 +71,10 @@ onBeforeUnmount(() => {
       </button>
       <div
         ref="scroller"
-        class="px-2 sm:px-8"
+        class="overflow-x-auto px-2 sm:px-8"
       >
-      <div class="flex flex-wrap items-end gap-3">
-        <div class="w-full sm:w-52">
+      <div class="flex w-max min-w-full flex-nowrap items-end gap-3">
+        <div class="w-52 shrink-0">
           <label class="block text-xs font-medium text-gray-600">Employee</label>
           <select
             v-model="filters.user_id"
@@ -85,7 +85,7 @@ onBeforeUnmount(() => {
             <option v-for="u in filterOptions.users" :key="u.id" :value="u.id">{{ u.name }}</option>
           </select>
         </div>
-        <div class="w-full sm:w-52">
+        <div class="w-52 shrink-0">
           <label class="block text-xs font-medium text-gray-600">Role</label>
           <select
             v-model="filters.role"
@@ -96,7 +96,7 @@ onBeforeUnmount(() => {
             <option v-for="r in filterOptions.roles" :key="r.value" :value="r.value">{{ r.label }}</option>
           </select>
         </div>
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="ml-auto flex shrink-0 items-center gap-2">
           <button
             type="button"
             class="inline-flex items-center whitespace-nowrap rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover focus:ring-2 focus:ring-brand-primary disabled:opacity-50"

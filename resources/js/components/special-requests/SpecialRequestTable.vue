@@ -44,20 +44,24 @@ const canInlineEdit = computed(() => {
 const hasAnyRowAction = computed(() => canViewAction.value || canEditAction.value || canHistoryAction.value || canDeleteAction.value)
 
 const COLUMN_LABELS = {
-  id: 'ID',
+  id: 'SR',
   submitted_at: 'Submitted At',
-  created_at: 'Created At',
-  company_name: 'Company Name',
+  created_at: 'Created',
+  company_name: 'Company Name as per Trade License',
   account_number: 'Account Number',
   request_type: 'Request Type',
   complete_address: 'Complete Address',
   special_instruction: 'Special Instruction',
-  sales_agent: 'Sales Agent',
-  team_leader: 'Team Leader',
-  manager: 'Manager',
+  sales_agent: 'Sales Agent Name',
+  team_leader: 'Team Leader Name',
+  manager: 'Manager Name',
   status: 'Status',
   creator: 'Submitter Name',
   updated_at: 'Last Updated',
+}
+
+function rowNumber(index) {
+  return (props.currentPage - 1) * props.perPage + index + 1
 }
 
 const SORTABLE = new Set([
@@ -194,20 +198,20 @@ function toggleRow(id) {
           <th
             v-for="col in columns"
             :key="col"
-            class="whitespace-nowrap px-3 py-2.5 text-xs font-semibold uppercase text-black"
-            :class="{ 'cursor-pointer select-none hover:text-gray-700': SORTABLE.has(col) }"
+            class="whitespace-nowrap px-3 py-2.5 text-xs font-semibold text-white"
+            :class="{ 'cursor-pointer select-none hover:text-white/80': SORTABLE.has(col) }"
             @click="toggleSort(col)"
           >
             <span class="inline-flex items-center gap-1">
               {{ COLUMN_LABELS[col] ?? col }}
               <template v-if="SORTABLE.has(col)">
-                <svg v-if="sort === col && order === 'asc'" class="h-3.5 w-3.5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
-                <svg v-else-if="sort === col && order === 'desc'" class="h-3.5 w-3.5 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-                <svg v-else class="h-3.5 w-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
+                <svg v-if="sort === col && order === 'asc'" class="h-3.5 w-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
+                <svg v-else-if="sort === col && order === 'desc'" class="h-3.5 w-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                <svg v-else class="h-3.5 w-3.5 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
               </template>
             </span>
           </th>
-          <th v-if="hasAnyRowAction" class="whitespace-nowrap px-3 py-2.5 text-xs font-semibold uppercase text-white">Actions</th>
+          <th v-if="hasAnyRowAction" class="whitespace-nowrap px-3 py-2.5 text-xs font-semibold text-white">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -224,7 +228,7 @@ function toggleRow(id) {
         </tr>
         <tr
           v-else
-          v-for="row in data"
+          v-for="(row, rowIndex) in data"
           :key="row.id"
           class="group transition-colors hover:bg-gray-50"
           :class="{ 'bg-brand-primary-light/40': selectedIds.includes(row.id) }"
@@ -289,7 +293,7 @@ function toggleRow(id) {
                 @click="canInlineEdit && isDropdownColumn(col) && startEdit(row, col)"
                 @dblclick="canInlineEdit && isInputColumn(col) && startEdit(row, col)"
               >
-                {{ truncate(cellVal(row, col)) }}
+                {{ col === 'id' ? rowNumber(rowIndex) : truncate(cellVal(row, col)) }}
               </span>
             </template>
           </td>

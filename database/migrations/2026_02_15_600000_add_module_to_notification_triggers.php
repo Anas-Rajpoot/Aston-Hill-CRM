@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -31,10 +32,24 @@ return new class extends Migration
             'submission_completed'      => 'All Modules',
         ];
 
-        foreach ($modules as $key => $module) {
-            \Illuminate\Support\Facades\DB::table('notification_triggers')
-                ->where('key', $key)
-                ->update(['module' => $module]);
+        if (Schema::hasColumn('notification_triggers', 'key')) {
+            foreach ($modules as $key => $module) {
+                DB::table('notification_triggers')
+                    ->where('key', $key)
+                    ->update(['module' => $module]);
+            }
+            return;
+        }
+
+        if (Schema::hasColumn('notification_triggers', 'name')) {
+            foreach ($modules as $key => $module) {
+                $displayName = str_replace('_', ' ', $key);
+                $displayName = ucwords($displayName);
+
+                DB::table('notification_triggers')
+                    ->whereIn('name', [$key, $displayName])
+                    ->update(['module' => $module]);
+            }
         }
     }
 

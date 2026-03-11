@@ -7,6 +7,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/lib/axios'
 import SkeletonBox from '@/components/skeletons/SkeletonBox.vue'
+import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
 
 const auth = useAuthStore()
 const loading = ref(true)
@@ -32,7 +33,10 @@ function applyData(data) {
 
 async function loadFilters() {
   try {
-    const { data } = await api.get('/dashboard/filters')
+    const { data } = await api.get('/dashboard/filters', {
+      skipAuthRedirect: true,
+      showToast: false,
+    })
     filterOptions.value = data
   } catch { /* silent */ }
 }
@@ -44,13 +48,19 @@ async function fetchStats() {
   if (teamId.value) params.team_id = teamId.value
   if (csrId.value) params.csr_id = csrId.value
 
-  const { data } = await api.get('/dashboard/stats', { params })
+  const { data } = await api.get('/dashboard/stats', {
+    params,
+    skipAuthRedirect: true,
+    showToast: false,
+  })
   applyData(data.data)
 }
 
 async function initialLoad() {
   loading.value = true
   try {
+    await auth.fetchUser(true)
+    if (!auth.isAuthenticated) return
     await Promise.all([fetchStats(), loadFilters(), fetchSlaStats()])
   } catch { /* silent */ }
   finally { loading.value = false }
@@ -58,7 +68,10 @@ async function initialLoad() {
 
 async function fetchSlaStats() {
   try {
-    const { data } = await api.get('/reports/sla-performance')
+    const { data } = await api.get('/reports/sla-performance', {
+      skipAuthRedirect: true,
+      showToast: false,
+    })
     slaStats.value = data.data ?? data
   } catch { slaStats.value = null }
 }
@@ -204,11 +217,11 @@ function formatMrc(n) {
       <div class="flex flex-wrap items-end gap-3">
         <div class="flex-1 min-w-[140px]">
           <label class="block text-xs font-medium text-gray-600 mb-1">From Date</label>
-          <input type="date" v-model="dateFrom" class="w-full rounded-lg border-gray-300 text-sm focus:border-brand-primary focus:ring-brand-primary" />
+          <DateInputDdMmYyyy v-model="dateFrom" placeholder="DD-MMM-YYYY" />
         </div>
         <div class="flex-1 min-w-[140px]">
           <label class="block text-xs font-medium text-gray-600 mb-1">To Date</label>
-          <input type="date" v-model="dateTo" class="w-full rounded-lg border-gray-300 text-sm focus:border-brand-primary focus:ring-brand-primary" />
+          <DateInputDdMmYyyy v-model="dateTo" placeholder="DD-MMM-YYYY" />
         </div>
         <div class="flex-1 min-w-[160px]">
           <label class="block text-xs font-medium text-gray-600 mb-1">Team</label>

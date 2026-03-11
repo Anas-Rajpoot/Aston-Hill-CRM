@@ -8,6 +8,7 @@ import { fromDdMmYyyy } from '@/lib/dateFormat'
 import AdvancedFilters from '@/components/dsp-tracker/AdvancedFilters.vue'
 import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomizerModal.vue'
 import DSPTrackerDetailModal from '@/components/dsp-tracker/DSPTrackerDetailModal.vue'
+import HorizontalScrollToolbar from '@/components/common/HorizontalScrollToolbar.vue'
 import dspTrackerApi from '@/services/dspTrackerApi'
 import Toast from '@/components/Toast.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -311,52 +312,73 @@ function csvEscape(val) {
 
 function downloadCsvSample() {
   if (!canImport.value) return
-  const headers = IMPORT_CSV_COLUMNS.map((c) => {
-    if (c === 'dsp_om_id') return 'DSP OM ID'
-    if (c === 'uploaded_by') return 'Uploaded By'
-    if (c === 'uploaded_at') return 'Uploaded At'
+  const tableCols = [...displayedColumns.value]
+  const extraCols = ['other_1', 'other_2']
+  const exportCols = [...tableCols, ...extraCols]
+  const headers = exportCols.map((c) => {
+    if (c === 'other_1') return 'Other 1'
+    if (c === 'other_2') return 'Other 2'
     return COLUMN_LABELS[c] || c
   })
-  const sampleRow1 = [
-    'ACT-1001',
-    'ABC Trading LLC',
-    'ACC-0001',
-    'New Request',
-    '24-Feb-2026',
-    '10:30',
-    'Fiber 100Mbps',
-    'SO-1001',
-    'Pending',
-    '',
-    'Ahmed',
-    '971501234567',
-    'OM-1022',
-    'operations.user',
-    '24-Feb-2026 10:30',
+  const rows = [
+    {
+      activity_number: 'ACT-1001',
+      company_name: 'ABC Trading LLC',
+      account_number: 'ACC-0001',
+      request_type: 'New Request',
+      appointment_date: '24-Feb-2026',
+      appointment_time: '10:30',
+      product: 'Fiber 100Mbps',
+      so_number: 'SO-1001',
+      request_status: 'Pending',
+      rejection_reason: '',
+      verifier_name: 'Ahmed',
+      verifier_number: '971501234567',
+      other_1: 'Sample extra value A',
+      other_2: 'Sample extra value B',
+    },
+    {
+      activity_number: 'ACT-1002',
+      company_name: 'XYZ Services LLC',
+      account_number: 'ACC-0002',
+      request_type: 'Upgrade',
+      appointment_date: '25-Feb-2026',
+      appointment_time: '14:00',
+      product: 'Fiber 200Mbps',
+      so_number: 'SO-1002',
+      request_status: 'In Progress',
+      rejection_reason: '',
+      verifier_name: 'Sara',
+      verifier_number: '971509876543',
+      other_1: 'Sample extra value C',
+      other_2: 'Sample extra value D',
+    },
+    {
+      activity_number: 'ACT-1003',
+      company_name: 'Blue Star Telecom',
+      account_number: 'ACC-0003',
+      request_type: 'Reactivation',
+      appointment_date: '26-Feb-2026',
+      appointment_time: '09:15',
+      product: 'Fiber 50Mbps',
+      so_number: 'SO-1003',
+      request_status: 'Completed',
+      rejection_reason: '',
+      verifier_name: 'Khalid',
+      verifier_number: '971507778889',
+      other_1: 'Sample extra value E',
+      other_2: 'Sample extra value F',
+    },
   ]
-  const sampleRow2 = [
-    'ACT-1002',
-    'XYZ Services LLC',
-    'ACC-0002',
-    'Upgrade',
-    '25-Feb-2026',
-    '14:00',
-    'Fiber 200Mbps',
-    'SO-1002',
-    'In Progress',
-    '',
-    'Sara',
-    '971509876543',
-    'OM-1023',
-    'field.user',
-    '25-Feb-2026 14:00',
-  ]
-  const csv = [headers.map(csvEscape).join(','), sampleRow1.map(csvEscape).join(','), sampleRow2.map(csvEscape).join(',')].join('\r\n')
+  const csv = [
+    headers.map(csvEscape).join(','),
+    ...rows.map((row) => exportCols.map((col) => csvEscape(row[col] ?? '')).join(',')),
+  ].join('\r\n')
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = 'dsp-tracker-sample.csv'
+  a.download = 'dsp-tracker-template.csv'
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -476,61 +498,6 @@ onMounted(() => load())
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-white py-6 px-4 sm:px-6">
     <div class="mx-auto max-w-7xl space-y-4">
-      <div class="flex flex-wrap items-start justify-between gap-4">
-        <div class="flex items-start gap-3">
-          <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-brand-primary text-white">
-            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-            </svg>
-          </div>
-          <div>
-            <div class="flex items-baseline gap-4">
-              <h1 class="text-xl font-bold text-gray-900 leading-tight">DSP Tracker - Status Check</h1>            </div>
-            <p class="mt-0.5 text-sm text-gray-500">Search and track DSP-related activities and requests.</p>
-          </div>
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <input
-            ref="csvInputRef"
-            type="file"
-            accept=".csv,text/csv"
-            class="hidden"
-            @change="onCsvChange"
-          />
-          <button
-            v-if="canImport"
-            type="button"
-            class="inline-flex items-center gap-2 rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            @click="downloadCsvSample"
-          >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Download CSV Sample
-          </button>
-          <button
-            v-if="canDeleteCsv"
-            type="button"
-            class="inline-flex items-center rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-            :disabled="!lastUploadedBatchId"
-            @click="deleteOldFile"
-          >
-            Delete Old File
-          </button>
-          <button
-            v-if="canImport"
-            type="button"
-            class="inline-flex items-center gap-2 rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover"
-            @click="triggerImport"
-          >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Upload CSV file
-          </button>
-        </div>
-      </div>
-
       <div v-if="loadError" class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
         {{ loadError }}
       </div>
@@ -540,8 +507,15 @@ onMounted(() => load())
 
       <!-- Filters: Request Status, Company Name, Apply/Reset, Advanced Filters, Customize Columns (Activity Number only in Advanced) -->
       <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-        <div class="flex flex-wrap items-end gap-3">
-          <div class="w-full sm:min-w-[140px] sm:max-w-[180px] sm:w-auto">
+        <input
+          ref="csvInputRef"
+          type="file"
+          accept=".csv,text/csv"
+          class="hidden"
+          @change="onCsvChange"
+        />
+        <HorizontalScrollToolbar>
+          <div class="w-[170px] shrink-0">
             <label class="mb-1 block text-xs font-medium text-gray-600">Request Status</label>
             <select
               v-model="filters.request_status"
@@ -552,7 +526,7 @@ onMounted(() => load())
               <option v-for="o in filterOptions.request_status_options" :key="o.value" :value="o.value">{{ o.label }}</option>
             </select>
           </div>
-          <div class="w-full sm:min-w-[140px] sm:max-w-[200px] sm:w-auto">
+          <div class="w-[200px] shrink-0">
             <label class="mb-1 block text-xs font-medium text-gray-600">Company Name</label>
             <input
               v-model="filters.company_name"
@@ -562,7 +536,7 @@ onMounted(() => load())
               :disabled="loading"
             />
           </div>
-          <div class="w-full sm:min-w-[140px] sm:max-w-[200px] sm:w-auto">
+          <div class="w-[200px] shrink-0">
             <label class="mb-1 block text-xs font-medium text-gray-600">Activity</label>
             <input
               v-model="filters.activity_number"
@@ -572,7 +546,7 @@ onMounted(() => load())
               :disabled="loading"
             />
           </div>
-          <div class="flex gap-2">
+          <div class="flex shrink-0 items-end gap-2">
             <button
               type="button"
               class="rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50"
@@ -590,7 +564,38 @@ onMounted(() => load())
               Reset
             </button>
           </div>
-          <div class="flex flex-wrap gap-2 sm:ml-auto">
+          <div class="ml-2 flex shrink-0 items-end gap-2">
+            <button
+              v-if="canImport"
+              type="button"
+              class="inline-flex items-center gap-2 rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              @click="downloadCsvSample"
+            >
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Template
+            </button>
+            <button
+              v-if="canDeleteCsv"
+              type="button"
+              class="inline-flex items-center rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+              :disabled="!lastUploadedBatchId"
+              @click="deleteOldFile"
+            >
+              Delete Old File
+            </button>
+            <button
+              v-if="canImport"
+              type="button"
+              class="inline-flex items-center gap-2 rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover"
+              @click="triggerImport"
+            >
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Upload CSV file
+            </button>
             <button
               type="button"
               class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -610,7 +615,7 @@ onMounted(() => load())
               </svg>
             </button>
           </div>
-        </div>
+        </HorizontalScrollToolbar>
       </div>
 
       <AdvancedFilters

@@ -75,7 +75,9 @@ export default {
     return data
   },
 
-  getTeamOptions() {
-    return api.get('/field-submissions/team-options')
+  getTeamOptions(forceRefresh = false) {
+    return api.get('/field-submissions/team-options', {
+      params: forceRefresh ? { fresh: 1 } : undefined,
+    })
   },
 }

@@ -170,21 +170,21 @@ function buildParams() {
 }
 
 const COLUMN_LABELS = {
-  id: 'ID',
-  submitted_at: 'Submitted At',
+  id: 'SR',
+  submitted_at: 'Created',
   updated_at: 'Updated At',
   submission_type: 'Request Type',
   account_number: 'Account Number',
-  company_name: 'Company Name',
+  company_name: 'Company Name as per Trade License',
   authorized_signatory_name: 'Authorized Signatory Name',
   email: 'Email ID',
   contact_number_gsm: 'Contact Number',
   alternate_contact_number: 'Alternate Contact Number',
-  address: 'Complete Address',
-  emirate: 'Emirate',
+  address: 'Complete Address as per Ejari',
+  emirate: 'Emirates',
   location_coordinates: 'Location Coordinates',
-  category: 'Service Category',
-  type: 'Service Type',
+  category: 'Service Categories',
+  type: 'Service Types',
   product: 'Product',
   offer: 'Offer',
   mrc_aed: 'MRC (AED)',
@@ -194,9 +194,9 @@ const COLUMN_LABELS = {
   previous_activity: 'Old Activity',
   resubmission_reason: 'Resubmission Reason',
   remarks: 'Remarks',
-  sales_agent: 'Sales Agent',
-  team_leader: 'Team Leader',
-  manager: 'Manager',
+  sales_agent: 'Sales Agent Name',
+  team_leader: 'Team Leader Name',
+  manager: 'Manager Name',
   status: 'Status',
   sla_timer: 'SLA Timer',
   executive: 'Back Office Executive',
@@ -208,7 +208,7 @@ const COLUMN_LABELS = {
   submission_date_from: 'Submission Date',
   back_office_notes: 'Back Office Notes',
   activity: 'Activity',
-  back_office_account: 'Back Office Account',
+  back_office_account: 'Back Office Notes',
   work_order: 'Work Order',
   du_status: 'DU Status',
   completion_date: 'Completion Date',
@@ -257,6 +257,29 @@ async function onExport() {
   } finally {
     exportLoading.value = false
   }
+}
+
+function downloadTemplateCsv() {
+  const cols = [...visibleColumns.value]
+  const additionalHeaders = ['contact_1_name', 'contact_1_contact_number']
+  const headers = [...new Set([...cols, ...additionalHeaders])]
+  const stamp = Date.now()
+  const rows = [
+    { company_name: 'Demo Company LLC', account_number: `LEAD-${stamp}-1`, submitted_at: '2026-03-10', contact_1_name: 'John Doe', contact_1_contact_number: '971501112233' },
+    { company_name: 'Al Noor Trading', account_number: `LEAD-${stamp}-2`, submitted_at: '2026-03-11', contact_1_name: 'Ali Hassan', contact_1_contact_number: '971502223344' },
+    { company_name: 'Bright Star FZE', account_number: `LEAD-${stamp}-3`, submitted_at: '2026-03-12', contact_1_name: 'Sara Khan', contact_1_contact_number: '971503334455' },
+  ]
+  const csvRows = [headers.map(escapeCsv).join(',')]
+  for (const row of rows) {
+    csvRows.push(headers.map((col) => escapeCsv(row[col] ?? '')).join(','))
+  }
+  const blob = new Blob([csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'lead-submissions-template.csv'
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 async function load() {
@@ -722,6 +745,17 @@ onMounted(async () => {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
             {{ exportLoading ? 'Exporting...' : 'Export' }}
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70 disabled:cursor-wait"
+            :disabled="loading || exportLoading"
+            @click="downloadTemplateCsv"
+          >
+            <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Template
           </button>
         </template>
         <template #after-reset>

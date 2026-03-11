@@ -188,8 +188,8 @@ async function submit() {
       if (form.value.user_id != null && form.value.user_id !== '') {
         fd.append('user_id', String(form.value.user_id))
       }
-      if (invoiceFile.value) fd.append('invoice', invoiceFile.value)
-      if (supportingFile.value) fd.append('supporting_documents', supportingFile.value)
+      if (invoiceFile.value) fd.append('invoice[]', invoiceFile.value)
+      if (supportingFile.value) fd.append('supporting_documents[]', supportingFile.value)
       await expensesApi.create(fd)
     } else {
       const payload = {

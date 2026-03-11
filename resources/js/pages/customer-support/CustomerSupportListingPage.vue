@@ -57,7 +57,7 @@ const perPageOptions = ref([10, 20, 25, 50, 100])
 const allColumns = ref([])
 const visibleColumns = ref([
   'id', 'submitted_at', 'ticket_number', 'account_number', 'company_name', 'issue_category',
-  'contact_number', 'alternate_contact_number', 'issue_description', 'attachments', 'creator', 'csr', 'sla_timer', 'status', 'workflow_status',
+  'contact_number', 'alternate_contact_number', 'issue_description', 'creator', 'csr', 'sla_timer', 'status', 'workflow_status',
   'completion_date', 'updated_at',
   'trouble_ticket', 'activity', 'resolution_remarks', 'internal_remarks',
   'manager', 'team_leader', 'sales_agent',
@@ -160,27 +160,25 @@ function buildParams() {
 }
 
 const COLUMN_LABELS = {
-  id: 'ID',
-  submitted_at: 'Submitted At',
+  id: 'SR',
+  submitted_at: 'Created',
   ticket_number: 'Ticket Number',
   account_number: 'Account Number',
-  company_name: 'Company Name',
+  company_name: 'Company Name as per Trade License',
   issue_category: 'Issue Category',
   contact_number: 'Contact Number',
   alternate_contact_number: 'Alternate Contact Number',
   issue_description: 'Issue Description',
-  attachments: 'Attachments',
   creator: 'Submitter Name',
   csr: 'CSR Name',
   sla_timer: 'SLA Timer',
-  manager: 'Manager',
-  team_leader: 'Team Leader',
-  sales_agent: 'Sales Agent',
+  manager: 'Manager Name',
+  team_leader: 'Team Leader Name',
+  sales_agent: 'Sales Agent Name',
   status: 'Status',
   workflow_status: 'SLA Status',
   completion_date: 'Completion Date',
   updated_at: 'Last Updated',
-  created_at: 'Created At',
   trouble_ticket: 'Trouble Ticket',
   activity: 'Activity',
   resolution_remarks: 'Resolution Remarks',
@@ -229,6 +227,29 @@ async function onExport() {
   }
 }
 
+function downloadTemplateCsv() {
+  const cols = [...visibleColumns.value]
+  const additionalHeaders = ['contact_1_name', 'contact_1_contact_number']
+  const headers = [...new Set([...cols, ...additionalHeaders])]
+  const stamp = Date.now()
+  const rows = [
+    { company_name: 'Demo Company LLC', account_number: `CS-${stamp}-1`, submitted_at: '2026-03-10', contact_1_name: 'John Doe', contact_1_contact_number: '971501112233' },
+    { company_name: 'Al Noor Trading', account_number: `CS-${stamp}-2`, submitted_at: '2026-03-11', contact_1_name: 'Ali Hassan', contact_1_contact_number: '971502223344' },
+    { company_name: 'Bright Star FZE', account_number: `CS-${stamp}-3`, submitted_at: '2026-03-12', contact_1_name: 'Sara Khan', contact_1_contact_number: '971503334455' },
+  ]
+  const csvRows = [headers.map(escapeCsv).join(',')]
+  for (const row of rows) {
+    csvRows.push(headers.map((col) => escapeCsv(row[col] ?? '')).join(','))
+  }
+  const blob = new Blob([csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'customer-support-template.csv'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 async function load() {
   window.scrollTo(0, 0)
   // Cancel any in-flight list request before starting a new one
@@ -271,7 +292,8 @@ async function loadFilters() {
 }
 
 function removeLegacyPendingColumn(cols) {
-  return cols.filter(c => c !== 'pending')
+  const hiddenColumns = new Set(['pending', 'attachments', 'created_at'])
+  return cols.filter(c => !hiddenColumns.has(c))
 }
 
 async function loadColumns() {
@@ -587,6 +609,17 @@ onMounted(async () => {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
             {{ exportLoading ? 'Exporting...' : 'Export' }}
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70 disabled:cursor-wait"
+            :disabled="loading || exportLoading"
+            @click="downloadTemplateCsv"
+          >
+            <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Template
           </button>
         </template>
         <template #after-reset>

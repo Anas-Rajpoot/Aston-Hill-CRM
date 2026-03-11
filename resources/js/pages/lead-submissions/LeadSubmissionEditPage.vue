@@ -80,6 +80,7 @@ const form = ref({
 })
 
 const { draftSaving, draftSavedAt, clearDraft } = useFormDraft('lead-submission', route.params.id || 'new', form)
+const accountSyncing = ref(false)
 
 const STATUS_OPTIONS = [
   { value: 'unassigned', label: 'UnAssigned' },
@@ -225,8 +226,9 @@ async function loadLead() {
       team_leaders: teamData.team_leaders ?? [],
       sales_agents: teamData.sales_agents ?? [],
     }
+    const accountNumberValue = data.account_number ?? data.back_office_account ?? ''
     form.value = {
-      account_number: data.account_number ?? '',
+      account_number: accountNumberValue,
       company_name: data.company_name ?? '',
       authorized_signatory_name: data.authorized_signatory_name ?? '',
       email: data.email ?? '',
@@ -255,7 +257,7 @@ async function loadLead() {
       submission_date_from: data.submission_date_from ?? '',
       back_office_notes: data.back_office_notes ?? '',
       activity: data.activity ?? '',
-      back_office_account: data.back_office_account ?? '',
+      back_office_account: accountNumberValue,
       work_order: data.work_order ?? '',
       du_status: normalizeDuStatus(data.du_status),
       completion_date: data.completion_date ?? '',
@@ -299,6 +301,8 @@ async function downloadDoc(doc) {
 const bulkDownloading = ref(false)
 const uploadingDocs = ref(false)
 const removingDocId = ref(null)
+const showDeleteConfirmModal = ref(false)
+const deleteDocCandidate = ref(null)
 /** Slots for "Add Document" cards; user can add more. */
 const addDocumentSlots = ref([{ id: 0 }])
 async function bulkDownload() {
@@ -337,8 +341,16 @@ async function uploadFromInput(e) {
       formData.append('documents[]', input.files[i])
     }
     await leadSubmissionsApi.uploadDocuments(id, formData)
-    await loadLead()
+    // Refresh only documents to preserve unsaved form edits.
+    const leadRes = await leadSubmissionsApi.getLead(id)
+    const latestLead = leadRes?.data ?? leadRes ?? null
+    if (lead.value) {
+      lead.value.documents = latestLead?.documents ?? lead.value.documents ?? []
+    } else {
+      lead.value = latestLead
+    }
     input.value = ''
+    toast('success', 'Document uploaded successfully.')
   } catch (err) {
     const msg = err.response?.data?.message || err.message || 'Upload failed.'
     toast('error', msg)
@@ -347,16 +359,32 @@ async function uploadFromInput(e) {
   }
 }
 
-async function removeDocument(doc) {
+function requestRemoveDocument(doc) {
+  if (!doc?.id) return
+  deleteDocCandidate.value = doc
+  showDeleteConfirmModal.value = true
+}
+
+function closeDeleteConfirmModal() {
+  if (removingDocId.value) return
+  showDeleteConfirmModal.value = false
+  deleteDocCandidate.value = null
+}
+
+async function confirmRemoveDocument() {
   const id = leadId.value
+  const doc = deleteDocCandidate.value
   if (!id || !doc?.id) return
-  if (!confirm('Remove this document?')) return
+  const docName = docDisplayName(doc)
+  // Close confirmation modal immediately after user confirms.
+  closeDeleteConfirmModal()
   removingDocId.value = doc.id
   try {
     await leadSubmissionsApi.deleteDocument(id, doc.id)
     if (lead.value?.documents) {
       lead.value.documents = lead.value.documents.filter((d) => d.id !== doc.id)
     }
+    toast('success', `Document "${docName}" deleted successfully.`)
   } catch (err) {
     const msg = err.response?.data?.message || err.message || 'Remove failed.'
     toast('error', msg)
@@ -475,9 +503,32 @@ watch(
   }
 )
 
+watch(
+  () => form.value.account_number,
+  (value) => {
+    if (accountSyncing.value) return
+    if (form.value.back_office_account === value) return
+    accountSyncing.value = true
+    form.value.back_office_account = value ?? ''
+    accountSyncing.value = false
+  }
+)
+
+watch(
+  () => form.value.back_office_account,
+  (value) => {
+    if (accountSyncing.value) return
+    if (form.value.account_number === value) return
+    accountSyncing.value = true
+    form.value.account_number = value ?? ''
+    accountSyncing.value = false
+  }
+)
+
 onMounted(() => {
   loadLead()
 })
+
 </script>
 
 <template>
@@ -613,7 +664,7 @@ onMounted(() => {
                   <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.gaid) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Service Category</label>
+                  <label class="block text-xs font-medium text-gray-500">Service Categories</label>
                   <select v-if="canEditBackOffice" v-model="form.service_category_id" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm">
                     <option :value="null">Select</option>
                     <option v-for="c in options.categories" :key="c.id" :value="c.id">{{ c.name }}</option>
@@ -621,7 +672,7 @@ onMounted(() => {
                   <div v-else class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ categoryDisplay(lead) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Service Type</label>
+                  <label class="block text-xs font-medium text-gray-500">Service Types</label>
                   <select v-if="canEditBackOffice" v-model="form.service_type_id" class="mt-0.5 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm">
                     <option :value="null">Select</option>
                     <option v-for="t in options.serviceTypes" :key="t.id" :value="t.id">{{ t.name }}</option>
@@ -895,7 +946,7 @@ onMounted(() => {
                       class="rounded p-1.5 text-red-600 hover:bg-red-50 hover:text-red-700"
                       title="Remove"
                       :disabled="removingDocId === doc.id"
-                      @click="removeDocument(doc)"
+                      @click="requestRemoveDocument(doc)"
                     >
                       <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -968,6 +1019,40 @@ onMounted(() => {
               </button>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-if="showDeleteConfirmModal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      @click.self="closeDeleteConfirmModal"
+    >
+      <div class="w-full max-w-md rounded-xl border border-gray-200 bg-white shadow-xl">
+        <div class="border-b border-gray-100 px-5 py-4">
+          <h3 class="text-base font-semibold text-gray-900">Confirm Document Deletion</h3>
+        </div>
+        <div class="px-5 py-4 text-sm text-gray-700">
+          Delete document
+          <span class="font-medium text-gray-900">"{{ docDisplayName(deleteDocCandidate) }}"</span>?
+        </div>
+        <div class="flex items-center justify-end gap-2 border-t border-gray-100 px-5 py-4">
+          <button
+            type="button"
+            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            :disabled="!!removingDocId"
+            @click="closeDeleteConfirmModal"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-70"
+            :disabled="!!removingDocId"
+            @click="confirmRemoveDocument"
+          >
+            {{ removingDocId ? 'Deleting...' : 'OK' }}
+          </button>
         </div>
       </div>
     </div>

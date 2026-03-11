@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\LeadSubmission;
 use App\Models\ServiceType;
+use App\Models\User;
 use App\Repositories\Contracts\LeadSubmissionRepositoryInterface;
 use App\Support\LeadSubmissionSchema;
 use App\Traits\StoresLeadSubmissionDocuments;
@@ -158,6 +159,16 @@ class LeadSubmissionService
 
     public function submit(LeadSubmission $leadSubmission): LeadSubmission
     {
-        return $this->repo->submit($leadSubmission);
+        $fresh = $this->repo->submit($leadSubmission);
+
+        NotificationService::dispatchOnce('new_submission_created', 'lead_submission:' . $fresh->id, [
+            'module' => 'Lead Submissions',
+            'title' => 'New Lead Submission',
+            'message' => sprintf('Lead submission #%d was created for %s.', $fresh->id, $fresh->company_name ?: 'N/A'),
+            'url' => '/lead-submissions',
+            'users' => User::query()->get(['id', 'name', 'email']),
+        ], 900);
+
+        return $fresh;
     }
 }

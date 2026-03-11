@@ -32,6 +32,12 @@ export default {
     return api.post('/expenses', payload)
   },
 
+  importCsv(formData) {
+    return api.post('/expenses/import-csv', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+
   show(id) {
     return api.get(`/expenses/${id}`)
   },

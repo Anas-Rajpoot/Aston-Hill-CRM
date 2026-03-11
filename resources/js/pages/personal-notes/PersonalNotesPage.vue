@@ -7,6 +7,7 @@ import { useRoute, useRouter } from 'vue-router'
 import personalNotesApi from '@/services/personalNotesApi'
 import { toDdMonYyyyLower } from '@/lib/dateFormat'
 import Toast from '@/components/Toast.vue'
+import DeleteOtpModal from '@/components/DeleteOtpModal.vue'
 import { useAuthStore } from '@/stores/auth'
 import { canModuleAction } from '@/lib/accessControl'
 
@@ -30,7 +31,7 @@ const canDelete = computed(() =>
 const notes = ref([])
 const currentIndex = ref(0)
 const loading = ref(true)
-const showDeleteModal = ref(false)
+const deleteModalVisible = ref(false)
 const deleting = ref(false)
 const editing = ref(false)
 const saving = ref(false)
@@ -159,11 +160,11 @@ async function saveEdit() {
 
 function openDeleteModal() {
   if (!canDelete.value) return
-  if (currentNote.value?.id) showDeleteModal.value = true
+  if (currentNote.value?.id) deleteModalVisible.value = true
 }
 
 function closeDeleteModal() {
-  if (!deleting.value) showDeleteModal.value = false
+  if (!deleting.value) deleteModalVisible.value = false
 }
 
 async function confirmDeleteNote() {
@@ -174,7 +175,7 @@ async function confirmDeleteNote() {
   try {
     await personalNotesApi.delete(note.id)
     toast('success', 'Note deleted successfully.')
-    showDeleteModal.value = false
+    deleteModalVisible.value = false
     await loadNotes()
     if (currentIndex.value >= notes.value.length && notes.value.length > 0) {
       currentIndex.value = notes.value.length - 1
@@ -367,61 +368,14 @@ watch(
       </div>
     </footer>
 
-    <!-- Delete confirmation modal -->
-    <Teleport to="body">
-      <Transition
-        enter-active-class="transition ease-out duration-200"
-        enter-from-class="opacity-0"
-        enter-to-class="opacity-100"
-        leave-active-class="transition ease-in duration-150"
-        leave-from-class="opacity-100"
-        leave-to-class="opacity-0"
-      >
-        <div
-          v-if="showDeleteModal"
-          class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-gray-900/50 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delete-note-title"
-          @click.self="closeDeleteModal"
-        >
-          <div
-            class="w-full max-w-md rounded-xl bg-white shadow-xl border border-gray-200 overflow-hidden"
-            @keydown.esc="closeDeleteModal"
-          >
-            <div class="flex items-center gap-3 px-6 pt-6 pb-2">
-              <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600">
-                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </span>
-              <div>
-                <h2 id="delete-note-title" class="text-lg font-semibold text-gray-900">Delete note?</h2>
-                <p class="mt-0.5 text-sm text-gray-500">This note will be permanently removed. This action cannot be undone.</p>
-              </div>
-            </div>
-            <div class="flex justify-end gap-3 px-6 pb-6 pt-4">
-              <button
-                type="button"
-                class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#0D7377] focus:ring-offset-2 disabled:opacity-70"
-                :disabled="deleting"
-                @click="closeDeleteModal"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                class="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-70"
-                :disabled="deleting"
-                @click="confirmDeleteNote"
-              >
-                {{ deleting ? 'Deleting…' : 'Delete' }}
-              </button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+    <DeleteOtpModal
+      :visible="deleteModalVisible"
+      title="Delete Personal Note"
+      :item-label="currentNote?.title || `Note #${currentNote?.id ?? ''}`"
+      :loading="deleting"
+      @close="closeDeleteModal"
+      @confirm="confirmDeleteNote"
+    />
 
     <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />
   </div>

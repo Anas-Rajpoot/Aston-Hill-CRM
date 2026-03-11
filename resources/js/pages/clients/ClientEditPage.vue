@@ -405,6 +405,10 @@ onMounted(() => load())
                   <option v-for="opt in accountTransferGivenToOptions" :key="opt" :value="opt">{{ opt }}</option>
                 </select>
               </div>
+              <div>
+                <label class="text-xs font-medium text-gray-500">Account Transfer Given Date</label>
+                <DateInputDdMmYyyy v-model="form.account_transfer_given_date" />
+              </div>
             </div>
 
             <!-- Account Manager & CSR -->

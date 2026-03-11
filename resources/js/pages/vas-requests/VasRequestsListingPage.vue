@@ -150,21 +150,25 @@ function buildParams() {
 }
 
 const COLUMN_LABELS = {
-  id: 'ID',
-  created_at: 'Created At',
+  id: 'SR',
+  created_at: 'Created',
   request_type: 'Request Type',
   account_number: 'Account Number',
-  company_name: 'Company Name',
+  company_name: 'Company Name as per Trade License',
   contact_number: 'Contact Number',
   request_description: 'Request Description',
   description: 'Request Description',
   additional_notes: 'Additional Notes',
-  manager: 'Manager',
-  team_leader: 'Team Leader',
-  sales_agent: 'Sales Agent',
+  manager: 'Manager Name',
+  team_leader: 'Team Leader Name',
+  sales_agent: 'Sales Agent Name',
   executive: 'Back Office Executive',
+  submitted_at: 'Submission Date',
   sla_timer: 'SLA Timer',
   status: 'Status',
+  activity: 'Activity',
+  completion_date: 'Completion Date',
+  remarks: 'Remarks',
   creator: 'Submitter Name',
 }
 
@@ -210,6 +214,29 @@ async function onExport() {
   }
 }
 
+function downloadTemplateCsv() {
+  const cols = [...visibleColumns.value]
+  const additionalHeaders = ['contact_1_name', 'contact_1_contact_number']
+  const headers = [...new Set([...cols, ...additionalHeaders])]
+  const stamp = Date.now()
+  const rows = [
+    { company_name: 'Demo Company LLC', account_number: `VAS-${stamp}-1`, submitted_at: '2026-03-10', contact_1_name: 'John Doe', contact_1_contact_number: '971501112233' },
+    { company_name: 'Al Noor Trading', account_number: `VAS-${stamp}-2`, submitted_at: '2026-03-11', contact_1_name: 'Ali Hassan', contact_1_contact_number: '971502223344' },
+    { company_name: 'Bright Star FZE', account_number: `VAS-${stamp}-3`, submitted_at: '2026-03-12', contact_1_name: 'Sara Khan', contact_1_contact_number: '971503334455' },
+  ]
+  const csvRows = [headers.map(escapeCsv).join(',')]
+  for (const row of rows) {
+    csvRows.push(headers.map((col) => escapeCsv(row[col] ?? '')).join(','))
+  }
+  const blob = new Blob([csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'vas-requests-template.csv'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 async function load() {
   window.scrollTo(0, 0)
   // Cancel any in-flight list request before starting a new one
@@ -253,11 +280,26 @@ async function loadFilters() {
 async function loadColumns() {
   try {
     const data = await vasRequestsApi.columns()
-    allColumns.value = data.all_columns ?? []
-    visibleColumns.value = data.visible_columns ?? visibleColumns.value
+    allColumns.value = normalizeVasColumns(data.all_columns ?? [])
+    visibleColumns.value = normalizeVasColumns(data.visible_columns ?? visibleColumns.value)
   } catch {
     //
   }
+}
+
+function normalizeVasColumns(cols) {
+  const seen = new Set()
+  const out = []
+  for (const col of cols || []) {
+    // Hide legacy duplicate column; keep canonical request_description only.
+    if (col === 'description') continue
+    // Hide legacy completion date source; keep canonical completion_date only.
+    if (col === 'approved_at') continue
+    if (seen.has(col)) continue
+    seen.add(col)
+    out.push(col)
+  }
+  return out
 }
 
 function applyFilters() {
@@ -294,8 +336,9 @@ function onSort({ sort: s, order: o }) {
 
 async function onSaveColumns(cols) {
   try {
-    await vasRequestsApi.saveColumns(cols)
-    visibleColumns.value = cols
+    const cleaned = normalizeVasColumns(cols)
+    await vasRequestsApi.saveColumns(cleaned)
+    visibleColumns.value = cleaned
     meta.value.current_page = 1
     load()
   } catch {
@@ -493,9 +536,9 @@ onMounted(async () => {
       executives: bo.executives ?? [],
     }
     const cd = bootstrapResult.columns ?? {}
-    if (cd.all_columns) allColumns.value = cd.all_columns
+    if (cd.all_columns) allColumns.value = normalizeVasColumns(cd.all_columns)
     const requestedCols = [...visibleColumns.value]
-    if (cd.visible_columns) visibleColumns.value = cd.visible_columns ?? visibleColumns.value
+    if (cd.visible_columns) visibleColumns.value = normalizeVasColumns(cd.visible_columns ?? visibleColumns.value)
     const pd = bootstrapResult.page ?? {}
     submissions.value = pd.data ?? []
     meta.value = pd.meta ?? meta.value
@@ -559,6 +602,17 @@ onMounted(async () => {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
             {{ exportLoading ? 'Exporting...' : 'Export' }}
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70 disabled:cursor-wait"
+            :disabled="loading || exportLoading"
+            @click="downloadTemplateCsv"
+          >
+            <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Template
           </button>
         </template>
         <template #after-reset>

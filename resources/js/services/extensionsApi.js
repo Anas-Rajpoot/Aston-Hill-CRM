@@ -37,6 +37,14 @@ export default {
     })
   },
 
+  bulkDelete(ids = []) {
+    return api.post('/cisco-extensions/bulk-delete', { ids })
+  },
+
+  bulkStatusUpdate(ids = [], status) {
+    return api.patch('/cisco-extensions/bulk-status', { ids, status })
+  },
+
   update(id, payload) {
     return api.put(`/cisco-extensions/${id}`, payload)
   },

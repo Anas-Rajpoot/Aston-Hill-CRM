@@ -11,6 +11,7 @@ use App\Models\SystemAuditLog;
 use App\Rules\AllowedDocumentFile;
 use App\Models\User;
 use App\Models\UserColumnPreference;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -250,6 +251,14 @@ class SpecialRequestApiController extends Controller
             'status' => $data['status'] ?? 'unassigned',
             'submitted_at' => now(),
         ]);
+
+        NotificationService::dispatchOnce('new_submission_created', 'special_request:' . $specialRequest->id, [
+            'module' => 'Special Requests',
+            'title' => 'New Special Request',
+            'message' => sprintf('Special request #%d was created for %s.', $specialRequest->id, $specialRequest->company_name ?: 'N/A'),
+            'url' => '/special-requests',
+            'users' => User::query()->get(['id', 'name', 'email']),
+        ], 900);
 
         // Validate and handle document uploads
         $request->validate([

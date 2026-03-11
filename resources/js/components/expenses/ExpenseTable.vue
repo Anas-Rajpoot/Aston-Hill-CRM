@@ -23,12 +23,14 @@ const props = defineProps({
   canDelete: { type: Boolean, default: undefined },
   canView: { type: Boolean, default: undefined },
   canHistory: { type: Boolean, default: undefined },
+  selectable: { type: Boolean, default: false },
+  selectedIds: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['sort', 'delete', 'view', 'edit', 'viewHistory', 'openEdit'])
+const emit = defineEmits(['sort', 'delete', 'view', 'edit', 'viewHistory', 'openEdit', 'toggleSelectRow', 'toggleSelectAll'])
 
 // Column order as per design: Status first, then rest
-const ORDERED_COLUMNS = ['status', 'expense_date', 'product_category', 'product_description', 'invoice_number', 'vat_amount', 'amount_without_vat', 'vat_amount_currency', 'full_amount', 'added_by', 'created_at']
+const ORDERED_COLUMNS = ['id', 'status', 'created_at', 'expense_date', 'product_category', 'product_description', 'invoice_number', 'vat_amount', 'amount_without_vat', 'vat_amount_currency', 'full_amount', 'added_by']
 const orderedColumns = computed(() => {
   const cols = [...(props.columns || [])]
   return cols.sort((a, b) => {
@@ -55,6 +57,12 @@ const effectiveCanHistory = computed(() => props.canHistory !== undefined
   : canModuleAction(auth.user, 'expense-tracker', 'view', ['expense_tracker.history', 'expense_tracker.view-history']))
 const hasAnyRowAction = computed(() =>
   effectiveCanView.value || effectiveCanEdit.value || effectiveCanDelete.value || effectiveCanHistory.value
+)
+const selectedIdSet = computed(() => new Set((props.selectedIds || []).map((id) => Number(id))))
+const selectableRows = computed(() => (props.data || []).filter((row) => !!row?.id))
+const allPageSelected = computed(() =>
+  selectableRows.value.length > 0
+  && selectableRows.value.every((row) => selectedIdSet.value.has(Number(row.id)))
 )
 
 const editingCell = ref({ rowId: null, col: null })
@@ -118,21 +126,21 @@ watch(
 )
 
 const COLUMN_LABELS = {
-  id: 'ID',
+  id: 'SR',
   expense_date: 'Expense Date',
   product_category: 'Product Category',
   product_description: 'Product Description',
   invoice_number: 'Invoice Number',
   vat_amount: 'VAT %',
-  amount_without_vat: 'Amount (Without VAT)',
-  vat_amount_currency: 'VAT Amount',
-  full_amount: 'Total Amount',
+  amount_without_vat: 'Amount Without VAT (AED)',
+  vat_amount_currency: 'VAT Amount (AED)',
+  full_amount: 'Total Amount (AED)',
   added_by: 'Added By',
-  created_at: 'Created Date',
+  created_at: 'Created',
   status: 'Status',
 }
 
-const SORTABLE_COLUMNS = ['id', 'expense_date', 'product_category', 'product_description', 'invoice_number', 'vat_amount', 'amount_without_vat', 'vat_amount_currency', 'full_amount', 'added_by', 'created_at', 'status']
+const SORTABLE_COLUMNS = ['expense_date', 'product_category', 'product_description', 'invoice_number', 'vat_amount', 'amount_without_vat', 'vat_amount_currency', 'full_amount', 'added_by', 'created_at', 'status']
 
 function label(col) {
   return COLUMN_LABELS[col] ?? col
@@ -152,6 +160,12 @@ function formatValue(row, col) {
   const val = row[col]
   if (val == null || val === '') return '—'
   return val
+}
+
+function serialNumber(rowIndex) {
+  const page = Number(props.currentPage) || 1
+  const size = Number(props.perPage) || 15
+  return ((page - 1) * size) + rowIndex + 1
 }
 
 function statusLabel(status) {
@@ -174,6 +188,20 @@ function goToViewHistory(row) {
 
 function onDelete(row) {
   if (row?.id && effectiveCanDelete.value) emit('delete', row)
+}
+
+function isSelected(row) {
+  return selectedIdSet.value.has(Number(row?.id))
+}
+
+function onToggleRowSelection(row, checked) {
+  if (!row?.id || !props.selectable) return
+  emit('toggleSelectRow', { id: Number(row.id), checked })
+}
+
+function onToggleAllSelection(checked) {
+  if (!props.selectable) return
+  emit('toggleSelectAll', checked)
 }
 </script>
 
@@ -198,16 +226,28 @@ function onDelete(row) {
       <thead>
         <tr class="bg-brand-primary border-b-2 border-green-700">
           <th
+            v-if="selectable"
+            scope="col"
+            class="w-10 whitespace-nowrap px-3 py-3 text-center text-sm font-semibold text-white"
+          >
+            <input
+              type="checkbox"
+              class="h-4 w-4 rounded border-white/40 text-brand-primary focus:ring-brand-primary"
+              :checked="allPageSelected"
+              @change="onToggleAllSelection(($event.target).checked)"
+            >
+          </th>
+          <th
             v-for="col in orderedColumns"
             :key="col"
             scope="col"
-            class="whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-black cursor-pointer select-none"
+            class="whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-white cursor-pointer select-none"
             @click="sortable(col) ? toggleSort(col) : null"
           >
             <button
               v-if="sortable(col)"
               type="button"
-              class="inline-flex items-center gap-1 font-semibold text-white hover:text-white/70"
+              class="inline-flex items-center gap-1 font-semibold text-white hover:text-white"
               @click.stop="toggleSort(col)"
             >
               {{ label(col) }}
@@ -215,26 +255,34 @@ function onDelete(row) {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
               </svg>
             </button>
-            <span v-else class="font-semibold text-black">{{ label(col) }}</span>
+            <span v-else class="font-semibold text-white">{{ label(col) }}</span>
           </th>
           <th v-if="hasAnyRowAction" scope="col" class="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold text-white">Actions</th>
         </tr>
       </thead>
       <tbody class="bg-white">
         <tr v-if="!loading && !data.length" class="border-b border-black">
-          <td :colspan="orderedColumns.length + (hasAnyRowAction ? 1 : 0)" class="px-4 py-12 text-center text-sm text-gray-500">No expenses found.</td>
+          <td :colspan="orderedColumns.length + (hasAnyRowAction ? 1 : 0) + (selectable ? 1 : 0)" class="px-4 py-12 text-center text-sm text-gray-500">No expenses found.</td>
         </tr>
         <tr
-          v-for="row in data"
+          v-for="(row, rowIndex) in data"
           :key="row.id"
           class="border-b border-black bg-white hover:bg-gray-50/50"
         >
+          <td v-if="selectable" class="w-10 whitespace-nowrap px-3 py-3 text-center">
+            <input
+              type="checkbox"
+              class="h-4 w-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary"
+              :checked="isSelected(row)"
+              @change="onToggleRowSelection(row, ($event.target).checked)"
+            >
+          </td>
           <td
             v-for="col in orderedColumns"
             :key="col"
             class="px-4 py-3 text-sm text-gray-900"
             :class="[
-              col === 'product_description' ? '' : 'whitespace-nowrap',
+              'whitespace-nowrap',
               effectiveCanEdit && isEditable(col) ? 'cursor-pointer hover:bg-brand-primary-light/50' : '',
             ]"
             @dblclick="effectiveCanEdit && isEditable(col) && startCellEdit(row, col)"
@@ -382,8 +430,11 @@ function onDelete(row) {
                 </span>
               </div>
             </template>
+            <template v-else-if="col === 'id'">
+              <span>{{ serialNumber(rowIndex) }}</span>
+            </template>
             <template v-else-if="col === 'product_description'">
-              <span class="block max-w-[220px] text-gray-700 whitespace-normal line-clamp-2" title="Double-click to edit">{{ formatValue(row, col) }}</span>
+              <span class="block max-w-[220px] truncate text-gray-700" title="Double-click to edit">{{ formatValue(row, col) }}</span>
             </template>
             <template v-else-if="col === 'vat_amount'">
               <span title="Double-click to edit">{{ row.vat_amount_raw != null ? row.vat_amount_raw + '%' : '—' }}</span>

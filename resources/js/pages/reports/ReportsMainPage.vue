@@ -72,11 +72,6 @@ function viewReport(route) {
 
 <template>
   <div class="space-y-8 bg-white -mx-4 -my-5 min-h-full px-6 py-6">
-    <div>
-      <h1 class="text-2xl font-bold text-gray-900">Reports</h1>
-      <p class="mt-1 text-sm text-gray-500">Access comprehensive analytics and insights across all CRM modules.</p>
-    </div>
-
     <div v-if="!canView" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
       You do not have permission to view reports.
     </div>

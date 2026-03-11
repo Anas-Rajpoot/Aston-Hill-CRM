@@ -10,9 +10,11 @@ use App\Models\ClientAddress;
 use App\Models\ClientCompanyDetail;
 use App\Models\ClientContact;
 use App\Models\ClientCsr;
+use App\Models\NotificationLog;
 use App\Models\SystemAuditLog;
 use App\Models\User;
 use App\Models\UserColumnPreference;
+use App\Services\NotificationService;
 use App\Repositories\ClientRepository;
 use App\Repositories\FilterRepository;
 use App\Http\Resources\ClientResource;
@@ -49,6 +51,7 @@ class ClientApiController extends Controller
         'trade_license_issuing_authority', 'company_category', 'trade_license_number', 'trade_license_expiry_date',
         'establishment_card_number', 'establishment_card_expiry_date',
         'account_taken_from', 'account_mapping_date', 'account_transfer_given_to', 'account_transfer_given_date',
+        'primary_contact_detail',
         'account_manager_name', 'first_bill', 'second_bill', 'third_bill', 'fourth_bill',
         'additional_comment_1', 'additional_comment_2', 'full_address',
         'created_by', 'revenue', 'csr_name_1', 'csr_name_2', 'csr_name_3',
@@ -158,6 +161,9 @@ class ClientApiController extends Controller
             function () use ($validated, $columns, $user) {
                 $paginator = app(ClientRepository::class)->list($validated, $columns, $user);
                 $items = ClientResource::collection(collect($paginator->items()))->resolve();
+                if (in_array('renewal_alert', $columns, true)) {
+                    $items = $this->attachAllClientsAlertDetails($items);
+                }
 
                 return [
                     'success' => true,
@@ -211,6 +217,138 @@ class ClientApiController extends Controller
     {
         $module = (string) $request->input('module', self::MODULE);
         return in_array($module, self::ALLOWED_PREF_MODULES, true) ? $module : self::MODULE;
+    }
+
+    /**
+     * Enrich /all-clients rows with dynamic alert count + details.
+     * This mirrors the Alerts tab source (client_alerts) instead of using stale c.renewal_alert.
+     *
+     * @param  array<int,array<string,mixed>>  $items
+     * @return array<int,array<string,mixed>>
+     */
+    private function attachAllClientsAlertDetails(array $items): array
+    {
+        if (empty($items)) {
+            return $items;
+        }
+
+        $clientIds = [];
+        $accountNumbers = [];
+        $companyNames = [];
+        foreach ($items as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $clientIds[] = $id;
+            }
+            $account = trim((string) ($row['account_number'] ?? ''));
+            if ($account !== '') {
+                $accountNumbers[] = $account;
+            }
+            $company = trim((string) ($row['company_name'] ?? ''));
+            if ($company !== '') {
+                $companyNames[] = $company;
+            }
+        }
+        $clientIds = array_values(array_unique($clientIds));
+        $accountNumbers = array_values(array_unique($accountNumbers));
+        $companyNames = array_values(array_unique($companyNames));
+
+        if (empty($clientIds) && empty($accountNumbers) && empty($companyNames)) {
+            return $items;
+        }
+
+        $alerts = ClientAlert::query()
+            ->where(function ($q) use ($clientIds, $accountNumbers, $companyNames) {
+                if (! empty($clientIds)) {
+                    $q->whereIn('client_id', $clientIds);
+                }
+                if (! empty($accountNumbers)) {
+                    if (! empty($clientIds)) {
+                        $q->orWhereIn('account_number', $accountNumbers);
+                    } else {
+                        $q->whereIn('account_number', $accountNumbers);
+                    }
+                }
+                if (! empty($companyNames)) {
+                    if (! empty($clientIds) || ! empty($accountNumbers)) {
+                        $q->orWhereIn('company_name', $companyNames);
+                    } else {
+                        $q->whereIn('company_name', $companyNames);
+                    }
+                }
+            })
+            ->orderBy('expiry_date')
+            ->get(['id', 'client_id', 'alert_type', 'company_name', 'account_number', 'expiry_date', 'days_remaining', 'status', 'resolved', 'created_at', 'manager_id']);
+
+        if ($alerts->isEmpty()) {
+            foreach ($items as &$row) {
+                $row['renewal_alert'] = 0;
+                $row['renewal_alert_details'] = [];
+            }
+            unset($row);
+            return $items;
+        }
+
+        $managerIds = $alerts->pluck('manager_id')->filter()->unique()->values()->all();
+        $managers = [];
+        if (! empty($managerIds)) {
+            $managers = User::query()->whereIn('id', $managerIds)->pluck('name', 'id')->all();
+        }
+
+        $byId = [];
+        $byAccount = [];
+        $byCompany = [];
+        foreach ($alerts as $alert) {
+            $item = [
+                'id' => $alert->id,
+                'alert_type' => $alert->alert_type,
+                'expiry_date' => $alert->expiry_date?->format('Y-m-d'),
+                'display_date' => $alert->expiry_date?->format('d-M-Y'),
+                'days_remaining' => $alert->days_remaining,
+                'status' => $alert->status,
+                'resolved' => (bool) $alert->resolved,
+                'manager' => $managers[$alert->manager_id] ?? null,
+                'created_date' => $alert->created_at?->format('d-M-Y'),
+            ];
+
+            $cid = (int) ($alert->client_id ?? 0);
+            if ($cid > 0) {
+                $byId[$cid] ??= [];
+                $byId[$cid][] = $item;
+            }
+
+            $acc = strtolower(trim((string) ($alert->account_number ?? '')));
+            if ($acc !== '') {
+                $byAccount[$acc] ??= [];
+                $byAccount[$acc][] = $item;
+            }
+
+            $cmp = strtolower(trim((string) ($alert->company_name ?? '')));
+            if ($cmp !== '') {
+                $byCompany[$cmp] ??= [];
+                $byCompany[$cmp][] = $item;
+            }
+        }
+
+        foreach ($items as &$row) {
+            $rid = (int) ($row['id'] ?? 0);
+            $acc = strtolower(trim((string) ($row['account_number'] ?? '')));
+            $cmp = strtolower(trim((string) ($row['company_name'] ?? '')));
+
+            $details = $byId[$rid] ?? [];
+            if (empty($details) && $acc !== '') {
+                $details = $byAccount[$acc] ?? [];
+            }
+            if (empty($details) && $cmp !== '') {
+                $details = $byCompany[$cmp] ?? [];
+            }
+
+            $row['renewal_alert'] = count($details);
+            $row['renewal_alert_details'] = $details;
+        }
+        unset($row);
+
+        return $items;
     }
 
     private function sumMrcByStatus(Client $client, string $status): float
@@ -397,13 +535,14 @@ class ClientApiController extends Controller
             ->get(['id', 'client_id', 'alert_type'])
             ->groupBy('client_id');
 
+        $createdAlertIds = [];
         foreach ($clients as $client) {
             $candidates = $this->resolveRenewalAlertCandidates($client, $now);
             $candidateTypes = collect($candidates)->pluck('alert_type')->all();
 
             foreach ($candidates as $candidate) {
                 $daysRemaining = $now->diffInDays($candidate['expiry_date'], false);
-                ClientAlert::updateOrCreate(
+                $alert = ClientAlert::updateOrCreate(
                     [
                         'client_id' => $client->id,
                         'alert_type' => $candidate['alert_type'],
@@ -420,6 +559,9 @@ class ClientApiController extends Controller
                         'created_date' => now()->toDateString(),
                     ]
                 );
+                if ($alert->wasRecentlyCreated) {
+                    $createdAlertIds[] = (int) $alert->id;
+                }
             }
 
             $stale = collect($existingAuto->get($client->id, []))
@@ -439,6 +581,13 @@ class ClientApiController extends Controller
                 ->count();
             $client->updateQuietly(['renewal_alert' => $count]);
         });
+
+        if (! empty($createdAlertIds)) {
+            $createdAlerts = ClientAlert::query()
+                ->whereIn('id', $createdAlertIds)
+                ->get(['id', 'client_id', 'alert_type', 'company_name']);
+            $this->dispatchAlertNotifications($createdAlerts);
+        }
     }
 
     private function buildRenewalAlertMap(array $clientIds): array
@@ -447,10 +596,64 @@ class ClientApiController extends Controller
             return [];
         }
 
+        $seedClients = Client::query()
+            ->whereIn('id', $clientIds)
+            ->get(['id', 'account_number', 'company_name']);
+
+        $accountNumbers = $seedClients
+            ->pluck('account_number')
+            ->map(fn ($v) => trim((string) $v))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $companyNames = $seedClients
+            ->pluck('company_name')
+            ->map(fn ($v) => trim((string) $v))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $relatedClientIds = [];
+        if (! empty($accountNumbers) || ! empty($companyNames)) {
+            $relatedClientIds = Client::query()
+                ->where(function ($q) use ($accountNumbers, $companyNames) {
+                    if (! empty($accountNumbers)) {
+                        $q->whereIn('account_number', $accountNumbers);
+                    }
+                    if (! empty($companyNames)) {
+                        if (! empty($accountNumbers)) {
+                            $q->orWhereIn('company_name', $companyNames);
+                        } else {
+                            $q->whereIn('company_name', $companyNames);
+                        }
+                    }
+                })
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+        }
+
+        $targetClientIds = array_values(array_unique(array_merge(
+            array_map(fn ($id) => (int) $id, $clientIds),
+            $relatedClientIds
+        )));
+
         $alerts = ClientAlert::query()
-            ->whereIn('client_id', $clientIds)
+            ->where(function ($q) use ($targetClientIds, $accountNumbers, $companyNames) {
+                $q->whereIn('client_id', $targetClientIds);
+                if (! empty($accountNumbers)) {
+                    $q->orWhereIn('account_number', $accountNumbers);
+                }
+                if (! empty($companyNames)) {
+                    $q->orWhereIn('company_name', $companyNames);
+                }
+            })
             ->orderBy('expiry_date')
-            ->get(['id', 'client_id', 'alert_type', 'expiry_date', 'days_remaining', 'status', 'resolved', 'created_at', 'manager_id']);
+            ->get(['id', 'client_id', 'alert_type', 'company_name', 'account_number', 'expiry_date', 'days_remaining', 'status', 'resolved', 'created_at', 'manager_id']);
 
         $managerIds = $alerts->pluck('manager_id')->filter()->unique()->values()->all();
         $managers = [];
@@ -461,8 +664,7 @@ class ClientApiController extends Controller
         $map = [];
         foreach ($alerts as $alert) {
             $clientId = (int) $alert->client_id;
-            $map[$clientId] ??= [];
-            $map[$clientId][] = [
+            $item = [
                 'id' => $alert->id,
                 'alert_type' => $alert->alert_type,
                 'expiry_date' => $alert->expiry_date?->format('Y-m-d'),
@@ -473,6 +675,29 @@ class ClientApiController extends Controller
                 'manager' => $managers[$alert->manager_id] ?? null,
                 'created_date' => $alert->created_at?->format('d-M-Y'),
             ];
+
+            // Keep the legacy client-id key and add flexible keys so child product rows
+            // in All Clients can still resolve alert counts/details by shared account/company.
+            $map[$clientId] ??= [];
+            $map[$clientId][] = $item;
+
+            $idKey = 'id:' . $clientId;
+            $map[$idKey] ??= [];
+            $map[$idKey][] = $item;
+
+            $accountNumber = strtolower(trim((string) ($alert->account_number ?? '')));
+            if ($accountNumber !== '') {
+                $accKey = 'acc:' . $accountNumber;
+                $map[$accKey] ??= [];
+                $map[$accKey][] = $item;
+            }
+
+            $companyName = strtolower(trim((string) ($alert->company_name ?? '')));
+            if ($companyName !== '') {
+                $cmpKey = 'cmp:' . $companyName;
+                $map[$cmpKey] ??= [];
+                $map[$cmpKey][] = $item;
+            }
         }
 
         return $map;
@@ -692,7 +917,23 @@ class ClientApiController extends Controller
                 continue;
             }
             if ($col === 'renewal_alert') {
-                $details = $renewalAlertMap[(int) $row->id] ?? [];
+                $rowId = (int) $row->id;
+                $details = $renewalAlertMap[$rowId]
+                    ?? $renewalAlertMap['id:' . $rowId]
+                    ?? [];
+
+                if (empty($details)) {
+                    $accountKey = strtolower(trim((string) ($row->account_number ?? '')));
+                    if ($accountKey !== '') {
+                        $details = $renewalAlertMap['acc:' . $accountKey] ?? [];
+                    }
+                }
+                if (empty($details)) {
+                    $companyKey = strtolower(trim((string) ($row->company_name ?? '')));
+                    if ($companyKey !== '') {
+                        $details = $renewalAlertMap['cmp:' . $companyKey] ?? [];
+                    }
+                }
                 $out['renewal_alert'] = count($details);
                 $out['renewal_alert_details'] = $details;
                 continue;
@@ -774,7 +1015,10 @@ class ClientApiController extends Controller
         if ($lastModified) {
             $response->headers->set('Last-Modified', gmdate('D, d M Y H:i:s', strtotime($lastModified)) . ' GMT');
         }
-        $response->headers->set('Cache-Control', 'private, max-age=300');
+        // Prevent stale browser-level caching for authenticated, mutable listing data.
+        $response->headers->set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+        $response->headers->set('Pragma', 'no-cache');
+        $response->headers->set('Expires', '0');
 
         return $response;
     }
@@ -786,6 +1030,11 @@ class ClientApiController extends Controller
      */
     private function rememberByTags(string $key, int $seconds, callable $resolver): mixed
     {
+        // Keep clients listing fully fresh to avoid stale row actions (delete/edit) on UI.
+        if (str_starts_with($key, 'clients:index:')) {
+            return $resolver();
+        }
+
         $store = Cache::getStore();
         if (method_exists($store, 'tags')) {
             return Cache::tags(['clients', 'filters'])->remember($key, $seconds, $resolver);
@@ -894,6 +1143,13 @@ class ClientApiController extends Controller
         }
 
         $header = array_map('trim', $header);
+        $normalizedHeaderSet = array_fill_keys(
+            array_map(
+                static fn ($h) => strtolower(trim((string) $h)),
+                $header
+            ),
+            true
+        );
         $created = 0;
         $errors = [];
 
@@ -956,21 +1212,31 @@ class ClientApiController extends Controller
 
             $missing = [];
             $requiredChecks = [
-                'account_number' => $pick($data, ['account_number', 'Account Number'], ''),
-                'company_category' => $pick($data, ['company_category', 'Company Category'], ''),
-                'trade_license_number' => $pick($data, ['trade_license_number', 'Trade License Number'], ''),
-                'first_bill' => $pick($data, ['first_bill', 'First Bill'], ''),
-                'second_bill' => $pick($data, ['second_bill', 'Second Bill'], ''),
-                'third_bill' => $pick($data, ['third_bill', 'Third Bill'], ''),
-                'fourth_bill' => $pick($data, ['fourth_bill', 'Fourth Bill'], ''),
-                'account_manager_name' => $pick($data, ['account_manager_name', 'Account Manager Name'], ''),
-                'csr_name_1' => $pick($data, ['csr_name_1', 'CSR Name 1', 'CSR Name'], ''),
-                'contact_1_name' => $pick($data, ['contact_1_name', 'Contact 1 Name', 'Contact Person Name'], ''),
-                'contact_1_contact_number' => $pick($data, ['contact_1_contact_number', 'Contact 1 Contact Number', 'Contact Number'], ''),
-                'contact_1_email' => $pick($data, ['contact_1_email', 'Contact 1 Email', 'Email ID'], ''),
+                'account_number' => ['aliases' => ['account_number', 'Account Number'], 'value' => $pick($data, ['account_number', 'Account Number'], '')],
+                'company_category' => ['aliases' => ['company_category', 'Company Category'], 'value' => $pick($data, ['company_category', 'Company Category'], '')],
+                'trade_license_number' => ['aliases' => ['trade_license_number', 'Trade License Number'], 'value' => $pick($data, ['trade_license_number', 'Trade License Number'], '')],
+                'first_bill' => ['aliases' => ['first_bill', 'First Bill'], 'value' => $pick($data, ['first_bill', 'First Bill'], '')],
+                'second_bill' => ['aliases' => ['second_bill', 'Second Bill'], 'value' => $pick($data, ['second_bill', 'Second Bill'], '')],
+                'third_bill' => ['aliases' => ['third_bill', 'Third Bill'], 'value' => $pick($data, ['third_bill', 'Third Bill'], '')],
+                'fourth_bill' => ['aliases' => ['fourth_bill', 'Fourth Bill'], 'value' => $pick($data, ['fourth_bill', 'Fourth Bill'], '')],
+                'account_manager_name' => ['aliases' => ['account_manager_name', 'Account Manager Name'], 'value' => $pick($data, ['account_manager_name', 'Account Manager Name'], '')],
+                'csr_name_1' => ['aliases' => ['csr_name_1', 'CSR Name 1', 'CSR Name'], 'value' => $pick($data, ['csr_name_1', 'CSR Name 1', 'CSR Name'], '')],
+                'contact_1_name' => ['aliases' => ['contact_1_name', 'Contact 1 Name', 'Contact Person Name'], 'value' => $pick($data, ['contact_1_name', 'Contact 1 Name', 'Contact Person Name'], '')],
+                'contact_1_contact_number' => ['aliases' => ['contact_1_contact_number', 'Contact 1 Contact Number', 'Contact Number'], 'value' => $pick($data, ['contact_1_contact_number', 'Contact 1 Contact Number', 'Contact Number'], '')],
+                'contact_1_email' => ['aliases' => ['contact_1_email', 'Contact 1 Email', 'Email ID'], 'value' => $pick($data, ['contact_1_email', 'Contact 1 Email', 'Email ID'], '')],
             ];
-            foreach ($requiredChecks as $k => $v) {
-                if (trim((string) $v) === '') {
+            foreach ($requiredChecks as $k => $meta) {
+                $columnPresentInCsv = false;
+                foreach ($meta['aliases'] as $alias) {
+                    if (isset($normalizedHeaderSet[strtolower((string) $alias)])) {
+                        $columnPresentInCsv = true;
+                        break;
+                    }
+                }
+                if (! $columnPresentInCsv) {
+                    continue;
+                }
+                if (trim((string) $meta['value']) === '') {
                     $missing[] = $k;
                 }
             }
@@ -1177,8 +1443,8 @@ class ClientApiController extends Controller
             'contacts' => ['sometimes', 'array', 'max:10'],
             'contacts.*.name' => ['sometimes', 'nullable', 'string', 'max:200'],
             'contacts.*.designation' => ['sometimes', 'nullable', 'string', 'max:100'],
-            'contacts.*.contact_number' => ['sometimes', 'nullable', 'string', 'max:50'],
-            'contacts.*.alternate_number' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'contacts.*.contact_number' => ['sometimes', 'nullable', 'string', 'max:50', 'regex:/^971\d{9}$/'],
+            'contacts.*.alternate_number' => ['sometimes', 'nullable', 'string', 'max:50', 'regex:/^971\d{9}$/'],
             'contacts.*.email' => ['sometimes', 'nullable', 'email', 'max:255'],
             'contacts.*.as_updated_or_not' => ['sometimes', 'nullable', 'string', 'max:20'],
             'contacts.*.as_expiry_date' => ['sometimes', 'nullable', 'date'],
@@ -1626,7 +1892,20 @@ class ClientApiController extends Controller
             'order' => ['sometimes', 'string', Rule::in(['asc', 'desc'])],
         ]);
 
-        $query = Client::query();
+        $accountNumber = trim((string) $client->account_number);
+        $companyName = trim((string) $client->company_name);
+
+        // Keep Products & Services scoped to the same client/account context.
+        $query = Client::query()
+            ->where(function ($q) use ($client, $accountNumber, $companyName) {
+                $q->where('id', $client->id);
+                if ($accountNumber !== '') {
+                    $q->orWhere('account_number', $accountNumber);
+                } elseif ($companyName !== '') {
+                    // Fallback for legacy rows where account_number may be empty.
+                    $q->orWhere('company_name', $companyName);
+                }
+            });
 
         $perPage = (int) ($validated['per_page'] ?? 10);
         $page = (int) ($validated['page'] ?? 1);
@@ -1672,12 +1951,17 @@ class ClientApiController extends Controller
         $this->authorize('view', $client);
 
         $accountNumber = trim((string) $client->account_number);
+        $companyName = trim((string) $client->company_name);
         $query = \App\Models\VasRequestSubmission::query()
             ->visibleTo($request->user())
-            ->where(function ($q) use ($client, $accountNumber) {
+            ->where(function ($q) use ($client, $accountNumber, $companyName) {
                 $q->where('client_id', $client->id);
                 if ($accountNumber !== '') {
                     $q->orWhere('account_number', $accountNumber);
+                }
+                if ($companyName !== '') {
+                    // Include legacy records linked by company name.
+                    $q->orWhere('company_name', $companyName);
                 }
             });
 
@@ -1702,7 +1986,12 @@ class ClientApiController extends Controller
                 'team_leader' => $row->teamLeader?->name,
                 'sales_agent' => $row->salesAgent?->name,
                 'executive' => $row->backOfficeExecutive?->name,
+                'submitted_at' => ($row->submitted_at ?? $row->created_at)?->format('d-M-Y H:i'),
+                'sla_timer' => $this->computeVasSlaTimer($row),
                 'status' => $row->status,
+                'completion_date' => $row->completion_date?->format('d-M-Y'),
+                'activity' => $row->activity ?: null,
+                'remarks' => $row->remarks ?: ($row->additional_notes ?: null),
                 'creator' => $row->creator?->name,
             ];
         });
@@ -1719,6 +2008,43 @@ class ClientApiController extends Controller
         ]);
     }
 
+    private function computeVasSlaTimer(\App\Models\VasRequestSubmission $row): ?string
+    {
+        $startAt = $row->submitted_at ?? $row->created_at ?? $row->updated_at;
+        if (! $startAt) {
+            return null;
+        }
+        if (! empty($row->back_office_executive_id)) {
+            return 'Assigned';
+        }
+
+        $rule = \App\Models\SlaRule::cached()->firstWhere('module_key', 'vas_requests');
+        $slaMinutes = ($rule && $rule->is_active) ? max(1, (int) $rule->sla_duration_minutes) : 960;
+        $warningMinutes = ($rule && $rule->is_active) ? max(0, (int) $rule->warning_threshold_minutes) : 90;
+
+        $elapsed = $startAt->diffInMinutes(now());
+        if ($elapsed <= $slaMinutes) {
+            $remaining = $slaMinutes - $elapsed;
+            if ($warningMinutes > 0 && $remaining <= $warningMinutes) {
+                return 'Due in ' . $this->formatVasDuration($remaining);
+            }
+            return $this->formatVasDuration($elapsed) . ' passed of ' . $this->formatVasDuration($slaMinutes);
+        }
+
+        $overdue = $elapsed - $slaMinutes;
+        return 'Breached by ' . $this->formatVasDuration($overdue);
+    }
+
+    private function formatVasDuration(int $minutes): string
+    {
+        $minutes = max(0, $minutes);
+        $h = intdiv($minutes, 60);
+        $m = $minutes % 60;
+        if ($h > 0 && $m > 0) return "{$h}h {$m}m";
+        if ($h > 0) return "{$h}h";
+        return "{$m}m";
+    }
+
     public function customerSupport(Request $request, Client $client): JsonResponse
     {
         $this->authorize('view', $client);
@@ -1733,7 +2059,7 @@ class ClientApiController extends Controller
                 }
             });
 
-        $query->with(['manager:id,name', 'teamLeader:id,name', 'salesAgent:id,name', 'creator:id,name', 'csrs.user:id,name']);
+        $query->with(['manager:id,name', 'teamLeader:id,name', 'salesAgent:id,name', 'creator:id,name', 'csrUser:id,name']);
         $query->orderByDesc('submitted_at');
 
         $perPage = (int) $request->input('per_page', 10);
@@ -1750,9 +2076,11 @@ class ClientApiController extends Controller
                 'company_name' => $row->company_name,
                 'account_number' => $row->account_number,
                 'contact_number' => $row->contact_number,
+                'alternate_contact_number' => $row->alternate_contact_number,
                 'issue_description' => $row->issue_description,
                 'creator' => $row->creator?->name,
-                'csr' => $row->csrs->map(fn ($c) => $c->user?->name)->filter()->implode(', '),
+                'csr' => $row->csrUser?->name,
+                'sla_timer' => $this->computeCustomerSupportSlaTimer($row),
                 'manager' => $row->manager?->name,
                 'team_leader' => $row->teamLeader?->name,
                 'sales_agent' => $row->salesAgent?->name,
@@ -1777,6 +2105,33 @@ class ClientApiController extends Controller
                 'total' => $paginated->total(),
             ],
         ]);
+    }
+
+    private function computeCustomerSupportSlaTimer(\App\Models\CustomerSupportSubmission $row): ?string
+    {
+        $startAt = $row->submitted_at ?? $row->created_at;
+        if (! $startAt) {
+            return null;
+        }
+        if (! empty($row->csr_id)) {
+            return 'Assigned';
+        }
+
+        $rule = \App\Models\SlaRule::cached()->firstWhere('module_key', 'customer_support_requests');
+        $slaMinutes = ($rule && $rule->is_active) ? max(1, (int) $rule->sla_duration_minutes) : 1440;
+        $warningMinutes = ($rule && $rule->is_active) ? max(0, (int) $rule->warning_threshold_minutes) : 120;
+
+        $elapsed = $startAt->diffInMinutes(now());
+        if ($elapsed <= $slaMinutes) {
+            $remaining = $slaMinutes - $elapsed;
+            if ($warningMinutes > 0 && $remaining <= $warningMinutes) {
+                return 'Due in ' . $this->formatVasDuration($remaining);
+            }
+            return $this->formatVasDuration($elapsed) . ' passed of ' . $this->formatVasDuration($slaMinutes);
+        }
+
+        $overdue = $elapsed - $slaMinutes;
+        return 'Breached by ' . $this->formatVasDuration($overdue);
     }
 
     /**
@@ -2020,8 +2375,8 @@ class ClientApiController extends Controller
             'contacts.*.id' => ['sometimes', 'nullable', 'integer', 'exists:client_contacts,id'],
             'contacts.*.name' => ['sometimes', 'nullable', 'string', 'max:200'],
             'contacts.*.designation' => ['sometimes', 'nullable', 'string', 'max:100'],
-            'contacts.*.contact_number' => ['sometimes', 'nullable', 'string', 'max:50'],
-            'contacts.*.alternate_number' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'contacts.*.contact_number' => ['sometimes', 'nullable', 'string', 'max:50', 'regex:/^971\d{9}$/'],
+            'contacts.*.alternate_number' => ['sometimes', 'nullable', 'string', 'max:50', 'regex:/^971\d{9}$/'],
             'contacts.*.email' => ['sometimes', 'nullable', 'email', 'max:255'],
             'contacts.*.as_updated_or_not' => ['sometimes', 'nullable', 'string', 'max:20'],
             'contacts.*.as_expiry_date' => ['sometimes', 'nullable', 'date'],
@@ -2108,6 +2463,10 @@ class ClientApiController extends Controller
         // Ensure date-driven renewal alerts are up to date before listing.
         // This covers Trade License Expiry and Establishment Card Expiry when they fall in next month.
         $this->syncRenewalAlertsForClientIds([(int) $client->id]);
+        $openAlerts = $client->alerts()
+            ->where('resolved', false)
+            ->get(['id', 'client_id', 'alert_type', 'company_name']);
+        $this->dispatchAlertNotifications($openAlerts);
 
         $query = $client->alerts()->with('manager:id,name');
 
@@ -2202,6 +2561,8 @@ class ClientApiController extends Controller
 
         $alert->load('manager:id,name');
 
+        $this->dispatchAlertNotifications(collect([$alert]));
+
         return response()->json([
             'message' => 'Alert created successfully.',
             'alert' => [
@@ -2294,12 +2655,98 @@ class ClientApiController extends Controller
         $query = Client::query()->select('clients.id');
         $this->applyFilters($query, $validated);
         $ids = $query->pluck('clients.id')->map(fn ($id) => (int) $id)->filter()->values()->all();
+        $before = empty($ids)
+            ? 0
+            : ClientAlert::query()
+                ->whereIn('client_id', $ids)
+                ->where('resolved', false)
+                ->whereIn('alert_type', self::AUTO_RENEWAL_ALERT_TYPES)
+                ->count();
         $this->syncRenewalAlertsForClientIds($ids);
+        $after = empty($ids)
+            ? 0
+            : ClientAlert::query()
+                ->whereIn('client_id', $ids)
+                ->where('resolved', false)
+                ->whereIn('alert_type', self::AUTO_RENEWAL_ALERT_TYPES)
+                ->count();
+        $generated = max(0, $after - $before);
 
         return response()->json([
             'message' => 'Renewal alerts generated successfully.',
             'processed_clients' => count($ids),
+            'generated_alerts' => $generated,
         ]);
+    }
+
+    /**
+     * Create in-app notification log entries for alert records.
+     * Uses a stable dedupe key so each alert appears once in notifications.
+     */
+    private function dispatchAlertNotifications($alerts): void
+    {
+        if (! $alerts || (is_countable($alerts) && count($alerts) === 0)) {
+            return;
+        }
+
+        $users = User::query()->get(['id', 'name', 'email']);
+        $existingLogs = NotificationLog::query()
+            ->where('trigger_key', 'alert_generated')
+            ->where('module', 'Client Alerts')
+            ->where('status', 'sent')
+            ->get(['id', 'payload']);
+        $existingByAlertId = [];
+        $duplicateLogIds = [];
+        foreach ($existingLogs as $log) {
+            $alertId = (int) data_get($log->payload, 'alert_id', 0);
+            if ($alertId <= 0) {
+                continue;
+            }
+            if (isset($existingByAlertId[$alertId])) {
+                $duplicateLogIds[] = (int) $log->id;
+                continue;
+            }
+            $existingByAlertId[$alertId] = (int) $log->id;
+        }
+        if (! empty($duplicateLogIds)) {
+            NotificationLog::query()->whereIn('id', $duplicateLogIds)->delete();
+        }
+
+        foreach ($alerts as $alert) {
+            if (! $alert || empty($alert->id)) {
+                continue;
+            }
+            $payload = [
+                'module' => 'Client Alerts',
+                'title' => 'New Alert Generated',
+                'message' => sprintf(
+                    'Alert "%s" was generated for %s.',
+                    (string) ($alert->alert_type ?? 'Alert'),
+                    (string) ($alert->company_name ?: 'N/A')
+                ),
+                'url' => '/all-clients',
+                'users' => $users,
+                'alert_id' => (int) $alert->id,
+                'client_id' => (int) ($alert->client_id ?? 0),
+            ];
+
+            // Normal path: respects notification channel toggles and user preferences.
+            NotificationService::dispatchOnce('alert_generated', 'client_alert:' . (int) $alert->id, $payload, 31536000);
+
+            // Fallback path: keep only ONE notification-log row per alert id.
+            $alertId = (int) $alert->id;
+            if (! isset($existingByAlertId[$alertId])) {
+                $created = NotificationLog::create([
+                    'trigger_key' => 'alert_generated',
+                    'channel' => 'web',
+                    'module' => 'Client Alerts',
+                    'sent_to' => 'system',
+                    'status' => 'sent',
+                    'payload' => $payload,
+                ]);
+                $existingByAlertId[$alertId] = (int) $created->id;
+            }
+        }
     }
 
     public function bulkAssignCsr(Request $request): JsonResponse
@@ -2369,13 +2816,85 @@ class ClientApiController extends Controller
 
         $validated = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
-            'ids.*' => ['integer', 'exists:clients,id'],
+            'ids.*' => ['integer', 'min:1'],
+            'scope' => ['sometimes', 'string', Rule::in(['clients', 'products'])],
+            'hint' => ['sometimes', 'array'],
+            'hint.account_number' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'hint.company_name' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'hint.product_name' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'hint.wo_number' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'hint.submitted_at' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'hint.service_type' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'hint.product_type' => ['sometimes', 'nullable', 'string', 'max:100'],
         ]);
 
-        $clients = Client::whereIn('id', $validated['ids'])->get(['id', 'account_number']);
+        $normalizedIds = collect($validated['ids'])
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        $scope = (string) ($validated['scope'] ?? 'clients');
+
+        $deleteQuery = Client::query()->whereIn('id', $normalizedIds);
+
+        $clients = $deleteQuery->get(['id', 'account_number']);
         $deletedIds = $clients->pluck('id')->toArray();
 
-        Client::whereIn('id', $deletedIds)->delete();
+        // Single-row delete fallback: if ID mismatches UI row snapshot, resolve the product row by strict hint.
+        if (
+            $scope === 'products'
+            && empty($deletedIds)
+            && count($normalizedIds) === 1
+            && ! empty($validated['hint'])
+        ) {
+            $hint = (array) $validated['hint'];
+            $account = trim((string) ($hint['account_number'] ?? ''));
+            $company = trim((string) ($hint['company_name'] ?? ''));
+            $product = trim((string) ($hint['product_name'] ?? ''));
+            $wo = trim((string) ($hint['wo_number'] ?? ''));
+            $serviceType = trim((string) ($hint['service_type'] ?? ''));
+            $productType = trim((string) ($hint['product_type'] ?? ''));
+            $submitted = trim((string) ($hint['submitted_at'] ?? ''));
+
+            $hintQuery = Client::query();
+            if ($account !== '') {
+                $hintQuery->where('account_number', $account);
+            } elseif ($company !== '') {
+                $hintQuery->where('company_name', $company);
+            }
+            if ($product !== '') {
+                $hintQuery->where('product_name', $product);
+            }
+            if ($wo !== '') {
+                $hintQuery->where('wo_number', $wo);
+            }
+            if ($serviceType !== '') {
+                $hintQuery->where('service_type', $serviceType);
+            }
+            if ($productType !== '') {
+                $hintQuery->where('product_type', $productType);
+            }
+            if ($submitted !== '') {
+                try {
+                    $parsed = Carbon::parse($submitted);
+                    $hintQuery->whereDate('submitted_at', $parsed->toDateString());
+                } catch (\Throwable $e) {
+                    // Ignore invalid submitted_at hint and keep other constraints.
+                }
+            }
+
+            $fallbackClient = $hintQuery->orderByDesc('id')->first(['id', 'account_number']);
+            if ($fallbackClient) {
+                $deletedIds = [(int) $fallbackClient->id];
+                $clients = collect([$fallbackClient]);
+            }
+        }
+
+        if (! empty($deletedIds)) {
+            Client::whereIn('id', $deletedIds)->delete();
+        }
 
         // Log each deletion
         foreach ($clients as $client) {
@@ -2392,9 +2911,22 @@ class ClientApiController extends Controller
             // Driver doesn't support tags — flush module keys only
             Cache::flush();
         }
+        // Query-builder delete() does not fire Eloquent observers, so bump version explicitly.
+        Cache::forget('clients:last-modified');
+        if (! Cache::has('cache_version:clients')) {
+            Cache::forever('cache_version:clients', 1);
+        } else {
+            Cache::increment('cache_version:clients');
+        }
+
+        $missingCount = max(0, count($normalizedIds) - count($deletedIds));
 
         return response()->json([
-            'message' => count($deletedIds) . ' client(s) deleted successfully.',
+            'message' => count($deletedIds) . ' product/service row(s) deleted successfully.' . ($missingCount > 0 ? " {$missingCount} item(s) were already deleted or not found." : ''),
+            'deleted_ids' => $deletedIds,
+            'missing_count' => $missingCount,
+            'scope' => $scope,
+            'requested_ids' => $normalizedIds,
         ]);
     }
 }

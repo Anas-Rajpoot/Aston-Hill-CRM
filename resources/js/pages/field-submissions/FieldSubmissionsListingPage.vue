@@ -205,10 +205,10 @@ function buildParams() {
 }
 
 const COLUMN_LABELS = {
-  id: 'ID',
-  created_at: 'Submitted At',
+  id: 'SR',
+  created_at: 'Created',
   account_number: 'Account Number',
-  company_name: 'Company Name',
+  company_name: 'Company Name as per Trade License',
   authorized_signatory_name: 'Authorized Signatory Name',
   contact_number: 'Contact Number',
   product: 'Product',
@@ -272,6 +272,29 @@ async function onExport() {
   } finally {
     exportLoading.value = false
   }
+}
+
+function downloadTemplateCsv() {
+  const cols = [...visibleColumns.value]
+  const additionalHeaders = ['contact_1_name', 'contact_1_contact_number']
+  const headers = [...new Set([...cols, ...additionalHeaders])]
+  const stamp = Date.now()
+  const rows = [
+    { company_name: 'Demo Company LLC', account_number: `FIELD-${stamp}-1`, submitted_at: '2026-03-10', contact_1_name: 'John Doe', contact_1_contact_number: '971501112233' },
+    { company_name: 'Al Noor Trading', account_number: `FIELD-${stamp}-2`, submitted_at: '2026-03-11', contact_1_name: 'Ali Hassan', contact_1_contact_number: '971502223344' },
+    { company_name: 'Bright Star FZE', account_number: `FIELD-${stamp}-3`, submitted_at: '2026-03-12', contact_1_name: 'Sara Khan', contact_1_contact_number: '971503334455' },
+  ]
+  const csvRows = [headers.map(escapeCsv).join(',')]
+  for (const row of rows) {
+    csvRows.push(headers.map((col) => escapeCsv(row[col] ?? '')).join(','))
+  }
+  const blob = new Blob([csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'field-submissions-template.csv'
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 async function load() {
@@ -687,6 +710,17 @@ onMounted(async () => {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
             {{ exportLoading ? 'Exporting...' : 'Export' }}
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70 disabled:cursor-wait"
+            :disabled="loading || exportLoading"
+            @click="downloadTemplateCsv"
+          >
+            <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Template
           </button>
         </template>
         <template #after-reset>

@@ -1,0 +1,10 @@
+HTTP/1.1 401 Unauthorized
+Host: 127.0.0.1:8000
+Connection: close
+X-Powered-By: PHP/8.2.12
+Cache-Control: no-cache, private
+Date: Sat, 07 Mar 2026 08:10:26 GMT
+Content-Type: application/json
+Vary: Origin
+Set-Cookie: laravel-session=eyJpdiI6Im5FeVlRVVpjOVNFWStiWm1tdStPd3c9PSIsInZhbHVlIjoiL0dFQ3FmQmU1dHcrOEErbWRRMnZyZ1FLZkszOURnU2IyYzNueWVsZFhnbnVqS0FxWlpBeVFJdStTZVcrSzhRTENsWTZaWHdlMUtOQzRzWTUzMlJyZnFqTGxtNnJKRllKaUM4WUJOM2U2TFh3ZGtBWHNQT241MkZyYSt4ZzUwL00iLCJtYWMiOiI2OTI5NWRmOTQ5ZTcxNmRlNzVkMzlkNzgxNzE1MmFjOTEzMDVlMmZmMjdmOGI5NTA3NTVjMmU3MmQyNTAyZmJjIiwidGFnIjoiIn0%3D; expires=Sat, 07 Mar 2026 10:10:26 GMT; Max-Age=7200; path=/; httponly; samesite=lax
+

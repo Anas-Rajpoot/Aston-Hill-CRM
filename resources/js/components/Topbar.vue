@@ -29,15 +29,28 @@ const webEnabled   = ref(true)
 const notifications = ref([])
 const bellOpen     = ref(false)
 let pollTimer      = null
+let pollingDisabled = false
 
 async function pollNotifications() {
+  // Avoid hitting poll endpoint when auth state is not established.
+  if (!auth.isAuthenticated || pollingDisabled) return
+
   try {
-    const { data } = await api.get('/notifications/poll')
+    const { data } = await api.get('/notifications/poll', { skipAuthRedirect: true })
     webEnabled.value   = data.web_enabled !== false
     unreadCount.value  = data.unreadCount ?? 0
     badge.value        = data.badge ?? '0'
     notifications.value = data.top ?? []
-  } catch { /* silent */ }
+  } catch (e) {
+    // If session is no longer authorized, stop background polling noise.
+    if (e?.response?.status === 401) {
+      pollingDisabled = true
+      webEnabled.value = false
+      unreadCount.value = 0
+      badge.value = '0'
+      notifications.value = []
+    }
+  }
 }
 
 function toggleBell() {
@@ -55,6 +68,7 @@ async function markRead(id) {
 }
 
 function schedulePoll() {
+  if (pollingDisabled) return
   if (pollTimer) clearTimeout(pollTimer)
   pollTimer = setTimeout(async () => {
     if (!document.hidden) await pollNotifications()
@@ -65,6 +79,15 @@ function schedulePoll() {
 onMounted(() => {
   // Defer initial poll so it doesn't block page-load API calls on single-threaded server
   pollTimer = setTimeout(async () => {
+    try {
+      await auth.fetchUser(true)
+    } catch {
+      // If auth probe fails, polling will be disabled below.
+    }
+    if (!auth.isAuthenticated) {
+      pollingDisabled = true
+      return
+    }
     await pollNotifications()
     schedulePoll()
   }, 5_000)

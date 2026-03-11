@@ -164,10 +164,6 @@ onBeforeUnmount(() => {
                 <h3 class="mb-4 text-sm font-bold text-gray-900">Expense Information</h3>
                 <dl class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
                   <div>
-                    <dt class="text-sm text-gray-500">Expense ID</dt>
-                    <dd class="mt-0.5 text-sm font-bold text-gray-900">{{ expense.expense_id ?? '—' }}</dd>
-                  </div>
-                  <div>
                     <dt class="text-sm text-gray-500">Status</dt>
                     <dd class="mt-0.5">
                       <span
@@ -179,6 +175,14 @@ onBeforeUnmount(() => {
                     </dd>
                   </div>
                   <div>
+                    <dt class="text-sm text-gray-500">Created</dt>
+                    <dd class="mt-0.5 text-sm font-bold text-gray-900">{{ expense.created_at ?? '—' }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-sm text-gray-500">Expense Date</dt>
+                    <dd class="mt-0.5 text-sm font-bold text-gray-900">{{ expense.expense_date ?? '—' }}</dd>
+                  </div>
+                  <div>
                     <dt class="text-sm text-gray-500">Product Category</dt>
                     <dd class="mt-0.5 text-sm font-bold text-gray-900">{{ expense.product_category ?? '—' }}</dd>
                   </div>
@@ -187,16 +191,30 @@ onBeforeUnmount(() => {
                     <dd class="mt-0.5 text-sm font-bold text-gray-900">{{ expense.invoice_number ?? '—' }}</dd>
                   </div>
                   <div>
+                    <dt class="text-sm text-gray-500">VAT %</dt>
+                    <dd class="mt-0.5 text-sm font-bold text-gray-900">{{ expense.vat_percent != null ? expense.vat_percent + '%' : '—' }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-sm text-gray-500">Amount Without VAT (AED)</dt>
+                    <dd class="mt-0.5 text-sm font-bold text-gray-900">
+                      {{ expense.amount_without_vat != null ? Number(expense.amount_without_vat).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—' }}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt class="text-sm text-gray-500">VAT Amount (AED)</dt>
+                    <dd class="mt-0.5 text-sm font-bold text-gray-900">
+                      {{ expense.vat_amount_currency != null ? Number(expense.vat_amount_currency).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—' }}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt class="text-sm text-gray-500">Total Amount (AED)</dt>
+                    <dd class="mt-0.5 text-sm font-bold text-gray-900">
+                      {{ expense.full_amount != null ? Number(expense.full_amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—' }}
+                    </dd>
+                  </div>
+                  <div>
                     <dt class="text-sm text-gray-500">Added By</dt>
                     <dd class="mt-0.5 text-sm font-bold text-gray-900">{{ expense.added_by ?? '—' }}</dd>
-                  </div>
-                  <div>
-                    <dt class="text-sm text-gray-500">Expense Date</dt>
-                    <dd class="mt-0.5 text-sm font-bold text-gray-900">{{ expense.expense_date ?? '—' }}</dd>
-                  </div>
-                  <div>
-                    <dt class="text-sm text-gray-500">Created Date</dt>
-                    <dd class="mt-0.5 text-sm font-bold text-gray-900">{{ expense.created_at ?? '—' }}</dd>
                   </div>
                   <div class="sm:col-span-2">
                     <dt class="text-sm text-gray-500">Product Description</dt>
@@ -218,20 +236,20 @@ onBeforeUnmount(() => {
                     <span class="text-sm font-bold text-gray-900">{{ expense.vat_percent != null ? expense.vat_percent + '%' : '—' }}</span>
                   </div>
                   <div class="flex items-center justify-between py-2">
-                    <span class="text-sm text-gray-600">Amount (Without VAT)</span>
+                    <span class="text-sm text-gray-600">Amount Without VAT (AED)</span>
                     <span class="text-sm font-bold text-gray-900">
                       {{ expense.amount_without_vat != null ? 'AED ' + Number(expense.amount_without_vat).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—' }}
                     </span>
                   </div>
                   <div class="flex items-center justify-between py-2">
-                    <span class="text-sm text-gray-600">VAT Amount</span>
+                    <span class="text-sm text-gray-600">VAT Amount (AED)</span>
                     <span class="text-sm font-bold text-gray-900">
                       {{ expense.vat_amount_currency != null ? 'AED ' + Number(expense.vat_amount_currency).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—' }}
                     </span>
                   </div>
                   <div class="border-t border-gray-200 my-2" />
                   <div class="flex items-center justify-between py-2">
-                    <span class="text-sm font-bold text-gray-900">Total Amount</span>
+                    <span class="text-sm font-bold text-gray-900">Total Amount (AED)</span>
                     <span class="text-base font-bold text-brand-primary">
                       {{ expense.full_amount != null ? 'AED ' + Number(expense.full_amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—' }}
                     </span>

@@ -73,27 +73,25 @@ function toggleRow(id) {
 }
 
 const columnLabels = {
-  id: 'ID',
-  submitted_at: 'Submitted At',
+  id: 'SR',
+  submitted_at: 'Created',
   ticket_number: 'Ticket Number',
   account_number: 'Account Number',
-  company_name: 'Company Name',
+  company_name: 'Company Name as per Trade License',
   issue_category: 'Issue Category',
   contact_number: 'Contact Number',
   alternate_contact_number: 'Alternate Contact Number',
   issue_description: 'Issue Description',
-  attachments: 'Attachments',
   creator: 'Submitter Name',
   csr: 'CSR Name',
   sla_timer: 'SLA Timer',
-  manager: 'Manager',
-  team_leader: 'Team Leader',
-  sales_agent: 'Sales Agent',
+  manager: 'Manager Name',
+  team_leader: 'Team Leader Name',
+  sales_agent: 'Sales Agent Name',
   status: 'Status',
   workflow_status: 'SLA Status',
   completion_date: 'Completion Date',
   updated_at: 'Last Updated',
-  created_at: 'Created At',
   trouble_ticket: 'Trouble Ticket',
   activity: 'Activity',
   resolution_remarks: 'Resolution Remarks',
@@ -374,7 +372,7 @@ const hasAnyRowAction = computed(() => {
             v-for="col in columns"
             :key="col"
             scope="col"
-            class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold text-black cursor-pointer select-none"
+            class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold text-white cursor-pointer select-none"
             @click="sortable(col) ? toggleSort(col) : null"
           >
             <button
@@ -395,7 +393,7 @@ const hasAnyRowAction = computed(() => {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
               </svg>
             </button>
-            <span v-else class="font-bold text-black">{{ label(col) }}</span>
+            <span v-else class="font-bold text-white">{{ label(col) }}</span>
           </th>
           <th v-if="hasAnyRowAction" scope="col" class="whitespace-nowrap px-4 py-3 text-center text-sm font-bold capitalize text-white">
             Actions

@@ -14,14 +14,17 @@ function formatDateTime(val) {
 function formatDateOnly(val) {
   if (!val || typeof val !== 'string') return '—'
   const raw = val.trim()
-  let date = new Date(raw)
-  if (isNaN(date.getTime())) {
-    // Accept API values that come as dd/mm/yyyy.
-    const m = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
-    if (!m) return raw
+  // Prefer explicit dd/mm/yyyy parsing before Date() to avoid US mm/dd ambiguity.
+  const m = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+  let date
+  if (m) {
     const [, dd, mm, yyyy] = m
     date = new Date(`${yyyy}-${mm}-${dd}`)
-    if (isNaN(date.getTime())) return raw
+  } else {
+    date = new Date(raw)
+  }
+  if (isNaN(date.getTime())) {
+    return raw
   }
   const dd = String(date.getDate()).padStart(2, '0')
   const mon = MONTHS_3[date.getMonth()]
@@ -45,9 +48,10 @@ const props = defineProps({
   permissionModule: { type: String, default: 'clients' },
   selectable: { type: Boolean, default: false },
   selectedIds: { type: Array, default: () => [] },
+  hideDelete: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['sort', 'updateCell', 'viewHistory', 'show-renewal-alerts', 'toggle-select', 'toggle-select-all'])
+const emit = defineEmits(['sort', 'updateCell', 'viewHistory', 'show-renewal-alerts', 'toggle-select', 'toggle-select-all', 'delete'])
 
 const isAllSelected = computed(() => props.data.length > 0 && props.selectedIds.length === props.data.length)
 
@@ -56,7 +60,8 @@ const auth = useAuthStore()
 const canViewAction = computed(() => canModuleAction(auth.user, props.permissionModule, 'view'))
 const canEditAction = computed(() => canModuleAction(auth.user, props.permissionModule, 'edit'))
 const canHistoryAction = computed(() => canViewAction.value)
-const hasAnyRowAction = computed(() => canViewAction.value || canHistoryAction.value)
+const canDeleteAction = computed(() => !props.hideDelete && canModuleAction(auth.user, props.permissionModule, 'delete'))
+const hasAnyRowAction = computed(() => canViewAction.value || canHistoryAction.value || canDeleteAction.value)
 
 const columnLabels = {
   id: 'ID',
@@ -72,6 +77,7 @@ const columnLabels = {
   account_mapping_date: 'Account Mapping Date',
   account_transfer_given_to: 'Account Transfer Given To',
   account_transfer_given_date: 'Account Transfer Given Date',
+  primary_contact_detail: 'Primary Contact Detail',
   full_address: 'Full Address',
   account_manager_name: 'Account Manager Name',
   csr_name_1: 'CSR Name 1',
@@ -81,13 +87,13 @@ const columnLabels = {
   second_bill: 'Second Bill',
   third_bill: 'Third Bill',
   fourth_bill: 'Fourth Bill',
-  additional_comment_1: 'Additional Note 1',
+  additional_comment_1: 'Additional Note',
   additional_comment_2: 'Additional Note 2',
   submitted_at: 'Created',
   submission_type: 'Submission Type',
   service_category: 'Service Category',
   manager: 'Manager Name',
-  team_leader: 'Team Leader',
+  team_leader: 'Team Leader Name',
   sales_agent: 'Sales Agent Name',
   status: 'Status',
   service_type: 'Service Type',
@@ -202,6 +208,11 @@ function sortable(col) {
   return SORTABLE_COLUMNS.includes(col)
 }
 
+function resolveRowId(row) {
+  const id = Number(row?._row_id ?? row?.id)
+  return Number.isInteger(id) && id > 0 ? id : null
+}
+
 function toggleSort(col) {
   if (!sortable(col)) return
   const nextOrder = props.sort === col && props.order === 'asc' ? 'desc' : 'asc'
@@ -209,7 +220,12 @@ function toggleSort(col) {
 }
 
 function formatValue(row, col) {
-  const val = row[col]
+  let val = row[col]
+  if (col === 'submission_type' && (val == null || String(val).trim() === '')) {
+    // Defensive fallback for payload/key shape differences from legacy rows/endpoints.
+    val = row.submissionType ?? row.request_type ?? row.requestType ?? row.type ?? val
+  }
+  if (typeof val === 'string') val = val.trim()
   if (val == null || val === '') return '—'
   if (col === 'submitted_at') return formatDateTime(val)
   if ([
@@ -466,7 +482,7 @@ function onCellDblClick(e, row, col) {
     <table class="min-w-full border-2 border-black border-collapse">
       <thead>
         <tr class="bg-brand-primary border-b-2 border-green-700">
-          <th class="w-10 px-3 py-3">
+          <th v-if="selectable" class="w-10 px-3 py-3">
             <input type="checkbox" :checked="isAllSelected" @change="emit('toggle-select-all')" class="rounded border-gray-300 text-brand-primary focus:ring-brand-primary" />
           </th>
           <th
@@ -484,7 +500,7 @@ function onCellDblClick(e, row, col) {
             <button
               v-if="sortable(col)"
               type="button"
-              class="inline-flex items-center gap-1 font-bold text-white hover:text-white/70"
+              class="inline-flex items-center gap-1 font-bold text-white"
               @click="toggleSort(col)"
             >
               {{ label(col) }}
@@ -514,11 +530,16 @@ function onCellDblClick(e, row, col) {
         </tr>
         <tr
           v-for="(row, rowIndex) in data"
-          :key="row.id"
+          :key="resolveRowId(row) ?? rowIndex"
           class="border-b border-black bg-white hover:bg-gray-50/50"
         >
           <td v-if="selectable" class="whitespace-nowrap px-3 py-3 text-center text-sm" @click.stop>
-            <input type="checkbox" :checked="selectedIds.includes(row.id)" @change="emit('toggle-select', row.id)" class="rounded border-gray-300 text-brand-primary focus:ring-brand-primary" />
+            <input
+              type="checkbox"
+              :checked="selectedIds.includes(resolveRowId(row))"
+              @change="resolveRowId(row) && emit('toggle-select', resolveRowId(row))"
+              class="rounded border-gray-300 text-brand-primary focus:ring-brand-primary"
+            />
           </td>
           <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-900">
             {{ ((currentPage - 1) * perPage) + rowIndex + 1 }}
@@ -631,6 +652,17 @@ function onCellDblClick(e, row, col) {
               >
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </button>
+              <button
+                v-if="canDeleteAction"
+                type="button"
+                class="rounded-full p-1.5 text-red-600 hover:bg-red-50"
+                title="Delete"
+                @click="$emit('delete', row)"
+              >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
                 </svg>
               </button>
             </div>

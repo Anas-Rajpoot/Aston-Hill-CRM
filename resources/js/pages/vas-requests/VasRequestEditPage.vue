@@ -101,8 +101,11 @@ const resolveTeamLeaderManagerId = (teamLeader) => {
 
 const filteredTeamLeaders = computed(() => {
   const mid = form.value.manager_id
-  if (!mid) return teamOptions.value.team_leaders ?? []
-  return (teamOptions.value.team_leaders ?? []).filter((t) => resolveTeamLeaderManagerId(t) === String(mid))
+  const allTeamLeaders = teamOptions.value.team_leaders ?? []
+  if (!mid) return allTeamLeaders
+  const filtered = allTeamLeaders.filter((t) => resolveTeamLeaderManagerId(t) === String(mid))
+  // Fallback to all role users when hierarchy mapping is missing/incomplete.
+  return filtered.length ? filtered : allTeamLeaders
 })
 
 const filteredSalesAgents = computed(() => {
@@ -143,14 +146,20 @@ const filteredSalesAgents = computed(() => {
   }
 
   if (tlId) {
-    return (teamOptions.value.sales_agents ?? []).filter((salesAgent) => resolveSalesAgentTeamLeaderId(salesAgent) === String(tlId))
+    const allSalesAgents = teamOptions.value.sales_agents ?? []
+    const filteredByTeamLeader = allSalesAgents.filter((salesAgent) => resolveSalesAgentTeamLeaderId(salesAgent) === String(tlId))
+    // Fallback to all role users when hierarchy mapping is missing/incomplete.
+    return filteredByTeamLeader.length ? filteredByTeamLeader : allSalesAgents
   }
   if (managerId) {
-    return (teamOptions.value.sales_agents ?? []).filter((salesAgent) => {
+    const allSalesAgents = teamOptions.value.sales_agents ?? []
+    const filteredByManager = allSalesAgents.filter((salesAgent) => {
       const resolvedManagerId = resolveSalesAgentManagerId(salesAgent)
       const resolvedTeamLeaderId = resolveSalesAgentTeamLeaderId(salesAgent)
       return resolvedManagerId === String(managerId) || teamLeaderIdsUnderManager.has(resolvedTeamLeaderId)
     })
+    // Fallback to all role users when hierarchy mapping is missing/incomplete.
+    return filteredByManager.length ? filteredByManager : allSalesAgents
   }
   return teamOptions.value.sales_agents ?? []
 })
@@ -185,7 +194,7 @@ async function load() {
   try {
     const [reqRes, teamRes, filtersRes, schemaRes, boRes] = await Promise.all([
       vasRequestsApi.getRequest(id.value),
-      vasRequestsApi.getTeamOptions().then((r) => r?.data ?? r).catch(() => ({})),
+      vasRequestsApi.getTeamOptions(true).then((r) => r?.data ?? r).catch(() => ({})),
       vasRequestsApi.filters().catch(() => ({})),
       vasRequestsApi.getDocumentSchema().then((r) => r?.data ?? r).catch(() => ({ documents: [] })),
       vasRequestsApi.getBackOfficeOptions().catch(() => ({ executives: [] })),
@@ -525,6 +534,14 @@ async function submitForm() {
       sales_agent_id: form.value.sales_agent_id,
       back_office_executive_id: form.value.back_office_executive_id || null,
     })
+
+    // Save Changes should also persist newly selected documents
+    // so users don't need to click "Upload selected files" separately.
+    if (hasNewFilesToUpload.value) {
+      const fd = buildUploadFormData()
+      await vasRequestsApi.storeStep2(id.value, fd)
+    }
+
     router.push(`/vas-requests/${id.value}`)
   } catch (err) {
     if (err.response?.status === 422 && err.response?.data?.errors) {
@@ -665,7 +682,7 @@ onMounted(() => load())
               />
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700">Manager <span class="text-red-500">*</span></label>
+              <label class="block text-sm font-medium text-gray-700">Manager Name <span class="text-red-500">*</span></label>
               <select
                 v-model="form.manager_id"
                 :class="selectClass('manager_id')"
@@ -677,7 +694,7 @@ onMounted(() => load())
               <p v-if="getError('manager_id')" class="mt-1 text-sm text-red-600">{{ getError('manager_id') }}</p>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700">Team Leader</label>
+              <label class="block text-sm font-medium text-gray-700">Team Leader Name</label>
               <select
                 v-model="form.team_leader_id"
                 :class="selectClass('team_leader_id')"
@@ -689,7 +706,7 @@ onMounted(() => load())
               <p v-if="getError('team_leader_id')" class="mt-1 text-sm text-red-600">{{ getError('team_leader_id') }}</p>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700">Sales Agent</label>
+              <label class="block text-sm font-medium text-gray-700">Sales Agent Name</label>
               <select
                 v-model="form.sales_agent_id"
                 :class="selectClass('sales_agent_id')"

@@ -71,6 +71,11 @@ class FieldSubmissionController extends Controller
      */
     public function teamOptions(Request $request): JsonResponse
     {
+        // Allow callers to force a fresh read right after user/role changes.
+        if ($request->boolean('fresh')) {
+            Cache::forget(self::CACHE_KEY_TEAM_OPTIONS);
+        }
+
         $data = Cache::remember(self::CACHE_KEY_TEAM_OPTIONS, self::TTL_TEAM_OPTIONS, function () {
             $formatUsers = function ($users, bool $includeHierarchy = false) {
                 return $users->map(fn (User $user) => [

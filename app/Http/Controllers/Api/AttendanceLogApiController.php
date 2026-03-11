@@ -98,6 +98,22 @@ class AttendanceLogApiController extends Controller
             return $this->formatRow($log, $sessionIds, $dayAggregates);
         });
 
+        // Fallback: if login logs are empty but there are active sessions, still show logged-in users.
+        if ($total === 0) {
+            $sessionFallback = $this->buildSessionFallbackRows($validated, $sort, $order, $page, $perPage);
+            if (($sessionFallback['total'] ?? 0) > 0) {
+                return response()->json([
+                    'data' => $sessionFallback['data'],
+                    'meta' => [
+                        'current_page' => $page,
+                        'last_page' => $sessionFallback['last_page'],
+                        'per_page' => $perPage,
+                        'total' => $sessionFallback['total'],
+                    ],
+                ]);
+            }
+        }
+
         $lastPage = $total > 0 ? (int) ceil($total / $perPage) : 1;
 
         return response()->json([
@@ -128,9 +144,16 @@ class AttendanceLogApiController extends Controller
             [$todayStart, $todayStart, $todayStart]
         )->first();
 
+        $loggedInFromSessions = (int) DB::table('sessions')
+            ->whereNotNull('user_id')
+            ->distinct('user_id')
+            ->count('user_id');
+
+        $loggedIn = max((int) ($logRow->logged_in ?? 0), $loggedInFromSessions);
+
         return response()->json([
             'total_users' => $totalUsers,
-            'logged_in' => (int) ($logRow->logged_in ?? 0),
+            'logged_in' => $loggedIn,
             'logged_out' => (int) ($logRow->logged_out ?? 0),
             'missing_logout' => (int) ($logRow->missing_logout ?? 0),
         ]);
@@ -345,5 +368,102 @@ class AttendanceLogApiController extends Controller
         $h = (int) floor($s / 3600);
         $m = (int) floor(($s % 3600) / 60);
         return $h . 'h ' . $m . 'm';
+    }
+
+    /**
+     * Build synthetic attendance rows from active sessions when user_login_logs has no data.
+     */
+    private function buildSessionFallbackRows(array $validated, string $sort, string $order, int $page, int $perPage): array
+    {
+        if (! empty($validated['status']) && $validated['status'] !== 'logged_in') {
+            return ['data' => [], 'total' => 0, 'last_page' => 1];
+        }
+
+        $sessions = DB::table('sessions')
+            ->whereNotNull('user_id')
+            ->get(['id', 'user_id', 'last_activity']);
+
+        if ($sessions->isEmpty()) {
+            return ['data' => [], 'total' => 0, 'last_page' => 1];
+        }
+
+        $users = User::query()
+            ->with('roles:id,name')
+            ->whereIn('id', $sessions->pluck('user_id')->unique()->values()->all())
+            ->where('status', 'approved')
+            ->get()
+            ->keyBy('id');
+
+        $from = ! empty($validated['from']) ? \Carbon\Carbon::parse($validated['from'])->startOfDay() : null;
+        $to = ! empty($validated['to']) ? \Carbon\Carbon::parse($validated['to'])->endOfDay() : null;
+        $roleFilter = (string) ($validated['role'] ?? '');
+        $userIdFilter = (int) ($validated['user_id'] ?? 0);
+
+        $rows = collect();
+        foreach ($sessions as $session) {
+            $user = $users->get((int) $session->user_id);
+            if (! $user) {
+                continue;
+            }
+
+            if ($userIdFilter > 0 && (int) $user->id !== $userIdFilter) {
+                continue;
+            }
+            if ($roleFilter !== '' && ! $user->roles->contains(fn ($r) => (string) $r->name === $roleFilter)) {
+                continue;
+            }
+
+            $loginAt = \Carbon\Carbon::createFromTimestamp((int) $session->last_activity);
+            if ($from && $loginAt->lt($from)) {
+                continue;
+            }
+            if ($to && $loginAt->gt($to)) {
+                continue;
+            }
+
+            $empNum = $user->employee_number ?: $user->id;
+            $employeeId = 'EMP-' . str_pad((string) $empNum, 3, '0', STR_PAD_LEFT);
+            $roleLabel = $user->roles
+                ->pluck('name')
+                ->map(fn ($n) => str_replace('_', ' ', ucwords((string) $n, '_')))
+                ->implode(', ');
+
+            $rows->push([
+                'id' => null,
+                'user_id' => (int) $user->id,
+                'employee_name' => (string) ($user->name ?? '—'),
+                'employee_id' => $employeeId,
+                'role' => $roleLabel !== '' ? $roleLabel : '—',
+                'department' => $user->department ?? '—',
+                'login_date' => $loginAt->format('d M Y'),
+                'login_time' => $loginAt->format('H:i:s'),
+                'logout_time' => null,
+                'first_login_time' => $loginAt->format('H:i:s'),
+                'last_logout_time' => null,
+                'duration_text' => 'In Progress',
+                'duration_state' => 'in_progress',
+                'status' => 'logged_in',
+            ]);
+        }
+
+        if ($rows->isEmpty()) {
+            return ['data' => [], 'total' => 0, 'last_page' => 1];
+        }
+
+        $sortField = in_array($sort, ['employee_name', 'employee_id', 'role'], true) ? $sort : 'login_at';
+        if ($sortField === 'login_at') {
+            $rows = $rows->sortBy('login_date')->values();
+        } else {
+            $rows = $rows->sortBy($sortField, SORT_NATURAL | SORT_FLAG_CASE)->values();
+        }
+        if ($order === 'desc') {
+            $rows = $rows->reverse()->values();
+        }
+
+        $total = $rows->count();
+        $paged = $rows->forPage($page, $perPage)->values()->all();
+        $lastPage = $total > 0 ? (int) ceil($total / $perPage) : 1;
+
+        return ['data' => $paged, 'total' => $total, 'last_page' => $lastPage];
     }
 }

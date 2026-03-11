@@ -13,6 +13,44 @@ use Illuminate\Http\Request;
 
 class AnnouncementController extends Controller
 {
+    private function buildSystemGeneratedAnnouncements(): array
+    {
+        $eventTitles = [
+            'system_preferences.updated'   => 'System Preferences Updated',
+            'system_preferences.reset'     => 'System Preferences Reset',
+            'security_settings.updated'    => 'Security Settings Updated',
+            'security_settings.reset'      => 'Security Settings Reset',
+            'notification_settings.updated'=> 'Notification Settings Updated',
+            'sla_rule.updated'             => 'SLA Rule Updated',
+            'sla_rule.created'             => 'SLA Rule Created',
+            'sla_rule.deleted'             => 'SLA Rule Deleted',
+        ];
+
+        $logs = SystemAuditLog::query()
+            ->whereIn('event', array_keys($eventTitles))
+            ->orderByDesc('created_at')
+            ->limit(200)
+            ->get(['id', 'event', 'created_at']);
+
+        return $logs->map(function (SystemAuditLog $log) use ($eventTitles) {
+            $title = $eventTitles[$log->event] ?? 'System Settings Updated';
+            $message = $title . ' from system settings.';
+
+            return [
+                'id' => 'system-audit-' . $log->id,
+                'title' => $title,
+                'type' => 'system',
+                'priority' => 'normal',
+                'status' => 'active',
+                'body' => $message,
+                'content' => $message,
+                'message' => $message,
+                'created_at' => optional($log->created_at)?->toIso8601String(),
+                'published_at' => optional($log->created_at)?->toIso8601String(),
+            ];
+        })->values()->all();
+    }
+
     private function canManage($user): bool
     {
         return $user && ($user->hasRole('superadmin') || $user->can('manage-announcements'));
@@ -21,6 +59,56 @@ class AnnouncementController extends Controller
     /* ── GET /api/announcements ──────────────────────── */
     public function index(Request $request): JsonResponse
     {
+        $includeSystemGenerated = $request->boolean('include_system_generated');
+
+        if ($includeSystemGenerated) {
+            $query = Announcement::query();
+            if ($status = $request->input('status')) {
+                match ($status) {
+                    'active'    => $query->active(),
+                    'scheduled' => $query->scheduled(),
+                    'expired'   => $query->expired(),
+                    'disabled', 'archived' => $query->archived(),
+                    default     => null,
+                };
+            }
+            if ($q = $request->input('q')) {
+                $query->where(fn ($w) => $w->where('title', 'like', "%{$q}%")->orWhere('body', 'like', "%{$q}%"));
+            }
+
+            $baseRows = AnnouncementResource::collection(
+                $query->with('creator')->orderByDesc('published_at')->limit(500)->get()
+            )->resolve();
+
+            $merged = collect($baseRows)
+                ->concat($this->buildSystemGeneratedAnnouncements())
+                ->sortByDesc(function ($row) {
+                    return strtotime((string) ($row['published_at'] ?? $row['created_at'] ?? '1970-01-01 00:00:00'));
+                })
+                ->values();
+
+            $perPage = min((int) $request->input('per_page', 10), 100);
+            $page = max((int) $request->input('page', 1), 1);
+            $total = $merged->count();
+            $lastPage = max((int) ceil(max(1, $total) / max(1, $perPage)), 1);
+            $page = min($page, $lastPage);
+            $items = $merged->forPage($page, $perPage)->values();
+
+            return response()->json([
+                'data' => $items,
+                'meta' => [
+                    'total'        => $total,
+                    'per_page'     => $perPage,
+                    'current_page' => $page,
+                    'last_page'    => $lastPage,
+                    'from'         => $total > 0 ? (($page - 1) * $perPage) + 1 : null,
+                    'to'           => min($page * $perPage, $total),
+                    'counters'     => Announcement::counters(),
+                    'can_update'   => $this->canManage($request->user()),
+                ],
+            ]);
+        }
+
         // Show ALL announcements by default (including disabled/archived)
         $query = Announcement::with('creator')->withCount('acknowledgements');
 

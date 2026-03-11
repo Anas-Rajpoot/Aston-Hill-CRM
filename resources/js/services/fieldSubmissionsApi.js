@@ -13,7 +13,9 @@ export default {
     if (!forceRefresh && _teamOptionsCache && Date.now() - _teamOptionsCacheAt < TEAM_OPTIONS_TTL_MS) {
       return Promise.resolve(_teamOptionsCache)
     }
-    const req = api.get('/field-submissions/team-options')
+    const req = api.get('/field-submissions/team-options', {
+      params: forceRefresh ? { fresh: 1 } : undefined,
+    })
     req.then((res) => {
       _teamOptionsCache = res
       _teamOptionsCacheAt = Date.now()

@@ -22,6 +22,7 @@ const accountCsrIds = ref([])
 const newFiles = ref([])
 const fileInput = ref(null)
 const completionDateRef = ref(null)
+const deletingAttachmentIndex = ref(null)
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 function formatDateDisplay(val) {
@@ -122,8 +123,11 @@ const resolveTeamLeaderManagerId = (teamLeader) => {
 
 const filteredTeamLeaders = computed(() => {
   const mid = form.value.manager_id
-  if (!mid) return teamOptions.value.team_leaders ?? []
-  return (teamOptions.value.team_leaders ?? []).filter((t) => resolveTeamLeaderManagerId(t) === String(mid))
+  const allTeamLeaders = teamOptions.value.team_leaders ?? []
+  if (!mid) return allTeamLeaders
+  const filtered = allTeamLeaders.filter((t) => resolveTeamLeaderManagerId(t) === String(mid))
+  // Match add-form fallback: show all when hierarchy links are missing/incomplete.
+  return filtered.length ? filtered : allTeamLeaders
 })
 
 const filteredSalesAgents = computed(() => {
@@ -164,14 +168,20 @@ const filteredSalesAgents = computed(() => {
   }
 
   if (tlId) {
-    return (teamOptions.value.sales_agents ?? []).filter((salesAgent) => resolveSalesAgentTeamLeaderId(salesAgent) === String(tlId))
+    const allSalesAgents = teamOptions.value.sales_agents ?? []
+    const filteredByTeamLeader = allSalesAgents.filter((salesAgent) => resolveSalesAgentTeamLeaderId(salesAgent) === String(tlId))
+    // Match add-form fallback: show all when hierarchy links are missing/incomplete.
+    return filteredByTeamLeader.length ? filteredByTeamLeader : allSalesAgents
   }
   if (managerId) {
-    return (teamOptions.value.sales_agents ?? []).filter((salesAgent) => {
+    const allSalesAgents = teamOptions.value.sales_agents ?? []
+    const filteredByManager = allSalesAgents.filter((salesAgent) => {
       const resolvedManagerId = resolveSalesAgentManagerId(salesAgent)
       const resolvedTeamLeaderId = resolveSalesAgentTeamLeaderId(salesAgent)
       return resolvedManagerId === String(managerId) || teamLeaderIdsUnderManager.has(resolvedTeamLeaderId)
     })
+    // Match add-form fallback: show all when hierarchy links are missing/incomplete.
+    return filteredByManager.length ? filteredByManager : allSalesAgents
   }
   return teamOptions.value.sales_agents ?? []
 })
@@ -226,6 +236,20 @@ async function downloadAttachment(index) {
   }
 }
 
+async function removeExistingAttachment(index) {
+  if (!submission.value?.id) return
+  if (deletingAttachmentIndex.value != null) return
+  deletingAttachmentIndex.value = index
+  try {
+    const res = await customerSupportApi.removeAttachment(submission.value.id, index)
+    submission.value.attachments = Array.isArray(res?.attachments) ? res.attachments : []
+  } catch (e) {
+    setErrors(e)
+  } finally {
+    deletingAttachmentIndex.value = null
+  }
+}
+
 async function load() {
   if (!id.value) return
   loading.value = true
@@ -236,7 +260,7 @@ async function load() {
     const [subData, optionsData, teamData, csrData] = await Promise.all([
       customerSupportApi.getSubmission(id.value),
       customerSupportApi.getEditOptions().catch(() => ({})),
-      customerSupportApi.getTeamOptions().then((r) => r?.data ?? {}).catch(() => ({})),
+      customerSupportApi.getTeamOptions(true).then((r) => r?.data ?? {}).catch(() => ({})),
       customerSupportApi.getCsrOptions().catch(() => ({})),
     ])
     csrUsers.value = csrData?.csrs ?? []
@@ -364,6 +388,20 @@ function goBack() {
   router.push(`/customer-support/${id.value}`)
 }
 
+function validateOptionalPhone(value) {
+  if (!value) return null
+  if (/\s/.test(value)) return 'Alternate contact number must not contain spaces.'
+  if (!/^\d+$/.test(value)) return 'Alternate contact number must contain only digits.'
+  if (!value.startsWith('971')) return 'Alternate contact number must start with 971.'
+  if (value.length !== 12) return 'Alternate contact number must be exactly 12 digits.'
+  return null
+}
+
+function onPhoneInput(field, event) {
+  const raw = event.target.value.replace(/\D/g, '')
+  form.value[field] = raw
+}
+
 /** Validate required (starred) fields; set errors and return false if invalid */
 function validateRequired() {
   const f = form.value
@@ -371,6 +409,8 @@ function validateRequired() {
   if (!(f.issue_category ?? '').toString().trim()) errs.issue_category = ['Please select an issue category.']
   if (!(f.company_name ?? '').toString().trim()) errs.company_name = ['Company name is required.']
   if (!(f.contact_number ?? '').toString().trim()) errs.contact_number = ['Contact number is required.']
+  const alternatePhoneErr = validateOptionalPhone((f.alternate_contact_number ?? '').toString().trim())
+  if (alternatePhoneErr) errs.alternate_contact_number = [alternatePhoneErr]
   if (!(f.issue_description ?? '').toString().trim()) errs.issue_description = ['Issue description is required.']
   if (!f.manager_id || Number(f.manager_id) < 1) errs.manager_id = ['Please select a manager.']
   if (Object.keys(errs).length > 0) {
@@ -506,9 +546,9 @@ onMounted(() => {
           <!-- Primary Information -->
           <section class="mb-8">
             <h2 class="mb-3 border-b border-gray-200 pb-2 text-base font-semibold text-gray-900">Primary Information</h2>
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700">Company Name <span class="text-red-500">*</span></label>
+                <label class="block text-sm font-medium text-gray-700">Company Name as per Trade License <span class="text-red-500">*</span></label>
                 <input v-model="form.company_name" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" :class="{ 'border-red-500': getError('company_name') }" />
                 <p v-if="getError('company_name')" class="mt-1 text-sm text-red-600">{{ getError('company_name') }}</p>
               </div>
@@ -524,10 +564,18 @@ onMounted(() => {
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">Alternate Contact Number</label>
-                <input v-model="form.alternate_contact_number" type="text" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" :class="{ 'border-red-500': getError('alternate_contact_number') }" />
+                <input
+                  v-model="form.alternate_contact_number"
+                  type="text"
+                  maxlength="12"
+                  placeholder="971XXXXXXXXX"
+                  class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+                  :class="{ 'border-red-500': getError('alternate_contact_number') }"
+                  @input="onPhoneInput('alternate_contact_number', $event)"
+                />
                 <p v-if="getError('alternate_contact_number')" class="mt-1 text-sm text-red-600">{{ getError('alternate_contact_number') }}</p>
               </div>
-              <div class="sm:col-span-3">
+              <div class="sm:col-span-2 xl:col-span-4">
                 <label class="block text-sm font-medium text-gray-700">Issue Category <span class="text-red-500">*</span></label>
                 <div class="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <label
@@ -577,17 +625,17 @@ onMounted(() => {
                 <p v-if="getError('manager_id')" class="mt-1 text-sm text-red-600">{{ getError('manager_id') }}</p>
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700">{{ teamLabels.team_leader }}</label>
+                <label class="block text-sm font-medium text-gray-700">{{ teamLabels.team_leader }} Name</label>
                 <select v-model="form.team_leader_id" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
-                  <option value="">Select {{ teamLabels.team_leader }}</option>
+                  <option value="">Select {{ teamLabels.team_leader }} Name</option>
                   <option v-for="u in filteredTeamLeaders" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
                 </select>
                 <p v-if="getError('team_leader_id')" class="mt-1 text-sm text-red-600">{{ getError('team_leader_id') }}</p>
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700">{{ teamLabels.sales_agent || 'Sales Agent' }}</label>
+                <label class="block text-sm font-medium text-gray-700">{{ teamLabels.sales_agent || 'Sales Agent' }} Name</label>
                 <select v-model="form.sales_agent_id" class="mt-1 block w-full rounded border px-3 py-2 shadow-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" :class="getError('sales_agent_id') ? 'border-red-500' : 'border-gray-300'">
-                  <option value="">Select {{ teamLabels.sales_agent || 'Sales Agent' }}</option>
+                  <option value="">Select {{ teamLabels.sales_agent || 'Sales Agent' }} Name</option>
                   <option v-for="u in filteredSalesAgents" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
                 </select>
                 <p v-if="getError('sales_agent_id')" class="mt-1 text-sm text-red-600">{{ getError('sales_agent_id') }}</p>
@@ -694,6 +742,21 @@ onMounted(() => {
                 <button type="button" class="shrink-0 rounded p-2 text-brand-primary hover:bg-brand-primary-light" :title="'Download ' + attachmentDisplayName(att)" @click="downloadAttachment(idx)">
                   <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="shrink-0 rounded p-2 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  :title="'Remove ' + attachmentDisplayName(att)"
+                  :disabled="deletingAttachmentIndex === idx"
+                  @click="removeExistingAttachment(idx)"
+                >
+                  <svg v-if="deletingAttachmentIndex === idx" class="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <svg v-else class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011 1h4a1 1 0 011 1v3M4 7h16" />
                   </svg>
                 </button>
               </div>

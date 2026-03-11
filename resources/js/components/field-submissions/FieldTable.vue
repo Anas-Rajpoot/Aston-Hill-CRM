@@ -67,10 +67,10 @@ const hasAnyRowAction = computed(() => {
 })
 
 const columnLabels = {
-  id: 'ID',
-  created_at: 'Submitted At',
+  id: 'SR',
+  created_at: 'Created',
   account_number: 'Account Number',
-  company_name: 'Company Name',
+  company_name: 'Company Name as per Trade License',
   authorized_signatory_name: 'Authorized Signatory Name',
   contact_number: 'Contact Number',
   alternate_number: 'Alternate Contact Number',
@@ -410,7 +410,7 @@ function statusDisplayClass(row) {
             v-for="col in columns"
             :key="col"
             scope="col"
-            class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold text-black cursor-pointer select-none"
+            class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold text-white cursor-pointer select-none"
             @click="sortable(col) ? toggleSort(col) : null"
           >
             <button
@@ -431,7 +431,7 @@ function statusDisplayClass(row) {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
               </svg>
             </button>
-            <span v-else class="font-bold text-black">{{ label(col) }}</span>
+            <span v-else class="font-bold text-white">{{ label(col) }}</span>
           </th>
           <th v-if="hasAnyRowAction" scope="col" class="whitespace-nowrap px-4 py-3 text-right text-sm font-bold text-white">
             Actions

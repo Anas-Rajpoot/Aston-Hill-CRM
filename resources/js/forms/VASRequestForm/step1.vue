@@ -275,7 +275,9 @@ const resolveTeamLeaderManagerId = (teamLeader) => {
 const filteredTeamLeaders = computed(() => {
   const mid = form.value.manager_id
   if (!mid) return teamLeaders.value
-  return teamLeaders.value.filter((t) => resolveTeamLeaderManagerId(t) === String(mid))
+  const filtered = teamLeaders.value.filter((t) => resolveTeamLeaderManagerId(t) === String(mid))
+  // Fallback to all role users when hierarchy mapping is missing/incomplete.
+  return filtered.length ? filtered : teamLeaders.value
 })
 
 const filteredSalesAgents = computed(() => {
@@ -316,14 +318,18 @@ const filteredSalesAgents = computed(() => {
   }
 
   if (tlId) {
-    return salesAgents.value.filter((salesAgent) => resolveSalesAgentTeamLeaderId(salesAgent) === String(tlId))
+    const filteredByTeamLeader = salesAgents.value.filter((salesAgent) => resolveSalesAgentTeamLeaderId(salesAgent) === String(tlId))
+    // Fallback to all role users when hierarchy mapping is missing/incomplete.
+    return filteredByTeamLeader.length ? filteredByTeamLeader : salesAgents.value
   }
   if (managerId) {
-    return salesAgents.value.filter((salesAgent) => {
+    const filteredByManager = salesAgents.value.filter((salesAgent) => {
       const resolvedManagerId = resolveSalesAgentManagerId(salesAgent)
       const resolvedTeamLeaderId = resolveSalesAgentTeamLeaderId(salesAgent)
       return resolvedManagerId === String(managerId) || teamLeaderIdsUnderManager.has(resolvedTeamLeaderId)
     })
+    // Fallback to all role users when hierarchy mapping is missing/incomplete.
+    return filteredByManager.length ? filteredByManager : salesAgents.value
   }
   return salesAgents.value
 })
@@ -693,25 +699,25 @@ const selectClass = (field) =>
             <input :value="currentSubmitterName" type="text" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-gray-100 text-gray-700" readonly />
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">{{ formatTeamLabel(teamLabels.manager || 'manager') }} Name <span class="text-red-500">*</span></label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Manager Name <span class="text-red-500">*</span></label>
             <select v-model="form.manager_id" :class="inputClass('manager_id')" @change="clearFieldError('manager_id')">
-              <option value="">Select {{ formatTeamLabel(teamLabels.manager || 'manager') }}</option>
+              <option value="">Select Manager Name</option>
               <option v-for="u in managers" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
             </select>
             <p v-if="getError('manager_id')" class="mt-1 text-sm text-red-600">{{ getError('manager_id') }}</p>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">{{ formatTeamLabel(teamLabels.team_leader || 'team_leader') }} Name</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Team Leader Name</label>
             <select v-model="form.team_leader_id" :class="inputClass('team_leader_id')" @change="clearFieldError('team_leader_id')">
-              <option value="">Select {{ formatTeamLabel(teamLabels.team_leader || 'team_leader') }}</option>
+              <option value="">Select Team Leader Name</option>
               <option v-for="u in filteredTeamLeaders" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
             </select>
             <p v-if="getError('team_leader_id')" class="mt-1 text-sm text-red-600">{{ getError('team_leader_id') }}</p>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">{{ formatTeamLabel(teamLabels.sales_agent || 'sales_agent') }} Name</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Sales Agent Name</label>
             <select v-model="form.sales_agent_id" :class="inputClass('sales_agent_id')" @change="clearFieldError('sales_agent_id')">
-              <option value="">Select {{ formatTeamLabel(teamLabels.sales_agent || 'sales_agent') }}</option>
+              <option value="">Select Sales Agent Name</option>
               <option v-for="u in filteredSalesAgents" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
             </select>
             <p v-if="getError('sales_agent_id')" class="mt-1 text-sm text-red-600">{{ getError('sales_agent_id') }}</p>

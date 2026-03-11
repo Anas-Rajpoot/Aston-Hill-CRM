@@ -59,17 +59,17 @@ function formatAuditSingleValue(val) {
 }
 
 const FIELD_LABELS = {
-  company_name: 'Company Name',
+  company_name: 'Company Name as per Trade License',
   account_number: 'Account Number',
   authorized_signatory_name: 'Authorized Signatory Name',
   contact_number_gsm: 'Contact Number',
   alternate_contact_number: 'Alternate Contact Number',
   email: 'Email ID',
-  address: 'Complete Address',
+  address: 'Complete Address as per Ejari',
   emirate: 'Emirates',
   location_coordinates: 'Location Coordinates',
-  service_category_id: 'Service Category',
-  service_type_id: 'Service Type',
+  service_category_id: 'Service Categories',
+  service_type_id: 'Service Types',
   product: 'Product',
   offer: 'Offer',
   mrc_aed: 'MRC (AED)',
@@ -77,9 +77,9 @@ const FIELD_LABELS = {
   ae_domain: '.ae Domain',
   gaid: 'GAID',
   remarks: 'Remarks',
-  manager_id: 'Manager',
-  team_leader_id: 'Team Leader',
-  sales_agent_id: 'Sales Agent',
+  manager_id: 'Manager Name',
+  team_leader_id: 'Team Leader Name',
+  sales_agent_id: 'Sales Agent Name',
   executive_id: 'Executive',
   status: 'Status',
   submission_type: 'Request Type',
@@ -97,7 +97,7 @@ const FIELD_LABELS = {
   manager_name: 'Manager Name',
   team_leader_name: 'Team Leader Name',
   sales_agent_name: 'Sales Agent Name',
-  creator_name: 'Created By',
+  creator_name: 'Submitter Name',
   original_name: 'File Name',
   doc_key: 'Document Type',
   file_path: 'File Path',
@@ -353,11 +353,11 @@ onMounted(() => {
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ displayVal(lead.gaid) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Service Category</label>
+                  <label class="block text-xs font-medium text-gray-500">Service Categories</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ categoryDisplay(lead) }}</div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500">Service Type</label>
+                  <label class="block text-xs font-medium text-gray-500">Service Types</label>
                   <div class="mt-0.5 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{{ typeNameDisplay(lead) }}</div>
                 </div>
 

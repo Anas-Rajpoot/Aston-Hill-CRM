@@ -243,7 +243,7 @@ function onNewInvoiceChange(e) {
 async function uploadNewAttachments() {
   if (!props.expenseId || !newInvoiceFile.value) return
   const fd = new FormData()
-  fd.append('invoice', newInvoiceFile.value)
+  fd.append('invoice[]', newInvoiceFile.value)
   uploadingAttachments.value = true
   error.value = null
   try {

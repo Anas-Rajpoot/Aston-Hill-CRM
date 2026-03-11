@@ -13,7 +13,9 @@ export default {
     if (!forceRefresh && _teamOptionsCache && Date.now() - _teamOptionsCacheAt < TEAM_OPTIONS_TTL_MS) {
       return Promise.resolve(_teamOptionsCache)
     }
-    const req = api.get('/customer-support/team-options')
+    const req = api.get('/customer-support/team-options', {
+      params: forceRefresh ? { fresh: 1 } : undefined,
+    })
     req.then((res) => {
       _teamOptionsCache = res
       _teamOptionsCacheAt = Date.now()
@@ -66,13 +68,18 @@ export default {
   async uploadAttachments(submissionId, files) {
     const formData = new FormData()
     if (Array.isArray(files)) {
-      files.forEach((f, i) => formData.append(`document_${i + 1}`, f))
+      files.forEach((f) => formData.append('documents[]', f))
     } else {
-      formData.append('document_1', files)
+      formData.append('documents[]', files)
     }
     const { data } = await api.post(`/customer-support/${submissionId}/attachments`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
+    return data
+  },
+
+  async removeAttachment(submissionId, index) {
+    const { data } = await api.delete(`/customer-support/${submissionId}/attachments/${index}`)
     return data
   },
 
@@ -129,6 +136,7 @@ export default {
       'company_name',
       'account_number',
       'contact_number',
+      'alternate_contact_number',
       'issue_description',
       'manager_id',
       'team_leader_id',

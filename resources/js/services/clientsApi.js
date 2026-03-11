@@ -127,8 +127,11 @@ export default {
     return data
   },
 
-  async bulkDelete(ids) {
-    const { data } = await api.post('/clients/bulk-delete', { ids })
+  async bulkDelete(ids, options = {}) {
+    const payload = { ids }
+    if (options?.scope) payload.scope = options.scope
+    if (options?.hint) payload.hint = options.hint
+    const { data } = await api.post('/clients/bulk-delete', payload)
     return data
   },
 }

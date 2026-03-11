@@ -605,6 +605,74 @@ class ExtensionsApiController extends Controller
         return response()->json(['message' => 'Extension deleted.']);
     }
 
+    public function bulkDelete(Request $request): JsonResponse
+    {
+        $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer', 'distinct', 'exists:cisco_extensions,id'],
+        ]);
+
+        $ids = array_values(array_unique(array_map('intval', $request->input('ids', []))));
+        $extensions = CiscoExtension::query()->whereIn('id', $ids)->get();
+        if ($extensions->isEmpty()) {
+            return response()->json(['message' => 'No valid extensions selected.'], 422);
+        }
+
+        foreach ($extensions as $ext) {
+            $this->authorize('delete', $ext);
+        }
+
+        $deleted = 0;
+        foreach ($extensions as $ext) {
+            $old = $ext->toArray();
+            unset($old['password']);
+            $this->writeAuditLog($ext, 'deleted', $old, null);
+            $ext->delete();
+            $deleted++;
+        }
+
+        return response()->json([
+            'message' => "Deleted {$deleted} extension(s).",
+            'deleted' => $deleted,
+        ]);
+    }
+
+    public function bulkStatusUpdate(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer', 'distinct', 'exists:cisco_extensions,id'],
+            'status' => ['required', 'string', Rule::in(CiscoExtension::STATUSES)],
+        ]);
+
+        $ids = array_values(array_unique(array_map('intval', $validated['ids'])));
+        $targetStatus = $validated['status'];
+        $extensions = CiscoExtension::query()->whereIn('id', $ids)->get();
+        if ($extensions->isEmpty()) {
+            return response()->json(['message' => 'No valid extensions selected.'], 422);
+        }
+
+        foreach ($extensions as $ext) {
+            $this->authorize('update', $ext);
+        }
+
+        $updated = 0;
+        foreach ($extensions as $ext) {
+            if ($ext->status === $targetStatus) {
+                continue;
+            }
+            $old = ['status' => $ext->status];
+            $ext->update(['status' => $targetStatus]);
+            $this->writeAuditLog($ext, 'updated', $old, ['status' => $targetStatus]);
+            $updated++;
+        }
+
+        return response()->json([
+            'message' => "Status updated for {$updated} extension(s).",
+            'updated' => $updated,
+        ]);
+    }
+
     public function auditLog(CiscoExtension $ciscoExtension): JsonResponse
     {
         $this->authorize('view', $ciscoExtension);

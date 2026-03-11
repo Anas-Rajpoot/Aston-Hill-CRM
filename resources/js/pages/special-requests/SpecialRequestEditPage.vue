@@ -87,7 +87,9 @@ const resolveTeamLeaderManagerId = (teamLeader) => {
 const filteredTeamLeaders = computed(() => {
   const mid = form.value.manager_id
   if (!mid) return teamOptions.value.team_leaders
-  return teamOptions.value.team_leaders.filter((t) => resolveTeamLeaderManagerId(t) === String(mid))
+  const filtered = teamOptions.value.team_leaders.filter((t) => resolveTeamLeaderManagerId(t) === String(mid))
+  // Fallback to all team leaders when hierarchy mapping is missing/incomplete.
+  return filtered.length ? filtered : teamOptions.value.team_leaders
 })
 
 const filteredSalesAgents = computed(() => {
@@ -128,14 +130,18 @@ const filteredSalesAgents = computed(() => {
   }
 
   if (tlId) {
-    return teamOptions.value.sales_agents.filter((salesAgent) => resolveSalesAgentTeamLeaderId(salesAgent) === String(tlId))
+    const filtered = teamOptions.value.sales_agents.filter((salesAgent) => resolveSalesAgentTeamLeaderId(salesAgent) === String(tlId))
+    // Fallback to all sales agents when hierarchy mapping is missing/incomplete.
+    return filtered.length ? filtered : teamOptions.value.sales_agents
   }
   if (managerId) {
-    return teamOptions.value.sales_agents.filter((salesAgent) => {
+    const filtered = teamOptions.value.sales_agents.filter((salesAgent) => {
       const resolvedManagerId = resolveSalesAgentManagerId(salesAgent)
       const resolvedTeamLeaderId = resolveSalesAgentTeamLeaderId(salesAgent)
       return resolvedManagerId === String(managerId) || teamLeaderIdsUnderManager.has(resolvedTeamLeaderId)
     })
+    // Fallback to all sales agents when hierarchy mapping is missing/incomplete.
+    return filtered.length ? filtered : teamOptions.value.sales_agents
   }
   return teamOptions.value.sales_agents
 })
@@ -199,7 +205,7 @@ async function loadData() {
   try {
     const [reqData, teamRes] = await Promise.all([
       specialRequestsApi.getRequest(id.value),
-      specialRequestsApi.getTeamOptions(),
+      specialRequestsApi.getTeamOptions(true),
     ])
     const teamData = teamRes?.data ?? teamRes ?? {}
     teamOptions.value = {
@@ -400,7 +406,7 @@ onMounted(() => loadData())
               <h2 class="mb-3 text-sm font-semibold text-gray-900">Primary Information</h2>
               <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div>
-                  <label class="block text-xs font-medium text-gray-500">Company Name <span class="text-red-500">*</span></label>
+                  <label class="block text-xs font-medium text-gray-500">Company Name as per Trade License <span class="text-red-500">*</span></label>
                   <input v-model="form.company_name" type="text" placeholder="Enter company name" :class="`${inputClass('company_name')} mt-0.5`" @input="clearFieldError('company_name')" />
                   <p v-if="getError('company_name')" class="mt-1 text-xs text-red-600">{{ getError('company_name') }}</p>
               </div>
@@ -431,25 +437,25 @@ onMounted(() => loadData())
               <h2 class="mb-3 text-sm font-semibold text-gray-900">Team Information</h2>
               <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>
-                  <label class="block text-xs font-medium text-gray-500">Manager <span class="text-red-500">*</span></label>
+                  <label class="block text-xs font-medium text-gray-500">Manager Name <span class="text-red-500">*</span></label>
                   <select v-model="form.manager_id" :class="`${selectClass('manager_id')} mt-0.5`" @change="clearFieldError('manager_id')">
-                  <option value="">Select Manager</option>
+                  <option value="">Select Manager Name</option>
                   <option v-for="u in teamOptions.managers" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
                 </select>
                   <p v-if="getError('manager_id')" class="mt-1 text-xs text-red-600">{{ getError('manager_id') }}</p>
               </div>
               <div>
-                  <label class="block text-xs font-medium text-gray-500">Team Leader</label>
+                  <label class="block text-xs font-medium text-gray-500">Team Leader Name</label>
                   <select v-model="form.team_leader_id" :class="`${selectClass('team_leader_id')} mt-0.5`" @change="clearFieldError('team_leader_id')">
-                  <option value="">Select Team Leader</option>
+                  <option value="">Select Team Leader Name</option>
                   <option v-for="u in filteredTeamLeaders" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
                 </select>
                   <p v-if="getError('team_leader_id')" class="mt-1 text-xs text-red-600">{{ getError('team_leader_id') }}</p>
               </div>
               <div>
-                  <label class="block text-xs font-medium text-gray-500">Sales Agent</label>
+                  <label class="block text-xs font-medium text-gray-500">Sales Agent Name</label>
                   <select v-model="form.sales_agent_id" :class="`${selectClass('sales_agent_id')} mt-0.5`" @change="clearFieldError('sales_agent_id')">
-                  <option value="">Select Sales Agent</option>
+                  <option value="">Select Sales Agent Name</option>
                   <option v-for="u in filteredSalesAgents" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
                 </select>
                   <p v-if="getError('sales_agent_id')" class="mt-1 text-xs text-red-600">{{ getError('sales_agent_id') }}</p>

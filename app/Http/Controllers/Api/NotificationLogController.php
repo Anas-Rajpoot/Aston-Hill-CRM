@@ -10,6 +10,62 @@ use Illuminate\Http\Request;
 
 class NotificationLogController extends Controller
 {
+    private function enrichRow(NotificationLog $row): NotificationLog
+    {
+        $payload = is_array($row->payload) ? $row->payload : [];
+        $type = $row->trigger_key ?: 'notification';
+        $subject = $payload['title']
+            ?? ($row->module ? ($row->module . ' Notification') : 'Notification');
+        $message = $payload['message']
+            ?? ($row->module
+                ? sprintf('%s event: %s.', $row->module, str_replace('_', ' ', (string) $type))
+                : str_replace('_', ' ', (string) $type));
+
+        $row->setAttribute('type', $type);
+        $row->setAttribute('subject', $subject);
+        $row->setAttribute('message', $message);
+        $row->setAttribute('body', $message);
+
+        return $row;
+    }
+
+    private function dedupeKey(NotificationLog $row): ?string
+    {
+        $payload = is_array($row->payload) ? $row->payload : [];
+        $message = strtolower((string) ($row->getAttribute('message') ?? ''));
+        $subject = strtolower((string) ($row->getAttribute('subject') ?? ''));
+        $module = strtolower((string) ($row->module ?? ''));
+        $trigger = strtolower((string) ($row->trigger_key ?? ''));
+
+        // Deduplicate repeated event rows shown to super-admin/all-users view.
+        // This collapses per-recipient log rows into one event row.
+        $isEventRow = in_array($trigger, ['alert_generated', 'new_submission_created', 'sla_breached'], true)
+            || $module === 'client alerts'
+            || ($trigger === 'status_updated' && str_contains($message, 'alert "'));
+
+        if (! $isEventRow) {
+            return null;
+        }
+
+        $alertId = (int) ($payload['alert_id'] ?? 0);
+        if ($alertId > 0) {
+            return 'alert_id:' . $alertId;
+        }
+
+        $submissionId = (int) ($payload['submission_id'] ?? 0);
+        if ($submissionId > 0) {
+            return 'submission_id:' . $submissionId;
+        }
+
+        $recordId = (int) ($payload['record_id'] ?? 0);
+        if ($recordId > 0) {
+            return 'record_id:' . $recordId;
+        }
+
+        // Generic fallback: same trigger + same message is treated as one event.
+        return 'event_msg:' . md5($trigger . '|' . $subject . '|' . $message);
+    }
+
     /**
      * Super admin check.
      */
@@ -50,12 +106,35 @@ class NotificationLogController extends Controller
     {
         $user  = $request->user();
         $query = NotificationLog::query()->orderByDesc('created_at');
+        $validated = $request->validate([
+            'page' => ['sometimes', 'integer', 'min:1'],
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
+        ]);
+        $perPage = (int) ($validated['per_page'] ?? 10);
+        $page = (int) ($validated['page'] ?? 1);
 
         $canViewAll = $this->canViewAll($user);
 
         // Non-admin users: only show logs where sent_to matches their email
         if (! $canViewAll) {
-            $query->where('sent_to', $user->email);
+            $query->where(function ($q) use ($user) {
+                $hasAny = false;
+                if (! empty($user->email)) {
+                    $q->where('sent_to', $user->email);
+                    $hasAny = true;
+                }
+                if (! empty($user->name)) {
+                    if ($hasAny) {
+                        $q->orWhere('sent_to', $user->name);
+                    } else {
+                        $q->where('sent_to', $user->name);
+                    }
+                    $hasAny = true;
+                }
+                if (! $hasAny) {
+                    $q->whereRaw('1 = 0');
+                }
+            });
         }
 
         // Filters
@@ -81,17 +160,38 @@ class NotificationLogController extends Controller
             });
         }
 
-        // Fixed at 10 latest records
-        $perPage   = 10;
-        $paginated = $query->paginate($perPage);
+        // Build latest notification feed with dedupe (for repeated per-recipient rows).
+        $rows = $query->limit(2000)->get()->map(fn (NotificationLog $row) => $this->enrichRow($row));
+        $seen = [];
+        $deduped = collect();
+        foreach ($rows as $row) {
+            $key = $this->dedupeKey($row);
+            if ($key !== null) {
+                if (isset($seen[$key])) {
+                    continue;
+                }
+                $seen[$key] = true;
+            }
+            $deduped->push($row);
+        }
 
-        return response()->json(array_merge($paginated->toArray(), [
+        $total = $deduped->count();
+        $lastPage = max(1, (int) ceil(max(1, $total) / max(1, $perPage)));
+        $page = min(max(1, $page), $lastPage);
+        $items = $deduped->forPage($page, $perPage)->values();
+
+        return response()->json([
+            'data' => $items->all(),
+            'current_page' => $page,
+            'last_page' => $lastPage,
+            'per_page' => $perPage,
+            'total' => $total,
             'meta' => [
                 'can_view_all'    => $canViewAll,
                 'can_delete_logs' => $this->canDeleteLogs($user),
                 'viewing_scope'   => $canViewAll ? 'all' : 'personal',
             ],
-        ]));
+        ]);
     }
 
     /**

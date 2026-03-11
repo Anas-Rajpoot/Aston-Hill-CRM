@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 
 class NotificationTrigger extends Model
 {
@@ -53,6 +54,48 @@ class NotificationTrigger extends Model
     public function preferences()
     {
         return $this->hasMany(UserNotificationPreference::class, 'trigger_id');
+    }
+
+    /**
+     * Support both schema variants:
+     * - notification_triggers.key
+     * - notification_triggers.trigger_key
+     */
+    public static function triggerKeyColumn(): ?string
+    {
+        if (Schema::hasColumn('notification_triggers', 'key')) {
+            return 'key';
+        }
+        if (Schema::hasColumn('notification_triggers', 'trigger_key')) {
+            return 'trigger_key';
+        }
+        return null;
+    }
+
+    public static function hasTableColumn(string $column): bool
+    {
+        return Schema::hasColumn('notification_triggers', $column);
+    }
+
+    public static function findByTriggerKey(string $triggerKey): ?self
+    {
+        $col = self::triggerKeyColumn();
+        if ($col) {
+            return self::query()->where($col, $triggerKey)->first();
+        }
+
+        // Legacy fallback: match by humanized name when key column doesn't exist.
+        $nameGuess = ucwords(str_replace('_', ' ', trim($triggerKey)));
+        return self::query()->where('name', $nameGuess)->first();
+    }
+
+    public function resolvedTriggerKey(): string
+    {
+        $column = self::triggerKeyColumn();
+        if ($column) {
+            return (string) ($this->{$column} ?? '');
+        }
+        return strtolower(str_replace(' ', '_', (string) ($this->name ?? '')));
     }
 
     // ── Resolution: returns triggers with computed states for a user ──

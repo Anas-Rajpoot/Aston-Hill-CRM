@@ -11,6 +11,7 @@ import ColumnCustomizerModal from '@/components/lead-submissions/ColumnCustomize
 import EmailFollowUpTable from '@/components/email-followups/EmailFollowUpTable.vue'
 import Toast from '@/components/Toast.vue'
 import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
+import DeleteOtpModal from '@/components/DeleteOtpModal.vue'
 import api from '@/lib/axios'
 import { canModuleAction } from '@/lib/accessControl'
 
@@ -33,6 +34,11 @@ const canEdit = computed(() =>
     'emails_followup.update',
   ])
 )
+const canDelete = computed(() =>
+  canModuleAction(auth.user, 'email-follow-up', 'delete', [
+    'emails_followup.delete',
+  ])
+)
 const canExport = computed(() =>
   canModuleAction(auth.user, 'email-follow-up', 'export', [
     'emails_followup.export',
@@ -45,12 +51,19 @@ const addedByName = ref('')
 const loading = ref(true)
 const submitLoading = ref(false)
 const exportLoading = ref(false)
+const bulkLoading = ref(false)
+const selectedIds = ref([])
+const bulkStatus = ref('approved')
 
 /* ───── Toast ───── */
 const showToast = ref(false)
 const toastType = ref('success')
 const toastMsg  = ref('')
 function toast(t, m) { toastType.value = t; toastMsg.value = m; showToast.value = true }
+const deleteModalVisible = ref(false)
+const deleteLoading = ref(false)
+const deleteTargetIds = ref([])
+const deleteTargetLabel = ref('selected records')
 const filterOptions = ref({ statuses: [], categories: [] })
 const submissions = ref([])
 const meta = ref({ current_page: 1, last_page: 1, per_page: auth.defaultTablePageSize || 25, total: 0 })
@@ -104,6 +117,8 @@ async function load() {
     const data = await emailFollowUpsApi.index(buildParams())
     submissions.value = data.data ?? []
     meta.value = data.meta ?? meta.value
+    const visibleIdSet = new Set(submissions.value.map((row) => Number(row.id)))
+    selectedIds.value = selectedIds.value.filter((id) => visibleIdSet.has(Number(id)))
   } finally {
     loading.value = false
   }
@@ -198,6 +213,113 @@ async function onPerPageChange(e) {
   try { await api.post(`/table-preferences/${TABLE_MODULE}`, { per_page: val }) } catch { /* silent */ }
 }
 
+const selectedCount = computed(() => selectedIds.value.length)
+const visibleIds = computed(() => submissions.value.map((row) => Number(row.id)))
+const allRowsSelected = computed(() => {
+  const ids = visibleIds.value
+  return ids.length > 0 && ids.every((id) => selectedIds.value.includes(id))
+})
+const someRowsSelected = computed(() => {
+  const ids = visibleIds.value
+  const selectedVisible = ids.filter((id) => selectedIds.value.includes(id)).length
+  return selectedVisible > 0 && selectedVisible < ids.length
+})
+
+function toggleSelectAll() {
+  if (allRowsSelected.value) {
+    selectedIds.value = selectedIds.value.filter((id) => !visibleIds.value.includes(id))
+    return
+  }
+  selectedIds.value = Array.from(new Set([...selectedIds.value, ...visibleIds.value]))
+}
+
+function toggleRowSelection(rowId) {
+  const id = Number(rowId)
+  if (selectedIds.value.includes(id)) {
+    selectedIds.value = selectedIds.value.filter((v) => v !== id)
+    return
+  }
+  selectedIds.value = [...selectedIds.value, id]
+}
+
+function clearSelection() {
+  selectedIds.value = []
+}
+
+function openDeleteModal(ids, label) {
+  const normalizedIds = Array.from(new Set((ids || []).map((v) => Number(v)).filter((v) => Number.isInteger(v) && v > 0)))
+  if (!normalizedIds.length || !canDelete.value) return
+  deleteTargetIds.value = normalizedIds
+  deleteTargetLabel.value = label || (normalizedIds.length === 1 ? `Email Follow-Up #${normalizedIds[0]}` : `${normalizedIds.length} selected email follow-up entries`)
+  deleteModalVisible.value = true
+}
+
+function closeDeleteModal() {
+  if (deleteLoading.value) return
+  deleteModalVisible.value = false
+  deleteTargetIds.value = []
+  deleteTargetLabel.value = 'selected records'
+}
+
+async function confirmOtpDelete() {
+  if (!deleteTargetIds.value.length || !canDelete.value || deleteLoading.value) return
+  deleteLoading.value = true
+  try {
+    const idsToDelete = [...deleteTargetIds.value]
+    const res = await emailFollowUpsApi.bulkAction({
+      action: 'delete',
+      ids: idsToDelete,
+    })
+    toast('success', res?.message || 'Selected rows deleted.')
+    selectedIds.value = selectedIds.value.filter((id) => !idsToDelete.includes(Number(id)))
+    // Close immediately on success (do not rely on guarded close handler while loading).
+    deleteModalVisible.value = false
+    deleteTargetIds.value = []
+    deleteTargetLabel.value = 'selected records'
+    await load()
+  } catch (e) {
+    const msg = e.response?.data?.message || e.message || 'Failed to delete selected rows.'
+    toast('error', msg)
+  } finally {
+    deleteLoading.value = false
+  }
+}
+
+async function applyBulkStatus() {
+  if (!selectedIds.value.length || !bulkStatus.value || !canEdit.value) return
+  bulkLoading.value = true
+  try {
+    const res = await emailFollowUpsApi.bulkAction({
+      action: 'status',
+      ids: selectedIds.value,
+      status: bulkStatus.value,
+    })
+    toast('success', res?.message || 'Status updated for selected rows.')
+    clearSelection()
+    await load()
+  } catch (e) {
+    const msg = e.response?.data?.message || e.message || 'Failed to update selected rows.'
+    toast('error', msg)
+  } finally {
+    bulkLoading.value = false
+  }
+}
+
+async function applyBulkDelete() {
+  if (!selectedIds.value.length || !canDelete.value) return
+  openDeleteModal(
+    selectedIds.value,
+    `${selectedIds.value.length} selected email follow-up entr${selectedIds.value.length === 1 ? 'y' : 'ies'}`
+  )
+}
+
+async function onDeleteRow(row) {
+  const id = Number(row?.id)
+  if (!id || !canDelete.value) return
+  const label = row?.subject ? `"${row.subject}"` : `Email Follow-Up #${id}`
+  openDeleteModal([id], label)
+}
+
 async function loadTablePreference() {
   try {
     const { data } = await api.get(`/table-preferences/${TABLE_MODULE}`)
@@ -260,11 +382,21 @@ function escapeCsv(val) {
 
 async function onExport() {
   if (!canExport.value) return
-  const params = { ...buildParams(), page: 1, per_page: 500 }
   exportLoading.value = true
   try {
-    const data = await emailFollowUpsApi.index(params)
-    const rows = data.data ?? []
+    const baseParams = { ...buildParams(), per_page: 100 }
+    let currentPage = 1
+    let lastPage = 1
+    const rows = []
+
+    do {
+      const data = await emailFollowUpsApi.index({ ...baseParams, page: currentPage })
+      rows.push(...(data.data ?? []))
+      const metaInfo = data.meta ?? {}
+      lastPage = Number(metaInfo.last_page || 1)
+      currentPage += 1
+    } while (currentPage <= lastPage)
+
     const cols = visibleColumns.value
     const headers = cols.map((c) => COLUMN_LABELS[c] ?? c)
     const csvRows = [headers.map(escapeCsv).join(',')]
@@ -391,6 +523,44 @@ onMounted(async () => {
         @reset="resetFilters"
       >
         <template #after-reset>
+          <div
+            v-if="selectedCount > 0"
+            class="inline-flex flex-wrap items-center gap-2 rounded-lg border border-brand-primary/30 bg-brand-primary/5 px-2 py-1"
+          >
+            <span class="text-xs font-medium text-brand-primary">{{ selectedCount }} selected</span>
+            <select
+              v-model="bulkStatus"
+              class="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+              :disabled="bulkLoading"
+            >
+              <option value="pending">Open</option>
+              <option value="approved">Closed</option>
+            </select>
+            <button
+              type="button"
+              class="rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              :disabled="bulkLoading || !canEdit"
+              @click="applyBulkStatus"
+            >
+              Change Status
+            </button>
+            <button
+              type="button"
+              class="rounded border border-red-300 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-60"
+              :disabled="bulkLoading || !canDelete"
+              @click="applyBulkDelete"
+            >
+              Delete
+            </button>
+            <button
+              type="button"
+              class="rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              :disabled="bulkLoading"
+              @click="clearSelection"
+            >
+              Clear
+            </button>
+          </div>
           <button
             type="button"
             class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -439,8 +609,14 @@ onMounted(async () => {
           :per-page="meta.per_page"
           :edit-options="filterOptions"
           :can-inline-edit="canEdit"
+          :selected-ids="selectedIds"
+          :all-rows-selected="allRowsSelected"
+          :some-rows-selected="someRowsSelected"
           @sort="onSort"
           @update-cell="onUpdateCell"
+          @toggle-select-all="toggleSelectAll"
+          @toggle-row-selection="toggleRowSelection"
+          @delete="onDeleteRow"
         />
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-black bg-white px-4 py-3">
           <p class="text-sm text-gray-600">
@@ -475,6 +651,15 @@ onMounted(async () => {
       :visible-columns="visibleColumns"
       @update:visible="columnModalVisible = $event"
       @save="onSaveColumns"
+    />
+
+    <DeleteOtpModal
+      :visible="deleteModalVisible"
+      title="Delete Email Follow-Up"
+      :item-label="deleteTargetLabel"
+      :loading="deleteLoading"
+      @close="closeDeleteModal"
+      @confirm="confirmOtpDelete"
     />
 
     <Toast :show="showToast" :type="toastType" :message="toastMsg" :duration="4000" @dismiss="showToast = false" />

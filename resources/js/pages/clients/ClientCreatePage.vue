@@ -324,16 +324,84 @@ const createdDateLabel = computed(() => {
 const settingFromChild = ref(false)
 const settingFromSalesAgent = ref(false)
 
+const pickFirstValue = (obj, keys) => {
+  for (const key of keys) {
+    const value = obj?.[key]
+    if (value != null && value !== '') return String(value)
+  }
+  return ''
+}
+
+const resolveTeamLeaderManagerId = (teamLeader) => {
+  const direct = pickFirstValue(teamLeader, ['manager_id', 'managerId'])
+  if (direct) return direct
+  const reportsTo = pickFirstValue(teamLeader, ['reports_to', 'reportsTo'])
+  if (reportsTo && (teamOptions.value.managers ?? []).some((m) => String(m.id) === reportsTo)) return reportsTo
+  return ''
+}
+
+const resolveSalesAgentTeamLeaderId = (salesAgent) => {
+  const direct = pickFirstValue(salesAgent, ['team_leader_id', 'teamLeaderId'])
+  if (direct) return direct
+  const reportsTo = pickFirstValue(salesAgent, ['reports_to', 'reportsTo'])
+  if (reportsTo && (teamOptions.value.team_leaders ?? []).some((t) => String(t.id) === reportsTo)) return reportsTo
+  return ''
+}
+
+const resolveSalesAgentManagerId = (salesAgent) => {
+  const direct = pickFirstValue(salesAgent, ['manager_id', 'managerId'])
+  if (direct) return direct
+  const reportsTo = pickFirstValue(salesAgent, ['reports_to', 'reportsTo'])
+  if (reportsTo && (teamOptions.value.managers ?? []).some((m) => String(m.id) === reportsTo)) return reportsTo
+
+  const teamLeaderId = resolveSalesAgentTeamLeaderId(salesAgent)
+  if (teamLeaderId) {
+    const teamLeader = (teamOptions.value.team_leaders ?? []).find((t) => String(t.id) === String(teamLeaderId))
+    const managerIdFromLeader = resolveTeamLeaderManagerId(teamLeader)
+    if (managerIdFromLeader) return managerIdFromLeader
+  }
+  return ''
+}
+
+const withSelectedEntry = (list, selectedId) => {
+  if (!selectedId) return list
+  const hasSelected = list.some((item) => String(item.id) === String(selectedId))
+  if (hasSelected) return list
+  const fromAllTeamLeaders = (teamOptions.value.team_leaders ?? []).find((u) => String(u.id) === String(selectedId))
+  if (fromAllTeamLeaders) return [...list, fromAllTeamLeaders]
+  const fromAllSalesAgents = (teamOptions.value.sales_agents ?? []).find((u) => String(u.id) === String(selectedId))
+  if (fromAllSalesAgents) return [...list, fromAllSalesAgents]
+  return list
+}
+
 const filteredTeamLeaders = computed(() => {
+  const allTeamLeaders = teamOptions.value.team_leaders ?? []
   const mid = form.value.manager_id
-  if (!mid) return teamOptions.value.team_leaders ?? []
-  return (teamOptions.value.team_leaders ?? []).filter((t) => String(t.manager_id) === String(mid))
+  if (!mid) return withSelectedEntry(allTeamLeaders, form.value.team_leader_id)
+  const filtered = allTeamLeaders.filter((t) => resolveTeamLeaderManagerId(t) === String(mid))
+  // Fallback to all role users when hierarchy mapping is missing/incomplete.
+  const source = filtered.length ? filtered : allTeamLeaders
+  return withSelectedEntry(source, form.value.team_leader_id)
 })
 
 const filteredSalesAgents = computed(() => {
+  const allSalesAgents = teamOptions.value.sales_agents ?? []
   const tlId = form.value.team_leader_id
-  if (!tlId) return teamOptions.value.sales_agents ?? []
-  return (teamOptions.value.sales_agents ?? []).filter((s) => String(s.team_leader_id) === String(tlId))
+  const managerId = form.value.manager_id
+
+  if (tlId) {
+    const filteredByTeamLeader = allSalesAgents.filter((s) => resolveSalesAgentTeamLeaderId(s) === String(tlId))
+    const source = filteredByTeamLeader.length ? filteredByTeamLeader : allSalesAgents
+    return withSelectedEntry(source, form.value.sales_agent_id)
+  }
+
+  if (managerId) {
+    const filteredByManager = allSalesAgents.filter((s) => resolveSalesAgentManagerId(s) === String(managerId))
+    const source = filteredByManager.length ? filteredByManager : allSalesAgents
+    return withSelectedEntry(source, form.value.sales_agent_id)
+  }
+
+  return withSelectedEntry(allSalesAgents, form.value.sales_agent_id)
 })
 
 watch(
@@ -353,9 +421,10 @@ watch(
   (tid) => {
     if (tid) {
       const tl = (teamOptions.value.team_leaders ?? []).find((u) => String(u.id) === String(tid))
-      if (tl?.manager_id != null) {
+      const managerId = resolveTeamLeaderManagerId(tl)
+      if (managerId) {
         settingFromChild.value = true
-        form.value.manager_id = tl.manager_id
+        form.value.manager_id = managerId
         nextTick(() => { settingFromChild.value = false })
       }
       if (!settingFromSalesAgent.value) form.value.sales_agent_id = null
@@ -373,8 +442,10 @@ watch(
       if (sa) {
         settingFromSalesAgent.value = true
         settingFromChild.value = true
-        if (sa.team_leader_id != null) form.value.team_leader_id = sa.team_leader_id
-        if (sa.manager_id != null) form.value.manager_id = sa.manager_id
+        const teamLeaderId = resolveSalesAgentTeamLeaderId(sa)
+        const managerId = pickFirstValue(sa, ['manager_id', 'managerId'])
+        if (teamLeaderId) form.value.team_leader_id = teamLeaderId
+        if (managerId) form.value.manager_id = managerId
         nextTick(() => {
           settingFromSalesAgent.value = false
           settingFromChild.value = false
@@ -479,7 +550,7 @@ onMounted(async () => {
   resetProductServiceFieldsToPlaceholders()
 
   try {
-    const res = await leadSubmissionsApi.getTeamOptions()
+    const res = await leadSubmissionsApi.getTeamOptions(true)
     const data = res?.data ?? res ?? {}
     teamOptions.value = {
       managers: data.managers ?? [],
@@ -733,7 +804,16 @@ function validateForm() {
   const c0 = f.contacts[0]
   if (!isProductMode.value && c0) {
     if (!c0.name?.trim()) errs.contact_0_name = 'Contact Person Name is required.'
-    if (!c0.contact_number?.trim()) errs.contact_0_contact_number = 'Contact Number is required.'
+    if (!c0.contact_number?.trim()) {
+      errs.contact_0_contact_number = 'Contact Number is required.'
+    } else {
+      const phoneErr = validatePhone(c0.contact_number.trim())
+      if (phoneErr) errs.contact_0_contact_number = phoneErr
+    }
+    if (c0.alternate_number?.trim()) {
+      const altPhoneErr = validatePhone(c0.alternate_number.trim())
+      if (altPhoneErr) errs.contact_0_alternate_number = altPhoneErr
+    }
     if (!c0.email?.trim()) errs.contact_0_email = 'Email ID is required.'
   }
 
@@ -750,7 +830,25 @@ const requiredFieldLabels = {
   csr: 'CSR (at least one)',
   contact_0_name: 'Contact Person Name',
   contact_0_contact_number: 'Contact Number',
+  contact_0_alternate_number: 'Alternate Contact Number',
   contact_0_email: 'Email ID',
+}
+
+function validatePhone(value) {
+  if (!value) return null
+  if (/\s/.test(value)) return 'Must not contain spaces.'
+  if (!/^\d+$/.test(value)) return 'Must contain only digits.'
+  if (!value.startsWith('971')) return 'Must start with 971.'
+  if (value.length !== 12) return 'Must be exactly 12 digits.'
+  return null
+}
+
+function onPhoneInput(contact, field, event) {
+  contact[field] = (event?.target?.value || '').replace(/\D/g, '')
+  if (contact === form.value.contacts[0]) {
+    if (field === 'contact_number') fieldErrors.value.contact_0_contact_number = null
+    if (field === 'alternate_number') fieldErrors.value.contact_0_alternate_number = null
+  }
 }
 
 function inputClass(fieldKey) {
@@ -973,10 +1071,10 @@ function closeToast() {
       <router-link v-if="!isProductMode" :to="resolveListingTarget()" class="inline-block text-sm text-brand-primary hover:text-brand-primary-hover">
         {{ backToListingLabel }}
       </router-link>
-      <div>
+      <div v-if="isProductMode">
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div class="flex flex-wrap items-baseline gap-2">
-            <h1 class="text-2xl font-semibold text-gray-900">{{ isProductMode ? 'Add Product' : 'Add New Client' }}</h1>
+            <h1 class="text-2xl font-semibold text-gray-900">Add Product</h1>
             <span v-if="draftSavedAt" class="text-xs text-gray-400 flex items-center gap-1">
               <svg v-if="draftSaving" class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="4" class="opacity-25" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
               <svg v-else class="w-3 h-3 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
@@ -992,7 +1090,7 @@ function closeToast() {
           </button>
         </div>
         <p class="mt-2 text-sm text-gray-500">
-          {{ isProductMode ? 'Create a product/service record for this client.' : 'Create a new client master record.' }}
+          Create a product/service record for this client.
         </p>
       </div>
 
@@ -1190,12 +1288,27 @@ function closeToast() {
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">Contact Number <span class="text-red-600">*</span></label>
-                <input v-model="contact.contact_number" type="text" placeholder="Enter contact number" :class="idx === 0 ? inputClass('contact_0_contact_number') : 'mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary'" />
+                <input
+                  v-model="contact.contact_number"
+                  type="text"
+                  maxlength="12"
+                  placeholder="971XXXXXXXXX"
+                  :class="idx === 0 ? inputClass('contact_0_contact_number') : 'mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary'"
+                  @input="onPhoneInput(contact, 'contact_number', $event)"
+                />
                 <p v-if="idx === 0 && fieldErrors.contact_0_contact_number" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.contact_0_contact_number }}</p>
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">Alternate Contact Number</label>
-                <input v-model="contact.alternate_number" type="text" placeholder="Enter alternate number" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary" />
+                <input
+                  v-model="contact.alternate_number"
+                  type="text"
+                  maxlength="12"
+                  placeholder="971XXXXXXXXX"
+                  class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+                  @input="onPhoneInput(contact, 'alternate_number', $event)"
+                />
+                <p v-if="idx === 0 && fieldErrors.contact_0_alternate_number" class="mt-0.5 text-xs text-red-600">{{ fieldErrors.contact_0_alternate_number }}</p>
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">Email ID <span class="text-red-600">*</span></label>
@@ -1282,7 +1395,7 @@ function closeToast() {
               </select>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700">Team Leader</label>
+              <label class="block text-sm font-medium text-gray-700">Team Leader Name</label>
               <select v-model="form.team_leader_id" class="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary">
                 <option :value="null">Select</option>
                 <option v-for="t in filteredTeamLeaders" :key="t.id" :value="t.id">{{ t.name }}</option>

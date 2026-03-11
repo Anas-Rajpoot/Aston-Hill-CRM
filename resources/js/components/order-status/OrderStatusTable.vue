@@ -1,6 +1,6 @@
 <script setup>
 /**
- * Order Status table – Activity (green link), Account Number, Work Order, Work Order Status (badge), Activation Date, Remarks. Sortable.
+ * Order Status table – focused columns with sortable headers.
  */
 import { useRouter } from 'vue-router'
 import { toDdMonYyyy } from '@/lib/dateFormat'
@@ -12,6 +12,8 @@ const props = defineProps({
   order: { type: String, default: 'desc' },
   loading: { type: Boolean, default: false },
   canViewAction: { type: Boolean, default: true },
+  currentPage: { type: Number, default: 1 },
+  perPage: { type: Number, default: 25 },
 })
 
 const emit = defineEmits(['sort'])
@@ -25,7 +27,7 @@ const columnLabels = {
   account_number: 'Account Number',
   submitted_at: 'Activation Date',
   manager: 'Manager Name',
-  team_leader: 'Team Leader',
+  team_leader: 'Team Leader Name',
   sales_agent: 'Sales Agent Name',
   status: 'Work Order Status',
   service_type: 'Service Type',
@@ -36,13 +38,13 @@ const columnLabels = {
   quantity: 'Quantity',
   other: 'Activity Notes',
   migration_numbers: 'Migration Numbers',
-  wo_number: 'Work Order',
+  wo_number: 'Work Order Number',
   completion_date: 'Completion Date',
   payment_connection: 'Payment Connection',
   contract_type: 'Contract Type',
   contract_end_date: 'Contract End Date',
   renewal_alert: 'Renewal Alert',
-  additional_notes: 'Remarks',
+  additional_notes: 'Additional Notes',
   creator: 'Created By',
 }
 
@@ -68,15 +70,7 @@ function toggleSort(col) {
   emit('sort', { sort: col, order: nextOrder })
 }
 
-function activityDisplay(row) {
-  const year = row.submitted_at
-    ? new Date(row.submitted_at).getFullYear()
-    : new Date().getFullYear()
-  return `ACT-${year}-${String(row.id ?? 0).padStart(3, '0')}`
-}
-
 function formatValue(row, col) {
-  if (col === 'activity') return activityDisplay(row)
   const val = row[col]
   if (val == null || val === '') return '—'
   if (typeof val === 'object') return val?.name ?? '—'
@@ -91,12 +85,18 @@ function activationDateDisplay(row) {
   return toDdMonYyyy(str) || str
 }
 
-const TRUNCATE_LENGTH = 40
+const TRUNCATE_LENGTH = 30
 
 function truncate(str, max = TRUNCATE_LENGTH) {
   if (str == null || str === '') return '—'
   const s = String(str)
   return s.length > max ? s.slice(0, max) + '...' : s
+}
+
+function rowNumber(rowIndex) {
+  const page = Number(props.currentPage) > 0 ? Number(props.currentPage) : 1
+  const perPage = Number(props.perPage) > 0 ? Number(props.perPage) : 25
+  return ((page - 1) * perPage) + rowIndex + 1
 }
 
 const STATUS_BADGES = {
@@ -145,6 +145,12 @@ function goToClient(row) {
       <thead>
         <tr class="bg-brand-primary border-b-2 border-green-700">
           <th
+            scope="col"
+            class="whitespace-nowrap px-4 py-3 text-left text-sm font-bold text-white select-none"
+          >
+            SR
+          </th>
+          <th
             v-for="col in columns"
             :key="col"
             scope="col"
@@ -175,7 +181,7 @@ function goToClient(row) {
       </thead>
       <tbody class="bg-white">
         <tr v-if="!loading && !data.length" class="border-b border-black bg-white">
-          <td :colspan="columns.length" class="px-4 py-12 text-center text-gray-500">
+          <td :colspan="columns.length + 1" class="px-4 py-12 text-center text-gray-500">
             No orders found.
           </td>
         </tr>
@@ -184,6 +190,9 @@ function goToClient(row) {
           :key="row.id"
           class="border-b border-black bg-white hover:bg-gray-50/50"
         >
+          <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-900">
+            {{ rowNumber(rowIndex) }}
+          </td>
           <td
             v-for="col in columns"
             :key="col"
@@ -191,14 +200,15 @@ function goToClient(row) {
           >
             <template v-if="col === 'activity'">
               <router-link
-                v-if="canViewAction"
+                v-if="canViewAction && row?.id"
                 :to="`/clients/${row.id}`"
                 class="font-medium text-brand-primary hover:text-brand-primary-hover hover:underline"
+                :title="formatValue(row, col)"
                 @click.stop
               >
-                {{ activityDisplay(row) }}
+                {{ truncate(formatValue(row, col)) }}
               </router-link>
-              <span v-else class="text-gray-500">{{ activityDisplay(row) }}</span>
+              <span v-else class="text-gray-500" :title="formatValue(row, col)">{{ truncate(formatValue(row, col)) }}</span>
             </template>
             <template v-else-if="col === 'status'">
               <span
@@ -211,7 +221,9 @@ function goToClient(row) {
               {{ activationDateDisplay(row) }}
             </template>
             <template v-else>
-              {{ truncate(formatValue(row, col)) }}
+              <span :title="formatValue(row, col)">
+                {{ truncate(formatValue(row, col)) }}
+              </span>
             </template>
           </td>
         </tr>

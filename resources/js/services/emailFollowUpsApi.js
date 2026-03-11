@@ -31,4 +31,8 @@ export default {
     const { data } = await api.patch(`/email-follow-ups/${id}/status`, { status })
     return data
   },
+  async bulkAction(payload) {
+    const { data } = await api.post('/email-follow-ups/bulk-action', payload)
+    return data
+  },
 }
