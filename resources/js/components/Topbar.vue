@@ -18,12 +18,15 @@ const primaryRole = computed(() => {
 })
 
 const logout = async () => {
-  await auth.logout()
   try {
-    await router.replace('/login')
+    await auth.logout()
   } finally {
-    // Hard fallback ensures protected UI is not left visible due stale state/chunk timing.
-    if (window.location.pathname !== '/login') window.location.href = '/login'
+    try {
+      await router.replace('/login')
+    } finally {
+      // Hard fallback ensures protected UI is not left visible due stale state/chunk timing.
+      if (window.location.pathname !== '/login') window.location.href = '/login'
+    }
   }
 }
 

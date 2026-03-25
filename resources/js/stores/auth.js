@@ -77,6 +77,9 @@ export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null,
     token: null,
+    // Prevent immediate re-hydration of auth state right after logout
+    // (other mounted components may call fetchUser(true) concurrently).
+    logoutAt: 0,
     timezone: 'Asia/Dubai',
     defaultTablePageSize: 25,
     session: {
@@ -112,6 +115,11 @@ export const useAuthStore = defineStore('auth', {
 
     async _doFetchUser() {
       if (this.user?.pending2FA) return
+      // If we just logged out, do not rehydrate from cache / server for a short grace window.
+      // This fixes "logout then dashboard still visible" caused by a concurrent fetchUser(true).
+      if (this.logoutAt && Date.now() - this.logoutAt < 4000) {
+        return
+      }
       try {
         const hasToken = getStorage().getItem('api_token') || sessionStorage.getItem('api_token') || localStorage.getItem('api_token')
         const hasCsrfFromPage = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
@@ -289,22 +297,27 @@ export const useAuthStore = defineStore('auth', {
     },
 
     async logout() {
+      // Clear local auth state immediately so UI never stays visible even if the API call fails.
+      this.logoutAt = Date.now()
+      this.user = null
+      this.token = null
+      this.passwordAction = null
+      this._lastFetchedAt = 0
+      sessionStorage.removeItem('api_token')
+      localStorage.removeItem('api_token')
+      try {
+        sessionStorage.removeItem(BOOTSTRAP_CACHE_KEY)
+        localStorage.removeItem(BOOTSTRAP_CACHE_KEY)
+        sessionStorage.removeItem(FORCE_LOGOUT_KEY)
+      } catch {
+        //
+      }
+
+      // Best-effort revoke server session/token (ignore failures).
       try {
         await api.post('/auth/logout')
-      } finally {
-        this.user = null
-        this.token = null
-        this.passwordAction = null
-        this._lastFetchedAt = 0
-        sessionStorage.removeItem('api_token')
-        localStorage.removeItem('api_token')
-        try {
-          sessionStorage.removeItem(BOOTSTRAP_CACHE_KEY)
-          localStorage.removeItem(BOOTSTRAP_CACHE_KEY)
-          sessionStorage.removeItem(FORCE_LOGOUT_KEY)
-        } catch {
-          //
-        }
+      } catch {
+        // ignore
       }
     },
 
