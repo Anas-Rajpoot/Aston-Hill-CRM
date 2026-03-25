@@ -293,6 +293,9 @@ class UserController extends Controller
         if ($sort === 'last_login_at') {
             $sub = UserLoginLog::query()->selectRaw('user_id, MAX(login_at) as login_at')->groupBy('user_id');
             $query->leftJoinSub($sub, 'last_logins', 'users.id', '=', 'last_logins.user_id')
+                // SQLite sorts NULLs first by default; force NULLs to the bottom
+                // so "Last Login" sorting behaves as expected.
+                ->orderByRaw('CASE WHEN last_logins.login_at IS NULL THEN 1 ELSE 0 END ASC')
                 ->orderBy('last_logins.login_at', $direction)
                 ->select('users.*');
             return;
