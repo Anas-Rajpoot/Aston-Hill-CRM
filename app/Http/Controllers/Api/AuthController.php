@@ -405,13 +405,16 @@ class AuthController extends Controller
             $logoutQuery->latest('login_at')->limit(1)->update(['logout_at' => now()]);
         }
 
-        if ($request->bearerToken()) {
-            $user->currentAccessToken()->delete();
-        } else {
-            Auth::guard('web')->logout();
-            $request->session()->invalidate();
-            $request->session()->regenerateToken();
+        // Important: even if we received a bearer token, invalidate the web session too.
+        // Otherwise the SPA can still hit `/me` successfully (cookie session still valid),
+        // making it look like logout is "not working".
+        if ($request->bearerToken() && $user) {
+            $user->currentAccessToken()?->delete();
         }
+
+        Auth::guard('web')->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
         return response()->json(['message' => 'Logged out']);
     }
 
