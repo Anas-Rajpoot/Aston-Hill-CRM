@@ -697,7 +697,8 @@ const AE_DOMAIN_FORBIDDEN_KEYWORDS = ['lac', 'rac', 'rat', 'sgns']
 const AE_DOMAIN_SPECIAL = /[@#$%^&*()\-+={}\[\]:;'"\\<>,_?/!_`|\s]/
 function validateAeDomain(value) {
   const v = (value || '').trim()
-  if (!v) return { valid: false, message: 'Enter Domain Name' }
+  // Optional field: empty value is valid.
+  if (!v) return { valid: true, message: '' }
   if (/\s/.test(v)) return { valid: false, message: 'The domain must not contain spaces.' }
   if (/[0-9]/.test(v)) return { valid: false, message: 'The domain must not contain numbers (0–9).' }
   if (AE_DOMAIN_SPECIAL.test(v)) return { valid: false, message: 'The domain must not contain special characters such as: @ # $ % ^ & * ( ) - + = { } [ ] : ; \' " \\ <> , ? / ! _ ` |' }
@@ -731,8 +732,10 @@ const validateStep1 = () => {
   if (!form.value.product?.trim()) err.product = ['Product is required.']
   if (!selectedCategoryId.value) err.service_category_id = ['Please select a service category.']
   if (!selectedTypeId.value) err.service_type_id = ['Please select a service type.']
-  const aeResult = validateAeDomain(form.value.ae_domain)
-  if (!aeResult.valid) err.ae_domain = [aeResult.message]
+  if (form.value.ae_domain?.trim()) {
+    const aeResult = validateAeDomain(form.value.ae_domain)
+    if (!aeResult.valid) err.ae_domain = [aeResult.message]
+  }
   if (!form.value.manager_id) err.manager_id = [`${formatTeamLabel(teamLabels.value.manager || 'manager')} is required.`]
   if (form.value.location_coordinates?.trim()) {
     const coordPattern = /^-?\d{1,3}(\.\d+)?\s*,\s*-?\d{1,3}(\.\d+)?$/

@@ -13,6 +13,10 @@ import { canModuleAction } from '@/lib/accessControl'
 
 const auth = useAuthStore()
 const canViewAction = () => canModuleAction(auth.user, 'order-status', 'view')
+const canApplyFilters = () => canModuleAction(auth.user, 'order-status', 'apply_filters', ['order_status.apply_filters'])
+const canResetFilters = () => canModuleAction(auth.user, 'order-status', 'reset_filters', ['order_status.reset_filters'])
+const canAdvancedFilters = () => canModuleAction(auth.user, 'order-status', 'advanced_filters', ['order_status.advanced_filters'])
+const canCustomizeColumns = () => canModuleAction(auth.user, 'order-status', 'customize_columns', ['order_status.customize_columns'])
 const TABLE_MODULE = 'order-status'
 const COLUMN_MODULE = 'order-status-listing'
 const CLIENTS_MAX_PER_PAGE = 50
@@ -395,6 +399,7 @@ onMounted(async () => {
           </div>
           <div class="flex flex-wrap items-center gap-2 sm:ml-auto">
             <button
+              v-if="canApplyFilters()"
               type="button"
               class="inline-flex items-center rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover focus:ring-2 focus:ring-brand-primary disabled:opacity-50"
               :disabled="loading"
@@ -406,6 +411,7 @@ onMounted(async () => {
               Search
             </button>
             <button
+              v-if="canResetFilters()"
               type="button"
               class="inline-flex items-center rounded border border-gray-300 bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
               :disabled="loading"
@@ -415,6 +421,7 @@ onMounted(async () => {
             </button>
             <div class="flex flex-wrap items-center gap-2">
             <button
+              v-if="canAdvancedFilters()"
               type="button"
               class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
               @click="advancedFiltersOpen = !advancedFiltersOpen"
@@ -423,6 +430,7 @@ onMounted(async () => {
               Advanced Filters
             </button>
             <button
+              v-if="canCustomizeColumns()"
               type="button"
               class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
               @click="columnModalVisible = true"
@@ -437,7 +445,7 @@ onMounted(async () => {
         </div>
 
         <!-- Advanced filters panel (all API-supported order status filters) -->
-        <div v-show="advancedFiltersOpen" class="mt-4 border-t border-gray-200 pt-4">
+        <div v-show="advancedFiltersOpen && canAdvancedFilters()" class="mt-4 border-t border-gray-200 pt-4">
           <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
             <div v-for="f in advancedTextFilters" :key="f.key">
               <label :for="`os-${f.key}`" class="mb-0.5 block text-xs text-gray-700">{{ f.label }}</label>

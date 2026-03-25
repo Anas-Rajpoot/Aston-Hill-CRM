@@ -610,6 +610,31 @@ async function fetchProductAudits(recordId) {
   return await clientsApi.audits(recordId)
 }
 
+async function deleteProductRow(row) {
+  if (!row?.id) return
+  const ok = window.confirm('Delete this product/service row? This action cannot be undone.')
+  if (!ok) return
+  try {
+    await clientsApi.bulkDelete([row.id], {
+      scope: 'products',
+      hint: {
+        account_number: row.account_number || '',
+        company_name: row.company_name || '',
+        product_name: row.product_name || '',
+        wo_number: row.wo_number || '',
+        submitted_at: row.submitted_at || '',
+        service_type: row.service_type || '',
+        product_type: row.product_type || '',
+      },
+    })
+    toast('success', 'Product/service deleted successfully.')
+    await loadProducts()
+    await refreshRevenueSummary()
+  } catch (e) {
+    toast('error', e?.response?.data?.message || 'Failed to delete product/service row.')
+  }
+}
+
 watch(activeTab, (tab) => {
   if (tab === 'products-services') {
     loadProducts()
@@ -1172,6 +1197,7 @@ onMounted(() => {
                   @sort="onProductsSort"
                   @update-cell="onProductUpdateCell"
                   @view-history="openProductHistoryModal"
+                  @delete="deleteProductRow"
                 />
               </div>
               <div v-if="productsMeta.total > 0" class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 bg-white px-4 py-3">

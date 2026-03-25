@@ -227,7 +227,18 @@ function formatValue(row, col) {
   }
   if (typeof val === 'string') val = val.trim()
   if (val == null || val === '') return '—'
-  if (col === 'submitted_at') return formatDateTime(val)
+  if (col === 'submitted_at') {
+    const submittedRaw = row?.submitted_at
+    const createdRaw = row?.created_at
+    const submitted = submittedRaw == null ? '' : String(submittedRaw).trim()
+    const created = createdRaw == null ? '' : String(createdRaw).trim()
+    // "Created" column should show real creation timestamp.
+    // If submitted_at is date-only or midnight, prefer created_at which carries exact time.
+    const submittedLooksDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(submitted)
+    const submittedLooksMidnight = /(?:T|\s)00:00:00(?:\.\d+)?(?:Z)?$/i.test(submitted)
+    const source = (submittedLooksDateOnly || submittedLooksMidnight) && created ? created : (submitted || created)
+    return formatDateTime(source)
+  }
   if ([
     'activation_date', 'contract_end_date', 'completion_date',
     'trade_license_expiry_date', 'establishment_card_expiry_date',

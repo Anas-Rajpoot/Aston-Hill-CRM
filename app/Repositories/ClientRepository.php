@@ -9,6 +9,11 @@ use Illuminate\Support\Facades\DB;
 
 class ClientRepository
 {
+    private function isSqlite(): bool
+    {
+        return DB::connection()->getDriverName() === 'sqlite';
+    }
+
     /**
      * Optimized clients listing query used by All Clients page.
      *
@@ -266,7 +271,19 @@ class ClientRepository
 
     private function addressDisplaySubquery()
     {
-        $composed = "TRIM(CONCAT_WS(', ', NULLIF(ca.unit, ''), NULLIF(ca.building, ''), NULLIF(ca.area, ''), NULLIF(ca.emirates, '')))";
+        if ($this->isSqlite()) {
+            $composed = "TRIM("
+                . "COALESCE(NULLIF(ca.unit, ''), '')"
+                . " || CASE WHEN NULLIF(ca.unit, '') IS NOT NULL AND NULLIF(ca.building, '') IS NOT NULL THEN ', ' ELSE '' END"
+                . " || COALESCE(NULLIF(ca.building, ''), '')"
+                . " || CASE WHEN (NULLIF(ca.unit, '') IS NOT NULL OR NULLIF(ca.building, '') IS NOT NULL) AND NULLIF(ca.area, '') IS NOT NULL THEN ', ' ELSE '' END"
+                . " || COALESCE(NULLIF(ca.area, ''), '')"
+                . " || CASE WHEN (NULLIF(ca.unit, '') IS NOT NULL OR NULLIF(ca.building, '') IS NOT NULL OR NULLIF(ca.area, '') IS NOT NULL) AND NULLIF(ca.emirates, '') IS NOT NULL THEN ', ' ELSE '' END"
+                . " || COALESCE(NULLIF(ca.emirates, ''), '')"
+                . ")";
+        } else {
+            $composed = "TRIM(CONCAT_WS(', ', NULLIF(ca.unit, ''), NULLIF(ca.building, ''), NULLIF(ca.area, ''), NULLIF(ca.emirates, '')))";
+        }
         $bestAddress = "COALESCE(NULLIF(ca.full_address, ''), NULLIF({$composed}, ''))";
 
         return DB::table('client_addresses as ca')
@@ -293,7 +310,19 @@ class ClientRepository
 
     private function primaryContactDisplaySubquery()
     {
-        $detailExpr = "TRIM(CONCAT_WS(' | ', NULLIF(cc.name, ''), NULLIF(cc.designation, ''), NULLIF(cc.contact_number, ''), NULLIF(cc.email, '')))";
+        if ($this->isSqlite()) {
+            $detailExpr = "TRIM("
+                . "COALESCE(NULLIF(cc.name, ''), '')"
+                . " || CASE WHEN NULLIF(cc.name, '') IS NOT NULL AND NULLIF(cc.designation, '') IS NOT NULL THEN ' | ' ELSE '' END"
+                . " || COALESCE(NULLIF(cc.designation, ''), '')"
+                . " || CASE WHEN (NULLIF(cc.name, '') IS NOT NULL OR NULLIF(cc.designation, '') IS NOT NULL) AND NULLIF(cc.contact_number, '') IS NOT NULL THEN ' | ' ELSE '' END"
+                . " || COALESCE(NULLIF(cc.contact_number, ''), '')"
+                . " || CASE WHEN (NULLIF(cc.name, '') IS NOT NULL OR NULLIF(cc.designation, '') IS NOT NULL OR NULLIF(cc.contact_number, '') IS NOT NULL) AND NULLIF(cc.email, '') IS NOT NULL THEN ' | ' ELSE '' END"
+                . " || COALESCE(NULLIF(cc.email, ''), '')"
+                . ")";
+        } else {
+            $detailExpr = "TRIM(CONCAT_WS(' | ', NULLIF(cc.name, ''), NULLIF(cc.designation, ''), NULLIF(cc.contact_number, ''), NULLIF(cc.email, '')))";
+        }
 
         return DB::table('client_contacts as cc')
             ->select('cc.client_id')

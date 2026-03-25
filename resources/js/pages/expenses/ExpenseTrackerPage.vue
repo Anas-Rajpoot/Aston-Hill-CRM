@@ -42,6 +42,11 @@ const canHistory = computed(() =>
     'expense_tracker.view-history',
   ])
 )
+const canApplyFilters = computed(() => canModuleAction(auth.user, 'expense-tracker', 'apply_filters', ['expense_tracker.apply_filters']))
+const canResetFilters = computed(() => canModuleAction(auth.user, 'expense-tracker', 'reset_filters', ['expense_tracker.reset_filters']))
+const canAdvancedFilters = computed(() => canModuleAction(auth.user, 'expense-tracker', 'advanced_filters', ['expense_tracker.advanced_filters']))
+const canCustomizeColumns = computed(() => canModuleAction(auth.user, 'expense-tracker', 'customize_columns', ['expense_tracker.customize_columns']))
+const canTemplate = computed(() => canModuleAction(auth.user, 'expense-tracker', 'template', ['expense_tracker.download_template']))
 
 const loading = ref(true)
 const loadError = ref(null)
@@ -663,6 +668,7 @@ onMounted(() => {
           </div>
           <div class="flex shrink-0 gap-2">
             <button
+              v-if="canApplyFilters"
               type="button"
               class="rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50"
               :disabled="loading"
@@ -671,6 +677,7 @@ onMounted(() => {
               Apply Filters
             </button>
             <button
+              v-if="canResetFilters"
               type="button"
               class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
               :disabled="loading"
@@ -681,6 +688,7 @@ onMounted(() => {
           </div>
           <div class="flex shrink-0 gap-2">
             <button
+              v-if="canAdvancedFilters"
               type="button"
               class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
               @click="advancedVisible = !advancedVisible"
@@ -723,7 +731,7 @@ onMounted(() => {
               Delete Selected
             </button>
             <button
-              v-if="canCreate"
+              v-if="canCreate && canTemplate"
               type="button"
               class="inline-flex items-center rounded-lg bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover"
               @click="onDownloadTemplate"
@@ -777,6 +785,7 @@ onMounted(() => {
               Add Expense
             </button>
             <button
+              v-if="canCustomizeColumns"
               type="button"
               class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
               @click="columnModalVisible = true"
@@ -791,7 +800,7 @@ onMounted(() => {
       </div>
 
       <AdvancedFilters
-        v-if="canView"
+        v-if="canView && canAdvancedFilters"
         :visible="advancedVisible"
         :filters="filters"
         :filter-options="filterOptions"

@@ -94,6 +94,15 @@ class CrudPermission
         }
         $legacy = array_values(array_unique($legacy));
 
+        // Special-case: lead resubmission is controlled by an explicit permission key,
+        // not the generic "update/edit" permission.
+        if (in_array($action, ['resubmissionData', 'resubmit'], true)) {
+            foreach ($moduleCandidates as $candidate) {
+                $legacy[] = "{$candidate}.resubmit_lead";
+            }
+            $legacy = array_values(array_unique($legacy));
+        }
+
         if (! RbacPermission::can($user, $moduleCandidates, $permAction, $legacy)) {
             abort(403, 'Unauthorized');
         }

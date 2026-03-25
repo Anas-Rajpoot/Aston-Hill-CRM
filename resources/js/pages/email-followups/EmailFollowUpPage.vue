@@ -45,6 +45,10 @@ const canExport = computed(() =>
     'emails_followup.export_reports',
   ])
 )
+const canApplyFilters = computed(() => canModuleAction(auth.user, 'email-follow-up', 'apply_filters', ['emails_followup.apply_filters']))
+const canResetFilters = computed(() => canModuleAction(auth.user, 'email-follow-up', 'reset_filters', ['emails_followup.reset_filters']))
+const canAdvancedFilters = computed(() => canModuleAction(auth.user, 'email-follow-up', 'advanced_filters', ['emails_followup.advanced_filters']))
+const canCustomizeColumns = computed(() => canModuleAction(auth.user, 'email-follow-up', 'customize_columns', ['emails_followup.customize_columns']))
 const TABLE_MODULE = 'email-followups'
 const perPageOptions = ref([10, 20, 25, 50, 100])
 const addedByName = ref('')
@@ -519,6 +523,8 @@ onMounted(async () => {
         :filters="filters"
         :filter-options="filterOptions"
         :loading="loading"
+        :can-apply="canApplyFilters"
+        :can-reset="canResetFilters"
         @apply="applyFilters"
         @reset="resetFilters"
       >
@@ -562,6 +568,7 @@ onMounted(async () => {
             </button>
           </div>
           <button
+            v-if="canAdvancedFilters"
             type="button"
             class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
             @click="advancedVisible = !advancedVisible"
@@ -570,6 +577,7 @@ onMounted(async () => {
             Advanced Filters
           </button>
           <button
+            v-if="canCustomizeColumns"
             type="button"
             class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
             @click="columnModalVisible = true"
@@ -589,7 +597,7 @@ onMounted(async () => {
       </FiltersBar>
 
       <AdvancedFilters
-        v-if="canView"
+        v-if="canView && canAdvancedFilters"
         :visible="advancedVisible"
         :filters="filters"
         :filter-options="filterOptions"

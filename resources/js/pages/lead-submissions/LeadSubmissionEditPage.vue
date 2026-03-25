@@ -93,7 +93,7 @@ const STATUS_OPTIONS = [
 
 function normalizeLeadStatus(status) {
   const value = String(status || '').trim().toLowerCase()
-  if (!value || value === 'submitted') return 'unassigned'
+  if (!value) return 'unassigned'
   return value
 }
 

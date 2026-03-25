@@ -43,6 +43,11 @@ const COLUMN_LABELS = {
   verifier_name: 'Verifier Name',
   verifier_number: 'Verifier Number',
 }
+const OPTIONAL_COLUMN_LABELS = {
+  dsp_om_id: 'DSP OM ID',
+  uploaded_by: 'Uploaded By',
+  uploaded_at: 'Uploaded At',
+}
 
 /** Optional CSV columns (not required in file): DSP OM ID, Uploaded By, Uploaded At. */
 const OPTIONAL_CSV_COLUMNS = ['dsp_om_id', 'uploaded_by', 'uploaded_at']
@@ -58,6 +63,11 @@ const canImport = computed(() => canModuleAction(auth.user, 'dsp-tracker', 'impo
 const canViewAction = computed(() => canModuleAction(auth.user, 'dsp-tracker', 'view'))
 const canEditAction = computed(() => canModuleAction(auth.user, 'dsp-tracker', 'edit'))
 const canDeleteCsv = computed(() => canModuleAction(auth.user, 'dsp-tracker', 'delete', ['dsp-tracker.delete-existing-csv', 'dsp_tracker.delete_existing_csv']))
+const canApplyFilters = computed(() => canModuleAction(auth.user, 'dsp-tracker', 'apply_filters', ['dsp_tracker.apply_filters']))
+const canResetFilters = computed(() => canModuleAction(auth.user, 'dsp-tracker', 'reset_filters', ['dsp_tracker.reset_filters']))
+const canAdvancedFilters = computed(() => canModuleAction(auth.user, 'dsp-tracker', 'advanced_filters', ['dsp_tracker.advanced_filters']))
+const canCustomizeColumns = computed(() => canModuleAction(auth.user, 'dsp-tracker', 'customize_columns', ['dsp_tracker.customize_columns']))
+const canTemplate = computed(() => canModuleAction(auth.user, 'dsp-tracker', 'template', ['dsp_tracker.download_template']))
 const hasAnyRowAction = computed(() => canViewAction.value || canEditAction.value)
 const loadError = ref(null)
 const csvUploadError = ref('')
@@ -312,13 +322,10 @@ function csvEscape(val) {
 
 function downloadCsvSample() {
   if (!canImport.value) return
-  const tableCols = [...displayedColumns.value]
-  const extraCols = ['other_1', 'other_2']
-  const exportCols = [...tableCols, ...extraCols]
+  // Always export full import schema so downloaded template re-uploads without header mismatch.
+  const exportCols = [...IMPORT_CSV_COLUMNS]
   const headers = exportCols.map((c) => {
-    if (c === 'other_1') return 'Other 1'
-    if (c === 'other_2') return 'Other 2'
-    return COLUMN_LABELS[c] || c
+    return COLUMN_LABELS[c] || OPTIONAL_COLUMN_LABELS[c] || c
   })
   const rows = [
     {
@@ -334,8 +341,9 @@ function downloadCsvSample() {
       rejection_reason: '',
       verifier_name: 'Ahmed',
       verifier_number: '971501234567',
-      other_1: 'Sample extra value A',
-      other_2: 'Sample extra value B',
+      dsp_om_id: 'OM-001',
+      uploaded_by: 'System',
+      uploaded_at: '2026-03-24 09:30:00',
     },
     {
       activity_number: 'ACT-1002',
@@ -350,8 +358,9 @@ function downloadCsvSample() {
       rejection_reason: '',
       verifier_name: 'Sara',
       verifier_number: '971509876543',
-      other_1: 'Sample extra value C',
-      other_2: 'Sample extra value D',
+      dsp_om_id: 'OM-002',
+      uploaded_by: 'System',
+      uploaded_at: '2026-03-24 09:35:00',
     },
     {
       activity_number: 'ACT-1003',
@@ -366,8 +375,9 @@ function downloadCsvSample() {
       rejection_reason: '',
       verifier_name: 'Khalid',
       verifier_number: '971507778889',
-      other_1: 'Sample extra value E',
-      other_2: 'Sample extra value F',
+      dsp_om_id: 'OM-003',
+      uploaded_by: 'System',
+      uploaded_at: '2026-03-24 09:40:00',
     },
   ]
   const csv = [
@@ -548,6 +558,7 @@ onMounted(() => load())
           </div>
           <div class="flex shrink-0 items-end gap-2">
             <button
+              v-if="canApplyFilters"
               type="button"
               class="rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50"
               :disabled="loading"
@@ -556,6 +567,7 @@ onMounted(() => load())
               Apply Filters
             </button>
             <button
+              v-if="canResetFilters"
               type="button"
               class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
               :disabled="loading"
@@ -566,7 +578,7 @@ onMounted(() => load())
           </div>
           <div class="ml-2 flex shrink-0 items-end gap-2">
             <button
-              v-if="canImport"
+              v-if="canTemplate"
               type="button"
               class="inline-flex items-center gap-2 rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
               @click="downloadCsvSample"
@@ -597,6 +609,7 @@ onMounted(() => load())
               Upload CSV file
             </button>
             <button
+              v-if="canAdvancedFilters"
               type="button"
               class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
               @click="advancedVisible = !advancedVisible"
@@ -605,6 +618,7 @@ onMounted(() => load())
               Advanced Filters
             </button>
             <button
+              v-if="canCustomizeColumns"
               type="button"
               class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
               @click="columnModalVisible = true"
@@ -619,6 +633,7 @@ onMounted(() => load())
       </div>
 
       <AdvancedFilters
+        v-if="canAdvancedFilters"
         :visible="advancedVisible"
         :filters="filters"
         :loading="loading"

@@ -14,7 +14,12 @@ export default defineConfig({
         },
         // Allow Laravel app origin to load Vite dev scripts without CORS mismatch.
         cors: {
-            origin: ['http://127.0.0.1:8000', 'http://localhost:8000'],
+            origin: [
+                'http://127.0.0.1:8000',
+                'http://localhost:8000',
+                'http://127.0.0.1:8015',
+                'http://localhost:8015',
+            ],
         },
         hmr: {
             host: '127.0.0.1',

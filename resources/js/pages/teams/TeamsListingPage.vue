@@ -36,6 +36,11 @@ const canDelete = computed(() => canModuleAction(auth.user, 'teams', 'delete'))
 const canViewAction = computed(() => canModuleAction(auth.user, 'teams', 'view'))
 const canImport = computed(() => canModuleAction(auth.user, 'teams', 'create'))
 const canExport = computed(() => canModuleAction(auth.user, 'teams', 'view'))
+const canApplyFilters = computed(() => canModuleAction(auth.user, 'teams', 'apply_filters', ['teams.apply_filters']))
+const canResetFilters = computed(() => canModuleAction(auth.user, 'teams', 'reset_filters', ['teams.reset_filters']))
+const canAdvancedFilters = computed(() => canModuleAction(auth.user, 'teams', 'advanced_filters', ['teams.advanced_filters']))
+const canCustomizeColumns = computed(() => canModuleAction(auth.user, 'teams', 'customize_columns', ['teams.customize_columns']))
+const canTemplate = computed(() => canModuleAction(auth.user, 'teams', 'template', ['teams.download_template']))
 const hasSelectionColumn = computed(() => canDelete.value || canEdit.value)
 const hasAnyRowAction = computed(() => canViewAction.value || canEdit.value || canDelete.value)
 
@@ -247,13 +252,20 @@ function confirmDelete(team) {
   deleteModal.value = { visible: true, team, loading: false }
 }
 
-async function executeDelete() {
-  if (!deleteModal.value.team) return
+async function executeDelete(teamId = null) {
+  const id = Number(teamId ?? deleteModal.value.team?.id)
+  if (!id) {
+    toast('error', 'Unable to delete: invalid team selected.')
+    deleteModal.value.visible = false
+    return
+  }
   deleteModal.value.loading = true
   try {
-    await teamsApi.destroy(deleteModal.value.team.id)
+    await teamsApi.destroy(id)
+    const teamName = deleteModal.value.team?.name || `#${id}`
     deleteModal.value.visible = false
-    toast('success', `Team "${deleteModal.value.team.name}" deleted.`)
+    deleteModal.value.team = null
+    toast('success', `Team "${teamName}" deleted.`)
     loadTable()
   } catch (e) {
     toast('error', e?.response?.data?.message || 'Failed to delete team.')
@@ -412,7 +424,7 @@ onMounted(async () => {
           {{ exportLoading ? 'Exporting…' : 'Export CSV' }}
         </button>
         <button
-          v-if="canImport"
+          v-if="canImport && canTemplate"
           type="button"
           class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
           :disabled="importLoading"
@@ -489,13 +501,13 @@ onMounted(async () => {
         <input v-model="searchQ" type="text" placeholder="Search by name, description, department…" class="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-4 text-sm focus:border-brand-primary focus:ring-brand-primary" @keydown.enter="applySearch" />
       </div>
 
-      <button type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50" @click="filtersVisible = !filtersVisible">
+      <button v-if="canAdvancedFilters" type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50" @click="filtersVisible = !filtersVisible">
         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
         Advanced Filters
         <span v-if="activeFilterCount" class="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-brand-primary text-[10px] font-bold text-white">{{ activeFilterCount }}</span>
       </button>
 
-      <button type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50" @click="columnModalVisible = true">
+      <button v-if="canCustomizeColumns" type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50" @click="columnModalVisible = true">
         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
         Customize Columns
       </button>
@@ -513,10 +525,10 @@ onMounted(async () => {
 
     <!-- Filters Panel -->
     <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0 -translate-y-2" enter-to-class="opacity-100 translate-y-0" leave-active-class="transition ease-in duration-100" leave-from-class="opacity-100" leave-to-class="opacity-0">
-      <div v-if="filtersVisible" class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div v-if="filtersVisible && canAdvancedFilters" class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <div class="flex items-center justify-between mb-3">
           <h3 class="text-sm font-semibold text-gray-900">Advanced Filters</h3>
-          <button type="button" class="text-sm text-brand-primary hover:text-brand-primary-hover font-medium" @click="resetFilters">Reset All</button>
+          <button v-if="canResetFilters" type="button" class="text-sm text-brand-primary hover:text-brand-primary-hover font-medium" @click="resetFilters">Reset All</button>
         </div>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
@@ -549,7 +561,7 @@ onMounted(async () => {
           </div>
         </div>
         <div class="flex justify-end mt-3">
-          <button type="button" class="rounded-lg bg-brand-primary px-5 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover" @click="applyFilters">Apply Filters</button>
+          <button v-if="canApplyFilters" type="button" class="rounded-lg bg-brand-primary px-5 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover" @click="applyFilters">Apply Filters</button>
         </div>
       </div>
     </Transition>
@@ -749,8 +761,8 @@ onMounted(async () => {
       title="Delete Team"
       :item-label="deleteModal.team?.name || 'this team'"
       :loading="deleteModal.loading"
-      @confirm="executeDelete"
-      @close="deleteModal.visible = false"
+      @confirm="executeDelete(deleteModal.team?.id)"
+      @close="deleteModal.visible = false; deleteModal.team = null"
     />
   </div>
 </template>

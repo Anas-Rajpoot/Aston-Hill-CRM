@@ -1,1 +1,0 @@
-<?php /**PATH C:\Users\yousa\aston-hill-crm\resources\views\accounts\edit.blade.php ENDPATH**/ ?>

@@ -13,6 +13,8 @@ const props = defineProps({
   showAlertTypeFilter: { type: Boolean, default: true },
   title: { type: String, default: 'Search Products & Services' },
   compactActions: { type: Boolean, default: false },
+  canApply: { type: Boolean, default: true },
+  canReset: { type: Boolean, default: true },
 })
 
 const emit = defineEmits(['search', 'clear'])
@@ -145,6 +147,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onClickOutside))
           :class="'lg:ml-auto'"
         >
           <button
+            v-if="canApply"
             type="button"
             class="inline-flex items-center rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover focus:ring-2 focus:ring-brand-primary disabled:opacity-50"
             :disabled="loading"
@@ -156,6 +159,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onClickOutside))
             Search
           </button>
           <button
+            v-if="canReset"
             type="button"
             class="inline-flex items-center rounded border border-gray-300 bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             :disabled="loading"

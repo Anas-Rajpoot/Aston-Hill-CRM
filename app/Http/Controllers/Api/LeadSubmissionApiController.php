@@ -91,6 +91,10 @@ class LeadSubmissionApiController extends Controller
             'sales_agent_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'team_leader_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'manager_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'executive_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
+            'call_verification' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'documents_verification' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'du_status' => ['sometimes', 'nullable', 'string', Rule::in(['In Progress', 'Rejected', 'Completed'])],
         ]);
 
         $user = $request->user();
@@ -184,11 +188,7 @@ class LeadSubmissionApiController extends Controller
     private function applyFilters($query, array $validated): void
     {
         if (!empty($validated['status'])) {
-            if ($validated['status'] === 'unassigned') {
-                $query->whereIn('status', ['unassigned', 'submitted', 'draft']);
-            } else {
-                $query->where('status', $validated['status']);
-            }
+            $query->where('status', $validated['status']);
         }
         if (!empty($validated['submission_type'])) {
             $query->where('submission_type', $validated['submission_type']);
@@ -243,6 +243,18 @@ class LeadSubmissionApiController extends Controller
         }
         if (!empty($validated['manager_id'])) {
             $query->where('manager_id', $validated['manager_id']);
+        }
+        if (!empty($validated['executive_id'])) {
+            $query->where('executive_id', $validated['executive_id']);
+        }
+        if (!empty($validated['call_verification'])) {
+            $query->where('call_verification', $validated['call_verification']);
+        }
+        if (!empty($validated['documents_verification'])) {
+            $query->where('documents_verification', $validated['documents_verification']);
+        }
+        if (!empty($validated['du_status'])) {
+            $query->where('du_status', $validated['du_status']);
         }
         if (!empty($validated['q'])) {
             $term = '%' . addcslashes($validated['q'], '%_\\') . '%';
@@ -378,8 +390,7 @@ class LeadSubmissionApiController extends Controller
             } elseif ($col === 'sla_timer') {
                 $row['sla_timer'] = $this->computeLeadSlaTimer($lead);
             } elseif ($col === 'status') {
-                $status = (string) ($lead->status ?? '');
-                $row['status'] = in_array($status, ['submitted', 'draft'], true) ? 'unassigned' : $status;
+                $row['status'] = $lead->status;
             } elseif ($col === 'created_by') {
                 $row['created_by'] = $lead->created_by;
             } elseif (in_array($col, ['created_at', 'submitted_at', 'status_changed_at', 'updated_at'], true)) {
@@ -459,6 +470,7 @@ class LeadSubmissionApiController extends Controller
                 ->get(['id', 'name', 'service_category_id']);
 
             $products = LeadSubmission::query()
+                ->visibleTo(request()->user())
                 ->whereNotNull('product')
                 ->where('product', '!=', '')
                 ->distinct()

@@ -12,6 +12,8 @@ defineProps({
     default: () => ({ users: [], roles: [] }),
   },
   loading: { type: Boolean, default: false },
+  canApply: { type: Boolean, default: true },
+  canReset: { type: Boolean, default: true },
 })
 
 const emit = defineEmits(['apply', 'reset'])
@@ -98,6 +100,7 @@ onBeforeUnmount(() => {
         </div>
         <div class="ml-auto flex shrink-0 items-center gap-2">
           <button
+            v-if="canApply"
             type="button"
             class="inline-flex items-center whitespace-nowrap rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover focus:ring-2 focus:ring-brand-primary disabled:opacity-50"
             :disabled="loading"
@@ -109,6 +112,7 @@ onBeforeUnmount(() => {
             Apply
           </button>
           <button
+            v-if="canReset"
             type="button"
             class="whitespace-nowrap rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             :disabled="loading"

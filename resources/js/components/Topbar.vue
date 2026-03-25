@@ -19,7 +19,12 @@ const primaryRole = computed(() => {
 
 const logout = async () => {
   await auth.logout()
-  router.push('/login')
+  try {
+    await router.replace('/login')
+  } finally {
+    // Hard fallback ensures protected UI is not left visible due stale state/chunk timing.
+    if (window.location.pathname !== '/login') window.location.href = '/login'
+  }
 }
 
 // ─── Notification bell ──────────────────────────────────
@@ -30,6 +35,12 @@ const notifications = ref([])
 const bellOpen     = ref(false)
 let pollTimer      = null
 let pollingDisabled = false
+
+function onBadgeSync(event) {
+  const unread = Number(event?.detail?.unreadCount ?? 0)
+  unreadCount.value = Number.isFinite(unread) ? Math.max(0, unread) : 0
+  badge.value = event?.detail?.badge ?? (unreadCount.value > 5 ? '5+' : String(unreadCount.value))
+}
 
 async function pollNotifications() {
   // Avoid hitting poll endpoint when auth state is not established.
@@ -77,6 +88,9 @@ function schedulePoll() {
 }
 
 onMounted(() => {
+  if (typeof window !== 'undefined') {
+    window.addEventListener('notifications:badge-sync', onBadgeSync)
+  }
   // Defer initial poll so it doesn't block page-load API calls on single-threaded server
   pollTimer = setTimeout(async () => {
     try {
@@ -93,6 +107,9 @@ onMounted(() => {
   }, 5_000)
 })
 onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('notifications:badge-sync', onBadgeSync)
+  }
   if (pollTimer) clearTimeout(pollTimer)
 })
 </script>

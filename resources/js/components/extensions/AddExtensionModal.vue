@@ -15,11 +15,9 @@ const emit = defineEmits(['close', 'created'])
 
 /** Dummy gateway options when none provided from API/parent */
 const DEFAULT_GATEWAY_OPTIONS = [
-  { value: 'gateway_1', label: 'Gateway 1' },
-  { value: 'gateway_2', label: 'Gateway 2' },
-  { value: 'gateway_3', label: 'Gateway 3' },
-  { value: 'primary_gateway', label: 'Primary Gateway' },
-  { value: 'backup_gateway', label: 'Backup Gateway' },
+  { value: 'DU', label: 'DU' },
+  { value: 'ETISALAT', label: 'ETISALAT' },
+  { value: 'GSM', label: 'GSM' },
 ]
 
 const gatewayOptions = computed(() => {
@@ -81,8 +79,7 @@ function validateLandlineNumber(value) {
   if (!value) return 'Landline Number is required.'
   if (/\s/.test(value)) return 'Must not contain spaces.'
   if (!/^\d+$/.test(value)) return 'Must contain only digits.'
-  if (!value.startsWith('971')) return 'Must start with 971.'
-  if (value.length !== 12) return 'Must be exactly 12 digits.'
+  if (value.length < 11 || value.length > 12) return 'Must be 11 or 12 digits.'
   return null
 }
 
@@ -252,7 +249,7 @@ async function submit() {
                 type="text"
                 maxlength="12"
                 :class="inputClass('landline_number')"
-                placeholder="971XXXXXXXXX"
+                placeholder="Enter 11 or 12 digits"
                 @input="onLandlineInput"
               />
               <p v-if="fieldErrors.landline_number" class="mt-1 text-xs text-red-600">{{ fieldErrors.landline_number }}</p>

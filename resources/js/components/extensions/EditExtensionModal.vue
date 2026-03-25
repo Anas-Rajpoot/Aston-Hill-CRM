@@ -14,6 +14,12 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'updated'])
 
+const DEFAULT_GATEWAY_OPTIONS = [
+  { value: 'DU', label: 'DU' },
+  { value: 'ETISALAT', label: 'ETISALAT' },
+  { value: 'GSM', label: 'GSM' },
+]
+
 const form = ref({
   extension: '',
   landline_number: '',
@@ -64,8 +70,7 @@ function validateLandlineNumber(value) {
   if (!value) return 'Landline Number is required.'
   if (/\s/.test(value)) return 'Must not contain spaces.'
   if (!/^\d+$/.test(value)) return 'Must contain only digits.'
-  if (!value.startsWith('971')) return 'Must start with 971.'
-  if (value.length !== 12) return 'Must be exactly 12 digits.'
+  if (value.length < 11 || value.length > 12) return 'Must be 11 or 12 digits.'
   return null
 }
 
@@ -92,6 +97,9 @@ watch(
         } catch {
           //
         }
+      }
+      if (!gatewaysList.value.length) {
+        gatewaysList.value = [...DEFAULT_GATEWAY_OPTIONS]
       }
       loadAssignableEmployees()
       await loadExtension(id)
@@ -269,7 +277,7 @@ async function submit() {
                 type="text"
                 maxlength="12"
                 :class="inputClass('landline_number')"
-                placeholder="971XXXXXXXXX"
+                placeholder="Enter 11 or 12 digits"
                 @input="onLandlineInput"
               />
               <p v-if="fieldErrors.landline_number" class="mt-1 text-xs text-red-600">{{ fieldErrors.landline_number }}</p>

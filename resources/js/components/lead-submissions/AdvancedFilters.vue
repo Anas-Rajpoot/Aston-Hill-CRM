@@ -39,6 +39,10 @@ const props = defineProps({
       teamLeaders: [],
       salesAgents: [],
       types: [],
+      executives: [],
+      call_verification_options: [],
+      documents_verification_options: [],
+      du_status_options: [],
     }),
   },
   loading: { type: Boolean, default: false },
@@ -73,6 +77,10 @@ const activeCount = computed(() => {
   if (f.mrc !== '' && f.mrc != null) n++
   if (f.quantity !== '' && f.quantity != null) n++
   if (f.sales_agent_id || f.team_leader_id || f.manager_id) n++
+  if (f.executive_id) n++
+  if (f.call_verification) n++
+  if (f.documents_verification) n++
+  if (f.du_status) n++
   return n
 })
 
@@ -264,6 +272,50 @@ const activeCount = computed(() => {
           >
             <option :value="null">All</option>
             <option v-for="u in filterOptions.managers" :key="u.id" :value="u.id">{{ u.name }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="mb-0.5 block text-xs font-medium text-gray-600">Back Office Executive</label>
+          <select
+            v-model="filters.executive_id"
+            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+            :disabled="loading"
+          >
+            <option :value="null">All</option>
+            <option v-for="u in filterOptions.executives" :key="u.id" :value="u.id">{{ u.name }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="mb-0.5 block text-xs font-medium text-gray-600">Call Verification</label>
+          <select
+            v-model="filters.call_verification"
+            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+            :disabled="loading"
+          >
+            <option value="">All</option>
+            <option v-for="o in filterOptions.call_verification_options" :key="o.value" :value="o.value">{{ o.label }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="mb-0.5 block text-xs font-medium text-gray-600">Documents Verification</label>
+          <select
+            v-model="filters.documents_verification"
+            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+            :disabled="loading"
+          >
+            <option value="">All</option>
+            <option v-for="o in filterOptions.documents_verification_options" :key="o.value" :value="o.value">{{ o.label }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="mb-0.5 block text-xs font-medium text-gray-600">DU Status</label>
+          <select
+            v-model="filters.du_status"
+            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+            :disabled="loading"
+          >
+            <option value="">All</option>
+            <option v-for="o in filterOptions.du_status_options" :key="o.value" :value="o.value">{{ o.label }}</option>
           </select>
         </div>
       </div>

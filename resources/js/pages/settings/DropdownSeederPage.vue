@@ -22,6 +22,9 @@ const showAddGroup = ref(false)
 const newGroupName = ref('')
 const error = ref('')
 const success = ref('')
+const searchQuery = ref('')
+const importing = ref(false)
+const fileInputRef = ref(null)
 
 /* ───── New option form ───── */
 const newOption = ref({ value: '', label: '', sort_order: 0 })
@@ -35,33 +38,289 @@ const showDeleteModal = ref(false)
 const deleteTarget = ref(null)
 
 /* ───── Computed ───── */
+const GROUP_KEY_ALIASES = {
+  lead_statuses: ['lead_submission_statuses', 'lead_status'],
+  field_statuses: ['field_submission_statuses', 'field_status'],
+  vas_statuses: ['vas_request_statuses', 'vas_status'],
+  client_statuses: ['clients_statuses', 'client_status'],
+  expense_statuses: ['expenses_statuses', 'expense_status'],
+  team_statuses: ['teams_statuses', 'team_status'],
+}
+
+function normalizeKey(v) {
+  return String(v || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+}
+
+function resolveGroupKey(key) {
+  const target = normalizeKey(key)
+  const existing = groups.value || []
+  if (existing.includes(target)) return target
+
+  const aliases = (GROUP_KEY_ALIASES[target] || []).map(normalizeKey)
+  for (const a of aliases) {
+    if (existing.includes(a)) return a
+  }
+
+  // Fuzzy fallback: same important tokens (e.g., lead + statuses)
+  const tokens = target.split('_').filter((t) => t && t !== 'new')
+  const match = existing.find((g) => tokens.every((t) => normalizeKey(g).includes(t)))
+  return match || target
+}
+
+const resolvedSelectedGroup = computed(() => resolveGroupKey(selectedGroup.value))
 const currentGroup = computed(() =>
-  groupedData.value.find((g) => g.group === selectedGroup.value)
+  groupedData.value.find((g) => g.group === resolvedSelectedGroup.value)
 )
 const currentOptions = computed(() => currentGroup.value?.options ?? [])
+const groupCountMap = computed(() => {
+  const out = {}
+  for (const g of groupedData.value) out[g.group] = g.options?.length ?? 0
+  return out
+})
 
-/* ───── Predefined group templates ───── */
-const GROUP_TEMPLATES = [
-  { value: 'lead_statuses', label: 'Lead Statuses' },
-  { value: 'field_statuses', label: 'Field Submission Statuses' },
-  { value: 'field_meeting_statuses', label: 'Field Meeting Statuses' },
-  { value: 'customer_support_statuses', label: 'Customer Support Statuses' },
-  { value: 'vas_statuses', label: 'VAS Request Statuses' },
-  { value: 'special_request_statuses', label: 'Special Request Statuses' },
-  { value: 'client_statuses', label: 'Client Statuses' },
-  { value: 'emirates', label: 'Emirates' },
-  { value: 'service_categories', label: 'Service Categories' },
-  { value: 'service_types', label: 'Service Types' },
-  { value: 'product_types', label: 'Product Types' },
-  { value: 'contract_types', label: 'Contract Types' },
-  { value: 'company_categories', label: 'Company Categories' },
-  { value: 'expense_statuses', label: 'Expense Statuses' },
-  { value: 'team_statuses', label: 'Team Statuses' },
+/* ───── Admin-first sequence catalog (module -> groups) ───── */
+const GROUP_SECTIONS = [
+  {
+    key: 'lead',
+    title: 'Lead Submissions',
+    groups: [
+      { value: 'lead_statuses', label: 'Lead Statuses' },
+      { value: 'submission_types', label: 'Submission Types' },
+      { value: 'service_categories', label: 'Service Categories' },
+      { value: 'service_types', label: 'Service Types' },
+      { value: 'product_types', label: 'Product Types' },
+      { value: 'contract_types', label: 'Contract Types' },
+      { value: 'work_order_statuses', label: 'Work Order Statuses' },
+      { value: 'call_verification_statuses', label: 'Call Verification Statuses' },
+      { value: 'documents_verification_statuses', label: 'Documents Verification Statuses' },
+      { value: 'du_statuses', label: 'DU Statuses' },
+      { value: 'company_categories', label: 'Company Categories' },
+      { value: 'emirates', label: 'Emirates' },
+    ],
+  },
+  {
+    key: 'field',
+    title: 'Field Submissions',
+    groups: [
+      { value: 'field_statuses', label: 'Field Submission Statuses' },
+      { value: 'field_meeting_statuses', label: 'Field Meeting Statuses' },
+      { value: 'field_appointment_statuses', label: 'Field Appointment Statuses' },
+    ],
+  },
+  {
+    key: 'support',
+    title: 'Customer Support',
+    groups: [
+      { value: 'customer_support_statuses', label: 'Customer Support Statuses' },
+      { value: 'ticket_priorities', label: 'Ticket Priorities' },
+      { value: 'ticket_categories', label: 'Ticket Categories' },
+    ],
+  },
+  {
+    key: 'vas',
+    title: 'VAS & Special Requests',
+    groups: [
+      { value: 'vas_statuses', label: 'VAS Request Statuses' },
+      { value: 'special_request_statuses', label: 'Special Request Statuses' },
+    ],
+  },
+  {
+    key: 'clients',
+    title: 'Clients',
+    groups: [
+      { value: 'client_statuses', label: 'Client Statuses' },
+      { value: 'client_categories', label: 'Client Categories' },
+      { value: 'company_categories', label: 'Company Categories' },
+    ],
+  },
+  {
+    key: 'ops',
+    title: 'Operations',
+    groups: [
+      { value: 'dsp_statuses', label: 'DSP Statuses' },
+      { value: 'order_statuses', label: 'Order Statuses' },
+      { value: 'verification_statuses', label: 'Verifier Statuses' },
+    ],
+  },
+  {
+    key: 'extensions',
+    title: 'Cisco Extensions',
+    groups: [
+      { value: 'extension_statuses', label: 'Extension Statuses' },
+      { value: 'extension_gateways', label: 'Extension Gateways' },
+    ],
+  },
+  {
+    key: 'expenses',
+    title: 'Expense Tracker',
+    groups: [
+      { value: 'expense_statuses', label: 'Expense Statuses' },
+      { value: 'expense_categories', label: 'Expense Categories' },
+    ],
+  },
+  {
+    key: 'org',
+    title: 'Teams & Users',
+    groups: [
+      { value: 'team_statuses', label: 'Team Statuses' },
+      { value: 'user_statuses', label: 'User Statuses' },
+    ],
+  },
 ]
+const GROUP_TEMPLATES = GROUP_SECTIONS.flatMap((s) => s.groups)
+const allGroupSequence = computed(() => {
+  const ordered = GROUP_TEMPLATES.map((t) => t.value)
+  const extras = groups.value.filter((g) => !ordered.includes(g))
+  return [...ordered, ...extras]
+})
+const selectedGroupIndex = computed(() => allGroupSequence.value.indexOf(selectedGroup.value))
+const canGoPrevGroup = computed(() => selectedGroupIndex.value > 0)
+const canGoNextGroup = computed(() => {
+  const idx = selectedGroupIndex.value
+  return idx >= 0 && idx < allGroupSequence.value.length - 1
+})
+const filteredSections = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return GROUP_SECTIONS
+  const optionMap = {}
+  for (const g of groupedData.value) optionMap[g.group] = g.options ?? []
+  return GROUP_SECTIONS
+    .map((section) => {
+      const groupsFiltered = section.groups.filter((grp) => {
+        const groupText = `${grp.label} ${grp.value}`.toLowerCase()
+        if (groupText.includes(q)) return true
+        const opts = optionMap[grp.value] ?? []
+        return opts.some((o) =>
+          String(o?.value ?? '').toLowerCase().includes(q) ||
+          String(o?.label ?? '').toLowerCase().includes(q)
+        )
+      })
+      return { ...section, groups: groupsFiltered }
+    })
+    .filter((section) => section.groups.length > 0)
+})
 
 const groupLabel = (key) => {
   const tpl = GROUP_TEMPLATES.find((t) => t.value === key)
   return tpl ? tpl.label : key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+function goPrevGroup() {
+  if (!canGoPrevGroup.value) return
+  selectedGroup.value = allGroupSequence.value[selectedGroupIndex.value - 1] || selectedGroup.value
+}
+
+function goNextGroup() {
+  if (!canGoNextGroup.value) return
+  selectedGroup.value = allGroupSequence.value[selectedGroupIndex.value + 1] || selectedGroup.value
+}
+
+function triggerImport() {
+  fileInputRef.value?.click()
+}
+
+function downloadExportCsv() {
+  const rows = []
+  for (const groupItem of groupedData.value) {
+    for (const opt of groupItem.options ?? []) {
+      rows.push({
+        group: groupItem.group,
+        value: opt.value ?? '',
+        label: opt.label ?? '',
+        sort_order: Number(opt.sort_order ?? 0),
+        is_active: opt.is_active ? 1 : 0,
+      })
+    }
+  }
+  const headers = ['group', 'value', 'label', 'sort_order', 'is_active']
+  const escape = (v) => {
+    const s = String(v ?? '')
+    if (s.includes(',') || s.includes('"') || s.includes('\n')) return `"${s.replace(/"/g, '""')}"`
+    return s
+  }
+  const lines = [headers.join(',')]
+  for (const r of rows) lines.push(headers.map((h) => escape(r[h])).join(','))
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `dropdown-seeder-${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+async function onImportCsv(event) {
+  const file = event?.target?.files?.[0]
+  if (!file) return
+  importing.value = true
+  error.value = ''
+  success.value = ''
+  try {
+    const text = await file.text()
+    const lines = text.split(/\r?\n/).filter((l) => l.trim() !== '')
+    if (lines.length < 2) throw new Error('CSV is empty.')
+    const parseLine = (line) => {
+      const out = []
+      let cur = ''
+      let inQuotes = false
+      for (let i = 0; i < line.length; i += 1) {
+        const ch = line[i]
+        if (ch === '"' && line[i + 1] === '"') {
+          cur += '"'
+          i += 1
+          continue
+        }
+        if (ch === '"') { inQuotes = !inQuotes; continue }
+        if (ch === ',' && !inQuotes) { out.push(cur); cur = ''; continue }
+        cur += ch
+      }
+      out.push(cur)
+      return out.map((c) => c.trim())
+    }
+    const headers = parseLine(lines[0]).map((h) => h.toLowerCase())
+    const idx = {
+      group: headers.indexOf('group'),
+      value: headers.indexOf('value'),
+      label: headers.indexOf('label'),
+      sort_order: headers.indexOf('sort_order'),
+      is_active: headers.indexOf('is_active'),
+    }
+    if (idx.group < 0 || idx.value < 0) throw new Error('CSV must include group and value columns.')
+
+    const existing = new Map()
+    for (const groupItem of groupedData.value) {
+      for (const opt of groupItem.options ?? []) {
+        existing.set(`${groupItem.group}::${opt.value}`, opt.id)
+      }
+    }
+    let created = 0
+    let updated = 0
+    for (let i = 1; i < lines.length; i += 1) {
+      const cols = parseLine(lines[i])
+      const group = String(cols[idx.group] ?? '').trim().toLowerCase()
+      const value = String(cols[idx.value] ?? '').trim()
+      if (!group || !value) continue
+      const label = idx.label >= 0 ? String(cols[idx.label] ?? '').trim() : ''
+      const sortOrder = idx.sort_order >= 0 ? Number(cols[idx.sort_order] ?? 0) || 0 : 0
+      const active = idx.is_active >= 0 ? ['1', 'true', 'yes', 'active'].includes(String(cols[idx.is_active] ?? '').toLowerCase()) : true
+      const key = `${group}::${value}`
+      const existingId = existing.get(key)
+      if (existingId) {
+        await api.put(`/settings/dropdown-seeder/${existingId}`, { value, label: label || null, sort_order: sortOrder, is_active: active })
+        updated += 1
+      } else {
+        await api.post('/settings/dropdown-seeder', { group, value, label: label || null, sort_order: sortOrder, is_active: active })
+        created += 1
+      }
+    }
+    await loadData()
+    success.value = `Import complete. Created ${created}, updated ${updated}.`
+  } catch (e) {
+    error.value = e?.message || 'Failed to import CSV.'
+  } finally {
+    importing.value = false
+    if (event?.target) event.target.value = ''
+  }
 }
 
 /* ───── Load data ───── */
@@ -69,15 +328,16 @@ async function loadData() {
   loading.value = true
   error.value = ''
   try {
-    const params = {}
-    if (selectedGroup.value) params.group = selectedGroup.value
-    const { data } = await api.get('/settings/dropdown-seeder', { params })
+    const { data } = await api.get('/settings/dropdown-seeder')
     groups.value = data.groups ?? []
     groupedData.value = data.data ?? []
 
-    // Auto-select first group if none selected
-    if (!selectedGroup.value && groups.value.length > 0) {
-      selectedGroup.value = groups.value[0]
+    const allKnown = Array.from(new Set([...GROUP_TEMPLATES.map((t) => t.value), ...groups.value]))
+    const firstWithData = groupedData.value[0]?.group || groups.value[0] || ''
+    if (!selectedGroup.value && allKnown.length > 0) {
+      selectedGroup.value = firstWithData || allKnown[0]
+    } else if (selectedGroup.value && !allKnown.includes(selectedGroup.value)) {
+      selectedGroup.value = firstWithData || allKnown[0] || ''
     }
   } catch {
     error.value = 'Failed to load dropdown options.'
@@ -94,7 +354,7 @@ async function addOption() {
   success.value = ''
   try {
     await api.post('/settings/dropdown-seeder', {
-      group: selectedGroup.value,
+      group: resolvedSelectedGroup.value,
       value: newOption.value.value.trim(),
       label: newOption.value.label.trim() || null,
       sort_order: newOption.value.sort_order || 0,
@@ -163,6 +423,7 @@ function confirmDelete(opt) {
 
 async function handleDelete() {
   if (!deleteTarget.value) return
+  saving.value = true
   try {
     await api.delete(`/settings/dropdown-seeder/${deleteTarget.value.id}`)
     showDeleteModal.value = false
@@ -171,6 +432,8 @@ async function handleDelete() {
     await loadData()
   } catch {
     error.value = 'Failed to delete option.'
+  } finally {
+    saving.value = false
   }
 }
 
@@ -219,18 +482,19 @@ onMounted(() => loadData())
     </div>
 
     <template v-else>
-      <!-- Group selector -->
+      <!-- Legacy quick selector -->
       <div class="flex flex-wrap items-center gap-3">
         <label class="text-sm font-medium text-gray-700">Group:</label>
         <select
           v-model="selectedGroup"
-          class="rounded-lg border border-gray-300 px-3 py-2 text-sm min-w-[200px]"
-          @change="loadData()"
+          class="rounded-lg border border-gray-300 px-3 py-2 text-sm min-w-[260px]"
         >
           <option value="" disabled>Select a group</option>
-          <option v-for="g in groups" :key="g" :value="g">{{ groupLabel(g) }}</option>
-          <option v-for="tpl in GROUP_TEMPLATES.filter((t) => !groups.includes(t.value))" :key="tpl.value" :value="tpl.value">
-            {{ tpl.label }} (new)
+          <option v-for="tpl in GROUP_TEMPLATES" :key="tpl.value" :value="tpl.value">
+            {{ tpl.label }}
+          </option>
+          <option v-for="g in groups.filter((x) => !GROUP_TEMPLATES.some((t) => t.value === x))" :key="g" :value="g">
+            {{ groupLabel(g) }} (existing)
           </option>
         </select>
         <button
@@ -243,6 +507,83 @@ onMounted(() => loadData())
           </svg>
           Custom Group
         </button>
+        <button
+          type="button"
+          class="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          @click="downloadExportCsv"
+        >
+          Export CSV
+        </button>
+        <button
+          type="button"
+          class="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          :disabled="importing"
+          @click="triggerImport"
+        >
+          {{ importing ? 'Importing...' : 'Import CSV' }}
+        </button>
+        <input ref="fileInputRef" type="file" accept=".csv,text/csv" class="hidden" @change="onImportCsv" />
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="Search groups/options..."
+          class="rounded-lg border border-gray-300 px-3 py-2 text-sm min-w-[220px]"
+        />
+      </div>
+
+      <!-- Module-wise sequence: all groups in one screen -->
+      <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <div
+          v-for="section in filteredSections"
+          :key="section.key"
+          class="rounded-xl border border-gray-200 bg-white p-4"
+        >
+          <h3 class="text-sm font-semibold text-gray-900">{{ section.title }}</h3>
+          <p class="mt-1 text-xs text-gray-500">Select a dropdown group to manage values.</p>
+          <div class="mt-3 space-y-2">
+            <button
+              v-for="g in section.groups"
+              :key="g.value"
+              type="button"
+              class="flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm transition-colors"
+              :class="resolvedSelectedGroup === resolveGroupKey(g.value)
+                ? 'border-brand-primary bg-brand-primary-light text-brand-primary'
+                : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'"
+              @click="selectedGroup = g.value"
+            >
+              <span>{{ g.label }}</span>
+              <span class="text-xs"
+                :class="(groupCountMap[resolveGroupKey(g.value)] ?? 0) > 0 ? 'text-gray-500' : 'text-amber-600'">
+                {{ (groupCountMap[resolveGroupKey(g.value)] ?? 0) > 0 ? `${groupCountMap[resolveGroupKey(g.value)]} options` : 'empty' }}
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+        <div class="text-sm text-gray-600">
+          Sequence: <span class="font-medium text-gray-900">{{ selectedGroupIndex + 1 }}</span>
+          / {{ allGroupSequence.length }}
+        </div>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            :disabled="!canGoPrevGroup"
+            @click="goPrevGroup"
+          >
+            Previous Group
+          </button>
+          <button
+            type="button"
+            class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            :disabled="!canGoNextGroup"
+            @click="goNextGroup"
+          >
+            Next Group
+          </button>
+        </div>
       </div>
 
       <!-- Custom group input -->
@@ -430,9 +771,10 @@ onMounted(() => loadData())
     <DeleteOtpModal
       :visible="showDeleteModal"
       title="Delete Dropdown Option"
-      :message="'Are you sure you want to delete the option: ' + (deleteTarget?.value || '') + '?'"
-      @confirmed="handleDelete"
-      @cancelled="showDeleteModal = false; deleteTarget = null"
+      :item-label="deleteTarget?.value || ''"
+      :loading="saving"
+      @confirm="handleDelete"
+      @close="showDeleteModal = false; deleteTarget = null"
     />
   </div>
 </template>

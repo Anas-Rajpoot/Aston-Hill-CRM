@@ -413,6 +413,11 @@ const canBulkAssign = (() => {
   return perms.includes('back_office.assign_bo_executive') || perms.includes('vas_requests.process_vas_requests')
 })()
 const canExport = () => canModuleAction(auth.user, 'vas', 'export')
+const canTemplate = () => canModuleAction(auth.user, 'vas', 'template', ['vas_requests.download_template'])
+const canApplyFilters = () => canModuleAction(auth.user, 'vas', 'apply_filters', ['vas_requests.apply_filters'])
+const canResetFilters = () => canModuleAction(auth.user, 'vas', 'reset_filters', ['vas_requests.reset_filters'])
+const canAdvancedFilters = () => canModuleAction(auth.user, 'vas', 'advanced_filters', ['vas_requests.advanced_filters'])
+const canCustomizeColumns = () => canModuleAction(auth.user, 'vas', 'customize_columns', ['vas_requests.customize_columns'])
 
 let _cachedBackOfficeOptions = null
 async function loadBackOfficeOptions() {
@@ -571,6 +576,8 @@ onMounted(async () => {
         :filters="filters"
         :filter-options="filterOptions"
         :loading="loading"
+        :can-apply="canApplyFilters()"
+        :can-reset="canResetFilters()"
         @apply="applyFilters"
         @reset="resetFilters"
       >
@@ -604,6 +611,7 @@ onMounted(async () => {
             {{ exportLoading ? 'Exporting...' : 'Export' }}
           </button>
           <button
+            v-if="canTemplate()"
             type="button"
             class="inline-flex items-center rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70 disabled:cursor-wait"
             :disabled="loading || exportLoading"
@@ -617,6 +625,7 @@ onMounted(async () => {
         </template>
         <template #after-reset>
           <button
+            v-if="canAdvancedFilters()"
             type="button"
             class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
             @click="advancedVisible = !advancedVisible"
@@ -625,6 +634,7 @@ onMounted(async () => {
             Advanced Filters
           </button>
           <button
+            v-if="canCustomizeColumns()"
             type="button"
             class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
             @click="columnModalVisible = true"

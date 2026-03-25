@@ -7,8 +7,7 @@ use Illuminate\Auth\Events\Login;
 use Illuminate\Support\Facades\Request;
 
 /**
- * Dispatches login log processing to a queue so the login HTTP response is not blocked.
- * Ensure a queue worker is running in production (e.g. php artisan queue:work).
+ * Write login log immediately so attendance log is reliable even when no queue worker is running.
  */
 class LogUserLogin
 {
@@ -16,7 +15,7 @@ class LogUserLogin
     {
         $user = $event->user;
 
-        ProcessLoginLog::dispatch(
+        ProcessLoginLog::dispatchSync(
             (int) $user->id,
             session()->getId(),
             request()->ip() ?? '',

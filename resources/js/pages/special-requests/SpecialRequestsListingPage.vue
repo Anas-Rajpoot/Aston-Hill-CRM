@@ -103,6 +103,11 @@ const canEdit = computed(() => canModuleAction(auth.user, 'special', 'edit', ['s
 const canDelete = computed(() => canModuleAction(auth.user, 'special', 'delete', ['special-requests.delete']))
 const canViewAction = computed(() => canModuleAction(auth.user, 'special', 'view', ['special-requests.view']))
 const canExport = () => canModuleAction(auth.user, 'special', 'export')
+const canTemplate = () => canModuleAction(auth.user, 'special', 'template', ['special_requests.download_template'])
+const canApplyFilters = () => canModuleAction(auth.user, 'special', 'apply_filters', ['special_requests.apply_filters'])
+const canResetFilters = () => canModuleAction(auth.user, 'special', 'reset_filters', ['special_requests.reset_filters'])
+const canAdvancedFilters = () => canModuleAction(auth.user, 'special', 'advanced_filters', ['special_requests.advanced_filters'])
+const canCustomizeColumns = () => canModuleAction(auth.user, 'special', 'customize_columns', ['special_requests.customize_columns'])
 
 const filters = ref({
   q: '',
@@ -369,7 +374,7 @@ onMounted(async () => {
 <template>
   <div class="min-h-[calc(100vh-4rem)] bg-white py-3 px-4">
     <div class="w-full space-y-3">
-      <FiltersBar :filters="filters" :filter-options="filterOptions" :loading="loading" @apply="applyFilters" @reset="resetFilters">
+      <FiltersBar :filters="filters" :filter-options="filterOptions" :loading="loading" :can-apply="canApplyFilters()" :can-reset="canResetFilters()" @apply="applyFilters" @reset="resetFilters">
         <template #before-apply>
           <button
             v-if="canExport()"
@@ -383,6 +388,7 @@ onMounted(async () => {
             {{ exportLoading ? 'Exporting...' : 'Export' }}
           </button>
           <button
+            v-if="canTemplate()"
             type="button"
             class="inline-flex items-center rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70 disabled:cursor-wait"
             :disabled="loading || exportLoading"
@@ -395,11 +401,11 @@ onMounted(async () => {
           </button>
         </template>
         <template #after-reset>
-          <button type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50" @click="advancedVisible = !advancedVisible">
+          <button v-if="canAdvancedFilters()" type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50" @click="advancedVisible = !advancedVisible">
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
             Advanced Filters
           </button>
-          <button type="button" class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50" @click="columnModalVisible = true">
+          <button v-if="canCustomizeColumns()" type="button" class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50" @click="columnModalVisible = true">
             Customize Columns
             <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
           </button>

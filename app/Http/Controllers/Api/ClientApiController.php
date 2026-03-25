@@ -871,7 +871,16 @@ class ClientApiController extends Controller
                 continue;
             }
             if (in_array($col, ['submitted_at'], true)) {
-                $out[$col] = $row->$col ? $row->$col->format('d-M-Y H:i') : null;
+                // submitted_at may be date-only (00:00 time) from forms.
+                // For "Created" display, prefer created_at when submitted_at has no real time.
+                $submitted = $row->submitted_at;
+                $created = $row->created_at;
+                $hasRealSubmittedTime = $submitted
+                    && ! ((int) $submitted->format('H') === 0
+                        && (int) $submitted->format('i') === 0
+                        && (int) $submitted->format('s') === 0);
+                $displayAt = $hasRealSubmittedTime ? $submitted : ($created ?? $submitted);
+                $out[$col] = $displayAt ? $displayAt->format('d-M-Y H:i:s') : null;
                 continue;
             }
             if (in_array($col, ['activation_date', 'completion_date', 'contract_end_date'], true)) {
@@ -1539,9 +1548,11 @@ class ClientApiController extends Controller
     {
         $this->authorize('create', Client::class);
 
-        if (! empty(trim((string) $client->account_number))) {
+        // Product records are attached to an existing client identity.
+        // If the source client has no account number, we cannot safely clone by account.
+        if (empty(trim((string) $client->account_number))) {
             throw ValidationException::withMessages([
-                'account_number' => 'This account number is already assigned to a client. 1 account can only be linked to 1 client.',
+                'account_number' => 'Source client is missing account number, so product cannot be added.',
             ]);
         }
 

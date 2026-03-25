@@ -9,6 +9,24 @@ use Yajra\DataTables\Facades\DataTables;
 
 class NotificationController extends Controller
 {
+    private function mapNotification(DatabaseNotification $n): array
+    {
+        $data = $n->data ?? [];
+
+        return [
+            'id' => $n->id,
+            'title' => $data['title'] ?? ($data['subject'] ?? 'Notification'),
+            'subject' => $data['subject'] ?? ($data['title'] ?? 'Notification'),
+            'message' => $data['message'] ?? '',
+            'body' => $data['body'] ?? ($data['message'] ?? ''),
+            'url' => $data['url'] ?? '/notifications',
+            'kind' => $data['kind'] ?? ($data['type'] ?? 'general'),
+            'is_unread' => is_null($n->read_at),
+            'read_at' => $n->read_at?->toIso8601String(),
+            'created_at' => $n->created_at?->toIso8601String(),
+        ];
+    }
+
     public function __construct()
     {
         // $this->middleware('crud:notifications');
@@ -33,7 +51,21 @@ class NotificationController extends Controller
             $q->whereNotNull('read_at');
         }
 
-        $notifications = $q->paginate(20)->withQueryString();
+        $perPage = max(1, (int) $request->get('per_page', 20));
+        $notifications = $q->paginate($perPage)->withQueryString();
+
+        if ($request->expectsJson() || $request->is('api/*')) {
+            return response()->json([
+                'data' => $notifications->getCollection()
+                    ->map(fn (DatabaseNotification $n) => $this->mapNotification($n))
+                    ->values()
+                    ->all(),
+                'current_page' => $notifications->currentPage(),
+                'last_page' => $notifications->lastPage(),
+                'per_page' => $notifications->perPage(),
+                'total' => $notifications->total(),
+            ]);
+        }
 
         return view('notifications.index', compact('notifications'));
     }
@@ -77,14 +109,22 @@ class NotificationController extends Controller
             ->toJson();
     }
 
-    public function markAsRead($id)
+    public function markAsRead(Request $request, string $id)
     {
-        $notification = auth()->user()
+        $notification = $request->user()
             ->notifications()
             ->where('id', $id)
             ->firstOrFail();
 
         $notification->markAsRead();
+
+        if ($request->expectsJson() || $request->is('api/*')) {
+            return response()->json([
+                'success' => true,
+                'id' => $notification->id,
+                'read_at' => $notification->read_at?->toIso8601String(),
+            ]);
+        }
 
         return response()->json(['success' => true]);
     }
@@ -95,12 +135,30 @@ class NotificationController extends Controller
         $n->read_at = null;
         $n->save();
 
+        if ($request->expectsJson() || $request->is('api/*')) {
+            return response()->json([
+                'success' => true,
+                'id' => $n->id,
+                'read_at' => null,
+            ]);
+        }
+
         return back()->with('success', 'Marked as unread');
     }
 
     public function markAllRead(Request $request)
     {
-        $request->user()->unreadNotifications->markAsRead();
+        $unread = $request->user()->unreadNotifications;
+        $count = $unread->count();
+        $unread->markAsRead();
+
+        if ($request->expectsJson() || $request->is('api/*')) {
+            return response()->json([
+                'success' => true,
+                'marked' => $count,
+            ]);
+        }
+
         return back()->with('success', 'All notifications marked as read');
     }
 

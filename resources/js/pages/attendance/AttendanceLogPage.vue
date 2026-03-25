@@ -4,7 +4,7 @@
  * Filters, Advanced Filters, Customize Columns, sortable columns, Export. Force Logout for active/missing sessions.
  * Permissions: view_attendance_logs, force_logout, export_attendance_data.
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useTablePageSize } from '@/composables/useTablePageSize'
 import attendanceLogApi from '@/services/attendanceLogApi'
 import { useAuthStore } from '@/stores/auth'
@@ -36,6 +36,18 @@ const canExport = computed(() =>
     'attendance-log.export',
     'attendance_log.export',
   ])
+)
+const canApplyFilters = computed(() =>
+  canModuleAction(auth.user, 'attendance-log', 'apply_filters', ['attendance_log.apply_filters', 'attendance-log.apply_filters'])
+)
+const canResetFilters = computed(() =>
+  canModuleAction(auth.user, 'attendance-log', 'reset_filters', ['attendance_log.reset_filters', 'attendance-log.reset_filters'])
+)
+const canAdvancedFilters = computed(() =>
+  canModuleAction(auth.user, 'attendance-log', 'advanced_filters', ['attendance_log.advanced_filters', 'attendance-log.advanced_filters'])
+)
+const canCustomizeColumns = computed(() =>
+  canModuleAction(auth.user, 'attendance-log', 'customize_columns', ['attendance_log.customize_columns', 'attendance-log.customize_columns'])
 )
 
 const ATTENDANCE_COLUMNS = [
@@ -87,6 +99,8 @@ const allColumns = ref([...ATTENDANCE_COLUMNS])
 const forceLogoutLoading = ref(null)
 const exportLoading = ref(false)
 const forceLogoutConfirmRow = ref(null)
+const autoRefreshMs = 15000
+let refreshTimer = null
 
 const showToast = ref(false)
 const toastType = ref('success')
@@ -308,6 +322,19 @@ onMounted(() => {
     loadFilters()
     loadSummary()
     load()
+    // Keep attendance list in sync with real-time login/logout activity.
+    refreshTimer = window.setInterval(() => {
+      if (loading.value) return
+      loadSummary()
+      load()
+    }, autoRefreshMs)
+  }
+})
+
+onUnmounted(() => {
+  if (refreshTimer) {
+    clearInterval(refreshTimer)
+    refreshTimer = null
   }
 })
 </script>
@@ -376,11 +403,14 @@ onMounted(() => {
           :filters="filters"
           :filter-options="filterOptions"
           :loading="loading"
+          :can-apply="canApplyFilters"
+          :can-reset="canResetFilters"
           @apply="applyFilters"
           @reset="resetFilters"
         >
           <template #after-reset>
             <button
+              v-if="canAdvancedFilters"
               type="button"
               class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-sm text-gray-700 hover:bg-gray-50"
               @click="advancedVisible = !advancedVisible"
@@ -389,6 +419,7 @@ onMounted(() => {
               Advanced Filters
             </button>
             <button
+              v-if="canCustomizeColumns"
               type="button"
               class="inline-flex shrink-0 items-center whitespace-nowrap rounded border border-gray-300 bg-white px-2.5 py-2 text-sm text-gray-700 hover:bg-gray-50"
               @click="columnModalVisible = true"
@@ -417,7 +448,7 @@ onMounted(() => {
           </template>
         </FiltersBar>
 
-        <div v-show="advancedVisible" class="rounded-lg border border-gray-200 bg-gray-50/50 p-4">
+        <div v-show="advancedVisible && canAdvancedFilters" class="rounded-lg border border-gray-200 bg-gray-50/50 p-4">
           <div class="grid grid-cols-1 gap-3 md:grid-cols-12 md:items-end">
             <div class="md:col-span-4">
               <label class="block text-xs font-medium text-gray-600">From</label>
@@ -449,6 +480,7 @@ onMounted(() => {
               </select>
             </div>
             <button
+              v-if="canApplyFilters"
               type="button"
               class="rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-50 md:col-span-1"
               :disabled="loading"
@@ -457,6 +489,7 @@ onMounted(() => {
               Apply
             </button>
             <button
+              v-if="canResetFilters"
               type="button"
               class="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 md:col-span-1"
               :disabled="loading"

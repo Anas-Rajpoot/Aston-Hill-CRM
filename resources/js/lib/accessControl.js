@@ -74,6 +74,8 @@ const MODULE_ALIASES = {
   'personal-notes': ['personal-notes', 'personal_notes'],
   'email-follow-up': ['email-follow-up', 'email-followups', 'email_follow_up', 'emails_followup'],
   reports: ['reports'],
+  clients: ['clients'],
+  'all-clients': ['all-clients', 'all_clients', 'accounts'],
 }
 
 const ACTION_ALIASES = {
@@ -86,6 +88,12 @@ const ACTION_ALIASES = {
   import: ['import', 'upload', 'bulk-upload', 'upload-csv'],
   sample: ['download-sample', 'sample', 'import', 'upload'],
   create: ['create', 'add'],
+  bulk_assign: ['bulk-assign', 'bulk_assign', 'assign'],
+  template: ['template', 'download-template', 'download_template'],
+  apply_filters: ['apply-filters', 'apply_filters', 'apply'],
+  reset_filters: ['reset-filters', 'reset_filters', 'reset'],
+  advanced_filters: ['advanced-filters', 'advanced_filters'],
+  customize_columns: ['customize-columns', 'customize_columns', 'columns'],
 }
 
 function candidatePermissionKeys(moduleKey, actionKey) {
@@ -139,7 +147,7 @@ const ROUTE_ACCESS_RULES = [
   { prefix: '/clients', modules: ['clients'] },
   { prefix: '/order-status', modules: ['order-status', 'order_status'] },
   { prefix: '/dsp-tracker', modules: ['dsp_tracker', 'dsp-tracker'] },
-  { prefix: '/verifiers-detail', modules: ['verifier_detail', 'verifiers_detail', 'verifiers-detail'] },
+  { prefix: '/verifiers-detail', modules: ['verifier_detail', 'verifiers_detail', 'verifiers-detail', 'gsm_verifiers'] },
   { prefix: '/cisco-extensions', modules: ['cisco_extensions', 'cisco-extensions', 'extensions'] },
   { prefix: '/attendance-log', modules: ['attendance_log', 'attendance-log', 'attendance'] },
   { prefix: '/expenses', modules: ['expenses', 'expense_tracker', 'expense-tracker'] },

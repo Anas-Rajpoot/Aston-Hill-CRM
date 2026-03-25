@@ -56,7 +56,9 @@ class LeadSubmissionController extends Controller
         $categories = ServiceCategory::orderBy('name')->get(['id','name']);
 
         return LeadSubmissionResource::collection(
-            LeadSubmission::with(['creator','category','type'])
+            LeadSubmission::query()
+                ->visibleTo($request->user())
+                ->with(['creator','category','type'])
                 ->filter($request->all())
                 ->paginate(10)
         );
@@ -170,7 +172,7 @@ class LeadSubmissionController extends Controller
             'offer' => ['nullable', 'string', 'max:500'],
             'mrc_aed' => ['nullable', 'numeric', 'min:0'],
             'quantity' => ['nullable', 'integer', 'min:0'],
-            'ae_domain' => [$draft ? 'nullable' : 'required', 'string', 'max:255', new AeDomainRule()],
+            'ae_domain' => ['nullable', 'string', 'max:255', new AeDomainRule()],
             'gaid' => ['nullable', 'string', 'max:255'],
             'manager_id' => [$draft ? 'nullable' : 'required', 'integer', 'exists:users,id'],
             'team_leader_id' => ['nullable', 'integer', 'exists:users,id'],
@@ -184,7 +186,6 @@ class LeadSubmissionController extends Controller
             'address.required' => 'Complete address is required.',
             'emirates.required' => 'Emirates is required.',
             'product.required' => 'Product is required.',
-            'ae_domain.required' => 'Enter Domain Name',
             'manager_id.required' => 'Please select a manager.',
             'email.email' => 'Please enter a valid email address.',
         ];
@@ -296,7 +297,7 @@ class LeadSubmissionController extends Controller
             'offer' => ['nullable', 'string', 'max:500'],
             'mrc_aed' => ['nullable', 'numeric', 'min:0'],
             'quantity' => ['nullable', 'integer', 'min:0'],
-            'ae_domain' => [$draft ? 'nullable' : 'required', 'string', 'max:255', new AeDomainRule()],
+            'ae_domain' => ['nullable', 'string', 'max:255', new AeDomainRule()],
             'gaid' => ['nullable', 'string', 'max:255'],
             'manager_id' => [$draft ? 'nullable' : 'required', 'integer', 'exists:users,id'],
             'team_leader_id' => ['nullable', 'integer', 'exists:users,id'],
@@ -310,7 +311,6 @@ class LeadSubmissionController extends Controller
             'address.required' => 'Complete address is required.',
             'emirates.required' => 'Emirates is required.',
             'product.required' => 'Product is required.',
-            'ae_domain.required' => 'Enter Domain Name',
             'manager_id.required' => 'Please select a manager.',
             'email.email' => 'Please enter a valid email address.',
         ];
@@ -929,7 +929,8 @@ if ($request->expectsJson() || $request->ajax()) {
 
         // UPDATE existing row only (avoid INSERT / created_by error)
         $leadSubmission->update([
-            'status' => 'submitted',
+            // Business rule: newly submitted items start in Unassigned queue.
+            'status' => 'unassigned',
             'submitted_at' => now(),
             'status_changed_at' => now(),
             'submission_type' => $leadSubmission->submission_type ?? 'new',
@@ -1072,7 +1073,8 @@ if ($request->expectsJson() || $request->ajax()) {
             'submission_type' => 'resubmission',
             'updated_by' => $request->user()->id,
             'step' => 4,
-            'status' => $isDraft ? 'draft' : 'submitted',
+            // Non-draft resubmissions enter the Unassigned queue by default.
+            'status' => $isDraft ? 'draft' : 'unassigned',
             'submitted_at' => $isDraft ? null : now(),
             'status_changed_at' => now(),
             'rejected_at' => null,

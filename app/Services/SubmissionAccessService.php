@@ -52,6 +52,7 @@ class SubmissionAccessService
         $teamId = (int) data_get($record, 'team_id', 0);
         if ($teamId > 0) {
             $isRelatedTeam = Team::where('id', $teamId)
+                ->where('status', 'active')
                 ->where(function ($q) use ($uid) {
                     $q->where('manager_id', $uid)->orWhere('team_leader_id', $uid);
                 })

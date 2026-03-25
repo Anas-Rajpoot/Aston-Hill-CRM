@@ -8,6 +8,8 @@ const props = defineProps({
   filters: { type: Object, required: true },
   filterOptions: { type: Object, default: () => ({ categories: [], types: [], statuses: [] }) },
   loading: { type: Boolean, default: false },
+  canApply: { type: Boolean, default: true },
+  canReset: { type: Boolean, default: true },
 })
 
 const emit = defineEmits(['apply', 'reset'])
@@ -51,6 +53,7 @@ const emit = defineEmits(['apply', 'reset'])
       <div class="ml-auto flex shrink-0 items-center gap-2">
         <slot name="before-apply" />
         <button
+          v-if="canApply"
           type="button"
           class="inline-flex shrink-0 items-center rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover focus:ring-2 focus:ring-brand-primary disabled:opacity-50"
           :disabled="loading"
@@ -62,6 +65,7 @@ const emit = defineEmits(['apply', 'reset'])
           Apply
         </button>
         <button
+          v-if="canReset"
           type="button"
           class="shrink-0 rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
           :disabled="loading"

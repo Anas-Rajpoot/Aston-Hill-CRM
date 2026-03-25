@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import DateInputDdMmYyyy from '@/components/DateInputDdMmYyyy.vue'
 import clientsApi from '@/services/clientsApi'
+import leadSubmissionsApi from '@/services/leadSubmissionsApi'
 
 const route = useRoute()
 const router = useRouter()
@@ -64,6 +65,60 @@ const dropdowns = ref({
   contract_types: [],
   clawback_chum_options: [],
 })
+const DEFAULT_SUBMISSION_TYPES = ['new', 'resubmission']
+const DEFAULT_SERVICE_CATEGORIES = ['Fixed', 'FMS', 'GSM', 'Other']
+const DEFAULT_SERVICE_TYPES = [
+  'New Submission',
+  'Relocation',
+  'Update WO',
+  'Contract Renewal',
+  'Migration',
+  'Other',
+  'New Sim Card',
+  'C2B Migration',
+  'B2B Migration',
+  'MNP',
+  'MNMI / EC Renwal',
+  'AS Update',
+  'MPR',
+  'Sim Replacement',
+  'Multi Sim',
+]
+const DEFAULT_PRODUCT_TYPES = [
+  'Business Ultimate',
+  'Business Essential',
+  'Business Complete',
+  'Business Line',
+  'Business Trunk Line',
+  'ISDN 30',
+  'SIP Trunk',
+  'Fax Line',
+  'Fixed Other',
+  'Business Starter',
+  'Business Starter Pro',
+  'Business Starter Ultra 12M',
+  'Business Starter Ultra 24M',
+  'FMS Other',
+  'Simplified',
+  'Q1',
+  'BIP',
+  'Abu Dhabi Offer',
+  'SPR',
+]
+const DEFAULT_PRODUCT_TYPES_BY_CATEGORY = {
+  Fixed: ['Business Ultimate', 'Business Essential', 'Business Complete', 'Business Line', 'Business Trunk Line', 'ISDN 30', 'SIP Trunk', 'Fax Line', 'Fixed Other'],
+  FMS: ['Business Starter', 'Business Starter Pro', 'Business Starter Ultra 12M', 'Business Starter Ultra 24M', 'FMS Other'],
+  GSM: ['Simplified', 'Q1', 'BIP', 'Abu Dhabi Offer', 'SPR'],
+}
+const DEFAULT_WORK_ORDER_STATUSES = [
+  'Under Process',
+  'Appointment Scheduled',
+  'Completed',
+  'To be Resubmit',
+  'Rejected',
+  'IT Issue',
+]
+const DEFAULT_CONTRACT_TYPES = ['12 months', '24 months']
 const productTypeOptions = computed(() => {
   const category = form.value.service_category || ''
   const mapped = dropdowns.value.product_types_by_category?.[category]
@@ -71,16 +126,57 @@ const productTypeOptions = computed(() => {
   return ensureValueOption(mapped, form.value.product_type)
 })
 
+function pickFirstValue(obj, keys) {
+  for (const key of keys) {
+    const value = obj?.[key]
+    if (value != null && value !== '') return String(value)
+  }
+  return ''
+}
+
+function resolveTeamLeaderManagerId(teamLeader) {
+  const direct = pickFirstValue(teamLeader, ['manager_id', 'managerId'])
+  if (direct) return direct
+  const reportsTo = pickFirstValue(teamLeader, ['reports_to', 'reportsTo'])
+  if (reportsTo && (teamOptions.value.managers ?? []).some((m) => String(m.id) === reportsTo)) return reportsTo
+  return ''
+}
+
+function resolveSalesAgentTeamLeaderId(salesAgent) {
+  const direct = pickFirstValue(salesAgent, ['team_leader_id', 'teamLeaderId'])
+  if (direct) return direct
+  const reportsTo = pickFirstValue(salesAgent, ['reports_to', 'reportsTo'])
+  if (reportsTo && (teamOptions.value.team_leaders ?? []).some((t) => String(t.id) === reportsTo)) return reportsTo
+  return ''
+}
+
+function withSelectedEntry(list, selectedId) {
+  if (!selectedId) return list
+  const hasSelected = list.some((item) => String(item.id) === String(selectedId))
+  if (hasSelected) return list
+  const fromTeamLeaders = (teamOptions.value.team_leaders ?? []).find((u) => String(u.id) === String(selectedId))
+  if (fromTeamLeaders) return [...list, fromTeamLeaders]
+  const fromSalesAgents = (teamOptions.value.sales_agents ?? []).find((u) => String(u.id) === String(selectedId))
+  if (fromSalesAgents) return [...list, fromSalesAgents]
+  return list
+}
+
 const filteredTeamLeaders = computed(() => {
   const mid = form.value.manager_id
-  if (!mid) return teamOptions.value.team_leaders
-  return teamOptions.value.team_leaders.filter((t) => String(t.manager_id) === String(mid))
+  const allTeamLeaders = teamOptions.value.team_leaders ?? []
+  if (!mid) return withSelectedEntry(allTeamLeaders, form.value.team_leader_id)
+  const filtered = allTeamLeaders.filter((t) => resolveTeamLeaderManagerId(t) === String(mid))
+  const source = filtered.length ? filtered : allTeamLeaders
+  return withSelectedEntry(source, form.value.team_leader_id)
 })
 
 const filteredSalesAgents = computed(() => {
   const tid = form.value.team_leader_id
-  if (!tid) return teamOptions.value.sales_agents
-  return teamOptions.value.sales_agents.filter((s) => String(s.team_leader_id) === String(tid))
+  const allSalesAgents = teamOptions.value.sales_agents ?? []
+  if (!tid) return withSelectedEntry(allSalesAgents, form.value.sales_agent_id)
+  const filtered = allSalesAgents.filter((s) => resolveSalesAgentTeamLeaderId(s) === String(tid))
+  const source = filtered.length ? filtered : allSalesAgents
+  return withSelectedEntry(source, form.value.sales_agent_id)
 })
 
 function mapToYmd(val) {
@@ -154,19 +250,61 @@ async function loadInitial() {
     const currentContractType = data.contract_type ?? ''
     const currentClawbackChum = data.clawback_chum ?? ''
 
+    // Client filters may have empty manager/team options when no historic records are assigned.
+    // Always hydrate role-based team options from team-options endpoint as the source of truth.
+    let teamData = {}
+    try {
+      const teamRes = await leadSubmissionsApi.getTeamOptions(true)
+      teamData = teamRes?.data ?? teamRes ?? {}
+    } catch {
+      teamData = {}
+    }
     teamOptions.value = {
-      managers: filters.managers ?? [],
-      team_leaders: filters.team_leaders ?? [],
-      sales_agents: filters.sales_agents ?? [],
+      managers: (teamData.managers && teamData.managers.length ? teamData.managers : (filters.managers ?? [])),
+      team_leaders: (teamData.team_leaders && teamData.team_leaders.length ? teamData.team_leaders : (filters.team_leaders ?? [])),
+      sales_agents: (teamData.sales_agents && teamData.sales_agents.length ? teamData.sales_agents : (filters.sales_agents ?? [])),
     }
     dropdowns.value = {
-      submission_types: ensureValueOption(filters.submission_types, currentSubmissionType),
-      service_categories: ensureValueOption(filters.service_categories, currentServiceCategory),
-      service_types: ensureValueOption(filters.service_types, currentServiceType),
-      product_types: ensureValueOption(filters.product_types, currentProductType),
-      product_types_by_category: filters.product_types_by_category ?? {},
-      work_order_statuses: ensureValueOption(filters.work_order_statuses, currentWorkOrderStatus),
-      contract_types: ensureValueOption(filters.contract_types, currentContractType),
+      submission_types: ensureValueOption(
+        (Array.isArray(filters.submission_types) && filters.submission_types.length)
+          ? filters.submission_types
+          : DEFAULT_SUBMISSION_TYPES,
+        currentSubmissionType
+      ),
+      service_categories: ensureValueOption(
+        (Array.isArray(filters.service_categories) && filters.service_categories.length)
+          ? filters.service_categories
+          : DEFAULT_SERVICE_CATEGORIES,
+        currentServiceCategory
+      ),
+      service_types: ensureValueOption(
+        (Array.isArray(filters.service_types) && filters.service_types.length)
+          ? filters.service_types
+          : DEFAULT_SERVICE_TYPES,
+        currentServiceType
+      ),
+      product_types: ensureValueOption(
+        (Array.isArray(filters.product_types) && filters.product_types.length)
+          ? filters.product_types
+          : DEFAULT_PRODUCT_TYPES,
+        currentProductType
+      ),
+      product_types_by_category:
+        (filters.product_types_by_category && Object.keys(filters.product_types_by_category).length)
+          ? filters.product_types_by_category
+          : DEFAULT_PRODUCT_TYPES_BY_CATEGORY,
+      work_order_statuses: ensureValueOption(
+        (Array.isArray(filters.work_order_statuses) && filters.work_order_statuses.length)
+          ? filters.work_order_statuses
+          : DEFAULT_WORK_ORDER_STATUSES,
+        currentWorkOrderStatus
+      ),
+      contract_types: ensureValueOption(
+        (Array.isArray(filters.contract_types) && filters.contract_types.length)
+          ? filters.contract_types
+          : DEFAULT_CONTRACT_TYPES,
+        currentContractType
+      ),
       clawback_chum_options: ensureValueOption(filters.clawback_chum_options, currentClawbackChum),
     }
 

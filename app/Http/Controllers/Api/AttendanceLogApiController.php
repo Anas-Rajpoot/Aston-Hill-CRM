@@ -297,11 +297,13 @@ class AttendanceLogApiController extends Controller
         } else {
             if ($sessionStillExists) {
                 $status = 'logged_in';
-                $durationText = 'In Progress';
+                // Show live elapsed time for active sessions.
+                $durationText = $this->durationBetween($loginAt, now());
                 $durationState = 'in_progress';
             } else {
                 $status = 'missing_logout';
-                $durationText = 'Missing Logout';
+                // Session ended without explicit logout event; still show elapsed time since login.
+                $durationText = $this->durationBetween($loginAt, now());
                 $durationState = 'missing';
             }
         }

@@ -33,6 +33,7 @@ const MODULE_DISPLAY_ORDER = [
   'clients',
   'order_status',
   'dsp_tracker',
+  'attendance',
   'gsm_verifiers',
   'extensions',
   'expense_tracker',

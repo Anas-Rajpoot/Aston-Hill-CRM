@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\DropdownOption;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class DropdownSeederController extends Controller
@@ -16,6 +17,8 @@ class DropdownSeederController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->ensureSeededDefaults();
+
         $query = DropdownOption::query()->ordered();
 
         if ($request->filled('group')) {
@@ -68,6 +71,7 @@ class DropdownSeederController extends Controller
         }
 
         $option = DropdownOption::create($validated);
+        $this->forgetDependentCaches($validated['group']);
 
         return response()->json($option, 201);
     }
@@ -79,6 +83,7 @@ class DropdownSeederController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         $option = DropdownOption::findOrFail($id);
+        $group = (string) $option->group;
 
         $validated = $request->validate([
             'value'      => ['sometimes', 'required', 'string', 'max:255'],
@@ -103,6 +108,7 @@ class DropdownSeederController extends Controller
         }
 
         $option->update($validated);
+        $this->forgetDependentCaches($group);
 
         return response()->json($option);
     }
@@ -113,7 +119,9 @@ class DropdownSeederController extends Controller
     public function destroy(int $id): JsonResponse
     {
         $option = DropdownOption::findOrFail($id);
+        $group = (string) $option->group;
         $option->delete();
+        $this->forgetDependentCaches($group);
 
         return response()->json(['message' => 'Deleted.']);
     }
@@ -135,6 +143,14 @@ class DropdownSeederController extends Controller
                 DropdownOption::where('id', $item['id'])->update(['sort_order' => $item['sort_order']]);
             }
         });
+        $groups = DropdownOption::query()
+            ->whereIn('id', collect($validated['items'])->pluck('id')->all())
+            ->distinct()
+            ->pluck('group')
+            ->all();
+        foreach ($groups as $group) {
+            $this->forgetDependentCaches((string) $group);
+        }
 
         return response()->json(['message' => 'Sort order updated.']);
     }
@@ -219,5 +235,79 @@ class DropdownSeederController extends Controller
                 ['teams', 'status'],
             ],
         ];
+    }
+
+    /**
+     * Ensure core dropdown groups have baseline values so admin can manage from UI immediately.
+     */
+    private function ensureSeededDefaults(): void
+    {
+        $defaults = [
+            'lead_statuses' => ['unassigned', 'draft', 'submitted', 'approved', 'rejected'],
+            'submission_types' => ['new', 'resubmission'],
+            'service_categories' => ['Fixed', 'FMS', 'GSM', 'Other'],
+            'service_types' => ['New Submission', 'Relocation', 'Update WO', 'Contract Renewal', 'Migration', 'Other'],
+            'product_types' => ['Business Ultimate', 'Business Essential', 'Business Complete', 'Simplified', 'Q1', 'BIP'],
+            'contract_types' => ['12 months', '24 months'],
+            'work_order_statuses' => ['Under Process', 'Appointment Scheduled', 'Completed', 'To be Resubmit', 'Rejected', 'IT Issue'],
+            'call_verification_statuses' => ['pending', 'verified', 'rejected'],
+            'documents_verification_statuses' => ['pending', 'verified', 'rejected'],
+            'du_statuses' => ['pending', 'approved', 'rejected'],
+
+            'field_statuses' => ['unassigned', 'submitted', 'approved', 'rejected'],
+            'field_meeting_statuses' => ['scheduled', 'completed', 'cancelled', 'rescheduled'],
+            'field_appointment_statuses' => ['scheduled', 'completed', 'cancelled', 'no_show'],
+
+            'customer_support_statuses' => ['open', 'in_progress', 'resolved', 'closed'],
+            'ticket_priorities' => ['low', 'medium', 'high'],
+            'ticket_categories' => ['billing', 'technical', 'service', 'other'],
+
+            'vas_statuses' => ['unassigned', 'submitted', 'approved', 'rejected'],
+            'special_request_statuses' => ['submitted', 'approved', 'rejected'],
+
+            'client_statuses' => ['active', 'inactive', 'pending'],
+            'client_categories' => ['new', 'existing', 'vip'],
+            'company_categories' => ['SME', 'Enterprise', 'Government', 'Other'],
+            'emirates' => ['Dubai', 'Abu Dhabi', 'Sharjah', 'Ajman', 'Fujairah', 'Ras Al Khaimah', 'Umm Al Quwain'],
+
+            'dsp_statuses' => ['pending', 'in_progress', 'completed', 'rejected'],
+            'order_statuses' => ['Under Process', 'Completed', 'To be Resubmit', 'Rejected'],
+            'verification_statuses' => ['pending', 'verified', 'rejected'],
+
+            'extension_statuses' => ['active', 'inactive', 'not_created'],
+            'extension_gateways' => ['DU', 'ETISALAT', 'GSM'],
+
+            'expense_statuses' => ['pending', 'approved', 'rejected'],
+            'expense_categories' => ['Stationary', 'water', 'IT', 'telecom', 'nol/taxi', 'others'],
+
+            'team_statuses' => ['active', 'inactive'],
+            'user_statuses' => ['approved', 'pending', 'rejected', 'inactive'],
+        ];
+
+        foreach ($defaults as $group => $values) {
+            $hasAny = DropdownOption::query()->where('group', $group)->exists();
+            if ($hasAny) {
+                continue;
+            }
+            foreach (array_values($values) as $idx => $value) {
+                DropdownOption::query()->create([
+                    'group' => $group,
+                    'value' => (string) $value,
+                    'label' => (string) $value,
+                    'sort_order' => $idx,
+                    'is_active' => true,
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Drop module-level caches that depend on dropdown option groups.
+     */
+    private function forgetDependentCaches(string $group): void
+    {
+        if (in_array($group, ['extension_gateways', 'extension_statuses'], true)) {
+            Cache::forget('cisco_extensions_filters');
+        }
     }
 }

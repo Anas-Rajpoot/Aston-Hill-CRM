@@ -197,12 +197,9 @@ api.interceptors.response.use(
 
     // Generic unauthorized handler:
     // - never interfere with login endpoint validation
-    // - do not force logout on module-level 401s (often permission/policy mismatches)
-    // - only redirect on explicit auth-state probes (/bootstrap, /me, /auth/logout)
+    // - for all other API calls, clear auth and redirect to login
+    //   so protected pages are never visible after logout/session expiry.
     if (status === 401 && !isAuthLoginRequest && !skipAuthRedirect) {
-      if (!isAuthStateProbe) {
-        return Promise.reject(err)
-      }
       import('@/stores/auth').then(({ useAuthStore }) => {
         const auth = useAuthStore()
         auth.user = null

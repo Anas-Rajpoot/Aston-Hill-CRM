@@ -89,18 +89,13 @@ class DashboardController extends Controller
         $weekAgo = now()->subDays(7);
         $visibleUserIds = $this->visibleUserIds($user);
 
-        $leadQuery = LeadSubmission::query();
-        $fieldQuery = FieldSubmission::query();
-        $supportQuery = CustomerSupportSubmission::query();
-        $vasQuery = VasRequestSubmission::query();
-        $specialQuery = SpecialRequest::query();
+        $leadQuery = LeadSubmission::query()->visibleTo($user);
+        $fieldQuery = FieldSubmission::query()->visibleTo($user);
+        $supportQuery = CustomerSupportSubmission::query()->visibleTo($user);
+        $vasQuery = VasRequestSubmission::query()->visibleTo($user);
+        $specialQuery = SpecialRequest::query()->visibleTo($user);
         $clientQuery = Client::query();
 
-        $this->scopeByVisibleUsers($leadQuery, $user, ['created_by', 'sales_agent_id', 'team_leader_id', 'manager_id', 'executive_id']);
-        $this->scopeByVisibleUsers($fieldQuery, $user, ['created_by', 'sales_agent_id', 'team_leader_id', 'manager_id', 'field_executive_id']);
-        $this->scopeByVisibleUsers($supportQuery, $user, ['created_by', 'sales_agent_id', 'team_leader_id', 'manager_id', 'csr_id']);
-        $this->scopeByVisibleUsers($vasQuery, $user, ['created_by', 'sales_agent_id', 'team_leader_id', 'manager_id', 'back_office_executive_id']);
-        $this->scopeByVisibleUsers($specialQuery, $user, ['created_by', 'sales_agent_id', 'team_leader_id', 'manager_id']);
         $this->scopeByVisibleUsers($clientQuery, $user, ['created_by', 'sales_agent_id', 'team_leader_id', 'manager_id', 'account_manager_id']);
 
         // Apply date filters
@@ -191,19 +186,7 @@ class DashboardController extends Controller
 
     private function formSummaryForModel(string $modelClass, User $user, array $filters, ?string $categoryCol, ?string $mrcCol): array
     {
-        $query = $modelClass::query();
-
-        // Apply visibility scope
-        $userCols = match ($modelClass) {
-            LeadSubmission::class            => ['created_by', 'sales_agent_id', 'team_leader_id', 'manager_id', 'executive_id'],
-            FieldSubmission::class           => ['created_by', 'sales_agent_id', 'team_leader_id', 'manager_id', 'field_executive_id'],
-            CustomerSupportSubmission::class => ['created_by', 'sales_agent_id', 'team_leader_id', 'manager_id', 'csr_id'],
-            VasRequestSubmission::class      => ['created_by', 'sales_agent_id', 'team_leader_id', 'manager_id', 'back_office_executive_id'],
-            SpecialRequest::class            => ['created_by', 'sales_agent_id', 'team_leader_id', 'manager_id'],
-            default                          => ['created_by'],
-        };
-
-        $this->scopeByVisibleUsers($query, $user, $userCols);
+        $query = $modelClass::query()->visibleTo($user);
         $this->applyDateFilters($query, $filters);
 
         if (!empty($filters['team_id']) && \Schema::hasColumn((new $modelClass)->getTable(), 'team_id')) {
@@ -247,13 +230,9 @@ class DashboardController extends Controller
     private function recentActivity(User $user): array
     {
         $items = collect();
-        $leadQuery = LeadSubmission::query();
-        $fieldQuery = FieldSubmission::query();
-        $supportQuery = CustomerSupportSubmission::query();
-
-        $this->scopeByVisibleUsers($leadQuery, $user, ['created_by', 'sales_agent_id', 'team_leader_id', 'manager_id', 'executive_id']);
-        $this->scopeByVisibleUsers($fieldQuery, $user, ['created_by', 'sales_agent_id', 'team_leader_id', 'manager_id', 'field_executive_id']);
-        $this->scopeByVisibleUsers($supportQuery, $user, ['created_by', 'sales_agent_id', 'team_leader_id', 'manager_id', 'csr_id']);
+        $leadQuery = LeadSubmission::query()->visibleTo($user);
+        $fieldQuery = FieldSubmission::query()->visibleTo($user);
+        $supportQuery = CustomerSupportSubmission::query()->visibleTo($user);
 
         $leadQuery->orderByDesc('created_at')->limit(5)->get(['id', 'company_name', 'account_number', 'status', 'created_at'])->each(function ($r) use ($items) {
             $items->push([

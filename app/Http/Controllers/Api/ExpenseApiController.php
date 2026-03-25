@@ -22,7 +22,7 @@ class ExpenseApiController extends Controller
     use \App\Traits\ResolvesAuditDisplayValues;
 
     private const MODULE = 'expenses';
-    private const PRODUCT_CATEGORIES = ['Staionary', 'water', 'It', 'telecom', 'nol/taxi', 'others'];
+    private const PRODUCT_CATEGORIES = ['Stationary', 'water', 'It', 'telecom', 'nol/taxi', 'others'];
 
     private const ALLOWED_COLUMNS = [
         'id', 'expense_date', 'product_category', 'product_description', 'invoice_number',

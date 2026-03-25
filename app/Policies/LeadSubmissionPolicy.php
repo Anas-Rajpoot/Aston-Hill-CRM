@@ -21,11 +21,19 @@ class LeadSubmissionPolicy
         return self::hasBackOfficeRole($assignee);
     }
 
-    /** Requires read permission on lead module. */
+    /** Requires read permission on lead module (back office always allowed). */
     public function viewAny(User $user): bool
     {
-        // Business requirement: all authenticated roles can view lead submissions listing.
-        return true;
+        if (self::hasBackOfficeRole($user)) {
+            return true;
+        }
+
+        return RbacPermission::can($user, ['lead', 'lead-submissions'], 'read', [
+            'lead.view',
+            'lead.view.all',
+            'lead-submissions.list',
+            'lead-submissions.view',
+        ]);
     }
 
     public function create(User $user): bool
@@ -38,8 +46,23 @@ class LeadSubmissionPolicy
 
     public function view(User $user, LeadSubmission $lead): bool
     {
-        // Business requirement: all authenticated roles can view lead details/rows.
-        return true;
+        if (! $this->viewAny($user)) {
+            return false;
+        }
+
+        if ($user->hasRole('superadmin')) {
+            return true;
+        }
+
+        if ($user->can('lead.view.all')) {
+            return true;
+        }
+
+        if (self::hasBackOfficeRole($user)) {
+            return true;
+        }
+
+        return SubmissionAccessService::canAccessRecord($user, $lead, ['executive_id']);
     }
 
     public function update(User $user, LeadSubmission $lead): bool
@@ -87,9 +110,22 @@ class LeadSubmissionPolicy
         if (! in_array($lead->status, ['rejected', 'submitted'])) {
             return false;
         }
+
+        // Super admin can always resubmit.
         if ($user->hasRole('superadmin')) {
             return true;
         }
+
+        // Explicit permission gate (admin controls this in the role matrix).
+        // Still keep business rule: only the creator can resubmit their own lead.
+        $can = RbacPermission::can($user, ['lead', 'lead-submissions'], 'update', [
+            'lead-submissions.resubmit_lead',
+            'lead.resubmit_lead',
+        ]);
+        if (! $can) {
+            return false;
+        }
+
         return (int) $lead->created_by === (int) $user->id;
     }
 }

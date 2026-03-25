@@ -36,9 +36,9 @@ function confirmDelete() {
 
 <template>
   <div v-if="visible" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
-    <div class="absolute inset-0 bg-black/50" @click="closeModal" />
+    <div class="absolute inset-0 z-0 bg-black/50" @click="closeModal" />
 
-    <div class="relative w-full max-w-md rounded-lg bg-white shadow-xl">
+    <div class="relative z-10 w-full max-w-md rounded-lg bg-white shadow-xl">
       <div class="border-b border-gray-200 px-5 py-4">
         <h3 class="text-lg font-semibold text-gray-900">{{ title }}</h3>
       </div>

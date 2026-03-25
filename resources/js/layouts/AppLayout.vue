@@ -6,18 +6,32 @@ import SessionWarningBanner from '@/components/SessionWarningBanner.vue'
 import { useInactivityLogout } from '@/composables/useInactivityLogout'
 import { useSidebar } from '@/composables/useSidebar'
 import { watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
 const { showWarning, countdownSecs, totalWarningSecs, extending, staySignedIn, logoutNow } = useInactivityLogout()
 const { mobileOpen, closeMobile } = useSidebar()
 const route = useRoute()
+const router = useRouter()
+const auth = useAuthStore()
 
 // Close mobile sidebar on route change
 watch(() => route.path, () => closeMobile())
+
+// Hard client-side protection: if auth state is cleared (e.g., on logout), immediately leave protected layout.
+watch(
+  () => auth.isAuthenticated,
+  (ok) => {
+    if (!ok && route.path !== '/login') {
+      router.replace('/login')
+    }
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
-  <div class="flex h-screen overflow-hidden bg-brand-bg">
+  <div v-if="auth.isAuthenticated" class="flex h-screen overflow-hidden bg-brand-bg">
     <!-- Desktop sidebar (hidden below lg) -->
     <div class="hidden lg:flex flex-shrink-0">
       <Sidebar />

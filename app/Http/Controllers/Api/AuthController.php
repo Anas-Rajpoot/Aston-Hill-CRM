@@ -384,6 +384,7 @@ class AuthController extends Controller
     public function logout(Request $request): JsonResponse
     {
         $user = $request->user();
+        $sessionId = $request->session()->getId();
 
         AuditLogger::record([
             'action'     => 'logout',
@@ -392,6 +393,17 @@ class AuthController extends Controller
             'record_ref' => $user?->email,
             'result'     => 'success',
         ]);
+
+        // Ensure attendance row is closed even when event listeners are skipped/misconfigured.
+        if ($user) {
+            $logoutQuery = UserLoginLog::where('user_id', $user->id)->whereNull('logout_at');
+            if (! empty($sessionId)) {
+                $logoutQuery->where(function ($q) use ($sessionId) {
+                    $q->where('session_id', $sessionId)->orWhereNull('session_id');
+                });
+            }
+            $logoutQuery->latest('login_at')->limit(1)->update(['logout_at' => now()]);
+        }
 
         if ($request->bearerToken()) {
             $user->currentAccessToken()->delete();

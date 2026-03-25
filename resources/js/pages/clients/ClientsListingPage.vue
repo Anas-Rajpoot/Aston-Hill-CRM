@@ -43,6 +43,11 @@ const canCreate = computed(() => canModuleAction(authStore.user, 'clients', 'cre
 const canExport = computed(() => canModuleAction(authStore.user, 'clients', 'export'))
 const canImport = computed(() => canModuleAction(authStore.user, 'clients', 'import'))
 const canDelete = computed(() => canModuleAction(authStore.user, 'clients', 'delete'))
+const canApplyFilters = computed(() => canModuleAction(authStore.user, 'clients', 'apply_filters', ['clients.apply_filters']))
+const canResetFilters = computed(() => canModuleAction(authStore.user, 'clients', 'reset_filters', ['clients.reset_filters']))
+const canAdvancedFilters = computed(() => canModuleAction(authStore.user, 'clients', 'advanced_filters', ['clients.advanced_filters']))
+const canCustomizeColumns = computed(() => canModuleAction(authStore.user, 'clients', 'customize_columns', ['clients.customize_columns']))
+const canTemplate = computed(() => canModuleAction(authStore.user, 'clients', 'template', ['clients.download_template']))
 const loading = ref(true)
 
 /* ───── Toast ───── */
@@ -772,6 +777,8 @@ onMounted(() => {
         :account-numbers="accountNumbers"
         :alert-types="alertTypes"
         :show-alert-type-filter="false"
+        :can-apply="canApplyFilters"
+        :can-reset="canResetFilters"
         @search="applyFilters"
         @clear="clearSearch"
       >
@@ -784,7 +791,7 @@ onMounted(() => {
             @change="onImportFileSelect"
           />
           <button
-            v-if="canImport"
+            v-if="canTemplate"
             type="button"
             class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             :disabled="loading || importLoading"
@@ -828,6 +835,7 @@ onMounted(() => {
             {{ exportLoading ? 'Exporting...' : 'Export' }}
           </button>
           <button
+            v-if="canAdvancedFilters"
             type="button"
             class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
             @click="advancedVisible = !advancedVisible"
@@ -835,6 +843,7 @@ onMounted(() => {
             Advanced Filters
           </button>
           <button
+            v-if="canCustomizeColumns"
             type="button"
             class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
             @click="columnModalVisible = true"
@@ -870,7 +879,7 @@ onMounted(() => {
         </template>
       </ClientsFiltersBar>
 
-      <div v-if="advancedVisible" class="rounded-lg border border-gray-200 bg-white p-4">
+      <div v-if="advancedVisible && canAdvancedFilters" class="rounded-lg border border-gray-200 bg-white p-4">
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
           <div>
             <label class="mb-1 block text-xs text-gray-600">Manager</label>
@@ -976,8 +985,8 @@ onMounted(() => {
           </div>
         </div>
         <div class="mt-3 flex items-center gap-2">
-          <button type="button" class="rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover" @click="applyFilters">Apply</button>
-          <button type="button" class="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50" @click="resetFilters">Reset</button>
+          <button v-if="canApplyFilters" type="button" class="rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover" @click="applyFilters">Apply</button>
+          <button v-if="canResetFilters" type="button" class="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50" @click="resetFilters">Reset</button>
         </div>
       </div>
 

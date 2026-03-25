@@ -9,22 +9,14 @@ import { useAuthStore } from '@/stores/auth'
 import expensesApi from '@/services/expensesApi'
 import { fromDdMmYyyy, fromDdMonYyyyLower, toDdMonYyyyDash } from '@/lib/dateFormat'
 
-const VAT_OPTIONS_DEFAULT = [
-  { value: 0, label: '0% (Exempt)' },
-  { value: 5, label: '5%' },
-  { value: 15, label: '15%' },
-]
-
 const props = defineProps({
   visible: { type: Boolean, default: false },
   categories: { type: Array, default: () => [] },
-  vatPercentOptions: { type: Array, default: () => [] },
   addedByUsers: { type: Array, default: () => [] },
   currentUserId: { type: [Number, String], default: null },
 })
 
 const auth = useAuthStore()
-const vatOptions = computed(() => (props.vatPercentOptions?.length ? props.vatPercentOptions : VAT_OPTIONS_DEFAULT))
 const loggedInUserId = computed(() => props.currentUserId ?? auth.user?.id ?? null)
 const addedByDisplayName = computed(() => {
   const byId = props.addedByUsers?.find?.((u) => String(u.value) === String(loggedInUserId.value))?.label
@@ -364,15 +356,16 @@ async function submit() {
                 <label for="add-expense-vat" class="mb-1 block text-sm font-medium text-gray-700">
                   VAT %
                 </label>
-                <select
+                <input
                   id="add-expense-vat"
                   v-model="form.vat_percent"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
                   class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
-                >
-                  <option v-for="opt in vatOptions" :key="opt.value" :value="opt.value">
-                    {{ opt.label }}
-                  </option>
-                </select>
+                  placeholder="Enter VAT %"
+                />
               </div>
               <div>
                 <label for="add-expense-amount" class="mb-1 block text-sm font-medium text-gray-700">

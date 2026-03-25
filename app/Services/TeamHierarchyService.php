@@ -45,39 +45,54 @@ class TeamHierarchyService
         return Cache::remember($cacheKey, 300, function () use ($user) {
             $ids = [$user->id];
 
-            // ── Manager role: sees all members of teams they manage ──
-            $managedTeamIds = Team::where('manager_id', $user->id)
+            $uid = (int) $user->id;
+
+            // ── Manager: sees whole team work ──
+            $managedTeamIds = Team::query()
                 ->where('status', 'active')
+                ->where('manager_id', $uid)
                 ->pluck('id');
 
             if ($managedTeamIds->isNotEmpty()) {
-                // All users assigned to these teams
                 $memberIds = User::whereIn('team_id', $managedTeamIds)
                     ->pluck('id')
                     ->toArray();
                 $ids = array_merge($ids, $memberIds);
 
-                // Team leaders of those teams (they may not have team_id set)
-                $leaderIds = Team::whereIn('id', $managedTeamIds)
-                    ->whereNotNull('team_leader_id')
-                    ->pluck('team_leader_id')
-                    ->toArray();
-                $ids = array_merge($ids, $leaderIds);
+                return array_values(array_unique(array_map('intval', $ids)));
             }
 
-            // ── Team Leader role: sees all members of teams they lead ──
-            $ledTeamIds = Team::where('team_leader_id', $user->id)
+            // ── Team Leader: sees ONLY direct team members (exclude the manager's own work) ──
+            $ledTeamIds = Team::query()
                 ->where('status', 'active')
+                ->where('team_leader_id', $uid)
                 ->pluck('id');
 
             if ($ledTeamIds->isNotEmpty()) {
+                $teamManagerIds = Team::query()
+                    ->where('status', 'active')
+                    ->whereIn('id', $ledTeamIds)
+                    ->pluck('manager_id')
+                    ->filter()
+                    ->map(fn ($id) => (int) $id)
+                    ->toArray();
+
                 $memberIds = User::whereIn('team_id', $ledTeamIds)
                     ->pluck('id')
                     ->toArray();
-                $ids = array_merge($ids, $memberIds);
+
+                // Remove manager IDs so TL can't see manager-created work.
+                $filteredMemberIds = array_values(array_filter(
+                    $memberIds,
+                    fn ($id) => ! in_array((int) $id, $teamManagerIds, true)
+                ));
+
+                $ids = array_merge($ids, $filteredMemberIds);
+                return array_values(array_unique(array_map('intval', $ids)));
             }
 
-            return array_values(array_unique($ids));
+            // ── Sales agent / normal user: sees only own records ──
+            return [$uid];
         });
     }
 
@@ -110,8 +125,12 @@ class TeamHierarchyService
 
         $uid = $user->id;
         $visibleUserIds = self::getVisibleUserIds($user);
+        $isManagerRank = Team::query()
+            ->where('status', 'active')
+            ->where('manager_id', $uid)
+            ->exists();
 
-        $query->where(function ($q) use ($uid, $visibleUserIds, $extraAssignmentColumns) {
+        $query->where(function ($q) use ($uid, $visibleUserIds, $extraAssignmentColumns, $isManagerRank) {
             // ── 1. Records created by this user ──
             $q->where('created_by', $uid);
 
@@ -133,13 +152,17 @@ class TeamHierarchyService
                   ->orWhereIn('sales_agent_id', $visibleUserIds);
             }
 
-            // ── 5. Records belonging to teams this user manages/leads ──
-            $teamIds = Team::where('manager_id', $uid)
-                ->orWhere('team_leader_id', $uid)
-                ->pluck('id');
+            // ── 5. Broad team_id visibility only for Managers ──
+            // Team Leaders must NOT see the manager's work, so we do not OR by team_id for TL/agents.
+            if ($isManagerRank) {
+                $teamIds = Team::query()
+                    ->where('status', 'active')
+                    ->where('manager_id', $uid)
+                    ->pluck('id');
 
-            if ($teamIds->isNotEmpty()) {
-                $q->orWhereIn('team_id', $teamIds);
+                if ($teamIds->isNotEmpty()) {
+                    $q->orWhereIn('team_id', $teamIds);
+                }
             }
         });
     }

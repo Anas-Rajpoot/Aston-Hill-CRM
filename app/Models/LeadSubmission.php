@@ -52,7 +52,7 @@ class LeadSubmission extends Model
     public function submit()
     {
         $this->update([
-            'status' => 'submitted',
+            'status' => 'unassigned',
             'submitted_at' => now(),
             'status_changed_at' => now(),
         ]);
@@ -128,10 +128,25 @@ class LeadSubmission extends Model
      *  - Manager                      → own + team hierarchy members' records
      *  - Team Leader                  → own + direct team members' records
      *  - Sales Agent                  → only assigned-to or created-by them
+     *
+     * Team isolation: managers/leaders only see data for teams they manage/lead on the `teams` table.
      */
     public function scopeVisibleTo($q, User $user)
     {
-        // Business requirement: listing should be visible to all roles like super admin.
+        if ($user->hasRole('superadmin')) {
+            return $q;
+        }
+
+        if ($user->can('lead.view.all')) {
+            return $q;
+        }
+
+        if ($user->hasRole('back_office') || $user->hasRole('backoffice') || $user->hasRole('back_office_executive')) {
+            return $q;
+        }
+
+        \App\Services\TeamHierarchyService::scopeSubmissionsForUser($q, $user, ['executive_id']);
+
         return $q;
     }
 

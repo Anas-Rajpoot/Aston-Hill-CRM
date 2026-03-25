@@ -109,6 +109,11 @@ const canBulkAssign = (() => {
   return perms.includes('field_head.assign_field_agent') || perms.includes('field-submissions.assign_field_agent')
 })()
 const canExport = () => canModuleAction(auth.user, 'field', 'export')
+const canTemplate = () => canModuleAction(auth.user, 'field', 'template', ['field-submissions.download_template'])
+const canApplyFilters = () => canModuleAction(auth.user, 'field', 'apply_filters', ['field-submissions.apply_filters'])
+const canResetFilters = () => canModuleAction(auth.user, 'field', 'reset_filters', ['field-submissions.reset_filters'])
+const canAdvancedFilters = () => canModuleAction(auth.user, 'field', 'advanced_filters', ['field-submissions.advanced_filters'])
+const canCustomizeColumns = () => canModuleAction(auth.user, 'field', 'customize_columns', ['field-submissions.customize_columns'])
 const sort = ref('created_at')
 const order = ref('desc')
 const advancedVisible = ref(false)
@@ -667,6 +672,8 @@ onMounted(async () => {
         :filters="filters"
         :filter-options="filterOptions"
         :loading="loading"
+        :can-apply="canApplyFilters()"
+        :can-reset="canResetFilters()"
         @apply="applyFilters"
         @reset="resetFilters"
       >
@@ -712,6 +719,7 @@ onMounted(async () => {
             {{ exportLoading ? 'Exporting...' : 'Export' }}
           </button>
           <button
+            v-if="canTemplate()"
             type="button"
             class="inline-flex items-center rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70 disabled:cursor-wait"
             :disabled="loading || exportLoading"
@@ -725,6 +733,7 @@ onMounted(async () => {
         </template>
         <template #after-reset>
           <button
+            v-if="canAdvancedFilters()"
             type="button"
             class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
             @click="advancedVisible = !advancedVisible"
@@ -733,6 +742,7 @@ onMounted(async () => {
             Advanced Filters
           </button>
           <button
+            v-if="canCustomizeColumns()"
             type="button"
             class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
             @click="columnModalVisible = true"

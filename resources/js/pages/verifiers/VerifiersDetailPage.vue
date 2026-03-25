@@ -23,18 +23,18 @@ const successMessage = ref('')
 const errorMessage = ref('')
 
 const canAdd = computed(() => {
-  return canModuleAction(auth.user, 'verifiers-detail', 'create', ['verifiers.add', 'verifiers.create'])
+  return canModuleAction(auth.user, 'gsm_verifiers', 'create', ['verifiers.add', 'verifiers.create'])
 })
 
 const canDelete = computed(() => {
-  return canModuleAction(auth.user, 'verifiers-detail', 'delete', ['verifiers.delete'])
+  return canModuleAction(auth.user, 'gsm_verifiers', 'delete', ['verifiers.delete'])
 })
 const canEdit = computed(() => {
-  return canModuleAction(auth.user, 'verifiers-detail', 'edit', ['verifiers.edit', 'verifiers.update'])
+  return canModuleAction(auth.user, 'gsm_verifiers', 'edit', ['verifiers.edit', 'verifiers.update'])
 })
-const canViewAction = computed(() => canModuleAction(auth.user, 'verifiers-detail', 'view', ['verifiers.list', 'verifiers.view']))
-const canImport = computed(() => canModuleAction(auth.user, 'verifiers-detail', 'import'))
-const canExport = computed(() => canModuleAction(auth.user, 'verifiers-detail', 'export'))
+const canViewAction = computed(() => canModuleAction(auth.user, 'gsm_verifiers', 'view', ['verifiers.list', 'verifiers.view']))
+const canImport = computed(() => canModuleAction(auth.user, 'gsm_verifiers', 'import'))
+const canExport = computed(() => canModuleAction(auth.user, 'gsm_verifiers', 'export'))
 const canSample = computed(() => canImport.value)
 const hasAnyRowAction = computed(() => canViewAction.value || canDelete.value)
 

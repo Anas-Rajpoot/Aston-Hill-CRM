@@ -5,9 +5,9 @@
     "scripts": {
         "build": "vite build",
         "dev": "vite",
-        "serve": "php artisan serve --host=127.0.0.1 --port=8000",
+        "serve": "php artisan serve --host=127.0.0.1 --port=8015",
         "dev:all": "concurrently --kill-others-on-fail -n \"laravel,vite\" -c \"green,cyan\" \"npm:serve\" \"npm:dev\"",
-        "dev:reset": "kill-port 8000 5173 && npm run dev:all"
+        "dev:reset": "kill-port 8015 5173 && npm run dev:all"
     },
     "devDependencies": {
         "@tailwindcss/forms": "^0.5.2",

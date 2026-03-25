@@ -59,6 +59,10 @@ function formatAuditVal(v) {
       }
     } catch { /* not JSON */ }
   }
+  // Normalize SQL/ISO date-time strings in old/new values for consistent display.
+  if (/^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?$/.test(s)) {
+    return formatDateTime(s)
+  }
   return s
 }
 

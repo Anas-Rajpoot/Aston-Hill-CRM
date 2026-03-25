@@ -34,6 +34,7 @@ try {
 const auth = useAuthStore()
 const canViewAction = computed(() => canModuleAction(auth.user, 'lead', 'view'))
 const canEditAction = computed(() => canModuleAction(auth.user, 'lead', 'edit'))
+const canResubmitAction = computed(() => canModuleAction(auth.user, 'lead', 'resubmit_lead'))
 const canHistoryAction = computed(() => canViewAction.value)
 const canDeleteAction = computed(() => canModuleAction(auth.user, 'lead', 'delete'))
 
@@ -58,7 +59,7 @@ const canEditBackOffice = computed(() => {
 
 /** Resubmit: submitted or rejected; super admin or the user who submitted (creator / created_by). */
 function canResubmit(row) {
-  if (row.status === 'approved') return false
+  if (!['submitted', 'rejected'].includes(row.status)) return false
   const roles = auth.user?.roles ?? []
   const isSuperAdmin = Array.isArray(roles) && roles.some((r) => (typeof r === 'string' ? r : r?.name) === 'superadmin')
   if (isSuperAdmin) return true
@@ -844,7 +845,7 @@ function statusBadgeClass(status) {
               </div>
               <div class="inline-flex min-w-[72px] shrink-0 justify-end">
                 <router-link
-                  v-if="canEditAction && canResubmit(row)"
+                  v-if="canResubmitAction && canResubmit(row)"
                   :to="{ path: `/lead-submissions/${row.id}/resubmit` }"
                   class="rounded bg-brand-primary-hover px-2 py-1 text-xs font-medium text-white hover:bg-brand-primary-dark"
                 >

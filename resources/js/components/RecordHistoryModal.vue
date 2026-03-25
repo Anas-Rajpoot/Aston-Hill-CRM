@@ -157,7 +157,9 @@ function formatVal(v) {
       }
     } catch { /* not JSON, continue */ }
   }
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) {
+  // Normalize both ISO (`2026-03-24T09:39:00`) and SQL-style (`2026-03-24 09:39:00`) datetimes.
+  // Also handles date-only values, so audit old/new values show the same human format.
+  if (/^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?$/.test(s)) {
     return formatDateTime(s)
   }
   return s

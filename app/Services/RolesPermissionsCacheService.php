@@ -22,11 +22,6 @@ class RolesPermissionsCacheService
     /** System-only modules are not assignable from Roles & Permissions UI. */
     private const EXCLUDED_PERMISSION_MODULES = [
         'system',
-        'settings',
-        'attendance',
-        'roles',
-        'notification_rules',
-        'permissions',
     ];
 
     public function getStructure(): array
@@ -123,6 +118,7 @@ class RolesPermissionsCacheService
         $guard = 'web';
 
         $modules = [];
+        $knownPermissionNames = [];
         foreach ($structure as $moduleKey => $moduleDef) {
             if (in_array((string) $moduleKey, self::EXCLUDED_PERMISSION_MODULES, true)) {
                 continue;
@@ -138,6 +134,7 @@ class RolesPermissionsCacheService
                     'name' => $name,
                     'guard_name' => $guard,
                 ]);
+                $knownPermissionNames[$perm->name] = true;
                 $permissions[] = [
                     'id' => $perm->id,
                     'name' => $perm->name,
@@ -153,7 +150,78 @@ class RolesPermissionsCacheService
             ];
         }
 
+        // Also expose every existing DB permission so admin has full control from one screen.
+        $allPermissions = Permission::query()
+            ->where('guard_name', $guard)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $moduleMap = [];
+        foreach ($modules as $idx => $mod) {
+            $moduleMap[$mod['key']] = $idx;
+        }
+
+        foreach ($allPermissions as $perm) {
+            $name = (string) $perm->name;
+            if ($name === '' || isset($knownPermissionNames[$name])) {
+                continue;
+            }
+
+            $parts = explode('.', $name, 2);
+            $moduleKey = (string) ($parts[0] ?? 'misc');
+            if ($this->isExcludedModule($moduleKey)) {
+                continue;
+            }
+            $suffix = (string) ($parts[1] ?? $name);
+
+            $permItem = [
+                'id' => $perm->id,
+                'name' => $name,
+                'label' => $this->humanizePermissionLabel($suffix),
+                'priority' => 'medium',
+            ];
+
+            if (array_key_exists($moduleKey, $moduleMap)) {
+                $modules[$moduleMap[$moduleKey]]['permissions'][] = $permItem;
+            } else {
+                $modules[] = [
+                    'key' => $moduleKey,
+                    'label' => $this->humanizePermissionLabel($moduleKey),
+                    'icon' => 'folder',
+                    'permissions' => [$permItem],
+                ];
+                $moduleMap[$moduleKey] = count($modules) - 1;
+            }
+        }
+
+        // Keep module permissions stable and unique by permission name.
+        foreach ($modules as $i => $mod) {
+            $seen = [];
+            $unique = [];
+            foreach (($mod['permissions'] ?? []) as $p) {
+                $n = (string) ($p['name'] ?? '');
+                if ($n === '' || isset($seen[$n])) {
+                    continue;
+                }
+                $seen[$n] = true;
+                $unique[] = $p;
+            }
+            usort($unique, fn ($a, $b) => strcmp((string) $a['label'], (string) $b['label']));
+            $modules[$i]['permissions'] = $unique;
+        }
+
         return $modules;
+    }
+
+    private function humanizePermissionLabel(string $value): string
+    {
+        $text = trim($value);
+        if ($text === '') {
+            return $value;
+        }
+        $text = str_replace(['.', '_', '-'], ' ', $text);
+        $text = preg_replace('/\s+/', ' ', $text) ?? $text;
+        return ucwords($text);
     }
 
     private function isExcludedModule(string $moduleKey): bool

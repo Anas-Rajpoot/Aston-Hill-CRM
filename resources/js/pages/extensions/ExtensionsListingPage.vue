@@ -39,6 +39,11 @@ const canDeleteAction = computed(() => canModuleAction(auth.user, 'extensions', 
 const canSample = computed(() => canImport.value)
 const canBulkStatus = computed(() => canEditAction.value)
 const canBulkDelete = computed(() => canDeleteAction.value)
+const canApplyFilters = computed(() => canModuleAction(auth.user, 'extensions', 'apply_filters', ['extensions.apply_filters']))
+const canResetFilters = computed(() => canModuleAction(auth.user, 'extensions', 'reset_filters', ['extensions.reset_filters']))
+const canAdvancedFilters = computed(() => canModuleAction(auth.user, 'extensions', 'advanced_filters', ['extensions.advanced_filters']))
+const canCustomizeColumns = computed(() => canModuleAction(auth.user, 'extensions', 'customize_columns', ['extensions.customize_columns']))
+const canTemplate = computed(() => canModuleAction(auth.user, 'extensions', 'template', ['extensions.download_template']))
 const summaryHydration = useProgressiveHydration({ strategy: 'visible-or-idle', idleTimeout: 900 })
 const advancedFiltersHydration = useProgressiveHydration({ strategy: 'visible-or-idle', idleTimeout: 1200 })
 
@@ -852,6 +857,7 @@ onMounted(async () => {
 
           <div class="shrink-0 flex items-center gap-2 pt-5">
             <button
+              v-if="canApplyFilters"
               type="button"
               class="inline-flex items-center rounded bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover focus:ring-2 focus:ring-brand-primary disabled:opacity-50"
               :disabled="loading"
@@ -863,6 +869,7 @@ onMounted(async () => {
               Apply
             </button>
             <button
+              v-if="canResetFilters"
               type="button"
               class="rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
               :disabled="loading"
@@ -904,7 +911,7 @@ onMounted(async () => {
           </div>
 
           <button
-            v-if="canSample"
+            v-if="canSample && canTemplate"
             type="button"
             class="shrink-0 inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 mt-5"
             @click="downloadTemplateCsv"
@@ -962,6 +969,7 @@ onMounted(async () => {
           </button>
 
           <button
+            v-if="canAdvancedFilters"
             type="button"
             class="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 mt-5"
             @click="openAdvancedFilters"
@@ -971,6 +979,7 @@ onMounted(async () => {
           </button>
 
           <button
+            v-if="canCustomizeColumns"
             type="button"
             class="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 mt-5"
             @click="openColumnCustomizer"
@@ -986,7 +995,7 @@ onMounted(async () => {
       <!-- Advanced Filters (all filters) -->
       <div ref="advancedFiltersHydration.targetRef">
         <FiltersBar
-          v-if="advancedFiltersHydration.isHydrated"
+          v-if="advancedFiltersHydration.isHydrated && canAdvancedFilters"
           :visible="advancedVisible"
           :filters="filters"
           :filter-options="filterOptions"

@@ -107,16 +107,19 @@ function closeHistoryModal() {
 async function fetchLeadAudits(id) {
   return await leadSubmissionsApi.getAudits(id)
 }
-const canBulkAssign = (() => {
-  const roles = auth.user?.roles ?? []
-  const perms = auth.user?.permissions ?? []
-  const isSuperAdmin = Array.isArray(roles) && roles.some((r) => (typeof r === 'string' ? r : r?.name) === 'superadmin')
-  if (isSuperAdmin) return true
-  return perms.includes('back_office.assign_bo_executive')
-    || perms.includes('lead.assign_bo_executive')
-    || perms.includes('lead-submissions.assign_bo_executive')
-})()
-const canExport = () => canModuleAction(auth.user, 'lead', 'export')
+const canBulkAssign = () =>
+  canModuleAction(auth.user, 'lead', 'bulk_assign', [
+    'back_office.assign_bo_executive',
+    'lead.assign_bo_executive',
+    'lead-submissions.assign_bo_executive',
+    'lead-submissions.bulk_assign',
+  ])
+const canExport = () => canModuleAction(auth.user, 'lead', 'export', ['lead-submissions.export'])
+const canTemplate = () => canModuleAction(auth.user, 'lead', 'template', ['lead-submissions.download_template'])
+const canApplyFilters = () => canModuleAction(auth.user, 'lead', 'apply_filters', ['lead-submissions.apply_filters'])
+const canResetFilters = () => canModuleAction(auth.user, 'lead', 'reset_filters', ['lead-submissions.reset_filters'])
+const canAdvancedFilters = () => canModuleAction(auth.user, 'lead', 'advanced_filters', ['lead-submissions.advanced_filters'])
+const canCustomizeColumns = () => canModuleAction(auth.user, 'lead', 'customize_columns', ['lead-submissions.customize_columns'])
 
 const filters = ref({
   q: '',
@@ -136,6 +139,10 @@ const filters = ref({
   sales_agent_id: null,
   team_leader_id: null,
   manager_id: null,
+  executive_id: null,
+  call_verification: '',
+  documents_verification: '',
+  du_status: '',
 })
 
 const canEdit = () => (auth.user?.permissions ?? []).includes('lead.edit')
@@ -166,6 +173,10 @@ function buildParams() {
   if (f.sales_agent_id) p.sales_agent_id = f.sales_agent_id
   if (f.team_leader_id) p.team_leader_id = f.team_leader_id
   if (f.manager_id) p.manager_id = f.manager_id
+  if (f.executive_id) p.executive_id = f.executive_id
+  if (f.call_verification) p.call_verification = f.call_verification
+  if (f.documents_verification) p.documents_verification = f.documents_verification
+  if (f.du_status) p.du_status = f.du_status
   return p
 }
 
@@ -382,6 +393,10 @@ function resetFilters() {
     sales_agent_id: null,
     team_leader_id: null,
     manager_id: null,
+    executive_id: null,
+    call_verification: '',
+    documents_verification: '',
+    du_status: '',
   }
   meta.value.current_page = 1
   load()
@@ -702,6 +717,8 @@ onMounted(async () => {
         :filters="filters"
         :filter-options="filterOptions"
         :loading="loading"
+        :can-apply="canApplyFilters()"
+        :can-reset="canResetFilters()"
         @apply="applyFilters"
         @reset="resetFilters"
       >
@@ -747,6 +764,7 @@ onMounted(async () => {
             {{ exportLoading ? 'Exporting...' : 'Export' }}
           </button>
           <button
+            v-if="canTemplate()"
             type="button"
             class="inline-flex items-center rounded bg-brand-primary px-3 py-2 text-sm font-medium text-white hover:bg-brand-primary-hover disabled:opacity-70 disabled:cursor-wait"
             :disabled="loading || exportLoading"
@@ -760,6 +778,7 @@ onMounted(async () => {
         </template>
         <template #after-reset>
           <button
+            v-if="canAdvancedFilters()"
             type="button"
             class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
             @click="advancedVisible = !advancedVisible"
@@ -768,6 +787,7 @@ onMounted(async () => {
             Advanced Filters
           </button>
           <button
+            v-if="canCustomizeColumns()"
             type="button"
             class="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
             @click="columnModalVisible = true"

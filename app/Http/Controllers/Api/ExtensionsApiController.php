@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\CiscoExtension;
 use App\Models\CiscoExtensionAudit;
+use App\Models\DropdownOption;
 use App\Models\User;
 use App\Models\UserColumnPreference;
 use Illuminate\Http\JsonResponse;
@@ -254,21 +255,29 @@ class ExtensionsApiController extends Controller
         $this->authorize('viewAny', CiscoExtension::class);
 
         $data = Cache::remember('cisco_extensions_filters', 600, function () {
-            $gateways = CiscoExtension::query()
-                ->whereNotNull('gateway')
-                ->where('gateway', '!=', '')
-                ->distinct()
-                ->pluck('gateway')
-                ->sort()
-                ->values()
-                ->map(fn ($g) => ['value' => $g, 'label' => $g])
-                ->all();
+            // Use Dropdown Seeder values as the source of truth for options.
+            $gateways = DropdownOption::optionsForGroup('extension_gateways');
+            $statuses = DropdownOption::optionsForGroup('extension_statuses');
 
-            $statuses = [
-                ['value' => 'active', 'label' => 'Active'],
-                ['value' => 'inactive', 'label' => 'InActive'],
-                ['value' => 'not_created', 'label' => 'Not Created'],
-            ];
+            // Fallback for old databases that do not yet have seeded options.
+            if (empty($gateways)) {
+                $gateways = CiscoExtension::query()
+                    ->whereNotNull('gateway')
+                    ->where('gateway', '!=', '')
+                    ->distinct()
+                    ->pluck('gateway')
+                    ->sort()
+                    ->values()
+                    ->map(fn ($g) => ['value' => $g, 'label' => $g])
+                    ->all();
+            }
+            if (empty($statuses)) {
+                $statuses = [
+                    ['value' => 'active', 'label' => 'Active'],
+                    ['value' => 'inactive', 'label' => 'InActive'],
+                    ['value' => 'not_created', 'label' => 'Not Created'],
+                ];
+            }
 
             return [
                 'gateways' => $gateways,
@@ -345,7 +354,7 @@ class ExtensionsApiController extends Controller
 
         $data = $request->validate([
             'extension' => ['required', 'string', 'max:50', 'unique:cisco_extensions,extension'],
-            'landline_number' => ['required', 'regex:/^971\d{9}$/'],
+            'landline_number' => ['required', 'regex:/^\d{11,12}$/'],
             'gateway' => ['nullable', 'string', 'max:100'],
             'username' => ['nullable', 'string', 'max:100'],
             'password' => ['nullable', 'string', 'max:255'],
@@ -486,7 +495,7 @@ class ExtensionsApiController extends Controller
 
         $data = $request->validate([
             'extension' => ['sometimes', 'string', 'max:50', Rule::unique('cisco_extensions', 'extension')->ignore($ciscoExtension->id)],
-            'landline_number' => ['required', 'regex:/^971\d{9}$/'],
+            'landline_number' => ['required', 'regex:/^\d{11,12}$/'],
             'gateway' => ['nullable', 'string', 'max:100'],
             'username' => ['nullable', 'string', 'max:100'],
             'password' => ['nullable', 'string', 'max:255'],
@@ -516,7 +525,7 @@ class ExtensionsApiController extends Controller
 
         $data = $request->validate([
             'extension' => ['sometimes', 'string', 'max:50', Rule::unique('cisco_extensions', 'extension')->ignore($ciscoExtension->id)],
-            'landline_number' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'landline_number' => ['sometimes', 'nullable', 'regex:/^\d{11,12}$/'],
             'gateway' => ['sometimes', 'nullable', 'string', 'max:100'],
             'username' => ['sometimes', 'nullable', 'string', 'max:100'],
             'password' => ['sometimes', 'nullable', 'string', 'max:255'],

@@ -244,13 +244,15 @@ const PRODUCT_TYPE_OPTIONS_BY_CATEGORY = {
   FMS: ['Business Starter', 'Business Starter Pro', 'Business Starter Ultra 12M', 'Business Starter Ultra 24M', 'FMS Other'],
   GSM: ['Simplified', 'Q1', 'BIP', 'Abu Dhabi Offer', 'SPR'],
 }
+const ALL_SERVICE_TYPE_OPTIONS = Array.from(new Set(Object.values(SERVICE_TYPE_OPTIONS_BY_CATEGORY).flat()))
+const ALL_PRODUCT_TYPE_OPTIONS = Array.from(new Set(Object.values(PRODUCT_TYPE_OPTIONS_BY_CATEGORY).flat()))
 const serviceTypeOptions = computed(() => {
-  const category = form.value.service_category || ''
-  return SERVICE_TYPE_OPTIONS_BY_CATEGORY[category] ?? []
+  const category = String(form.value.service_category || '').trim()
+  return SERVICE_TYPE_OPTIONS_BY_CATEGORY[category] ?? ALL_SERVICE_TYPE_OPTIONS
 })
 const productTypeOptions = computed(() => {
-  const category = form.value.service_category || ''
-  return PRODUCT_TYPE_OPTIONS_BY_CATEGORY[category] ?? []
+  const category = String(form.value.service_category || '').trim()
+  return PRODUCT_TYPE_OPTIONS_BY_CATEGORY[category] ?? ALL_PRODUCT_TYPE_OPTIONS
 })
 const addressOptions = computed(() => {
   const options = []
@@ -567,6 +569,19 @@ onMounted(async () => {
       const d = raw?.data ?? raw ?? {}
       form.value.company_name = d.company_name ?? form.value.company_name
       form.value.account_number = d.account_number ?? form.value.account_number
+      // Prefill address candidates from source client so Address dropdown is usable in product mode.
+      if (Array.isArray(d.addresses) && d.addresses.length) {
+        form.value.addresses = d.addresses.map((a) => ({
+          full_address: a.full_address ?? '',
+          area: a.area ?? '',
+          building: a.building ?? '',
+          unit: a.unit ?? '',
+          emirates: a.emirates ?? '',
+        }))
+      }
+      if (!form.value.address && d.address) {
+        form.value.address = d.address
+      }
       if (Array.isArray(d.csrs) && d.csrs.length) {
         form.value.csrs = d.csrs.map((c) => ({ user_id: c.user_id || null }))
       }
@@ -916,9 +931,9 @@ async function submit(andAddAnother = false) {
       }
     } else {
       resultModalType.value = 'error'
-      resultModalMessage.value = 'Client can not be added'
+      resultModalMessage.value = isProductMode.value ? 'Product can not be added' : 'Client can not be added'
       showResultModal.value = true
-      error.value = 'Client can not be added'
+      error.value = isProductMode.value ? 'Product can not be added' : 'Client can not be added'
     }
   } catch (e) {
     const msg = e?.response?.data?.message
@@ -934,7 +949,8 @@ async function submit(andAddAnother = false) {
       fieldErrors.value = { ...fieldErrors.value, ...mapped }
     }
     const detail = safeMsg || (errs ? Object.values(errs).flat().filter(Boolean).join(' ') : '')
-    resultModalMessage.value = detail ? `Client can not be added. ${detail}` : 'Client can not be added'
+    const baseErr = isProductMode.value ? 'Product can not be added' : 'Client can not be added'
+    resultModalMessage.value = detail ? `${baseErr}. ${detail}` : baseErr
     resultModalType.value = 'error'
     showResultModal.value = true
     error.value = resultModalMessage.value
