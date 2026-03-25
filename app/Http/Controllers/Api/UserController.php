@@ -515,6 +515,11 @@ class UserController extends Controller
                 'updated_at' => $now,
             ]);
 
+            // Enforce: one target per user per month (no duplicates in history table).
+            UserMonthlyTargetHistory::whereIn('user_id', $idsToAssign->all())
+                ->where('month', $month)
+                ->delete();
+
             $historyRows = $idsToAssign
                 ->map(fn ($id) => [
                     'user_id' => (int) $id,
@@ -1151,15 +1156,26 @@ class UserController extends Controller
             'month'          => ['required', 'string', 'regex:/^\d{4}-\d{2}$/'],
         ]);
 
-        $user->monthly_target = $validated['monthly_target'];
-        $user->save();
+        $month = $validated['month'];
+        $target = (float) $validated['monthly_target'];
 
-        UserMonthlyTargetHistory::create([
-            'user_id' => $user->id,
-            'month' => $validated['month'],
-            'target_amount' => $validated['monthly_target'],
-            'set_by' => auth()->id(),
-        ]);
+        DB::transaction(function () use ($user, $month, $target) {
+            // Save current target on user row.
+            $user->monthly_target = $target;
+            $user->save();
+
+            // Enforce: one target per user per month (replace history row).
+            UserMonthlyTargetHistory::where('user_id', $user->id)
+                ->where('month', $month)
+                ->delete();
+
+            UserMonthlyTargetHistory::create([
+                'user_id' => $user->id,
+                'month' => $month,
+                'target_amount' => $target,
+                'set_by' => auth()->id(),
+            ]);
+        });
 
         Cache::forget('user_stats_sa');
         Cache::forget('user_stats_non_sa');
@@ -1172,18 +1188,28 @@ class UserController extends Controller
 
     public function monthlyTargetHistory(User $user): JsonResponse
     {
-        $history = UserMonthlyTargetHistory::where('user_id', $user->id)
+        // Return only latest row per month to avoid showing duplicates
+        // (rule: one target allocation per month).
+        $latestIds = DB::table('user_monthly_target_history')
+            ->select(DB::raw('MAX(id) as id'))
+            ->where('user_id', $user->id)
+            ->groupBy('month');
+
+        $history = UserMonthlyTargetHistory::query()
+            ->select('user_monthly_target_history.*')
+            ->joinSub($latestIds, 'latest', fn ($join) => $join->on('user_monthly_target_history.id', '=', 'latest.id'))
             ->with('setByUser:id,name')
-            ->orderByDesc('created_at')
-            ->orderByDesc('id')
+            ->where('user_monthly_target_history.user_id', $user->id)
+            ->orderByDesc('user_monthly_target_history.created_at')
+            ->orderByDesc('user_monthly_target_history.id')
             ->limit(50)
             ->get()
             ->map(fn ($h) => [
-                'id'            => $h->id,
-                'month'         => $h->month,
+                'id' => $h->id,
+                'month' => $h->month,
                 'target_amount' => $h->target_amount,
-                'set_by_name'   => $h->setByUser?->name ?? '—',
-                'created_at'    => $h->created_at?->toIso8601String(),
+                'set_by_name' => $h->setByUser?->name ?? '—',
+                'created_at' => $h->created_at?->toIso8601String(),
             ]);
 
         return response()->json(['data' => $history]);
