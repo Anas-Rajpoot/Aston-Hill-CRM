@@ -7,6 +7,7 @@ use App\Models\VasRequestDocument;
 use App\Models\VasRequestSubmission;
 use App\Models\User;
 use App\Policies\VasRequestPolicy;
+use App\Rules\AllowedDocumentFile;
 use App\Services\VasRequestService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -133,7 +134,7 @@ class VasRequestController extends Controller
         $schema = collect(self::documentSchema())->keyBy('key');
         $rules = [];
         $messages = [];
-        $allowedExtensions = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'eml', 'xls', 'xlsx'];
+        $allowedExtensions = AllowedDocumentFile::EXTENSIONS;
         $extensionRule = function ($attribute, $value, $fail) use ($allowedExtensions) {
             if (! $value instanceof \Illuminate\Http\UploadedFile) {
                 return;

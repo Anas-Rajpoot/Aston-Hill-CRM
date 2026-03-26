@@ -5,6 +5,9 @@ import customerSupportApi from '@/services/customerSupportApi'
 import api from '@/lib/axios'
 import { useFormErrors } from '@/composables/useFormErrors'
 import { formatTeamLabel } from '@/composables/useTeamLabel'
+import { documentUploadAcceptAttr } from '@/lib/documentUpload'
+
+const docUploadAccept = documentUploadAcceptAttr()
 
 const ISSUE_CATEGORIES = [
   'Internet / Landline Issues',
@@ -459,7 +462,7 @@ const selectClass = (field) =>
                   <button type="button" class="shrink-0 text-xs text-red-600 hover:underline" @click="removeNewFile(idx)">Remove</button>
                 </div>
                 <!-- Add more -->
-                <input ref="fileInput" type="file" multiple accept="image/*,.pdf,.doc,.docx,.csv" class="hidden" @change="onFileChange" />
+                <input ref="fileInput" type="file" multiple :accept="docUploadAccept" class="hidden" @change="onFileChange" />
                 <button
                   type="button"
                   class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-primary hover:text-brand-primary-hover hover:underline"

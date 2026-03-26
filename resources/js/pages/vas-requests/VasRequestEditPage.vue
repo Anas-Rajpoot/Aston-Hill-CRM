@@ -9,10 +9,11 @@ import { useAuthStore } from '@/stores/auth'
 import { useFormErrors } from '@/composables/useFormErrors'
 import Toast from '@/components/Toast.vue'
 import { formatUserDate } from '@/lib/dateFormat'
+import { DOCUMENT_UPLOAD_EXTENSIONS } from '@/lib/documentUpload'
 
 const MAX_FILE_MB = 3
 const MAX_TOTAL_MB = 10
-const ALLOWED_EXT = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpg', '.jpeg']
+const ALLOWED_EXT = DOCUMENT_UPLOAD_EXTENSIONS
 
 const route = useRoute()
 const router = useRouter()

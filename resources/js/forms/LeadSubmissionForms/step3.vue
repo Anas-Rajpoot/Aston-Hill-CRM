@@ -2,6 +2,7 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import api from '@/services/leadSubmissionsApi'
 import { useFormErrors } from '@/composables/useFormErrors'
+import { DOCUMENT_UPLOAD_EXTENSIONS } from '@/lib/documentUpload'
 
 const props = defineProps({
   leadId: { type: Number, required: true },
@@ -19,8 +20,7 @@ const additionalDocs = ref([]) // [{ key, label, files: File[], existingItems?: 
 
 const { errors, generalMessage, setErrors, clearErrors, clearFieldError, getError } = useFormErrors()
 
-const ALLOWED_TYPES = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'message/rfc822']
-const ALLOWED_EXT = ['.pdf', '.doc', '.docx', '.eml']
+const ALLOWED_EXT = DOCUMENT_UPLOAD_EXTENSIONS
 const MAX_FILE_MB = 3
 const MAX_TOTAL_MB = 10
 
@@ -73,7 +73,7 @@ const totalSizeMB = computed(() => (totalSizeBytes.value / (1024 * 1024)).toFixe
 const validateFile = (file, docKey) => {
   const ext = '.' + (file.name?.split('.').pop() || '').toLowerCase()
   if (!ALLOWED_EXT.includes(ext)) {
-    return 'File must be PDF, DOC, DOCX, or EML.'
+    return `File must be one of: ${ALLOWED_EXT.join(', ')}`
   }
   if (file.size > MAX_FILE_MB * 1024 * 1024) {
     return `File must not exceed ${MAX_FILE_MB}MB.`
@@ -375,7 +375,7 @@ const cancel = () => window.history.back()
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
             Upload
-            <input type="file" class="hidden" accept=".pdf,.doc,.docx,.eml" multiple @change="(e) => onFileChange(doc.key, e)" />
+            <input type="file" class="hidden" :accept="ALLOWED_EXT.join(',')" multiple @change="(e) => onFileChange(doc.key, e)" />
           </label>
         </div>
       </div>
@@ -432,7 +432,7 @@ const cancel = () => window.history.back()
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
               Upload
-              <input type="file" class="hidden" accept=".pdf,.doc,.docx,.eml" multiple @change="(e) => onAdditionalFileChange(idx, e)" />
+              <input type="file" class="hidden" :accept="ALLOWED_EXT.join(',')" multiple @change="(e) => onAdditionalFileChange(idx, e)" />
             </label>
             <button type="button" @click="removeAdditionalDoc(idx)" class="text-red-600 hover:text-red-700 text-sm font-medium whitespace-nowrap">Remove</button>
           </div>

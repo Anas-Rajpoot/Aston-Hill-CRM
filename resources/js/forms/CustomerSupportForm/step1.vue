@@ -5,6 +5,9 @@ import { useFormErrors } from '@/composables/useFormErrors'
 import { formatTeamLabel } from '@/composables/useTeamLabel'
 import { useSessionFormState } from '@/composables/useSessionFormState'
 import { useAuthStore } from '@/stores/auth'
+import { documentUploadAcceptAttr } from '@/lib/documentUpload'
+
+const docUploadAccept = documentUploadAcceptAttr()
 
 const ISSUE_CATEGORIES = [
   'Internet / Landline Issues',
@@ -614,6 +617,7 @@ const selectClass = (field) =>
                       ref="fileInput1"
                       type="file"
                       class="hidden"
+                      :accept="docUploadAccept"
                       @change="onFileChange(1, $event)"
                     />
                     <span class="inline-flex items-center gap-1 rounded-lg bg-brand-primary px-2 py-1 text-xs font-medium text-white shadow-sm hover:bg-brand-primary-hover">
@@ -639,6 +643,7 @@ const selectClass = (field) =>
                       ref="fileInput2"
                       type="file"
                       class="hidden"
+                      :accept="docUploadAccept"
                       @change="onFileChange(2, $event)"
                     />
                     <span class="inline-flex items-center gap-1 rounded-lg bg-brand-primary px-2 py-1 text-xs font-medium text-white shadow-sm hover:bg-brand-primary-hover">

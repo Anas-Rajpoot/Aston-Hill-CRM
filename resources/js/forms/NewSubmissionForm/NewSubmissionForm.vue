@@ -3,6 +3,10 @@ import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import specialRequestsApi from '@/services/specialRequestsApi'
 import { useFormErrors } from '@/composables/useFormErrors'
 import { useSessionFormState } from '@/composables/useSessionFormState'
+import { documentUploadAcceptAttr, documentUploadTypesHint } from '@/lib/documentUpload'
+
+const docUploadAccept = documentUploadAcceptAttr()
+const docTypesHint = documentUploadTypesHint()
 
 const form = ref({
   company_name: '',
@@ -345,14 +349,14 @@ const selectClass = (field) =>
                 {{ file ? file.name : 'Additional Document' }}
               </p>
               <p v-if="file" class="text-xs text-brand-primary mt-0.5">{{ (file.size / 1024).toFixed(1) }} KB — File selected</p>
-              <p v-else class="text-xs text-gray-500">PDF, DOC, DOCX, EML. You can select multiple files.</p>
+              <p v-else class="text-xs text-gray-500">{{ docTypesHint }}. You can select multiple files.</p>
             </div>
             <div class="flex shrink-0 items-center gap-2">
               <label class="cursor-pointer">
                 <input
                   type="file"
                   class="hidden"
-                  accept=".pdf,.doc,.docx,.eml"
+                  :accept="docUploadAccept"
                   @change="onFileChange(index, $event)"
                 />
                 <span class="inline-flex items-center gap-1 rounded-lg border border-brand-primary px-4 py-1.5 text-sm font-medium text-brand-primary hover:bg-brand-primary-light">

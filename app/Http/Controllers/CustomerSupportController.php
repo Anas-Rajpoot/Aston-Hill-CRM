@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\CustomerSupportSubmission;
+use App\Rules\AllowedDocumentFile;
 use App\Services\CustomerSupportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -64,7 +65,7 @@ class CustomerSupportController extends Controller
             'sales_agent_id.exists' => 'Please select a valid sales agent.',
         ];
         foreach (['attachment_1', 'attachment_2'] as $key) {
-            $rules[$key] = ['nullable', 'file', 'max:10240']; // 10MB
+            $rules[$key] = ['nullable', 'file', 'max:10240', new AllowedDocumentFile()]; // 10MB
         }
 
         $data = $request->validate($rules, $messages);

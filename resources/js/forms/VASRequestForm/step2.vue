@@ -2,6 +2,7 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import api from '@/services/vasRequestsApi'
 import { useFormErrors } from '@/composables/useFormErrors'
+import { DOCUMENT_UPLOAD_EXTENSIONS } from '@/lib/documentUpload'
 
 const props = defineProps({
   vasRequestId: { type: Number, required: true },
@@ -11,16 +12,7 @@ const emit = defineEmits(['back', 'draft-saved', 'next'])
 
 const MAX_FILE_MB = 3
 const MAX_TOTAL_MB = 10
-const ALLOWED_EXT = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpg', '.jpeg']
-const ALLOWED_MIME = [
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'image/png',
-  'image/jpeg',
-]
+const ALLOWED_EXT = DOCUMENT_UPLOAD_EXTENSIONS
 
 const docDefs = ref([])
 const existingDocs = ref([])

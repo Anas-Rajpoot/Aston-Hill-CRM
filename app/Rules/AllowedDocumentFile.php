@@ -12,7 +12,11 @@ use Illuminate\Http\UploadedFile;
  */
 class AllowedDocumentFile implements ValidationRule
 {
-    private const ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx', 'eml'];
+    /** @var list<string> extensions without leading dot */
+    public const EXTENSIONS = [
+        'pdf', 'doc', 'docx', 'txt', 'xls', 'xlsx', 'csv', 'eml', 'msg',
+        'png', 'jpg', 'jpeg', 'gpg', 'gif', 'webp',
+    ];
 
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
@@ -22,8 +26,8 @@ class AllowedDocumentFile implements ValidationRule
         }
 
         $ext = strtolower($value->getClientOriginalExtension());
-        if (! in_array($ext, self::ALLOWED_EXTENSIONS, true)) {
-            $fail('The :attribute field must be a file of type: pdf, doc, docx, eml.');
+        if (! in_array($ext, self::EXTENSIONS, true)) {
+            $fail('The :attribute field must be a file of type: '.implode(', ', self::EXTENSIONS).'.');
         }
     }
 }

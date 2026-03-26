@@ -7,6 +7,7 @@ import { formatTeamLabel } from '@/composables/useTeamLabel'
 import { useSessionFormState } from '@/composables/useSessionFormState'
 import { toDdMmYyyy } from '@/lib/dateFormat'
 import { useAuthStore } from '@/stores/auth'
+import { DOCUMENT_UPLOAD_EXTENSIONS } from '@/lib/documentUpload'
 
 const EMIRATES_OPTIONS = [
   'Abu Dhabi',
@@ -86,7 +87,7 @@ const files = ref({})
 const additionalDocs = ref([])
 const MAX_FILE_MB = 3
 const MAX_TOTAL_MB = 10
-const ALLOWED_EXT = ['.pdf', '.doc', '.docx', '.eml']
+const ALLOWED_EXT = DOCUMENT_UPLOAD_EXTENSIONS
 const DEFAULT_DOCUMENTS = [
   { key: 'trade_license', label: 'Trade License', required: true },
   { key: 'establishment_card', label: 'Establishment Card', required: false },
@@ -153,7 +154,7 @@ function truncateFileName(name, maxLen = 28) {
 const validateDocFile = (file) => {
   const ext = '.' + (file.name?.split('.').pop() || '').toLowerCase()
   if (!ALLOWED_EXT.includes(ext)) {
-    return 'File must be PDF, DOC, DOCX, or EML.'
+    return `File must be one of: ${ALLOWED_EXT.join(', ')}`
   }
   if (file.size > MAX_FILE_MB * 1024 * 1024) {
     return `File must not exceed ${MAX_FILE_MB}MB.`

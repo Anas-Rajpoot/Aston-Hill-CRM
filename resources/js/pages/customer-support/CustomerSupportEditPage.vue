@@ -8,6 +8,9 @@ import { useRoute, useRouter } from 'vue-router'
 import customerSupportApi from '@/services/customerSupportApi'
 import api from '@/lib/axios'
 import { useFormErrors } from '@/composables/useFormErrors'
+import { documentUploadAcceptAttr } from '@/lib/documentUpload'
+
+const docUploadAccept = documentUploadAcceptAttr()
 
 const route = useRoute()
 const router = useRouter()
@@ -762,7 +765,7 @@ onMounted(() => {
               </div>
             </div>
             <div class="mt-6 block border-t border-gray-100 pt-4">
-              <input ref="fileInput" type="file" multiple accept="image/*,.pdf,.doc,.docx,.csv" class="hidden" @change="onFileChange" />
+              <input ref="fileInput" type="file" multiple :accept="docUploadAccept" class="hidden" @change="onFileChange" />
               <button
                 type="button"
                 class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-primary hover:text-brand-primary-hover hover:underline focus:outline-none"

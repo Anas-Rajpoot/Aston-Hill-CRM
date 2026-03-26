@@ -6,6 +6,10 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import leadSubmissionsApi from '@/services/leadSubmissionsApi'
+import { DOCUMENT_UPLOAD_EXTENSIONS, documentUploadAcceptAttr } from '@/lib/documentUpload'
+
+const docUploadAccept = documentUploadAcceptAttr()
+const docAllowedDisplay = DOCUMENT_UPLOAD_EXTENSIONS.join(', ')
 
 const route = useRoute()
 const router = useRouter()
@@ -779,7 +783,7 @@ onMounted(() => {
 
           <div v-show="!documentsSectionCollapsed" class="mt-4 space-y-4">
             <p class="text-sm text-gray-600">Upload required and optional documents below.</p>
-            <p class="text-xs text-gray-500">Allowed: .pdf, .doc, .docx, .eml</p>
+            <p class="text-xs text-gray-500">Allowed: {{ docAllowedDisplay }}</p>
 
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <div
@@ -805,7 +809,7 @@ onMounted(() => {
                   <input
                     type="file"
                     class="hidden"
-                    accept=".pdf,.doc,.docx,.eml"
+                    :accept="docUploadAccept"
                     multiple
                     @change="onFileChange(doc.key, $event)"
                   />
@@ -865,7 +869,7 @@ onMounted(() => {
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                       </svg>
                       Upload
-                      <input type="file" class="hidden" accept=".pdf,.doc,.docx,.eml" multiple @change="onAdditionalFileSelect(slot.id, $event)" />
+                      <input type="file" class="hidden" :accept="docUploadAccept" multiple @change="onAdditionalFileSelect(slot.id, $event)" />
                     </label>
                   </div>
                   <div v-if="getSlotFiles(slot.id).length" class="mt-3 space-y-1.5">

@@ -6,6 +6,10 @@ import { canModuleAction } from '@/lib/accessControl'
 import specialRequestsApi from '@/services/specialRequestsApi'
 import { useFormErrors } from '@/composables/useFormErrors'
 import Toast from '@/components/Toast.vue'
+import { documentUploadAcceptAttr, documentUploadTypesHint } from '@/lib/documentUpload'
+
+const docUploadAccept = documentUploadAcceptAttr()
+const docTypesHint = documentUploadTypesHint()
 
 const route = useRoute()
 const router = useRouter()
@@ -548,7 +552,7 @@ onMounted(() => loadData())
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                       </svg>
                       {{ uploadingDocs ? 'Uploading...' : 'Upload' }}
-                      <input type="file" class="hidden" accept=".pdf,.doc,.docx,.eml" multiple @change="uploadFromInput" />
+                      <input type="file" class="hidden" :accept="docUploadAccept" multiple @change="uploadFromInput" />
                     </label>
                   </div>
               </div>

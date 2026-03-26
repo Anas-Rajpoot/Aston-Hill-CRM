@@ -5,6 +5,7 @@ import { useFormErrors } from '@/composables/useFormErrors'
 import { formatTeamLabel } from '@/composables/useTeamLabel'
 import { useSessionFormState } from '@/composables/useSessionFormState'
 import { useAuthStore } from '@/stores/auth'
+import { DOCUMENT_UPLOAD_EXTENSIONS } from '@/lib/documentUpload'
 
 const props = defineProps({
   vasRequestId: { type: Number, default: null },
@@ -65,7 +66,7 @@ const currentSubmitterName = computed(() => auth.user?.name || '-')
 
 const MAX_FILE_MB = 3
 const MAX_TOTAL_MB = 10
-const ALLOWED_EXT = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpg', '.jpeg']
+const ALLOWED_EXT = DOCUMENT_UPLOAD_EXTENSIONS
 
 const docDefs = ref([])
 const existingDocs = ref([])

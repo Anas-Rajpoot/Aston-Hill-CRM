@@ -14,6 +14,7 @@ use App\Models\Client;
 use App\Models\User;
 use App\Models\UserColumnPreference;
 use App\Policies\CustomerSupportSubmissionPolicy;
+use App\Rules\AllowedDocumentFile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -754,7 +755,7 @@ class CustomerSupportApiController extends Controller
 
         $request->validate([
             'documents' => ['required', 'array', 'max:10'],
-            'documents.*' => ['file', 'max:10240', 'mimes:pdf,doc,docx,jpg,jpeg,png,eml,xlsx,xls,csv'],
+            'documents.*' => ['file', 'max:10240', new AllowedDocumentFile()],
         ]);
 
         $files = $request->allFiles();
