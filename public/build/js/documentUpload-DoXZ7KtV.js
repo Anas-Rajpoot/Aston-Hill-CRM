@@ -1,0 +1,1 @@
+const t=[".pdf",".doc",".docx",".txt",".xls",".xlsx",".csv",".eml",".msg",".png",".jpg",".jpeg",".gpg",".gif",".webp"];function n(){return t.join(",")}function o(){return"PDF, DOC, DOCX, TXT, XLS, XLSX, CSV, EML, MSG, PNG, JPG, JPEG, GPG, GIF, WEBP"}export{t as D,o as a,n as d};
